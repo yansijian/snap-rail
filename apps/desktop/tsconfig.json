@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src-host/main",
+    "outDir": "lib/types/main"
+  },
+  "include": [
+    "src-host/main"
+  ],
+  "references": [
+    { "path": "./tsconfig.preload.json" },
+    { "path": "../../vendor/cordis" },
+    { "path": "../../packages/boot/app-boot" },
+    { "path": "../../packages/protocol/gateway" },
+    { "path": "../../packages/protocol/connection" },
+    { "path": "../../packages/client/kernel" }
+  ]
+}

@@ -24,7 +24,10 @@
     { "path": "./packages/boot/app-boot" },
     { "path": "./packages/protocol/protocol" },
     { "path": "./packages/protocol/gateway" },
+    { "path": "./packages/protocol/connection" },
     { "path": "./packages/field/field" },
-    { "path": "./packages/field/driver-mock" }
+    { "path": "./packages/field/driver-mock" },
+    { "path": "./packages/client/kernel" },
+    { "path": "./apps/desktop" }
   ]
 }

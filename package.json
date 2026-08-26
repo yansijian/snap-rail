@@ -7,7 +7,9 @@
     "build:lib:host": "tsc -b tsconfig.host.json && tsdown",
     "typecheck": "tsc -b tsconfig.host.json",
     "test": "pnpm run build && vitest run",
-    "verify-vendor-names": "tsx scripts/verify-vendor-names.ts"
+    "verify-vendor-names": "tsx scripts/verify-vendor-names.ts",
+    "app:dev": "pnpm --filter @snap-rail/desktop run dev",
+    "app:start": "pnpm --filter @snap-rail/desktop run start"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

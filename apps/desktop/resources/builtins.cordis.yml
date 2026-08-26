@@ -1,0 +1,33 @@
+- id: timer
+  name: '@snap-rail/cordis-plugin-timer'
+- id: settings
+  name: '@snap-rail/settings'
+- id: audit
+  name: '@snap-rail/audit'
+- id: gateway
+  name: '@snap-rail/gateway'
+  config:
+    name: snap-rail
+    version: 0.1.0
+    bin: desktop
+- id: field
+  name: '@snap-rail/field'
+- id: field-rpc
+  name: '@snap-rail/field/rpc'
+# Phase-1 demo resident: the dashboard's live source until connection
+# management lands; the user layer can disable or re-point it.
+- id: mock-demo
+  name: '@snap-rail/driver-mock'
+  config:
+    connection: demo
+    title: Demo simulator
+    periodMs: 500
+    points:
+      - id: temperature
+        type: float
+      - id: counter
+        type: int
+      - id: running
+        type: bool
+      - id: device
+        type: string

@@ -7,10 +7,17 @@
  * @module @snap-rail/protocol/client
  */
 
-import { randomUUID } from 'node:crypto'
 import type { ClientRequest, RpcResult, ServerRequest, ServerResponse } from './rpc.ts'
 import { RpcId } from './rpc.ts'
 import type { MethodName, RequestPayload, ResponseValue } from './methods.ts'
+
+/**
+ * Mint a fresh rpc id. `globalThis.crypto` keeps the client family free of
+ * Node builtins so the same code bundles into the browser renderer.
+ */
+function freshId(): string {
+  return globalThis.crypto.randomUUID()
+}
 
 /** A thrown transport failure; carries no business semantics. */
 export class RpcTransportError extends Error {
@@ -44,7 +51,7 @@ export abstract class AbstractApiClient {
    * exception. Transport failures and rpcId echo mismatches throw.
    */
   async call<K extends MethodName>(method: K, payload: RequestPayload<K>): Promise<RpcResult<ResponseValue<K>>> {
-    const rpcId = RpcId(`${randomUUID()}`)
+    const rpcId = RpcId(freshId())
     const response = await this.transport({
       type: 'client-request',
       rpcId,

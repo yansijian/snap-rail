@@ -21,3 +21,4 @@ peerDependencyRules:
 # pnpm 10+ blocks dependencies shipping install scripts until reviewed here.
 allowBuilds:
   esbuild: true
+  electron: true
