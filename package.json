@@ -6,7 +6,7 @@
     "build": "tsc -b tsconfig.host.json && tsdown",
     "build:lib:host": "tsc -b tsconfig.host.json && tsdown",
     "typecheck": "tsc -b tsconfig.host.json",
-    "test": "vitest run",
+    "test": "pnpm run build && vitest run",
     "verify-vendor-names": "tsx scripts/verify-vendor-names.ts"
   },
   "devDependencies": {
@@ -16,6 +16,7 @@
     "tsdown": "^0.22.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
+    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.1.8"
   }
 }

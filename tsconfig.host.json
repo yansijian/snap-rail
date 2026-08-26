@@ -18,6 +18,9 @@
     { "path": "./vendor/timer" },
     { "path": "./vendor/hmr" },
     { "path": "./vendor/logger-console" },
-    { "path": "./packages/util/util" }
+    { "path": "./packages/util/util" },
+    { "path": "./packages/settings/settings" },
+    { "path": "./packages/audit/audit" },
+    { "path": "./packages/boot/app-boot" }
   ]
 }
