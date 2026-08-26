@@ -8,5 +8,6 @@
 
 export * from './rpc.ts'
 export * from './methods.ts'
+export * from './field.ts'
 export * from './schemas.ts'
 export * from './client.ts'

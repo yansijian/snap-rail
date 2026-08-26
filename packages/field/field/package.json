@@ -1,0 +1,39 @@
+{
+  "name": "@snap-rail/field",
+  "description": "The field seam: live point table (ctx.points) and connections (ctx.connections)",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./rpc": {
+      "types": "./lib/types/rpc.d.ts",
+      "default": "./lib/rpc.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/rpc.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@snap-rail/protocol": "workspace:^"
+  },
+  "peerDependencies": {
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/audit": "workspace:^"
+  },
+  "devDependencies": {
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/audit": "workspace:^"
+  }
+}

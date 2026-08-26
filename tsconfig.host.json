@@ -23,6 +23,8 @@
     { "path": "./packages/audit/audit" },
     { "path": "./packages/boot/app-boot" },
     { "path": "./packages/protocol/protocol" },
-    { "path": "./packages/protocol/gateway" }
+    { "path": "./packages/protocol/gateway" },
+    { "path": "./packages/field/field" },
+    { "path": "./packages/field/driver-mock" }
   ]
 }

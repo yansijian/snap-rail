@@ -50,6 +50,15 @@ export function parseServerRequest(raw: unknown): ServerRequest {
 /** Request schemas per method; the single home of payload validation. */
 export const methodRequestSchemas: { readonly [K in MethodName]: z.ZodType<RequestPayload<K>> } = {
   'host.describe': z.object({}).strict(),
+  'points.list': z.object({}).strict(),
+  'points.read': z.object({ ids: z.array(z.string().min(1)).min(1) }).strict(),
+  'points.write': z.object({
+    id: z.string().min(1),
+    value: z.union([z.boolean(), z.number(), z.bigint(), z.string()]),
+  }).strict(),
+  'points.subscribe': z.object({ ids: z.array(z.string().min(1)).min(1) }).strict(),
+  'points.unsubscribe': z.object({ ids: z.array(z.string().min(1)).min(1) }).strict(),
+  'connections.list': z.object({}).strict(),
 }
 
 /**

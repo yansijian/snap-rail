@@ -62,6 +62,41 @@ importers:
         specifier: workspace:^
         version: link:../../../vendor/loader
 
+  packages/field/driver-mock:
+    dependencies:
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../protocol/protocol
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../../vendor/timer
+      '@snap-rail/field':
+        specifier: workspace:^
+        version: link:../field
+
+  packages/field/field:
+    dependencies:
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../protocol/protocol
+    devDependencies:
+      '@snap-rail/audit':
+        specifier: workspace:^
+        version: link:../../audit/audit
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../protocol/gateway
+
   packages/protocol/gateway:
     dependencies:
       '@snap-rail/protocol':

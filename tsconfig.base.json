@@ -45,6 +45,7 @@
       "@snap-rail/gateway": ["./packages/protocol/gateway/src"],
       "@snap-rail/connection": ["./packages/protocol/connection/src"],
       "@snap-rail/field": ["./packages/field/field/src"],
+      "@snap-rail/field/rpc": ["./packages/field/field/src/rpc.ts"],
       "@snap-rail/driver-mock": ["./packages/field/driver-mock/src"],
       "@snap-rail/client-kernel": ["./packages/client/kernel/src"],
       "@snap-rail/client-slots": ["./packages/client/slots/src"],
