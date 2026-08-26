@@ -21,6 +21,8 @@
     { "path": "./packages/util/util" },
     { "path": "./packages/settings/settings" },
     { "path": "./packages/audit/audit" },
-    { "path": "./packages/boot/app-boot" }
+    { "path": "./packages/boot/app-boot" },
+    { "path": "./packages/protocol/protocol" },
+    { "path": "./packages/protocol/gateway" }
   ]
 }
