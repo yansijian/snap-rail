@@ -41,6 +41,15 @@ export interface ConnectionsApi {
   list(payload: {}): Promise<RpcResponse<{ connections: readonly ConnectionSnapshot[] }>>
 }
 
+/**
+ * Native window controls for frameless shells. The handler targets the
+ * shell's single main window; phase 1 is one-window by design.
+ */
+export interface WindowApi {
+  /** Apply a window action (`minimize`, `toggle-maximize`, `close`); `false` when no window exists to act on. */
+  control(payload: { action: 'minimize' | 'toggle-maximize' | 'close' }): Promise<RpcResponse<{ applied: boolean }>>
+}
+
 /** Every unary method callable by a client, keyed by its wire method name. */
 export interface RpcMethodMap {
   'host.describe': HostApi['describe']
@@ -50,6 +59,7 @@ export interface RpcMethodMap {
   'points.subscribe': PointsApi['subscribe']
   'points.unsubscribe': PointsApi['unsubscribe']
   'connections.list': ConnectionsApi['list']
+  'window.control': WindowApi['control']
 }
 
 /** Method names on the wire. */

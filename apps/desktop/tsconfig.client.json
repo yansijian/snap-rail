@@ -3,7 +3,11 @@
   "compilerOptions": {
     "composite": false,
     "noEmit": true,
-    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2024",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "jsx": "react-jsx",
     "types": []
   },
@@ -11,7 +15,26 @@
     "src/client"
   ],
   "references": [
-    { "path": "../../packages/protocol/connection" },
-    { "path": "../../packages/client/kernel" }
+    {
+      "path": "../../packages/protocol/connection"
+    },
+    {
+      "path": "../../packages/client/kernel"
+    },
+    {
+      "path": "../../packages/client/slots"
+    },
+    {
+      "path": "../../packages/client/runtime"
+    },
+    {
+      "path": "../../packages/client/layout-default"
+    },
+    {
+      "path": "../../packages/client/chrome-titlebar"
+    },
+    {
+      "path": "../../packages/client/panel-dashboard"
+    }
   ]
 }

@@ -46,9 +46,18 @@ importers:
       '@snap-rail/audit':
         specifier: workspace:^
         version: link:../../packages/audit/audit
+      '@snap-rail/chrome-titlebar':
+        specifier: workspace:^
+        version: link:../../packages/client/chrome-titlebar
       '@snap-rail/client-kernel':
         specifier: workspace:^
         version: link:../../packages/client/kernel
+      '@snap-rail/client-runtime':
+        specifier: workspace:^
+        version: link:../../packages/client/runtime
+      '@snap-rail/client-slots':
+        specifier: workspace:^
+        version: link:../../packages/client/slots
       '@snap-rail/connection':
         specifier: workspace:^
         version: link:../../packages/protocol/connection
@@ -61,6 +70,12 @@ importers:
       '@snap-rail/gateway':
         specifier: workspace:^
         version: link:../../packages/protocol/gateway
+      '@snap-rail/layout-default':
+        specifier: workspace:^
+        version: link:../../packages/client/layout-default
+      '@snap-rail/panel-dashboard':
+        specifier: workspace:^
+        version: link:../../packages/client/panel-dashboard
       '@snap-rail/settings':
         specifier: workspace:^
         version: link:../../packages/settings/settings
@@ -114,6 +129,25 @@ importers:
         specifier: workspace:^
         version: link:../../../vendor/loader
 
+  packages/client/chrome-titlebar:
+    dependencies:
+      '@snap-rail/client-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+    devDependencies:
+      '@snap-rail/client-slots':
+        specifier: workspace:^
+        version: link:../slots
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+
   packages/client/kernel:
     dependencies:
       '@snap-rail/connection':
@@ -141,6 +175,83 @@ importers:
       react-dom:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
+
+  packages/client/layout-default:
+    devDependencies:
+      '@snap-rail/client-slots':
+        specifier: workspace:^
+        version: link:../slots
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+
+  packages/client/panel-dashboard:
+    dependencies:
+      '@snap-rail/client-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+    devDependencies:
+      '@snap-rail/client-slots':
+        specifier: workspace:^
+        version: link:../slots
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+
+  packages/client/runtime:
+    dependencies:
+      '@snap-rail/client-kernel':
+        specifier: workspace:^
+        version: link:../kernel
+      '@snap-rail/client-slots':
+        specifier: workspace:^
+        version: link:../slots
+    devDependencies:
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../protocol/connection
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.5(@types/react@19.2.18)
+      happy-dom:
+        specifier: ^20.0.11
+        version: 20.11.6
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+
+  packages/client/slots:
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
 
   packages/field/driver-mock:
     dependencies:

@@ -10,7 +10,7 @@
  * @module @snap-rail/desktop/main/carrier
  */
 
-import { ipcMain, MessageChannelMain, type MessagePortMain, type WebContents } from 'electron'
+import { BrowserWindow, ipcMain, MessageChannelMain, type MessagePortMain, type WebContents } from 'electron'
 import { Context, type Plugin } from '@snap-rail/cordis'
 import type { GatewayService } from '@snap-rail/gateway'
 
@@ -48,6 +48,19 @@ const carrierPlugin: Plugin.Object<void> = {
 
     ipcMain.on(CLOSE_STREAM_CHANNEL, event => {
       streams.get(event.sender)?.close()
+    })
+
+    // Single-window shell: controls act on the main window whichever frame
+    // asked. `close` rides the normal close path so window-all-closed fires.
+    gateway.registerMethod('window.control', ({ action }) => {
+      const win = BrowserWindow.getAllWindows()[0]
+      if (win === undefined) return { applied: false as const }
+      if (action === 'minimize') win.minimize()
+      else if (action === 'toggle-maximize') {
+        if (win.isMaximized()) win.unmaximize()
+        else win.maximize()
+      } else win.close()
+      return { applied: true as const }
     })
 
     ctx.effect(() => () => {

@@ -15,12 +15,17 @@
     "@snap-rail/app-boot": "workspace:^"
   },
   "devDependencies": {
-    "@snap-rail/cordis": "workspace:^",
     "@snap-rail/audit": "workspace:^",
+    "@snap-rail/chrome-titlebar": "workspace:^",
     "@snap-rail/client-kernel": "workspace:^",
+    "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-slots": "workspace:^",
     "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
     "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/layout-default": "workspace:^",
+    "@snap-rail/panel-dashboard": "workspace:^",
     "@snap-rail/settings": "workspace:^",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

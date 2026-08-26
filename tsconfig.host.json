@@ -28,6 +28,11 @@
     { "path": "./packages/field/field" },
     { "path": "./packages/field/driver-mock" },
     { "path": "./packages/client/kernel" },
+    { "path": "./packages/client/slots" },
+    { "path": "./packages/client/runtime" },
+    { "path": "./packages/client/layout-default" },
+    { "path": "./packages/client/chrome-titlebar" },
+    { "path": "./packages/client/panel-dashboard" },
     { "path": "./apps/desktop" }
   ]
 }

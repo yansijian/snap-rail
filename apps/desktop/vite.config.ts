@@ -29,6 +29,11 @@ function snapRailSources(): Plugin {
     '@snap-rail/app-boot': 'packages/boot/app-boot/src/index.ts',
     '@snap-rail/driver-mock': 'packages/field/driver-mock/src/index.ts',
     '@snap-rail/client-kernel': 'packages/client/kernel/src/index.tsx',
+    '@snap-rail/client-slots': 'packages/client/slots/src/index.tsx',
+    '@snap-rail/client-runtime': 'packages/client/runtime/src/index.tsx',
+    '@snap-rail/layout-default': 'packages/client/layout-default/src/index.tsx',
+    '@snap-rail/chrome-titlebar': 'packages/client/chrome-titlebar/src/index.tsx',
+    '@snap-rail/panel-dashboard': 'packages/client/panel-dashboard/src/index.tsx',
   }
   const sourceOf = new Map<string, string>()
   for (const [name, rel] of Object.entries(sourceFiles)) {

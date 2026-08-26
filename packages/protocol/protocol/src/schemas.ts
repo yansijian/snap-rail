@@ -59,6 +59,9 @@ export const methodRequestSchemas: { readonly [K in MethodName]: z.ZodType<Reque
   'points.subscribe': z.object({ ids: z.array(z.string().min(1)).min(1) }).strict(),
   'points.unsubscribe': z.object({ ids: z.array(z.string().min(1)).min(1) }).strict(),
   'connections.list': z.object({}).strict(),
+  'window.control': z.object({
+    action: z.enum(['minimize', 'toggle-maximize', 'close']),
+  }).strict(),
 }
 
 /**

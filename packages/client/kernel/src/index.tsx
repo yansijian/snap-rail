@@ -27,6 +27,8 @@ export interface ClientHandle {
   link: HostLink
   /** The live React root; the client runtime takes it over on arrival. */
   root: Root
+  /** The element the startup page mounted into (runtime re-roots here). */
+  element: HTMLElement
 }
 
 /** Narrow the preload-global to the carrier contract; missing shapes fail loud. */
@@ -51,5 +53,5 @@ export async function bootClient(options: ClientBootOptions): Promise<ClientHand
   const link = new HostLink(options.channel ?? windowChannel())
   const root = createRoot(options.element)
   root.render(<StartupPage describe={() => link.describeHost()} />)
-  return { link, root }
+  return { link, root, element: options.element }
 }
