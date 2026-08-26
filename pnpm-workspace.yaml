@@ -1,0 +1,23 @@
+packages:
+  # Vendored Cordis framework layer (pinned source copies; see vendor/README.md).
+  - vendor/*
+  # Capability groups: every package lives at packages/<group>/<pkg>.
+  - packages/*/*
+  # Product assemblies (apps/desktop owns the Electron shell).
+  - apps/*
+
+# Vendored framework packages keep their upstream semver ranges; local builds
+# must resolve those matching names to this workspace's pinned sources.
+linkWorkspacePackages: true
+
+overrides:
+  '@snap-rail/cosmokit': 'link:vendor/cosmokit'
+  '@snap-rail/schemastery': 'link:vendor/schemastery'
+
+peerDependencyRules:
+  allowedVersions:
+    typescript: '>=5 <7'
+
+# pnpm 10+ blocks dependencies shipping install scripts until reviewed here.
+allowBuilds:
+  esbuild: true

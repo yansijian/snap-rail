@@ -1,0 +1,11 @@
+{
+  // Solution file: the whole-repo graph for `tsc -b tsconfig.json` and the
+  // tsserver entry. `files: []` keeps it program-less; per-plane aggregates
+  // (tsconfig.host.json, later tsconfig.client.json) are the check units, so
+  // host-side and client-side cordis Context merges never meet in one program.
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.host.json" }
+  ]
+}

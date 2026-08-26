@@ -1,0 +1,21 @@
+{
+  "name": "@snap-rail/root",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b tsconfig.host.json && tsdown",
+    "build:lib:host": "tsc -b tsconfig.host.json && tsdown",
+    "typecheck": "tsc -b tsconfig.host.json",
+    "test": "vitest run",
+    "verify-vendor-names": "tsx scripts/verify-vendor-names.ts"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.20.0",
+    "js-yaml": "^4.2.0",
+    "tsdown": "^0.22.2",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

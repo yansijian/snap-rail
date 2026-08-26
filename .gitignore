@@ -1,0 +1,8 @@
+node_modules/
+lib/
+dist/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+.env
+apps/desktop/release/
+.snap-rail/

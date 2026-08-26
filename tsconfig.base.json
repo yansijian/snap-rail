@@ -1,0 +1,59 @@
+{
+  // Resolution facade for workspace imports. NEVER add include/files to this
+  // file: it would leak into every extending package project and narrow the
+  // facade's match-all scope.
+  "compilerOptions": {
+    "target": "es2024",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "sourceMap": true,
+    "declarationMap": true,
+    "composite": true,
+    "incremental": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "verbatimModuleSyntax": false,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["node"],
+    // Source-level resolution for every repo-local graph. Project references,
+    // not declaration path aliases, keep each package/vendor source compiled
+    // under its own tsconfig boundary.
+    "paths": {
+      "@snap-rail/cordis": ["./vendor/cordis/src"],
+      "@snap-rail/cosmokit": ["./vendor/cosmokit/src"],
+      "@snap-rail/schemastery": ["./vendor/schemastery/src"],
+      "@snap-rail/cordis-plugin-loader": ["./vendor/loader/src"],
+      "@snap-rail/cordis-plugin-include": ["./vendor/include/src"],
+      "@snap-rail/cordis-plugin-group": ["./vendor/group/src"],
+      "@snap-rail/cordis-plugin-timer": ["./vendor/timer/src"],
+      "@snap-rail/cordis-plugin-hmr": ["./vendor/hmr/src"],
+      "@snap-rail/cordis-plugin-logger-console": ["./vendor/logger-console/src"],
+      "@snap-rail/util": ["./packages/util/util/src"],
+      "@snap-rail/settings": ["./packages/settings/settings/src"],
+      "@snap-rail/audit": ["./packages/audit/audit/src"],
+      "@snap-rail/app-boot": ["./packages/boot/app-boot/src"],
+      "@snap-rail/protocol": ["./packages/protocol/protocol/src"],
+      "@snap-rail/gateway": ["./packages/protocol/gateway/src"],
+      "@snap-rail/connection": ["./packages/protocol/connection/src"],
+      "@snap-rail/field": ["./packages/field/field/src"],
+      "@snap-rail/driver-mock": ["./packages/field/driver-mock/src"],
+      "@snap-rail/client-kernel": ["./packages/client/kernel/src"],
+      "@snap-rail/client-slots": ["./packages/client/slots/src"],
+      "@snap-rail/client-runtime": ["./packages/client/runtime/src"],
+      "@snap-rail/layout-default": ["./packages/client/layout-default/src"],
+      "@snap-rail/chrome-titlebar": ["./packages/client/chrome-titlebar/src"],
+      "@snap-rail/panel-dashboard": ["./packages/client/panel-dashboard/src"],
+      "@snap-rail/manage-plugins": ["./packages/client/manage-plugins/src"],
+      "@snap-rail/manage-connections": ["./packages/client/manage-connections/src"]
+    }
+  }
+}

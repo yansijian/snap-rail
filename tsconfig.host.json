@@ -1,0 +1,23 @@
+{
+  // Host aggregate (the Node-plane check unit; see tsconfig.json). Client
+  // packages get their own aggregate when the renderer tree arrives: the two
+  // sides merge cordis Context under the same keys, one program cannot see both.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rewriteRelativeImportExtensions": false
+  },
+  "files": [],
+  "references": [
+    { "path": "./vendor/cosmokit" },
+    { "path": "./vendor/schemastery" },
+    { "path": "./vendor/cordis" },
+    { "path": "./vendor/loader" },
+    { "path": "./vendor/include" },
+    { "path": "./vendor/group" },
+    { "path": "./vendor/timer" },
+    { "path": "./vendor/hmr" },
+    { "path": "./vendor/logger-console" },
+    { "path": "./packages/util/util" }
+  ]
+}
