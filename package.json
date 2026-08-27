@@ -6,10 +6,13 @@
     "build": "tsc -b tsconfig.host.json && tsdown",
     "build:lib:host": "tsc -b tsconfig.host.json && tsdown",
     "typecheck": "tsc -b tsconfig.host.json",
-    "test": "pnpm run build && vitest run",
+    "test": "pnpm run build && vitest run && pnpm run verify:spine",
     "verify-vendor-names": "tsx scripts/verify-vendor-names.ts",
     "app:dev": "pnpm --filter @snap-rail/desktop run dev",
-    "app:start": "pnpm --filter @snap-rail/desktop run start"
+    "app:start": "pnpm --filter @snap-rail/desktop run start",
+    "verify:spine": "tsx scripts/verify-spine.ts",
+    "app:pack": "pnpm --filter @snap-rail/desktop run pack",
+    "app:dist": "pnpm --filter @snap-rail/desktop run dist"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
