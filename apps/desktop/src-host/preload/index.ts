@@ -27,6 +27,9 @@ function acquire(): void {
       port.addEventListener('message', e => {
         for (const listener of listeners) listener((e as MessageEvent).data)
       })
+      // addEventListener does not implicitly start the port (only the
+      // onmessage setter does); without this no frame ever arrives.
+      port.start()
       resolve()
     }
     ipcRenderer.on('snap-rail:stream-reply', onReply)

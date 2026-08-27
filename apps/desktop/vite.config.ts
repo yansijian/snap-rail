@@ -51,9 +51,27 @@ function snapRailSources(): Plugin {
   }
 }
 
+/**
+ * CSP rides only the production bundle: dev needs Vite's inline module
+ * preludes, which a strict script-src would block.
+ */
+function productionCsp(): Plugin {
+  return {
+    name: 'snap-rail-csp',
+    apply: 'build',
+    transformIndexHtml(html) {
+      return html.replace(
+        '<meta charset="utf-8" />',
+        '<meta charset="utf-8" />'
+          + '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:" />',
+      )
+    },
+  }
+}
+
 export default defineConfig({
   root: join(import.meta.dirname, 'src/client'),
-  plugins: [react(), snapRailSources()],
+  plugins: [react(), snapRailSources(), productionCsp()],
   build: {
     outDir: join(import.meta.dirname, 'dist/client'),
     emptyOutDir: true,

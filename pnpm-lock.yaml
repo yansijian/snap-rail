@@ -64,6 +64,12 @@ importers:
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../vendor/cordis
+      '@snap-rail/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../vendor/timer
+      '@snap-rail/driver-mock':
+        specifier: workspace:^
+        version: link:../../packages/field/driver-mock
       '@snap-rail/field':
         specifier: workspace:^
         version: link:../../packages/field/field

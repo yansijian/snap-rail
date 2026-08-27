@@ -22,6 +22,8 @@
     "@snap-rail/client-slots": "workspace:^",
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/driver-mock": "workspace:^",
     "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
     "@snap-rail/layout-default": "workspace:^",
