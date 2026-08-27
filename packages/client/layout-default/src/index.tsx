@@ -7,8 +7,18 @@
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
-import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import type { SlotId } from '@snap-rail/client-slots'
+
+const regionStyle: Record<string, CSSProperties> = {
+  'sr-sidebar': {
+    borderRight: '1px solid var(--sr-border)',
+    flexShrink: 0,
+    overflowY: 'auto',
+    width: 260,
+  },
+  'sr-view': { flex: 1, minWidth: 0 },
+}
 
 function SlotRegion(props: { ctx: Context, slot: SlotId, className?: string }): ReactNode {
   const [tick, setTick] = useState(0)
@@ -20,7 +30,7 @@ function SlotRegion(props: { ctx: Context, slot: SlotId, className?: string }): 
   const occupants = props.ctx.uiSlots.list(props.slot)
   if (occupants.length === 0) return null
   return (
-    <div className={props.className} data-slot={props.slot} data-tick={tick}>
+    <div className={props.className} data-slot={props.slot} data-tick={tick} style={props.className !== undefined ? regionStyle[props.className] : undefined}>
       {occupants.map(occupant => <Fragment key={occupant.id}>{occupant.render()}</Fragment>)}
     </div>
   )

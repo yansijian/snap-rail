@@ -35,6 +35,12 @@
     },
     {
       "path": "../../packages/client/panel-dashboard"
+    },
+    {
+      "path": "../../packages/client/manage-plugins"
+    },
+    {
+      "path": "../../packages/client/manage-connections"
     }
   ]
 }

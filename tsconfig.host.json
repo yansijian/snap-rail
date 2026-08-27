@@ -33,6 +33,8 @@
     { "path": "./packages/client/layout-default" },
     { "path": "./packages/client/chrome-titlebar" },
     { "path": "./packages/client/panel-dashboard" },
+    { "path": "./packages/client/manage-plugins" },
+    { "path": "./packages/client/manage-connections" },
     { "path": "./apps/desktop" }
   ]
 }

@@ -34,6 +34,8 @@ function snapRailSources(): Plugin {
     '@snap-rail/layout-default': 'packages/client/layout-default/src/index.tsx',
     '@snap-rail/chrome-titlebar': 'packages/client/chrome-titlebar/src/index.tsx',
     '@snap-rail/panel-dashboard': 'packages/client/panel-dashboard/src/index.tsx',
+    '@snap-rail/manage-plugins': 'packages/client/manage-plugins/src/index.tsx',
+    '@snap-rail/manage-connections': 'packages/client/manage-connections/src/index.tsx',
   }
   const sourceOf = new Map<string, string>()
   for (const [name, rel] of Object.entries(sourceFiles)) {

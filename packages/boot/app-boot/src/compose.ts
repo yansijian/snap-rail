@@ -154,15 +154,18 @@ export function composeEntries(options: {
   pool: ReadonlyMap<string, PluginDescriptor>
   appRoot: string
 }): EntryOptions[] {
-  const builtinIds = new Set(options.builtin.map(entry => entry.id))
+  // User rows address plugins by package name; patches land on entry ids
+  // (which default to the name but may differ, e.g. mock-demo).
+  const builtinByName = new Map(options.builtin.map(entry => [entry.name as string, entry]))
   const patches: PatchOptions[] = []
   for (const row of options.userLayer.plugins) {
-    if (builtinIds.has(row.name)) {
-      const patch: PatchOptions = {}
+    const builtin = builtinByName.get(row.name)
+    if (builtin !== undefined) {
+      const patch: PatchOptions = { id: builtin.id }
       if (row.config !== undefined) patch.config = row.config
       if (row.enabled === false) patch.disabled = true
       if (row.enabled === true) patch.disabled = false
-      if (Object.keys(patch).length > 0) patches.push({ id: row.name, ...patch })
+      if (Object.keys(patch).length > 1) patches.push(patch)
       continue
     }
     if (options.pool.has(row.name)) {

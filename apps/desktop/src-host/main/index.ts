@@ -38,6 +38,10 @@ async function start(): Promise<void> {
     },
   })
 
+  // Hot layer reload: hand-edited or Agent-written plugins.yml (and pool or
+  // built-in list changes) re-compose and apply transactionally.
+  ctx.effect(() => ctx.pluginLayers.startWatch())
+
   const win = new BrowserWindow({
     width: 1280,
     height: 800,

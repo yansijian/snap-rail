@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/app-boot",
-  "description": "Host boot glue: plugin pool scan, two-layer entry composition, and the boot tree",
+  "description": "Host boot glue: plugin pool scan, two-layer composition, boot tree, layer admin",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -10,11 +10,16 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./rpc": {
+      "types": "./lib/types/rpc.d.ts",
+      "default": "./lib/rpc.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
+    "lib/rpc.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
@@ -22,15 +27,21 @@
     "js-yaml": "^4.2.0"
   },
   "peerDependencies": {
+    "@snap-rail/audit": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-group": "workspace:^",
     "@snap-rail/cordis-plugin-include": "workspace:^",
-    "@snap-rail/cordis-plugin-loader": "workspace:^"
+    "@snap-rail/cordis-plugin-loader": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/protocol": "workspace:^"
   },
   "devDependencies": {
+    "@snap-rail/audit": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-group": "workspace:^",
     "@snap-rail/cordis-plugin-include": "workspace:^",
-    "@snap-rail/cordis-plugin-loader": "workspace:^"
+    "@snap-rail/cordis-plugin-loader": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/protocol": "workspace:^"
   }
 }

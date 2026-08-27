@@ -62,6 +62,15 @@ export const methodRequestSchemas: { readonly [K in MethodName]: z.ZodType<Reque
   'window.control': z.object({
     action: z.enum(['minimize', 'toggle-maximize', 'close']),
   }).strict(),
+  'plugins.list': z.object({}).strict(),
+  'plugins.setEnabled': z.object({
+    name: z.string().min(1),
+    enabled: z.boolean(),
+  }).strict(),
+  'plugins.setConfig': z.object({
+    name: z.string().min(1),
+    config: z.unknown(),
+  }).strict(),
 }
 
 /**

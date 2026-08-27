@@ -90,7 +90,7 @@ describe('boot', () => {
     const world = makeWorld()
     writeFileSync(world.userPath, [
       'plugins:',
-      '  - name: audit',
+      "  - name: '@snap-rail/audit'",
       '    enabled: false',
       '',
     ].join('\n'))
@@ -150,8 +150,8 @@ describe('composeEntries', () => {
     const composed = composeEntries({
       builtin,
       userLayer: { plugins: [
-        { name: 'settings', config: { theme: 'dark' } },
-        { name: 'audit', enabled: false },
+        { name: '@snap-rail/settings', config: { theme: 'dark' } },
+        { name: '@snap-rail/audit', enabled: false },
       ] },
       pool: new Map(),
       appRoot: w.appRoot,

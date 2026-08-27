@@ -15,12 +15,21 @@ import Group from '@snap-rail/cordis-plugin-group'
 import Include from '@snap-rail/cordis-plugin-include'
 import Loader from '@snap-rail/cordis-plugin-loader'
 import { composeEntries, loadBuiltinLayer, loadUserLayer } from './compose.ts'
+import { LayerAdmin } from './admin.ts'
 import { scanPluginPool } from './scan.ts'
 
 declare module '@snap-rail/cordis' {
   interface Context {
     /** Absolute snap-rail home directory (settings, audit, plugin pool). */
     snapRailHome: string
+    /** Runtime layer administration (recompose, user-row edits, watching). */
+    pluginLayers: LayerAdmin
+  }
+
+  interface Events {
+    /** The composed entry list was rewritten and the include refreshed.
+     * @param composed - the entry list now mounted. */
+    'plugin-layers/applied'(composed: readonly unknown[]): void
   }
 }
 
@@ -108,6 +117,14 @@ export async function boot(options: BootOptions): Promise<Context> {
     if (loader === undefined) return ctx
     await loader.await()
     assertEntriesActivated(ctx.loader, composed, options.binName, includeId)
+    ctx.provide('pluginLayers', new LayerAdmin(ctx, {
+      builtinLayerPath: options.builtinLayerPath,
+      userLayerPath: options.userLayerPath,
+      appRoot: options.appRoot,
+      poolDirs,
+      composedPath,
+      includeId,
+    }))
     return ctx
   } catch (cause) {
     // Root-fiber disposal contains cleanup failures per observer and a

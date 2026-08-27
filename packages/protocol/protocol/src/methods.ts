@@ -50,6 +50,31 @@ export interface WindowApi {
   control(payload: { action: 'minimize' | 'toggle-maximize' | 'close' }): Promise<RpcResponse<{ applied: boolean }>>
 }
 
+/** Where a plugin row comes from in the merged view. */
+export type PluginSource = 'builtin' | 'user' | 'pool'
+
+/** One plugin as the management surface sees it. */
+export interface PluginInfo {
+  /** Package name; also the entry id in the composed list. */
+  name: string
+  /** Origin: shipped layer, user-layer insert, or available-in-pool only. */
+  source: PluginSource
+  /** Whether it is currently mounted (`false` covers disabled and unreferenced pool plugins). */
+  enabled: boolean
+  /** The entry's current config when one is set. */
+  config?: unknown
+}
+
+/** Plugin administration over the two-layer composition. */
+export interface PluginsApi {
+  /** Merged view: mounted entries with status plus pool plugins not referenced. */
+  list(payload: {}): Promise<RpcResponse<{ plugins: readonly PluginInfo[] }>>
+  /** Enable or disable one plugin by writing a user-layer row and hot-applying. */
+  setEnabled(payload: { name: string, enabled: boolean }): Promise<RpcResponse<{ applied: true }>>
+  /** Replace one plugin's config through a user-layer row and hot-apply. */
+  setConfig(payload: { name: string, config: unknown }): Promise<RpcResponse<{ applied: true }>>
+}
+
 /** Every unary method callable by a client, keyed by its wire method name. */
 export interface RpcMethodMap {
   'host.describe': HostApi['describe']
@@ -60,6 +85,9 @@ export interface RpcMethodMap {
   'points.unsubscribe': PointsApi['unsubscribe']
   'connections.list': ConnectionsApi['list']
   'window.control': WindowApi['control']
+  'plugins.list': PluginsApi['list']
+  'plugins.setEnabled': PluginsApi['setEnabled']
+  'plugins.setConfig': PluginsApi['setConfig']
 }
 
 /** Method names on the wire. */

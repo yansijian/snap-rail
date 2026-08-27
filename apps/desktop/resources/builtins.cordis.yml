@@ -14,6 +14,8 @@
   name: '@snap-rail/field'
 - id: field-rpc
   name: '@snap-rail/field/rpc'
+- id: plugins-rpc
+  name: '@snap-rail/app-boot/rpc'
 # Phase-1 demo resident: the dashboard's live source until connection
 # management lands; the user layer can disable or re-point it.
 - id: mock-demo

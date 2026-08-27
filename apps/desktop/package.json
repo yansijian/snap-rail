@@ -27,6 +27,8 @@
     "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
     "@snap-rail/layout-default": "workspace:^",
+    "@snap-rail/manage-connections": "workspace:^",
+    "@snap-rail/manage-plugins": "workspace:^",
     "@snap-rail/panel-dashboard": "workspace:^",
     "@snap-rail/settings": "workspace:^",
     "@types/react": "^19.2.14",

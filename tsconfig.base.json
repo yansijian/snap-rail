@@ -41,6 +41,7 @@
       "@snap-rail/settings": ["./packages/settings/settings/src"],
       "@snap-rail/audit": ["./packages/audit/audit/src"],
       "@snap-rail/app-boot": ["./packages/boot/app-boot/src"],
+      "@snap-rail/app-boot/rpc": ["./packages/boot/app-boot/src/rpc.ts"],
       "@snap-rail/protocol": ["./packages/protocol/protocol/src"],
       "@snap-rail/gateway": ["./packages/protocol/gateway/src"],
       "@snap-rail/connection": ["./packages/protocol/connection/src"],

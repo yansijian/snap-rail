@@ -11,6 +11,9 @@
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/group" },
     { "path": "../../../vendor/include" },
-    { "path": "../../../vendor/loader" }
+    { "path": "../../../vendor/loader" },
+    { "path": "../../audit/audit" },
+    { "path": "../../protocol/protocol" },
+    { "path": "../../protocol/gateway" }
   ]
 }
