@@ -20,8 +20,8 @@ export function Shell(props: { ctx: Context }): ReactNode {
   const layouts = props.ctx.uiSlots.list('layout')
   const content = layouts.length > 0
     ? layouts.map(occupant => <Fragment key={occupant.id}>{occupant.render()}</Fragment>)
-    : <div className="sr-shell-empty">没有已加载的布局插件。</div>
+    : <div className="m-auto text-muted-foreground">没有已加载的布局插件。</div>
 
   // `tick` participates so slot changes re-run the render.
-  return <div className="sr-shell" data-tick={tick}>{content}</div>
+  return <div className="flex h-full flex-col" data-tick={tick}>{content}</div>
 }

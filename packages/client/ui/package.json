@@ -1,6 +1,6 @@
 {
-  "name": "@snap-rail/client-runtime",
-  "description": "Client renderer host: plugin-tree mounting, slot-driven shell, theme tokens",
+  "name": "@snap-rail/client-ui",
+  "description": "The UI primitive seam: theme tokens plus shadcn-style components every UI plugin shares",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -10,28 +10,30 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./theme.css": "./src/theme.css",
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "src/theme.css"
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@snap-rail/client-kernel": "workspace:^",
-    "@snap-rail/client-slots": "workspace:^",
-    "@snap-rail/client-ui": "workspace:^"
+    "@radix-ui/react-scroll-area": "^1.2.18",
+    "@radix-ui/react-slot": "^1.3.3",
+    "@radix-ui/react-switch": "^1.3.7",
+    "@radix-ui/react-tooltip": "^1.2.16",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.6.0"
   },
   "peerDependencies": {
-    "@snap-rail/cordis": "workspace:^",
-    "@snap-rail/connection": "workspace:^",
     "react": ">=19",
     "react-dom": ">=19"
   },
   "devDependencies": {
-    "@snap-rail/cordis": "workspace:^",
-    "@snap-rail/connection": "workspace:^",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "happy-dom": "^20.0.11",

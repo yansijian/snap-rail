@@ -10,6 +10,7 @@
 import { Context, type Plugin } from '@snap-rail/cordis'
 import type { HostLink } from '@snap-rail/connection'
 import { useEffect, useState, type ReactNode } from 'react'
+import { Badge, Card, CardContent } from '@snap-rail/client-ui'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
 
@@ -26,38 +27,31 @@ function formatValue(value: unknown): string {
   return String(value)
 }
 
-const cardStyle = {
-  background: 'var(--sr-panel)',
-  borderRadius: 'var(--sr-radius)',
-  border: '1px solid var(--sr-border)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  margin: 'var(--sr-space)',
-  padding: 'calc(var(--sr-space) * 1.5)',
-} as const
-
 function Grid(props: { cells: [string, CellState][] }): ReactNode {
   const allOnline = props.cells.every(([, cell]) => cell.status === 'online')
   return (
-    <div style={{ overflow: 'auto', padding: 'var(--sr-space)' }}>
+    <div className="grid gap-2 self-start p-3 md:grid-cols-2 xl:grid-cols-3">
       {!allOnline && (
-        <div style={{ color: 'var(--sr-bad)', margin: 'var(--sr-space)' }}>有连接离线</div>
+        <Card className="border-destructive/40 md:col-span-2 xl:col-span-3">
+          <CardContent className="p-2 text-sm text-destructive">有连接离线</CardContent>
+        </Card>
       )}
       {props.cells.map(([id, cell]) => (
-        <div key={id} className="sr-card" style={cardStyle}>
-          <span>
-            <span style={{ color: cell.status === 'online' ? 'var(--sr-ok)' : 'var(--sr-bad)', marginRight: 6 }}>
-              {cell.status === 'online' ? '●' : '○'}
+        <Card key={id} className="gap-0 py-2">
+          <CardContent className="flex items-center justify-between gap-4 px-3">
+            <span className="flex min-w-0 items-center gap-2 text-sm">
+              <Badge variant={cell.status === 'online' ? 'success' : 'destructive'}>
+                {cell.status === 'online' ? '在线' : '离线'}
+              </Badge>
+              <span className="truncate font-mono text-xs text-muted-foreground">{id}</span>
             </span>
-            {id}
-          </span>
-          <span style={cell.value === null ? { color: 'var(--sr-bad)' } : undefined}>
-            {formatValue(cell.value)}
-          </span>
-        </div>
+            <span className={`font-mono ${cell.value === null ? 'text-destructive' : ''}`}>
+              {formatValue(cell.value)}
+            </span>
+          </CardContent>
+        </Card>
       ))}
-      {props.cells.length === 0 && <div style={{ color: 'var(--sr-text-dim)', margin: 'var(--sr-space)' }}>点表为空</div>}
+      {props.cells.length === 0 && <div className="p-2 text-muted-foreground">点表为空</div>}
     </div>
   )
 }
@@ -85,7 +79,6 @@ function Dashboard(props: { link: HostLink }): ReactNode {
       detachers.push(() => {
         void props.link.call('points.unsubscribe', { ids }).catch(() => {})
       })
-
       detachers.push(props.link.subscribe('point/updated', payload => {
         const frame = payload as { id: string, value: unknown }
         setCells(previous => {
@@ -112,7 +105,7 @@ function Dashboard(props: { link: HostLink }): ReactNode {
     }
   }, [props.link])
 
-  return <Grid cells={[...cells.entries()].sort(([a], [b]) => (a < b ? -1 : 1))} />
+  return <div className="h-full overflow-auto"><Grid cells={[...cells.entries()].sort(([a], [b]) => (a < b ? -1 : 1))} /></div>
 }
 
 /** The dashboard occupant. */

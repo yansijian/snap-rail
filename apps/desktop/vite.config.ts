@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
@@ -28,6 +29,7 @@ function snapRailSources(): Plugin {
     '@snap-rail/settings': 'packages/settings/settings/src/index.ts',
     '@snap-rail/app-boot': 'packages/boot/app-boot/src/index.ts',
     '@snap-rail/driver-mock': 'packages/field/driver-mock/src/index.ts',
+    '@snap-rail/client-ui': 'packages/client/ui/src/index.ts',
     '@snap-rail/client-kernel': 'packages/client/kernel/src/index.tsx',
     '@snap-rail/client-slots': 'packages/client/slots/src/index.tsx',
     '@snap-rail/client-runtime': 'packages/client/runtime/src/index.tsx',
@@ -41,6 +43,8 @@ function snapRailSources(): Plugin {
   for (const [name, rel] of Object.entries(sourceFiles)) {
     sourceOf.set(name, `${repoRoot}/${rel}`)
   }
+  // Exact-match lookup covers both the package entry and the css subpath.
+  sourceOf.set('@snap-rail/client-ui/theme.css', `${repoRoot}/packages/client/ui/src/theme.css`)
   sourceOf.set('@snap-rail/field/rpc', `${repoRoot}/packages/field/field/src/rpc.ts`)
   sourceOf.set('@snap-rail/field', `${repoRoot}/packages/field/field/src/index.ts`)
 
@@ -73,7 +77,7 @@ function productionCsp(): Plugin {
 
 export default defineConfig({
   root: join(import.meta.dirname, 'src/client'),
-  plugins: [react(), snapRailSources(), productionCsp()],
+  plugins: [react(), tailwindcss(), snapRailSources(), productionCsp()],
   build: {
     outDir: join(import.meta.dirname, 'dist/client'),
     emptyOutDir: true,

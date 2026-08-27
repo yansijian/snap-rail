@@ -49,16 +49,7 @@ export function StartupPage(props: { describe: () => Promise<HostIdentity> }): R
       : `连接失败：${phase.message}`
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
-      fontFamily: 'system-ui, sans-serif',
-      background: '#0b0f14',
-      color: '#8b949e',
-    }}
-    >
+    <div className="flex h-screen items-center justify-center bg-background font-sans text-muted-foreground">
       {line}
     </div>
   )

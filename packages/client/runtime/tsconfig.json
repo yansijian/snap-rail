@@ -3,7 +3,11 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "lib/types",
-    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2024",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "jsx": "react-jsx",
     "types": []
   },
@@ -11,9 +15,20 @@
     "src"
   ],
   "references": [
-    { "path": "../../../vendor/cordis" },
-    { "path": "../../protocol/connection" },
-    { "path": "../../client/kernel" },
-    { "path": "../../client/slots" }
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../protocol/connection"
+    },
+    {
+      "path": "../../client/kernel"
+    },
+    {
+      "path": "../../client/slots"
+    },
+    {
+      "path": "../ui"
+    }
   ]
 }

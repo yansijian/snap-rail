@@ -1,0 +1,77 @@
+/*
+ * The snap-rail theme: Tailwind v4 tokens carrying the industrial dark
+ * palette as the single theme. Class scanning is explicit (auto-detection
+ * roots at the Vite cwd, which is the app, not the workspace), and respects
+ * gitignore — build outputs under lib/dist are skipped naturally.
+ */
+@import "tailwindcss";
+
+@source "../../**/*.{ts,tsx}";
+@source "../../../apps/desktop/src/client/**/*.html";
+
+@theme {
+  --color-background: #0b0f14;
+  --color-foreground: #c9d1d9;
+
+  --color-card: #11161d;
+  --color-card-foreground: #c9d1d9;
+
+  --color-popover: #161b22;
+  --color-popover-foreground: #c9d1d9;
+
+  --color-primary: #2f81f7;
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #1c2430;
+  --color-secondary-foreground: #c9d1d9;
+
+  --color-muted: #161b22;
+  --color-muted-foreground: #8b949e;
+
+  --color-accent: #1c2430;
+  --color-accent-foreground: #c9d1d9;
+
+  --color-destructive: #f85149;
+  --color-destructive-foreground: #ffffff;
+
+  --color-success: #3fb950;
+  --color-success-foreground: #0b0f14;
+
+  --color-border: #1e2630;
+  --color-input: #1e2630;
+  --color-ring: #2f81f7;
+
+  --radius-md: 6px;
+  --radius-lg: 6px;
+
+  --font-sans: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    margin: 0;
+  }
+}
+
+@utility drag-region {
+  -webkit-app-region: drag;
+}
+
+@utility no-drag {
+  -webkit-app-region: no-drag;
+}

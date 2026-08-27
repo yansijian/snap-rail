@@ -11,6 +11,7 @@ import { Context, type Plugin } from '@snap-rail/cordis'
 import type { HostLink } from '@snap-rail/connection'
 import type { PluginInfo } from '@snap-rail/protocol'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@snap-rail/client-ui'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
 
@@ -19,24 +20,6 @@ const sourceLabels: Record<PluginInfo['source'], string> = {
   user: '用户',
   pool: '池',
 }
-
-const rowStyle = {
-  alignItems: 'center',
-  display: 'flex',
-  gap: 6,
-  justifyContent: 'space-between',
-  padding: '4px 0',
-} as const
-
-const toggleStyle = {
-  background: 'transparent',
-  border: '1px solid var(--sr-border)',
-  borderRadius: 'var(--sr-radius)',
-  color: 'var(--sr-text)',
-  cursor: 'pointer',
-  fontSize: 11,
-  padding: '1px 8px',
-} as const
 
 function PluginsPanel(props: { link: HostLink }): ReactNode {
   const [plugins, setPlugins] = useState<PluginInfo[]>([])
@@ -62,26 +45,26 @@ function PluginsPanel(props: { link: HostLink }): ReactNode {
   }
 
   return (
-    <section data-panel="plugins" style={{ padding: 'var(--sr-space)' }}>
-      <h3 style={{ fontSize: 12, margin: '0 0 6px', color: 'var(--sr-text-dim)' }}>插件</h3>
-      {error !== undefined && <div style={{ color: 'var(--sr-bad)', fontSize: 12 }}>{error}</div>}
-      {plugins.map(plugin => (
-        <div key={plugin.name} style={rowStyle}>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <span style={{ color: plugin.enabled ? 'var(--sr-ok)' : 'var(--sr-text-dim)', marginRight: 4 }}>
-              {plugin.enabled ? '●' : '○'}
+    <Card className="m-3 gap-0" data-panel="plugins">
+      <CardHeader><CardTitle>插件</CardTitle></CardHeader>
+      <CardContent className="flex flex-col gap-1">
+        {error !== undefined && <div className="text-xs text-destructive">{error}</div>}
+        {plugins.map(plugin => (
+          <div key={plugin.name} className="flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1.5 text-xs">
+              <Badge variant={plugin.enabled ? 'success' : 'secondary'}>
+                {plugin.enabled ? '启用' : '停用'}
+              </Badge>
+              <span className="truncate font-mono">{plugin.name}</span>
+              <span className="shrink-0 text-muted-foreground">[{sourceLabels[plugin.source]}]</span>
             </span>
-            {plugin.name}
-            <span style={{ color: 'var(--sr-text-dim)', fontSize: 11, marginLeft: 4 }}>
-              [{sourceLabels[plugin.source]}]
-            </span>
-          </span>
-          <button type="button" style={toggleStyle} onClick={() => onToggle(plugin.name, !plugin.enabled)}>
-            {plugin.enabled ? '禁用' : '启用'}
-          </button>
-        </div>
-      ))}
-    </section>
+            <Button variant="outline" size="sm" className="shrink-0" onClick={() => onToggle(plugin.name, !plugin.enabled)}>
+              {plugin.enabled ? '禁用' : '启用'}
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   )
 }
 

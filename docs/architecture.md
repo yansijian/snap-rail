@@ -41,7 +41,8 @@ Electron 主进程                        renderer（每窗口）
 | 点表/连接 | `field/field` | `ctx.points` / `ctx.connections`；`./rpc` 线桥 |
 | 模拟驱动 | `field/driver-mock` | 首方 Provider：四类型点流、离线模拟、写回显 |
 | 槽位词表 | `client/slots` | `ctx.uiSlots`：well-known slot ids + 缺槽降级 |
-| 渲染宿主 | `client/runtime` | 接管 React root、槽位驱动 Shell、主题令牌 |
+| UI 原语 | `client/ui` | 主题令牌（theme.css，Tailwind v4）+ shadcn 风格共享组件（Button/Card/Badge/Switch/Tooltip/ScrollArea），所有 UI 插件与社区插件的公共底座 |
+| 渲染宿主 | `client/runtime` | 接管 React root、槽位驱动 Shell、引入唯一主题 |
 | 引导 | `client/kernel` | 启动页、carrier 握手、root 移交 |
 | 布局/住户 | `client/layout-default` 等 | 全部是插件；布局也由插件提供 |
 | 设置 | `settings/settings` | 原子 JSON 持久化 |

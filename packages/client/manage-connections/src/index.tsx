@@ -1,7 +1,7 @@
 /**
  * Resident connection panel: occupies the `sidebar` slot with the live
- * connection list (status dots driven by `connection/status` frames) and,
- * while the mock driver is mounted, an offline-simulation toggle. The toggle
+ * connection list (status badges driven by `connection/status` frames) and,
+ * while the mock driver is mounted, an offline-simulation switch. The switch
  * rewrites the driver's config through `plugins.setConfig` — the same
  * user-layer round trip an Agent or hand edit performs.
  *
@@ -11,7 +11,9 @@
 import { Context, type Plugin } from '@snap-rail/cordis'
 import type { HostLink } from '@snap-rail/connection'
 import type { ConnectionSnapshot, PluginInfo } from '@snap-rail/protocol'
+import { PowerOff, Power } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@snap-rail/client-ui'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
 
@@ -25,16 +27,6 @@ interface MockDriverConfig {
   periodMs: number
   points: Array<{ id: string, type: string }>
 }
-
-const toggleStyle = {
-  background: 'transparent',
-  border: '1px solid var(--sr-border)',
-  borderRadius: 'var(--sr-radius)',
-  color: 'var(--sr-text)',
-  cursor: 'pointer',
-  fontSize: 11,
-  padding: '1px 8px',
-} as const
 
 function ConnectionsPanel(props: { link: HostLink }): ReactNode {
   const [connections, setConnections] = useState<ConnectionSnapshot[]>([])
@@ -87,27 +79,28 @@ function ConnectionsPanel(props: { link: HostLink }): ReactNode {
   }
 
   return (
-    <section data-panel="connections" style={{ padding: 'var(--sr-space)', borderTop: '1px solid var(--sr-border)' }}>
-      <h3 style={{ fontSize: 12, margin: '0 0 6px', color: 'var(--sr-text-dim)' }}>连接</h3>
-      {error !== undefined && <div style={{ color: 'var(--sr-bad)', fontSize: 12 }}>{error}</div>}
-      {connections.map(connection => (
-        <div key={connection.id as string} style={{ alignItems: 'center', display: 'flex', gap: 6, padding: '4px 0' }}>
-          <span style={{ color: connection.status === 'online' ? 'var(--sr-ok)' : 'var(--sr-bad)' }}>
-            {connection.status === 'online' ? '●' : '○'}
-          </span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {connection.title}
-          </span>
-          <span style={{ color: 'var(--sr-text-dim)', fontSize: 11 }}>{connection.id as string}</span>
-        </div>
-      ))}
-      {connections.length === 0 && <div style={{ color: 'var(--sr-text-dim)', fontSize: 12 }}>无连接</div>}
-      {mock !== undefined && (
-        <button type="button" style={{ ...toggleStyle, marginTop: 6 }} onClick={toggleOffline}>
-          {mock.offline ? '恢复在线' : '模拟离线'}
-        </button>
-      )}
-    </section>
+    <Card className="mx-3 mb-3 gap-0" data-panel="connections">
+      <CardHeader><CardTitle>连接</CardTitle></CardHeader>
+      <CardContent className="flex flex-col gap-1.5">
+        {error !== undefined && <div className="text-xs text-destructive">{error}</div>}
+        {connections.map(connection => (
+          <div key={connection.id as string} className="flex items-center gap-2 text-xs">
+            <Badge variant={connection.status === 'online' ? 'success' : 'destructive'}>
+              {connection.status === 'online' ? '在线' : '离线'}
+            </Badge>
+            <span className="truncate">{connection.title}</span>
+            <span className="ml-auto shrink-0 font-mono text-muted-foreground">{connection.id as string}</span>
+          </div>
+        ))}
+        {connections.length === 0 && <div className="text-xs text-muted-foreground">无连接</div>}
+        {mock !== undefined && (
+          <Button variant={mock.offline ? 'default' : 'outline'} size="sm" className="mt-1.5" onClick={toggleOffline}>
+            {mock.offline ? <Power className="h-3.5 w-3.5" /> : <PowerOff className="h-3.5 w-3.5" />}
+            {mock.offline ? '恢复在线' : '模拟离线'}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

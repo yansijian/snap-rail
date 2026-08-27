@@ -27,6 +27,7 @@
     { "path": "./packages/protocol/connection" },
     { "path": "./packages/field/field" },
     { "path": "./packages/field/driver-mock" },
+    { "path": "./packages/client/ui" },
     { "path": "./packages/client/kernel" },
     { "path": "./packages/client/slots" },
     { "path": "./packages/client/runtime" },

@@ -48,6 +48,8 @@
       "@snap-rail/field": ["./packages/field/field/src"],
       "@snap-rail/field/rpc": ["./packages/field/field/src/rpc.ts"],
       "@snap-rail/driver-mock": ["./packages/field/driver-mock/src"],
+      "@snap-rail/client-ui": ["./packages/client/ui/src"],
+      "@snap-rail/client-ui/theme.css": ["./packages/client/ui/src/theme.css"],
       "@snap-rail/client-kernel": ["./packages/client/kernel/src"],
       "@snap-rail/client-slots": ["./packages/client/slots/src"],
       "@snap-rail/client-runtime": ["./packages/client/runtime/src"],

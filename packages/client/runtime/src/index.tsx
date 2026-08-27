@@ -14,7 +14,10 @@ import type { HostLink } from '@snap-rail/connection'
 import slotsPlugin from '@snap-rail/client-slots'
 import { createRoot } from 'react-dom/client'
 import { Shell } from './Shell.tsx'
-import { THEME_CSS } from './theme.ts'
+// The single theme import: tokens and base styles ship with whoever links
+// the runtime; Tailwind scans the sources the theme.css @source list names.
+import '@snap-rail/client-ui/theme.css'
+
 declare module '@snap-rail/cordis' {
   interface Context {
     /** Shared client-side services every occupant may consume. */
@@ -45,13 +48,12 @@ export interface RuntimeHandle {
 
 /**
  * Take over the booted root: stop the startup page, mount the client plugin
- * tree, render the slot-driven shell.
+ * tree, render the shell.
  *
  * @param handle - the kernel's boot result.
  * @param options - see {@link RuntimeOptions}.
  */
 export async function createClientRuntime(handle: ClientHandle, options: RuntimeOptions): Promise<RuntimeHandle> {
-  installTheme()
   const ctx = new Context()
   await ctx.plugin(slotsPlugin)
   for (const plugin of options.plugins) {
@@ -70,13 +72,4 @@ export async function createClientRuntime(handle: ClientHandle, options: Runtime
       shellRoot.unmount()
     }),
   }
-}
-
-/** Inject the design-token stylesheet once per document. */
-function installTheme(): void {
-  if (document.getElementById('snap-rail-theme') !== null) return
-  const style = document.createElement('style')
-  style.id = 'snap-rail-theme'
-  style.textContent = THEME_CSS
-  document.head.append(style)
 }

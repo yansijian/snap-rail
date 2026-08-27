@@ -20,7 +20,7 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
 - **能力缝三件套齐备**：Service Definition / Provider / Consumer；
   角色不独立演化不拆包。新增能力先补缝，再补首方实现。
 - **脊柱不依赖住户**：`vendor/*`、`util`、`settings`、`audit`、`boot/`、
-  `protocol/*`、`field/field`、`client/{kernel,slots,runtime}` 是脊柱，
+  `protocol/*`、`field/field`、`client/{kernel,slots,runtime,ui}` 是脊柱，
   不得 import 任何住户（`client/layout-default|chrome-titlebar|
   panel-dashboard|manage-plugins|manage-connections`、`field/driver-mock`、
   `apps/*`）。`pnpm test` 里的门禁脚本断言这一点。

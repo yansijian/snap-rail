@@ -18,6 +18,7 @@ const spinePackages = [
   'packages/boot/app-boot',
   'packages/protocol/*',
   'packages/field/field',
+  'packages/client/ui',
   'packages/client/kernel',
   'packages/client/slots',
   'packages/client/runtime',

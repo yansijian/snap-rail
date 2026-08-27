@@ -19,6 +19,9 @@
       "path": "../../packages/protocol/connection"
     },
     {
+      "path": "../../packages/client/ui"
+    },
+    {
       "path": "../../packages/client/kernel"
     },
     {
