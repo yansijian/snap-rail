@@ -13,23 +13,23 @@ import type { Context } from '@snap-rail/cordis'
 import carrierPlugin from './carrier.ts'
 
 /**
- * Where the read-only built-in layer lives: beside the source tree in dev,
- * flattened into process.resourcesPath when packaged.
+ * The built-in layer ships inside the app directory (packed with the app in
+ * both dev source and installed layouts); `getAppPath()` is the one root
+ * that names it in both.
  */
-function resourcesDir(): string {
-  return process.env.SNAP_RAIL_DEV_URL === undefined
-    ? process.resourcesPath
-    : join(app.getAppPath(), 'resources')
+function builtinLayerPath(): string {
+  return join(app.getAppPath(), 'resources', 'builtins.cordis.yml')
 }
 
 async function start(): Promise<void> {
   await app.whenReady()
+  wireUpdateChannel()
 
   const home = app.getPath('userData')
   const ctx: Context = await boot({
     binName: 'desktop',
     home,
-    builtinLayerPath: join(resourcesDir(), 'builtins.cordis.yml'),
+    builtinLayerPath: builtinLayerPath(),
     userLayerPath: join(home, 'plugins.yml'),
     appRoot: app.getAppPath(),
     prepare: prepared => {
@@ -72,3 +72,24 @@ start().catch(cause => {
   console.error(cause instanceof Error ? cause.stack ?? cause.message : cause)
   app.exit(1)
 })
+
+/**
+ * The update channel seat: only a packaged build with a configured publish
+ * provider checks; dev and unconfigured installs stay idle. Configure
+ * `publish` in electron-builder.yml (e.g. the GitHub provider) to activate.
+ */
+function wireUpdateChannel(): void {
+  if (!app.isPackaged) return
+  void (async () => {
+    try {
+      const { autoUpdater } = (await import('electron-updater')) as typeof import('electron-updater')
+      autoUpdater.autoDownload = false
+      const available = await autoUpdater.checkForUpdates()
+      if (available !== null) {
+        console.log(`[updater] ${available.updateInfo.version} available (manual download; auto-install lands with the channel)`)
+      }
+    } catch (cause) {
+      console.log('[updater] channel not configured, staying idle:', cause instanceof Error ? cause.message : cause)
+    }
+  })()
+}

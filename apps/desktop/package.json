@@ -9,32 +9,36 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "start": "electron .",
-    "build:faces": "tsc -b && tsdown --config tsdown.config.ts && vite build"
+    "build:faces": "tsc -b && tsdown --config tsdown.config.ts && vite build",
+    "pack": "pnpm run build:faces && electron-builder --win --dir --config electron-builder.yml",
+    "dist": "pnpm run build:faces && electron-builder --win nsis --config electron-builder.yml"
   },
   "dependencies": {
-    "@snap-rail/app-boot": "workspace:^"
-  },
-  "devDependencies": {
+    "@snap-rail/app-boot": "workspace:^",
     "@snap-rail/audit": "workspace:^",
-    "@snap-rail/chrome-titlebar": "workspace:^",
-    "@snap-rail/client-kernel": "workspace:^",
-    "@snap-rail/client-runtime": "workspace:^",
-    "@snap-rail/client-slots": "workspace:^",
-    "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-timer": "workspace:^",
     "@snap-rail/driver-mock": "workspace:^",
     "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "@snap-rail/chrome-titlebar": "workspace:^",
+    "@snap-rail/client-kernel": "workspace:^",
+    "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-slots": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
     "@snap-rail/layout-default": "workspace:^",
     "@snap-rail/manage-connections": "workspace:^",
     "@snap-rail/manage-plugins": "workspace:^",
     "@snap-rail/panel-dashboard": "workspace:^",
-    "@snap-rail/settings": "workspace:^",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
     "electron": "^44.0.0",
+    "electron-builder": "^26.0.12",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "vite": "^8.2.2",

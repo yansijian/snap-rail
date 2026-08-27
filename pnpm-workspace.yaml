@@ -13,6 +13,9 @@ linkWorkspacePackages: true
 overrides:
   '@snap-rail/cosmokit': 'link:vendor/cosmokit'
   '@snap-rail/schemastery': 'link:vendor/schemastery'
+  # app-builder-lib@26.15.3 uses @electron/get v5's ElectronDownloadCacheMode
+  # but declares ^3.0.0; 3.0.0 lacks the enum and crashes at packaging.
+  'app-builder-lib>@electron/get': '5.1.0'
 
 peerDependencyRules:
   allowedVersions:
@@ -22,3 +25,4 @@ peerDependencyRules:
 allowBuilds:
   esbuild: true
   electron: true
+  electron-winstaller: true

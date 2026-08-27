@@ -1,0 +1,28 @@
+# Packaging: phase 1 ships a directory layout, not an asar archive — plugins
+# load through real file:// URLs the loader imports directly, and the built-in
+# layer file stays watchable for hot recomposition. Revisit with a custom
+# protocol when tamper resistance matters.
+appId: io.snaprail.desktop
+productName: snap-rail
+directories:
+  output: release-out
+files:
+  - dist/**
+  - resources/**
+  - package.json
+asar: false
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+# Update channel seat: electron-updater reads the publish provider at
+# runtime; phase 1 leaves it unconfigured and the updater stays idle.
+# publish:
+#   provider: github
+#   owner: snap-rail
+#   repo: snap-rail
