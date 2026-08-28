@@ -26,7 +26,9 @@ packages/    能力组 packages/<组>/<包>：
   protocol/    protocol / gateway / connection（RPC 缝）
   field/       field（点表缝）+ driver-mock（首方驱动）
   client/      kernel / slots / runtime（脊柱）+ 布局/标题栏/看板/管理页（住户）
-  audit/ settings/ util/
+  audit/
+  settings/
+  util/
 apps/desktop  Electron 应用（无框窗口、IPC 载体、打包配置）
 docs/         architecture.md（缝目录与决策）
 ```
