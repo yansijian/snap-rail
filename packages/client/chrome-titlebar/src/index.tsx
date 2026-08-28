@@ -53,7 +53,7 @@ function Titlebar(props: {
   const close = (): void => props.control('close')
 
   return (
-    <div className="drag-region relative flex h-9 select-none items-stretch justify-between border-b border-border">
+    <div className="drag-region relative flex h-12 select-none items-stretch justify-between border-b border-border">
       <div className="flex items-center gap-2 pl-3">
         <LogoMark />
         <span className="text-sm font-medium tracking-wide">snap-rail</span>
