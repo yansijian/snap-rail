@@ -22,6 +22,7 @@ function snapRailSources(): Plugin {
   const sourceFiles: Record<string, string> = {
     '@snap-rail/cordis': 'vendor/cordis/src/index.ts',
     '@snap-rail/cordis-plugin-timer': 'vendor/timer/src/index.ts',
+    '@snap-rail/cosmokit': 'vendor/cosmokit/src/index.ts',
     '@snap-rail/protocol': 'packages/protocol/protocol/src/index.ts',
     '@snap-rail/connection': 'packages/protocol/connection/src/index.ts',
     '@snap-rail/gateway': 'packages/protocol/gateway/src/index.ts',
