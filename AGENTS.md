@@ -20,9 +20,10 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
 - **能力缝三件套齐备**：Service Definition / Provider / Consumer；
   角色不独立演化不拆包。新增能力先补缝，再补首方实现。
 - **脊柱不依赖住户**：`vendor/*`、`util`、`settings`、`audit`、`boot/`、
-  `protocol/*`、`field/field`、`client/{kernel,slots,runtime,ui}` 是脊柱，
-  不得 import 任何住户（`client/layout-default|chrome-titlebar|
-  panel-dashboard|manage-plugins|manage-connections`、`field/driver-mock`、
+  `protocol/*`、`field/field`、`client/{kernel,slots,session,workflows,runtime,ui}` 是脊柱，
+  不得 import 任何住户（`client/layout-station|chrome-titlebar|
+  process-maintenance|process-production|process-sampling|process-fault|
+  process-downtime`、`field/driver-mock`、
   `apps/*`）。`pnpm test` 里的门禁脚本断言这一点。
 - **注册皆 effect**：一切贡献经 `ctx.effect()`/`ctx.on()`；`register()`
   返回处置函数。effect 体返回 disposer——把函数本身传进去等于立即执行。
@@ -31,6 +32,8 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   教训，源码有注释）。
 - **文件即接口**：用户层 `plugins.yml` 按包名寻址（`enabled`/`config`），
   页面、手编、Agent 共用一条 LayerAdmin 热重载路径；坏文件保持旧树。
+  渲染端住户的行也写同一文件（boot `rendererPackages` 挡在宿主树外，
+  `client-config.list` 启动时下发，v1 重启生效）。
 - **模型可见 ⟺ 有事件**；模型/用户可见行为变更配可运行例子的无 key
   快照式测试（本仓以 vitest 直测装配链路为主）。
 - **协议扩展**：新 rpc 方法 = methods.ts 一个签名 + schemas.ts 一条

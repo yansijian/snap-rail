@@ -19,6 +19,9 @@
       "path": "../../packages/protocol/connection"
     },
     {
+      "path": "../../vendor/cordis"
+    },
+    {
       "path": "../../packages/client/ui"
     },
     {
@@ -31,19 +34,25 @@
       "path": "../../packages/client/runtime"
     },
     {
-      "path": "../../packages/client/layout-default"
+      "path": "../../packages/client/layout-station"
     },
     {
       "path": "../../packages/client/chrome-titlebar"
     },
     {
-      "path": "../../packages/client/panel-dashboard"
+      "path": "../../packages/client/process-maintenance"
     },
     {
-      "path": "../../packages/client/manage-plugins"
+      "path": "../../packages/client/process-production"
     },
     {
-      "path": "../../packages/client/manage-connections"
+      "path": "../../packages/client/process-sampling"
+    },
+    {
+      "path": "../../packages/client/process-fault"
+    },
+    {
+      "path": "../../packages/client/process-downtime"
     }
   ]
 }

@@ -5,16 +5,19 @@ import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
 import auditPlugin from '@snap-rail/audit'
 import gatewayPlugin from '@snap-rail/gateway'
-import fieldPlugin, { type ConnectionRegistration } from '@snap-rail/field'
-import fieldRpcPlugin from '@snap-rail/field/rpc'
-import { ConnectionId, InProcessApiClient, PointId } from '@snap-rail/protocol'
-import { afterEach, describe, expect, it } from 'vitest'
+import settingsPlugin from '@snap-rail/settings'
+import stationRpcPlugin from '@snap-rail/station-rpc'
 import titlebarPlugin from '../../chrome-titlebar/src/index.tsx'
-import layoutPlugin from '../../layout-default/src/index.tsx'
-import dashboardPlugin from '../../panel-dashboard/src/index.tsx'
+import layoutPlugin from '../../layout-station/src/index.tsx'
+import downtimePlugin from '../../process-downtime/src/index.tsx'
+import faultPlugin from '../../process-fault/src/index.tsx'
+import maintenancePlugin from '../../process-maintenance/src/index.tsx'
+import productionPlugin from '../../process-production/src/index.tsx'
+import samplingPlugin from '../../process-sampling/src/index.tsx'
 import { bootClient } from '../../kernel/src/index.tsx'
 import type { HostChannel } from '../../connection/src/index.tsx'
 import { createClientRuntime } from '../src/index.tsx'
+import { afterEach, describe, expect, it } from 'vitest'
 
 const contexts: Context[] = []
 
@@ -24,90 +27,131 @@ afterEach(async () => {
     const home = ctx.get('snapRailHome') as string | undefined
     if (home !== undefined) rmSync(home, { recursive: true, force: true })
   }
+  // A failed test leaves its element behind; never leak DOM into the next one.
+  document.body.innerHTML = ''
 })
 
-async function makeWorld(): Promise<{ channel: HostChannel, ctx: Context, drive: ConnectionRegistration }> {
+/**
+ * A station world: gateway + settings + audit + the station bridge over an
+ * in-process channel. The pluginLayers stub carries an empty user layer.
+ */
+async function makeWorld(): Promise<HostChannel> {
   const host = new Context()
   contexts.push(host)
-  ctxProvideHome(host)
-  await host.plugin(gatewayPlugin, { name: 'demo-shell', version: '0.1.0', bin: 'desktop' })
+  host.provide('snapRailHome', mkdtempSync(join(tmpdir(), 'snap-rail-station-ui-')))
+  await host.plugin(gatewayPlugin, { name: 'station-shell', version: '0.1.0', bin: 'test' })
+  await host.plugin(settingsPlugin)
   await host.plugin(auditPlugin)
-  await host.plugin(fieldPlugin)
-  // All four injected services of the bridge must exist, or the entry stays
-  // suspended and silently registers nothing.
-  await host.plugin(fieldRpcPlugin)
-
-  let drive!: ConnectionRegistration
-  await host.plugin(Object.assign(
-    function rig(sub): void {
-      drive = sub.connections.register(sub, { id: ConnectionId('conn-1'), driver: 'rig', title: 'Rig' })
-      drive.setPoints([
-        { id: PointId('conn-1.temp'), connection: ConnectionId('conn-1'), type: 'float' },
-      ])
-    },
-    { inject: ['connections'] },
-  ))
-
-  const channel: HostChannel = {
+  host.provide('pluginLayers', {
+    handles: { userLayerPath: join(tmpdir(), 'absent-plugins.yml'), rendererPackages: [] },
+  } as never)
+  await host.plugin(stationRpcPlugin)
+  return {
     invoke: request => host.gateway.handleClientRequest(request),
     openStream: listener => host.gateway.attachDownlink(frame => listener(frame)),
   }
-  return { channel, ctx: host, drive }
 }
 
-function ctxProvideHome(host: Context): void {
-  host.provide('snapRailHome', mkdtempSync(join(tmpdir(), 'snap-rail-runtime-')))
-}
+const ALL_OCCUPANTS = [
+  layoutPlugin,
+  titlebarPlugin,
+  maintenancePlugin,
+  productionPlugin,
+  samplingPlugin,
+  faultPlugin,
+  downtimePlugin,
+]
 
-async function flush(times = 5): Promise<void> {
+async function flush(times = 12): Promise<void> {
   for (let i = 0; i < times; i += 1) await new Promise(resolve => setTimeout(resolve, 0))
 }
 
-describe('createClientRuntime', () => {
-  it('renders the full occupant stack and streams live point values', async () => {
-    const { channel, drive } = await makeWorld()
+function workflowItem(id: string): HTMLElement | null {
+  return document.querySelector(`[data-workflow="${id}"]`)
+}
+
+/** Set a React controlled input's value the way React's tracker accepts. */
+function setNativeValue(input: HTMLInputElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  setter?.call(input, value)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+async function loginAs(id: string): Promise<void> {
+  const input = document.querySelector<HTMLInputElement>('input[aria-label="工号"]')
+  expect(input).not.toBeNull()
+  setNativeValue(input!, id)
+  await flush()
+  const login = [...document.querySelectorAll('button')].find(button => button.textContent === '登录')
+  expect(login).toBeDefined()
+  login!.click()
+  await flush(20)
+}
+
+describe('station assembly', () => {
+  it('shows the login page first and the workflow rail after sign-on', async () => {
+    const channel = await makeWorld()
     const element = document.createElement('div')
     document.body.append(element)
-
     const handle = await bootClient({ element, channel })
-    const runtime = await createClientRuntime(handle, {
-      plugins: [layoutPlugin, titlebarPlugin, dashboardPlugin],
-    })
-
-    // Let the dashboard's async bootstrap (list + wire subscribe) land before
-    // driving values — a late joiner reads snapshot, then streams deltas.
-    drive.setStatus('online')
-    await flush()
-    drive.sample(PointId('conn-1.temp'), 21.5)
+    const runtime = await createClientRuntime(handle, { plugins: ALL_OCCUPANTS })
     await flush()
 
-    const text = document.body.textContent ?? ''
-    expect(text).toContain('snap-rail')          // titlebar resident
-    expect(text).toContain('conn-1.temp')        // dashboard card
-    expect(text).toContain('21.5')               // streamed value
-    expect(text).not.toContain('没有已加载的布局插件')
+    // Before login: the login page, the titlebar, and no workflow rail.
+    expect(document.querySelector('[data-region="login"]')).not.toBeNull()
+    expect(document.querySelector('[data-region="workflow-list"]')).toBeNull()
+    expect(document.body.textContent).toContain('snap-rail')
+
+    await loginAs('1001')
+
+    // After login: the rail with the operator, fault, and downtime unlocked.
+    expect(document.querySelector('[data-region="login"]')).toBeNull()
+    expect(document.querySelector('[data-region="workflow-list"]')).not.toBeNull()
+    for (const id of ['maintenance', 'fault', 'downtime']) {
+      expect(workflowItem(id)).not.toBeNull()
+    }
+    // The gated pair stays locked and gray until maintenance completes.
+    expect(workflowItem('production')?.getAttribute('aria-disabled')).toBe('true')
+    expect(workflowItem('sampling')?.getAttribute('aria-disabled')).toBe('true')
+    // The maintenance page is the active content.
+    expect(document.querySelector('[data-page="maintenance"]')).not.toBeNull()
 
     await runtime.dispose()
     element.remove()
   }, 20_000)
 
-  it('degrades to the notice when no layout plugin is present', async () => {
-    const { channel } = await makeWorld()
+  it('unlocks production after the maintenance checklist completes', async () => {
+    const channel = await makeWorld()
     const element = document.createElement('div')
     document.body.append(element)
-
     const handle = await bootClient({ element, channel })
-    const runtime = await createClientRuntime(handle, { plugins: [] })
+    const runtime = await createClientRuntime(handle, { plugins: ALL_OCCUPANTS })
     await flush()
 
-    expect(document.body.textContent).toContain('没有已加载的布局插件')
+    await loginAs('1001')
+
+    // Every checklist item checked, then 完成.
+    const boxes = [...document.querySelectorAll('button[role="checkbox"]')]
+    expect(boxes.length).toBe(5)
+    for (const box of boxes) box.click()
+    await flush()
+    const complete = [...document.querySelectorAll('button')].find(button => button.textContent === '完成')
+    expect(complete?.disabled).toBe(false)
+    complete!.click()
+    await flush(20)
+
+    expect(document.body.textContent).toContain('今日自主维护已完成')
+    expect(workflowItem('production')?.getAttribute('aria-disabled')).toBeNull()
+    // Sampling stays locked until production starts today.
+    expect(workflowItem('sampling')?.getAttribute('aria-disabled')).toBe('true')
+
     await runtime.dispose()
     element.remove()
   }, 20_000)
 
-  it('sends window.control requests when a titlebar button is clicked', async () => {
+  it('asks for confirmation before the close window control fires', async () => {
     const sent: Array<{ method?: unknown, payload?: unknown }> = []
-    const { channel, drive } = await makeWorld()
+    const channel = await makeWorld()
     const spyingChannel: HostChannel = {
       invoke: async request => {
         sent.push({ method: request.method, payload: request.payload })
@@ -115,22 +159,25 @@ describe('createClientRuntime', () => {
       },
       openStream: channel.openStream,
     }
-
     const element = document.createElement('div')
     document.body.append(element)
     const handle = await bootClient({ element, channel: spyingChannel })
-    const runtime = await createClientRuntime(handle, {
-      plugins: [layoutPlugin, titlebarPlugin, dashboardPlugin],
-    })
-    drive.setPoints([{ id: PointId('conn-1.temp'), connection: ConnectionId('conn-1'), type: 'float' }])
+    const runtime = await createClientRuntime(handle, { plugins: ALL_OCCUPANTS })
     await flush()
 
-    const close = [...document.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === '关闭')
-    expect(close).toBeDefined()
-    close?.click()
-    await flush()
+    const closeCalls = () => sent.filter(entry => entry.method === 'window.control' && (entry.payload as { action?: string })?.action === 'close')
 
-    expect(sent.some(entry => entry.method === 'window.control' && (entry.payload as { action?: string }).action === 'close')).toBe(true)
+    document.querySelector<HTMLButtonElement>('button[aria-label="关闭"]')!.click()
+    await flush()
+    // The dialog intercepted the close; nothing reached the window yet.
+    expect(document.body.textContent).toContain('退出客户端？')
+    expect(closeCalls().length).toBe(0)
+
+    const confirm = [...document.querySelectorAll('button')].find(button => button.textContent === '退出')
+    expect(confirm).toBeDefined()
+    confirm!.click()
+    await flush()
+    expect(closeCalls().length).toBe(1)
 
     await runtime.dispose()
     element.remove()

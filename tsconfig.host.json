@@ -22,6 +22,7 @@
     { "path": "./packages/settings/settings" },
     { "path": "./packages/audit/audit" },
     { "path": "./packages/boot/app-boot" },
+    { "path": "./packages/boot/station-rpc" },
     { "path": "./packages/protocol/protocol" },
     { "path": "./packages/protocol/gateway" },
     { "path": "./packages/protocol/connection" },
@@ -30,12 +31,16 @@
     { "path": "./packages/client/ui" },
     { "path": "./packages/client/kernel" },
     { "path": "./packages/client/slots" },
+    { "path": "./packages/client/session" },
+    { "path": "./packages/client/workflows" },
     { "path": "./packages/client/runtime" },
-    { "path": "./packages/client/layout-default" },
+    { "path": "./packages/client/layout-station" },
     { "path": "./packages/client/chrome-titlebar" },
-    { "path": "./packages/client/panel-dashboard" },
-    { "path": "./packages/client/manage-plugins" },
-    { "path": "./packages/client/manage-connections" },
+    { "path": "./packages/client/process-maintenance" },
+    { "path": "./packages/client/process-production" },
+    { "path": "./packages/client/process-sampling" },
+    { "path": "./packages/client/process-fault" },
+    { "path": "./packages/client/process-downtime" },
     { "path": "./apps/desktop" }
   ]
 }

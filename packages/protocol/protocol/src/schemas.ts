@@ -71,6 +71,23 @@ export const methodRequestSchemas: { readonly [K in MethodName]: z.ZodType<Reque
     name: z.string().min(1),
     config: z.unknown(),
   }).strict(),
+  'session.current': z.object({}).strict(),
+  'session.login': z.object({
+    operator: z.string().min(1),
+  }).strict(),
+  'session.logout': z.object({}).strict(),
+  'audit.list': z.object({
+    actions: z.array(z.string().min(1)).optional(),
+    actor: z.string().min(1).optional(),
+    since: z.number().int().nonnegative().optional(),
+    limit: z.number().int().positive().optional(),
+  }).strict(),
+  'audit.record': z.object({
+    action: z.string().min(1),
+    subject: z.string().optional(),
+    detail: z.unknown().optional(),
+  }).strict(),
+  'client-config.list': z.object({}).strict(),
 }
 
 /**

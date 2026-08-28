@@ -6,7 +6,7 @@
  * @module @snap-rail/audit
  */
 
-import { appendFileSync, mkdirSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Context, Service, type Plugin } from '@snap-rail/cordis'
 
@@ -44,6 +44,22 @@ export interface AuditService {
    * @returns the full entry with its assigned timestamp.
    */
   record(entry: Omit<AuditEntry, 'time'> & { time?: number }): AuditEntry
+  /** Read persisted entries back, newest-last; unparseable lines are skipped.
+   * @param filter - optional action/actor/time window; `limit` keeps the newest N.
+   */
+  list(filter?: AuditFilter): AuditEntry[]
+}
+
+/** Read-side filter for {@link AuditService.list}. */
+export interface AuditFilter {
+  /** Keep only these actions when set. */
+  actions?: readonly string[] | undefined
+  /** Keep only this actor when set. */
+  actor?: string | undefined
+  /** Keep entries at or after this epoch-ms timestamp when set. */
+  since?: number | undefined
+  /** Keep at most the newest N entries when set. */
+  limit?: number | undefined
 }
 
 class AuditServiceImpl extends Service {
@@ -69,6 +85,25 @@ class AuditServiceImpl extends Service {
     appendFileSync(this.file, `${serialized}\n`)
     this.ctx.emit('audit/event', full)
     return full
+  }
+
+  list(filter: AuditFilter = {}): AuditEntry[] {
+    if (!existsSync(this.file)) return []
+    const actions = filter.actions === undefined ? undefined : new Set(filter.actions)
+    const entries: AuditEntry[] = []
+    for (const line of readFileSync(this.file, 'utf8').split('\n')) {
+      if (line === '') continue
+      try {
+        entries.push(JSON.parse(line) as AuditEntry)
+      } catch {
+        // A torn line (crash mid-write) never blocks the readable history.
+      }
+    }
+    const kept = entries.filter(entry =>
+      (actions === undefined || actions.has(entry.action))
+      && (filter.actor === undefined || entry.actor === filter.actor)
+      && (filter.since === undefined || entry.time >= filter.since))
+    return filter.limit === undefined ? kept : kept.slice(-filter.limit)
   }
 }
 

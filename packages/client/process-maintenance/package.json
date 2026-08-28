@@ -1,0 +1,37 @@
+{
+  "name": "@snap-rail/process-maintenance",
+  "description": "Workflow page: daily autonomous-maintenance checklist; completing it unlocks production",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^"
+  },
+  "peerDependencies": {
+    "@snap-rail/cordis": "workspace:^",
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@snap-rail/client-session": "workspace:^",
+    "@snap-rail/client-slots": "workspace:^",
+    "@snap-rail/client-workflows": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@types/react": "^19.2.14",
+    "react": "^19.2.8"
+  }
+}

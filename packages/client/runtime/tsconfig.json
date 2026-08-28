@@ -19,6 +19,9 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../../vendor/timer"
+    },
+    {
       "path": "../../protocol/connection"
     },
     {
@@ -26,6 +29,12 @@
     },
     {
       "path": "../../client/slots"
+    },
+    {
+      "path": "../../client/session"
+    },
+    {
+      "path": "../../client/workflows"
     },
     {
       "path": "../ui"

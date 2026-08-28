@@ -32,12 +32,16 @@ function snapRailSources(): Plugin {
     '@snap-rail/client-ui': 'packages/client/ui/src/index.ts',
     '@snap-rail/client-kernel': 'packages/client/kernel/src/index.tsx',
     '@snap-rail/client-slots': 'packages/client/slots/src/index.tsx',
+    '@snap-rail/client-session': 'packages/client/session/src/index.ts',
+    '@snap-rail/client-workflows': 'packages/client/workflows/src/index.ts',
     '@snap-rail/client-runtime': 'packages/client/runtime/src/index.tsx',
-    '@snap-rail/layout-default': 'packages/client/layout-default/src/index.tsx',
+    '@snap-rail/layout-station': 'packages/client/layout-station/src/index.tsx',
     '@snap-rail/chrome-titlebar': 'packages/client/chrome-titlebar/src/index.tsx',
-    '@snap-rail/panel-dashboard': 'packages/client/panel-dashboard/src/index.tsx',
-    '@snap-rail/manage-plugins': 'packages/client/manage-plugins/src/index.tsx',
-    '@snap-rail/manage-connections': 'packages/client/manage-connections/src/index.tsx',
+    '@snap-rail/process-maintenance': 'packages/client/process-maintenance/src/index.tsx',
+    '@snap-rail/process-production': 'packages/client/process-production/src/index.tsx',
+    '@snap-rail/process-sampling': 'packages/client/process-sampling/src/index.tsx',
+    '@snap-rail/process-fault': 'packages/client/process-fault/src/index.tsx',
+    '@snap-rail/process-downtime': 'packages/client/process-downtime/src/index.tsx',
   }
   const sourceOf = new Map<string, string>()
   for (const [name, rel] of Object.entries(sourceFiles)) {

@@ -16,20 +16,25 @@ const spinePackages = [
   'packages/settings/settings',
   'packages/audit/audit',
   'packages/boot/app-boot',
+  'packages/boot/station-rpc',
   'packages/protocol/*',
   'packages/field/field',
   'packages/client/ui',
   'packages/client/kernel',
   'packages/client/slots',
+  'packages/client/session',
+  'packages/client/workflows',
   'packages/client/runtime',
 ]
 
 const occupantNames = new Set([
-  '@snap-rail/layout-default',
+  '@snap-rail/layout-station',
   '@snap-rail/chrome-titlebar',
-  '@snap-rail/panel-dashboard',
-  '@snap-rail/manage-plugins',
-  '@snap-rail/manage-connections',
+  '@snap-rail/process-maintenance',
+  '@snap-rail/process-production',
+  '@snap-rail/process-sampling',
+  '@snap-rail/process-fault',
+  '@snap-rail/process-downtime',
   '@snap-rail/driver-mock',
 ])
 

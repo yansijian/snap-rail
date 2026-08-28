@@ -1,0 +1,30 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../protocol/protocol"
+    },
+    {
+      "path": "../../protocol/gateway"
+    },
+    {
+      "path": "../../audit/audit"
+    },
+    {
+      "path": "../../settings/settings"
+    },
+    {
+      "path": "../app-boot"
+    }
+  ]
+}

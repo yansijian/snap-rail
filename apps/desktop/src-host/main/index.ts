@@ -21,6 +21,17 @@ function builtinLayerPath(): string {
   return join(app.getAppPath(), 'resources', 'builtins.cordis.yml')
 }
 
+/** Renderer occupant packages: their plugins.yml rows are config-only (client-config.list). */
+const RENDERER_PACKAGES: readonly string[] = [
+  '@snap-rail/layout-station',
+  '@snap-rail/chrome-titlebar',
+  '@snap-rail/process-maintenance',
+  '@snap-rail/process-production',
+  '@snap-rail/process-sampling',
+  '@snap-rail/process-fault',
+  '@snap-rail/process-downtime',
+]
+
 async function start(): Promise<void> {
   await app.whenReady()
   wireUpdateChannel()
@@ -32,6 +43,7 @@ async function start(): Promise<void> {
     builtinLayerPath: builtinLayerPath(),
     userLayerPath: join(home, 'plugins.yml'),
     appRoot: app.getAppPath(),
+    rendererPackages: RENDERER_PACKAGES,
     prepare: prepared => {
       // Mounts immediately; activates once the gateway mounts in the tree.
       void prepared.plugin(carrierPlugin)

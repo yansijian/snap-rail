@@ -20,6 +20,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-session": "workspace:^",
     "@snap-rail/client-ui": "workspace:^"
   },
   "peerDependencies": {

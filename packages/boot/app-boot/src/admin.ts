@@ -34,6 +34,8 @@ export interface LayerHandles {
   composedPath: string
   /** Loader entry id of the root include. */
   includeId: string
+  /** Renderer-occupant package names whose rows are config-only (never host-mounted). */
+  rendererPackages: readonly string[]
 }
 
 /** Minimal structural face of the vendored include entry (`refresh`). */
@@ -83,6 +85,7 @@ export class LayerAdmin {
       userLayer: loadUserLayer(this.handles.userLayerPath),
       pool,
       appRoot: this.handles.appRoot,
+      rendererPackages: this.handles.rendererPackages,
     })
   }
 

@@ -143,6 +143,10 @@ export function resolveModuleSpecifier(
  * Compose the final entry list: built-in layer with user rows applied as
  * patches, every module name resolved to a loadable specifier.
  *
+ * Renderer-occupant rows (names in `rendererPackages`) never join the host
+ * tree: they are config-only rows served to the renderer through
+ * `client-config.list`, so they skip patching and the pool requirement.
+ *
  * @param options - built-in entries, user layer, plugin pool, app root.
  * @returns the detached, fully resolved entry list for the loader.
  * @throws when a user row names a plugin present nowhere, or a patch lands on
@@ -153,12 +157,15 @@ export function composeEntries(options: {
   userLayer: UserLayer
   pool: ReadonlyMap<string, PluginDescriptor>
   appRoot: string
+  rendererPackages?: readonly string[]
 }): EntryOptions[] {
   // User rows address plugins by package name; patches land on entry ids
   // (which default to the name but may differ, e.g. mock-demo).
+  const rendererPackages = new Set(options.rendererPackages ?? [])
   const builtinByName = new Map(options.builtin.map(entry => [entry.name as string, entry]))
   const patches: PatchOptions[] = []
   for (const row of options.userLayer.plugins) {
+    if (rendererPackages.has(row.name)) continue
     const builtin = builtinByName.get(row.name)
     if (builtin !== undefined) {
       const patch: PatchOptions = { id: builtin.id }

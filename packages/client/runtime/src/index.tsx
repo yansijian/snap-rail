@@ -9,9 +9,12 @@
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
+import timerPlugin from '@snap-rail/cordis-plugin-timer'
 import type { ClientHandle } from '@snap-rail/client-kernel'
 import type { HostLink } from '@snap-rail/connection'
 import slotsPlugin from '@snap-rail/client-slots'
+import sessionPlugin from '@snap-rail/client-session'
+import workflowsPlugin from '@snap-rail/client-workflows'
 import { createRoot } from 'react-dom/client'
 import { Shell } from './Shell.tsx'
 // The single theme import: tokens and base styles ship with whoever links
@@ -31,14 +34,23 @@ export interface ClientServices {
   link: HostLink
 }
 
+/** One occupant seat: the plugin plus the config carved from its plugins.yml row. */
+export interface OccupantSpec {
+  /** The occupant plugin (layout, chrome, process pages). */
+  plugin: Plugin
+  /** The occupant's config when its user-layer row carries one. */
+  config?: unknown
+}
+
 /** Options for {@link createClientRuntime}. */
 export interface RuntimeOptions {
   /**
-   * Occupant plugins (layout, chrome, panels). Phase 1 ships them from an
-   * in-app list; the boot-graph-driven loader replaces this seat when plugin
-   * directories ship outside the bundle.
+   * Occupant plugins (layout, chrome, process pages) — a bare plugin or one
+   * paired with config. Phase 1 ships them from an in-app list; the
+   * boot-graph-driven loader replaces this seat when plugin directories ship
+   * outside the bundle.
    */
-  plugins: readonly Plugin[]
+  plugins: readonly (Plugin | OccupantSpec)[]
 }
 
 export interface RuntimeHandle {
@@ -55,11 +67,20 @@ export interface RuntimeHandle {
  */
 export async function createClientRuntime(handle: ClientHandle, options: RuntimeOptions): Promise<RuntimeHandle> {
   const ctx = new Context()
-  await ctx.plugin(slotsPlugin)
-  for (const plugin of options.plugins) {
-    await ctx.plugin(plugin as Plugin<void>)
-  }
   ctx.provide('client', { link: handle.link })
+  // Spine services first: timer gives occupants disposable intervals, slots
+  // carries the panel seam, session and workflows sit under every occupant.
+  await ctx.plugin(timerPlugin)
+  await ctx.plugin(slotsPlugin)
+  await ctx.plugin(sessionPlugin)
+  await ctx.plugin(workflowsPlugin)
+  for (const seat of options.plugins) {
+    const spec: OccupantSpec = 'plugin' in seat ? seat : { plugin: seat }
+    // Plugins without a Config ignore the second argument; an empty object
+    // lets zod-defaulted configs (model tables, schedules) fill themselves.
+    const plugin = spec.plugin as Plugin<Record<string, unknown>>
+    await ctx.plugin(plugin, spec.config === undefined ? {} : spec.config as Record<string, unknown>)
+  }
 
   // Take over the element: the startup root unmounts, a fresh shell roots.
   handle.root.unmount()

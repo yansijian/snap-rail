@@ -17,4 +17,8 @@ export default defineConfig({
   fixedExtension: false,
   dts: false,
   clean: false,
+  // Bundler asset imports (plugin-bundled photos): the node-side lib never
+  // loads them — only the renderer bundle does, through Vite. Keep the
+  // imports untouched instead of failing resolution.
+  external: [/\.(png|jpe?g|webp|gif|svg)$/],
 })

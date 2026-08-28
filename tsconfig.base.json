@@ -52,12 +52,17 @@
       "@snap-rail/client-ui/theme.css": ["./packages/client/ui/src/theme.css"],
       "@snap-rail/client-kernel": ["./packages/client/kernel/src"],
       "@snap-rail/client-slots": ["./packages/client/slots/src"],
+      "@snap-rail/client-session": ["./packages/client/session/src"],
+      "@snap-rail/client-workflows": ["./packages/client/workflows/src"],
       "@snap-rail/client-runtime": ["./packages/client/runtime/src"],
-      "@snap-rail/layout-default": ["./packages/client/layout-default/src"],
+      "@snap-rail/layout-station": ["./packages/client/layout-station/src"],
       "@snap-rail/chrome-titlebar": ["./packages/client/chrome-titlebar/src"],
-      "@snap-rail/panel-dashboard": ["./packages/client/panel-dashboard/src"],
-      "@snap-rail/manage-plugins": ["./packages/client/manage-plugins/src"],
-      "@snap-rail/manage-connections": ["./packages/client/manage-connections/src"]
+      "@snap-rail/process-maintenance": ["./packages/client/process-maintenance/src"],
+      "@snap-rail/process-production": ["./packages/client/process-production/src"],
+      "@snap-rail/process-sampling": ["./packages/client/process-sampling/src"],
+      "@snap-rail/process-fault": ["./packages/client/process-fault/src"],
+      "@snap-rail/process-downtime": ["./packages/client/process-downtime/src"],
+      "@snap-rail/station-rpc": ["./packages/boot/station-rpc/src"]
     }
   }
 }

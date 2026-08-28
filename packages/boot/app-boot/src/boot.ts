@@ -50,6 +50,9 @@ export interface BootOptions {
   appRoot: string
   /** Plugin pool directories; defaults to `<home>/plugins`. */
   poolDirs?: readonly string[]
+  /** Renderer-occupant package names: their `plugins.yml` rows are config-only
+   * (served via `client-config.list`) and never mount into the host tree. */
+  rendererPackages?: readonly string[]
   /** Host setup run after the loader mounts and before any config entry. */
   prepare?: (ctx: Context) => void | Promise<void>
 }
@@ -91,7 +94,8 @@ export async function boot(options: BootOptions): Promise<Context> {
   const pool = scanPluginPool(poolDirs)
   const builtin = loadBuiltinLayer(options.builtinLayerPath)
   const userLayer = loadUserLayer(options.userLayerPath)
-  const composed = composeEntries({ builtin, userLayer, pool, appRoot: options.appRoot })
+  const rendererPackages = options.rendererPackages ?? []
+  const composed = composeEntries({ builtin, userLayer, pool, appRoot: options.appRoot, rendererPackages })
   const composedPath = join(options.home, COMPOSED_CONFIG_NAME)
   writeFileSync(composedPath, dump(composed))
 
@@ -124,6 +128,7 @@ export async function boot(options: BootOptions): Promise<Context> {
       poolDirs,
       composedPath,
       includeId,
+      rendererPackages,
     }))
     return ctx
   } catch (cause) {

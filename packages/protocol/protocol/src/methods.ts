@@ -75,6 +75,59 @@ export interface PluginsApi {
   setConfig(payload: { name: string, config: unknown }): Promise<RpcResponse<{ applied: true }>>
 }
 
+/** Operator session: who is signed on at the station terminal. */
+export interface SessionApi {
+  /** The signed-on operator, or `null` when the station waits at the login page. */
+  current(payload: {}): Promise<RpcResponse<{ operator: string | null }>>
+  /** Sign an operator on (persisted across restarts); an empty id is a business failure. */
+  login(payload: { operator: string }): Promise<RpcResponse<{ applied: true }>>
+  /** Sign the current operator off. */
+  logout(payload: {}): Promise<RpcResponse<{ applied: true }>>
+}
+
+/** One audit record on the wire; mirrors the audit service entry shape. */
+export interface AuditEntryInfo {
+  /** Wall-clock epoch milliseconds. */
+  time: number
+  /** Who caused the action (`actor` of the audit entry). */
+  actor: string
+  /** What happened (`maintenance.complete`, `production.start`, ...). */
+  action: string
+  /** What the action targeted, when a single target exists. */
+  subject?: string
+  /** Action-specific detail. */
+  detail?: unknown
+}
+
+/** Reading and appending station business events (the audit log). */
+export interface AuditApi {
+  /** Read persisted entries, oldest-first; `limit` keeps the newest N. */
+  list(payload: {
+    actions?: readonly string[] | undefined
+    actor?: string | undefined
+    since?: number | undefined
+    limit?: number | undefined
+  }): Promise<RpcResponse<{ entries: readonly AuditEntryInfo[] }>>
+  /** Append one business event; the actor is the signed-on operator, resolved host-side. */
+  record(payload: { action: string, subject?: string | undefined, detail?: unknown }): Promise<RpcResponse<{ time: number }>>
+}
+
+/** One renderer-occupant row carved out of the user layer. */
+export interface ClientConfigRow {
+  /** Renderer occupant package name (the row key). */
+  name: string
+  /** Whether the occupant mounts (`absent` rows default to enabled). */
+  enabled: boolean
+  /** The occupant's config when the row carries one. */
+  config?: unknown
+}
+
+/** Renderer-occupant configuration carved out of the shared `plugins.yml`. */
+export interface ClientConfigApi {
+  /** Rows present in the user layer for known renderer packages. */
+  list(payload: {}): Promise<RpcResponse<{ rows: readonly ClientConfigRow[] }>>
+}
+
 /** Every unary method callable by a client, keyed by its wire method name. */
 export interface RpcMethodMap {
   'host.describe': HostApi['describe']
@@ -88,6 +141,12 @@ export interface RpcMethodMap {
   'plugins.list': PluginsApi['list']
   'plugins.setEnabled': PluginsApi['setEnabled']
   'plugins.setConfig': PluginsApi['setConfig']
+  'session.current': SessionApi['current']
+  'session.login': SessionApi['login']
+  'session.logout': SessionApi['logout']
+  'audit.list': AuditApi['list']
+  'audit.record': AuditApi['record']
+  'client-config.list': ClientConfigApi['list']
 }
 
 /** Method names on the wire. */
