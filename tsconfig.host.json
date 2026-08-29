@@ -20,6 +20,7 @@
     { "path": "./vendor/logger-console" },
     { "path": "./packages/util/util" },
     { "path": "./packages/settings/settings" },
+    { "path": "./packages/store/store" },
     { "path": "./packages/audit/audit" },
     { "path": "./packages/boot/app-boot" },
     { "path": "./packages/boot/station-rpc" },

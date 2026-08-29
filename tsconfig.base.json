@@ -39,6 +39,7 @@
       "@snap-rail/cordis-plugin-logger-console": ["./vendor/logger-console/src"],
       "@snap-rail/util": ["./packages/util/util/src"],
       "@snap-rail/settings": ["./packages/settings/settings/src"],
+      "@snap-rail/store": ["./packages/store/store/src"],
       "@snap-rail/audit": ["./packages/audit/audit/src"],
       "@snap-rail/app-boot": ["./packages/boot/app-boot/src"],
       "@snap-rail/app-boot/rpc": ["./packages/boot/app-boot/src/rpc.ts"],

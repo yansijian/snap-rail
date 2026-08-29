@@ -14,6 +14,7 @@ const spinePackages = [
   'vendor/*',
   'packages/util/util',
   'packages/settings/settings',
+  'packages/store/store',
   'packages/audit/audit',
   'packages/boot/app-boot',
   'packages/boot/station-rpc',

@@ -2,6 +2,8 @@
   name: '@snap-rail/cordis-plugin-timer'
 - id: settings
   name: '@snap-rail/settings'
+- id: store
+  name: '@snap-rail/store'
 - id: audit
   name: '@snap-rail/audit'
 - id: gateway
