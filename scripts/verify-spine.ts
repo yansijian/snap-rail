@@ -23,6 +23,7 @@ const spinePackages = [
   'packages/client/ui',
   'packages/client/kernel',
   'packages/client/slots',
+  'packages/client/settings',
   'packages/client/session',
   'packages/client/workflows',
   'packages/client/runtime',
@@ -31,6 +32,7 @@ const spinePackages = [
 const occupantNames = new Set([
   '@snap-rail/layout-station',
   '@snap-rail/chrome-titlebar',
+  '@snap-rail/settings-station',
   '@snap-rail/process-maintenance',
   '@snap-rail/process-production',
   '@snap-rail/process-sampling',

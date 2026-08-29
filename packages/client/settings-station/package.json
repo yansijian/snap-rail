@@ -1,6 +1,6 @@
 {
-  "name": "@snap-rail/chrome-titlebar",
-  "description": "Resident frameless-window titlebar with drag region and window controls",
+  "name": "@snap-rail/settings-station",
+  "description": "The settings dialog shell: renders the settingsPages registry (menu + content) and the first-party plugin management page",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -20,7 +20,6 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@snap-rail/client-runtime": "workspace:^",
-    "@snap-rail/client-session": "workspace:^",
     "@snap-rail/client-settings": "workspace:^",
     "@snap-rail/client-ui": "workspace:^"
   },
@@ -29,7 +28,6 @@
     "react": ">=19"
   },
   "devDependencies": {
-    "@snap-rail/client-slots": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@types/react": "^19.2.14",
     "lucide-react": "^1.34.0",

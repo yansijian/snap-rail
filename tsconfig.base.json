@@ -53,6 +53,8 @@
       "@snap-rail/client-ui/theme.css": ["./packages/client/ui/src/theme.css"],
       "@snap-rail/client-kernel": ["./packages/client/kernel/src"],
       "@snap-rail/client-slots": ["./packages/client/slots/src"],
+      "@snap-rail/client-settings": ["./packages/client/settings/src"],
+      "@snap-rail/settings-station": ["./packages/client/settings-station/src"],
       "@snap-rail/client-session": ["./packages/client/session/src"],
       "@snap-rail/client-workflows": ["./packages/client/workflows/src"],
       "@snap-rail/client-runtime": ["./packages/client/runtime/src"],

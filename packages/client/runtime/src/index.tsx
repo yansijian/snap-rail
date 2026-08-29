@@ -13,6 +13,7 @@ import timerPlugin from '@snap-rail/cordis-plugin-timer'
 import type { ClientHandle } from '@snap-rail/client-kernel'
 import type { HostLink } from '@snap-rail/connection'
 import slotsPlugin from '@snap-rail/client-slots'
+import settingsPlugin from '@snap-rail/client-settings'
 import sessionPlugin from '@snap-rail/client-session'
 import workflowsPlugin from '@snap-rail/client-workflows'
 import { createRoot } from 'react-dom/client'
@@ -69,9 +70,11 @@ export async function createClientRuntime(handle: ClientHandle, options: Runtime
   const ctx = new Context()
   ctx.provide('client', { link: handle.link })
   // Spine services first: timer gives occupants disposable intervals, slots
-  // carries the panel seam, session and workflows sit under every occupant.
+  // carries the panel seam, session and workflows sit under every occupant,
+  // and settingsPages is the seam dialog pages consume.
   await ctx.plugin(timerPlugin)
   await ctx.plugin(slotsPlugin)
+  await ctx.plugin(settingsPlugin)
   await ctx.plugin(sessionPlugin)
   await ctx.plugin(workflowsPlugin)
   for (const seat of options.plugins) {

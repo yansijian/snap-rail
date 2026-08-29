@@ -15,23 +15,9 @@
     "src"
   ],
   "references": [
-    {
-      "path": "../../../vendor/cordis"
-    },
-    {
-      "path": "../slots"
-    },
-    {
-      "path": "../settings"
-    },
-    {
-      "path": "../runtime"
-    },
-    {
-      "path": "../session"
-    },
-    {
-      "path": "../ui"
-    }
+    { "path": "../../../vendor/cordis" },
+    { "path": "../settings" },
+    { "path": "../runtime" },
+    { "path": "../ui" }
   ]
 }

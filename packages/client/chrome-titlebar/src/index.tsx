@@ -1,20 +1,23 @@
 /**
  * Resident frameless-window titlebar: logo and title on the left inside a
- * drag region; on the right the signed-on operator with sign-off, then
- * minimize / maximize / close as full-height flush buttons (no gaps to the
- * top or right edges). Close asks for confirmation first — the station is
- * always mid-shift, an accidental click must not kill the terminal.
+ * drag region; on the right the signed-on operator with sign-off, then the
+ * settings button and minimize / maximize / close as full-height flush
+ * buttons (no gaps to the top or right edges). Close asks for confirmation
+ * first — the station is always mid-shift, an accidental click must not kill
+ * the terminal. The settings button only raises the dialog (`open()`); its
+ * contents live behind the settings seam.
  *
  * @module @snap-rail/chrome-titlebar
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
-import { LogOut, Minus, Square, X } from 'lucide-react'
+import { LogOut, Minus, Settings, Square, X } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@snap-rail/client-ui'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
 import '@snap-rail/client-session'
+import '@snap-rail/client-settings'
 
 type Action = 'minimize' | 'toggle-maximize' | 'close'
 
@@ -82,6 +85,14 @@ function Titlebar(props: {
         <div className="flex items-stretch">
           <Button
             variant="ghost"
+            aria-label="设置"
+            className="h-full w-11 rounded-none px-0"
+            onClick={() => props.ctx.settingsPages.open()}
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
             aria-label="最小化"
             className="h-full w-11 rounded-none px-0"
             onClick={() => props.control('minimize')}
@@ -128,7 +139,7 @@ function Titlebar(props: {
 /** The titlebar occupant. */
 const titlebarPlugin: Plugin.Object<void> = {
   name: 'chrome-titlebar',
-  inject: ['uiSlots', 'client', 'session'],
+  inject: ['uiSlots', 'client', 'session', 'settingsPages'],
   apply(ctx: Context): void {
     // One stable sender for the plugin lifetime; late fires after teardown
     // must not surface as unhandled rejections.

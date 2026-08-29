@@ -21,6 +21,7 @@
   "dependencies": {
     "@snap-rail/client-kernel": "workspace:^",
     "@snap-rail/client-session": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
     "@snap-rail/client-slots": "workspace:^",
     "@snap-rail/client-ui": "workspace:^",
     "@snap-rail/client-workflows": "workspace:^"
