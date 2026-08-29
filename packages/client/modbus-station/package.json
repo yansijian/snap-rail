@@ -1,6 +1,6 @@
 {
-  "name": "@snap-rail/process-production",
-  "description": "Workflow page: production task — model pick, live actual/theoretical output, hourly chart",
+  "name": "@snap-rail/modbus-station",
+  "description": "The ModbusTCP settings page: device CRUD, variable mappings over the registry, manual debug variables, live values",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -20,24 +20,18 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@snap-rail/client-runtime": "workspace:^",
-    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
     "@snap-rail/client-variables": "workspace:^",
-    "@snap-rail/process-maintenance": "workspace:^"
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/protocol": "workspace:^"
   },
   "peerDependencies": {
     "@snap-rail/cordis": "workspace:^",
-    "react": ">=19",
-    "zod": "^4.4.3"
+    "react": ">=19"
   },
   "devDependencies": {
-    "@snap-rail/client-session": "workspace:^",
-    "@snap-rail/client-slots": "workspace:^",
-    "@snap-rail/client-variables": "workspace:^",
-    "@snap-rail/client-workflows": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
-    "@snap-rail/protocol": "workspace:^",
     "@types/react": "^19.2.14",
-    "react": "^19.2.8",
-    "zod": "^4.4.3"
+    "react": "^19.2.8"
   }
 }

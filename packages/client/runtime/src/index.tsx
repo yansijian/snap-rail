@@ -15,6 +15,7 @@ import type { HostLink } from '@snap-rail/connection'
 import slotsPlugin from '@snap-rail/client-slots'
 import settingsPlugin from '@snap-rail/client-settings'
 import sessionPlugin from '@snap-rail/client-session'
+import variablesPlugin from '@snap-rail/client-variables'
 import workflowsPlugin from '@snap-rail/client-workflows'
 import { createRoot } from 'react-dom/client'
 import { Shell } from './Shell.tsx'
@@ -71,10 +72,12 @@ export async function createClientRuntime(handle: ClientHandle, options: Runtime
   ctx.provide('client', { link: handle.link })
   // Spine services first: timer gives occupants disposable intervals, slots
   // carries the panel seam, session and workflows sit under every occupant,
-  // and settingsPages is the seam dialog pages consume.
+  // and settingsPages/variables are the seams dialog pages and demand
+  // plugins consume.
   await ctx.plugin(timerPlugin)
   await ctx.plugin(slotsPlugin)
   await ctx.plugin(settingsPlugin)
+  await ctx.plugin(variablesPlugin)
   await ctx.plugin(sessionPlugin)
   await ctx.plugin(workflowsPlugin)
   for (const seat of options.plugins) {

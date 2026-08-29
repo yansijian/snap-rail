@@ -16,6 +16,7 @@ import maintenancePlugin from '@snap-rail/process-maintenance'
 import productionPlugin from '@snap-rail/process-production'
 import samplingPlugin from '@snap-rail/process-sampling'
 import settingsStationPlugin from '@snap-rail/settings-station'
+import modbusStationPlugin from '@snap-rail/modbus-station'
 import layoutPlugin from '@snap-rail/layout-station'
 import { createClientRuntime, type OccupantSpec } from '@snap-rail/client-runtime'
 import type { Plugin } from '@snap-rail/cordis'
@@ -42,6 +43,7 @@ const OCCUPANTS: ReadonlyArray<{ name: string, plugin: Plugin }> = [
   { name: '@snap-rail/process-fault', plugin: faultPlugin },
   { name: '@snap-rail/process-downtime', plugin: downtimePlugin },
   { name: '@snap-rail/settings-station', plugin: settingsStationPlugin },
+  { name: '@snap-rail/modbus-station', plugin: modbusStationPlugin },
 ]
 
 const seats: (Plugin | OccupantSpec)[] = []

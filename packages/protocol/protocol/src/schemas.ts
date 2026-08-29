@@ -10,6 +10,7 @@
 import { z } from 'zod'
 import { RpcId, type ClientRequest, type RpcId as RpcIdType, type ServerRequest } from './rpc.ts'
 import type { MethodName, RequestPayload } from './methods.ts'
+import { modbusDeviceSchema, modbusPointSchema } from './modbus.ts'
 
 const rpcIdSchema: z.ZodType<RpcIdType, string> = z.string().min(1).transform(RpcId)
 
@@ -88,6 +89,17 @@ export const methodRequestSchemas: { readonly [K in MethodName]: z.ZodType<Reque
     detail: z.unknown().optional(),
   }).strict(),
   'client-config.list': z.object({}).strict(),
+  'modbus.devices.list': z.object({}).strict(),
+  'modbus.devices.upsert': z.object({ device: modbusDeviceSchema }).strict(),
+  'modbus.devices.remove': z.object({ id: z.string().min(1) }).strict(),
+  'modbus.devices.test': z.object({ device: modbusDeviceSchema }).strict(),
+  'modbus.vars.upsert': z.object({
+    name: z.string().min(1).max(128),
+    type: z.enum(['bool', 'int', 'float']),
+  }).strict(),
+  'modbus.vars.remove': z.object({ name: z.string().min(1) }).strict(),
+  'modbus.points.upsert': z.object({ point: modbusPointSchema }).strict(),
+  'modbus.points.remove': z.object({ id: z.string().min(1) }).strict(),
 }
 
 /**

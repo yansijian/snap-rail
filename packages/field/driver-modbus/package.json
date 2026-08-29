@@ -1,0 +1,49 @@
+{
+  "name": "@snap-rail/driver-modbus",
+  "description": "ModbusTCP field driver: block-merged polling, change-only sampling, write support; modbus.* bridge and store tables ride along",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./rpc": {
+      "types": "./lib/types/rpc.d.ts",
+      "default": "./lib/rpc.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/rpc.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@snap-rail/protocol": "workspace:^",
+    "modbus-serial": "8.0.23-no-serial-port",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@snap-rail/audit": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/store": "workspace:^"
+  },
+  "devDependencies": {
+    "@snap-rail/audit": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/store": "workspace:^"
+  }
+}

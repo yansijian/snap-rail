@@ -55,6 +55,9 @@ importers:
       '@snap-rail/driver-mock':
         specifier: workspace:^
         version: link:../../packages/field/driver-mock
+      '@snap-rail/driver-modbus':
+        specifier: workspace:^
+        version: link:../../packages/field/driver-modbus
       '@snap-rail/field':
         specifier: workspace:^
         version: link:../../packages/field/field
@@ -67,6 +70,9 @@ importers:
       '@snap-rail/station-rpc':
         specifier: workspace:^
         version: link:../../packages/boot/station-rpc
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../packages/store/store
       electron-updater:
         specifier: ^6.6.2
         version: 6.8.9(supports-color@9.4.0)
@@ -80,15 +86,24 @@ importers:
       '@snap-rail/client-runtime':
         specifier: workspace:^
         version: link:../../packages/client/runtime
+      '@snap-rail/client-settings':
+        specifier: workspace:^
+        version: link:../../packages/client/settings
       '@snap-rail/client-slots':
         specifier: workspace:^
         version: link:../../packages/client/slots
+      '@snap-rail/client-variables':
+        specifier: workspace:^
+        version: link:../../packages/client/variables
       '@snap-rail/connection':
         specifier: workspace:^
         version: link:../../packages/protocol/connection
       '@snap-rail/layout-station':
         specifier: workspace:^
         version: link:../../packages/client/layout-station
+      '@snap-rail/modbus-station':
+        specifier: workspace:^
+        version: link:../../packages/client/modbus-station
       '@snap-rail/process-downtime':
         specifier: workspace:^
         version: link:../../packages/client/process-downtime
@@ -104,6 +119,9 @@ importers:
       '@snap-rail/process-sampling':
         specifier: workspace:^
         version: link:../../packages/client/process-sampling
+      '@snap-rail/settings-station':
+        specifier: workspace:^
+        version: link:../../packages/client/settings-station
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
@@ -204,6 +222,9 @@ importers:
       '@snap-rail/client-session':
         specifier: workspace:^
         version: link:../session
+      '@snap-rail/client-settings':
+        specifier: workspace:^
+        version: link:../settings
       '@snap-rail/client-ui':
         specifier: workspace:^
         version: link:../ui
@@ -270,6 +291,34 @@ importers:
       '@snap-rail/client-workflows':
         specifier: workspace:^
         version: link:../workflows
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+
+  packages/client/modbus-station:
+    dependencies:
+      '@snap-rail/client-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+      '@snap-rail/client-settings':
+        specifier: workspace:^
+        version: link:../settings
+      '@snap-rail/client-ui':
+        specifier: workspace:^
+        version: link:../ui
+      '@snap-rail/client-variables':
+        specifier: workspace:^
+        version: link:../variables
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../protocol/protocol
+    devDependencies:
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
@@ -381,6 +430,9 @@ importers:
       '@snap-rail/client-ui':
         specifier: workspace:^
         version: link:../ui
+      '@snap-rail/client-variables':
+        specifier: workspace:^
+        version: link:../variables
       '@snap-rail/process-maintenance':
         specifier: workspace:^
         version: link:../process-maintenance
@@ -458,12 +510,18 @@ importers:
       '@snap-rail/client-session':
         specifier: workspace:^
         version: link:../session
+      '@snap-rail/client-settings':
+        specifier: workspace:^
+        version: link:../settings
       '@snap-rail/client-slots':
         specifier: workspace:^
         version: link:../slots
       '@snap-rail/client-ui':
         specifier: workspace:^
         version: link:../ui
+      '@snap-rail/client-variables':
+        specifier: workspace:^
+        version: link:../variables
       '@snap-rail/client-workflows':
         specifier: workspace:^
         version: link:../workflows
@@ -503,6 +561,43 @@ importers:
         specifier: workspace:^
         version: link:../../../vendor/cordis
 
+  packages/client/settings:
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+
+  packages/client/settings-station:
+    dependencies:
+      '@snap-rail/client-runtime':
+        specifier: workspace:^
+        version: link:../runtime
+      '@snap-rail/client-settings':
+        specifier: workspace:^
+        version: link:../settings
+      '@snap-rail/client-ui':
+        specifier: workspace:^
+        version: link:../ui
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      lucide-react:
+        specifier: ^1.34.0
+        version: 1.34.0(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+
   packages/client/slots:
     devDependencies:
       '@snap-rail/cordis':
@@ -532,6 +627,9 @@ importers:
       '@radix-ui/react-scroll-area':
         specifier: ^1.2.18
         version: 1.2.18(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-select':
+        specifier: ^2.3.7
+        version: 2.3.7(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-slot':
         specifier: ^1.3.3
         version: 1.3.3(@types/react@19.2.18)(react@19.2.8)
@@ -551,6 +649,34 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0
     devDependencies:
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.5(@types/react@19.2.18)
+      happy-dom:
+        specifier: ^20.0.11
+        version: 20.11.6
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+
+  packages/client/variables:
+    dependencies:
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../protocol/protocol
+    devDependencies:
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../protocol/connection
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
@@ -598,6 +724,40 @@ importers:
         specifier: workspace:^
         version: link:../field
 
+  packages/field/driver-modbus:
+    dependencies:
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../protocol/protocol
+      modbus-serial:
+        specifier: 8.0.23-no-serial-port
+        version: 8.0.23-no-serial-port(supports-color@9.4.0)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/audit':
+        specifier: workspace:^
+        version: link:../../audit/audit
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../../vendor/timer
+      '@snap-rail/field':
+        specifier: workspace:^
+        version: link:../field
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../protocol/gateway
+      '@snap-rail/settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../store/store
+
   packages/field/field:
     dependencies:
       '@snap-rail/protocol':
@@ -643,6 +803,12 @@ importers:
         version: 4.4.3
 
   packages/settings/settings:
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+
+  packages/store/store:
     devDependencies:
       '@snap-rail/cordis':
         specifier: workspace:^
@@ -1369,6 +1535,19 @@ packages:
       '@types/react-dom':
         optional: true
 
+  '@radix-ui/react-select@2.3.7':
+    resolution: {integrity: sha512-WFGImkmbzcfxeIwq/+4HvRN0pizBwbwQUED4I13ezQsDdfl38ZntN6TmR8XaSzPBqoCToe8rF75j6NPNDSzhbg==}
+    peerDependencies:
+      '@types/react': '*'
+      '@types/react-dom': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
+
   '@radix-ui/react-slot@1.3.3':
     resolution: {integrity: sha512-qx7oqnYbxnK9kYI9m317qmFmEgo6ywqWvbTogdj7cL9p3/yx4M48p7Rnw5z3H890cL/ow/EeWJsuTykeZVXP5Q==}
     peerDependencies:
@@ -1442,6 +1621,15 @@ packages:
 
   '@radix-ui/react-use-layout-effect@1.1.4':
     resolution: {integrity: sha512-K20DkRkUwDnxEYMBPcg3Y6voLkEy5p5QQmszZgLngKKiC7dzBR/aEuK3w1qlx2JWDUNH6FluahYdgR3BP+QbYw==}
+    peerDependencies:
+      '@types/react': '*'
+      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
+  '@radix-ui/react-use-previous@1.1.4':
+    resolution: {integrity: sha512-XoSLhbRbqxFtgJoi2fNHA3C6pDlY34x508vUpUGoFZfvePfHXHbE1lC4FYFMnJWgiCRroSTw6fOsXQoVS9RwZg==}
     peerDependencies:
       '@types/react': '*'
       react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
@@ -2719,6 +2907,9 @@ packages:
   mkdirp@0.5.6:
     resolution: {integrity: sha512-FP+p8RB8OWpF3YZBCrP5gtADmtXApB5AMLn+vdyA+PyxCjrCs00mjyUozssO33cwDeT3wNGdLxJ5M//YqtHAJw==}
     hasBin: true
+
+  modbus-serial@8.0.23-no-serial-port:
+    resolution: {integrity: sha512-7k9azlf6HQCUqv1LxKYgVVPPJmIOxUYNkAm8KQVuK105Ic9JHCMm8Vh/NQtlXd9YiGZF2rAHdkVHR7xvI6b6MQ==}
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -4042,6 +4233,36 @@ snapshots:
       '@types/react': 19.2.18
       '@types/react-dom': 19.2.5(@types/react@19.2.18)
 
+  '@radix-ui/react-select@2.3.7(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@radix-ui/number': 1.1.3
+      '@radix-ui/primitive': 1.1.7
+      '@radix-ui/react-collection': 1.1.15(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-compose-refs': 1.1.5(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-context': 1.2.2(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-direction': 1.1.4(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-dismissable-layer': 1.1.19(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-focus-guards': 1.1.6(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-focus-scope': 1.1.16(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-id': 1.1.4(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-popper': 1.3.7(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-portal': 1.1.17(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-presence': 1.1.10(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-primitive': 2.1.10(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-slot': 1.3.3(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-use-callback-ref': 1.1.4(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-use-controllable-state': 1.2.6(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-use-layout-effect': 1.1.4(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-use-previous': 1.1.4(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-visually-hidden': 1.2.11(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      aria-hidden: 1.2.6
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+      react-remove-scroll: 2.7.2(@types/react@19.2.18)(react@19.2.8)
+    optionalDependencies:
+      '@types/react': 19.2.18
+      '@types/react-dom': 19.2.5(@types/react@19.2.18)
+
   '@radix-ui/react-slot@1.3.3(@types/react@19.2.18)(react@19.2.8)':
     dependencies:
       '@radix-ui/react-compose-refs': 1.1.5(@types/react@19.2.18)(react@19.2.8)
@@ -4113,6 +4334,12 @@ snapshots:
       '@types/react': 19.2.18
 
   '@radix-ui/react-use-layout-effect@1.1.4(@types/react@19.2.18)(react@19.2.8)':
+    dependencies:
+      react: 19.2.8
+    optionalDependencies:
+      '@types/react': 19.2.18
+
+  '@radix-ui/react-use-previous@1.1.4(@types/react@19.2.18)(react@19.2.8)':
     dependencies:
       react: 19.2.8
     optionalDependencies:
@@ -5290,6 +5517,12 @@ snapshots:
   mkdirp@0.5.6:
     dependencies:
       minimist: 1.2.8
+
+  modbus-serial@8.0.23-no-serial-port(supports-color@9.4.0):
+    dependencies:
+      debug: 4.4.3(supports-color@9.4.0)
+    transitivePeerDependencies:
+      - supports-color
 
   ms@2.1.3: {}
 

@@ -20,6 +20,13 @@
   name: '@snap-rail/app-boot/rpc'
 - id: station-rpc
   name: '@snap-rail/station-rpc'
+# ModbusTCP: devices live in the driver's store tables and are edited from
+# the settings dialog (modbus-station); the driver mounts with an empty
+# table and reconciles on modbus/config-changed.
+- id: driver-modbus
+  name: '@snap-rail/driver-modbus'
+- id: modbus-rpc
+  name: '@snap-rail/driver-modbus/rpc'
 # Phase-1 demo resident: the dashboard's live source until connection
 # management lands; the user layer can disable or re-point it.
 - id: mock-demo

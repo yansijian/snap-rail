@@ -2,9 +2,11 @@
  * Workflow page: 生产任务 — pick a model, start, and watch the counters.
  * The theoretical total derives from the audit event stream (rate × net
  * running time, pauses unioned from fault + downtime events); the actual
- * total counts device samples on the configured `countPoint` — without one
- * it stays 0 until the communication plugin lands. Starting production
- * records `production.start`, which unlocks the sampling workflow.
+ * total follows the counting variable this plugin declares (默认 产量计数)
+ * and accumulates its positive deltas — map the variable onto a device
+ * address in the communication settings and the counter runs. Starting
+ * production records `production.start`, which unlocks the sampling
+ * workflow.
  *
  * @module @snap-rail/process-production
  */
@@ -14,6 +16,7 @@ import { z } from 'zod'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, cn } from '@snap-rail/client-ui'
 import { MAINTENANCE_COMPLETE } from '@snap-rail/process-maintenance'
+import { usePoint } from '@snap-rail/client-variables'
 import {
   deriveState,
   theoryPerHour,
@@ -25,6 +28,7 @@ import {
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
 import '@snap-rail/client-session'
+import '@snap-rail/client-variables'
 import '@snap-rail/client-workflows'
 
 /** Audit action: production started with a model (unlocks sampling for today). */
@@ -49,15 +53,16 @@ const modelSchema = z.object({
   ratePerHour: z.number().positive(),
 })
 
-/** Config schema: the model table (and optional counting point) from plugins.yml. */
+/** Config schema: the model table (and the counting variable name) from plugins.yml. */
 export const productionConfigSchema = z.object({
   models: z.array(modelSchema).min(1).default([
     { id: 'SR-100', name: 'SR-100', ratePerHour: 1200 },
     { id: 'SR-200', name: 'SR-200', ratePerHour: 900 },
     { id: 'SR-300', name: 'SR-300', ratePerHour: 600 },
   ]),
-  /** Device point id whose samples are counted; absent keeps the actual total at 0. */
-  countPoint: z.string().min(1).optional(),
+  /** Name of the counting variable this plugin declares and follows; map it
+   * onto a device address in the communication settings to run the counter. */
+  countVar: z.string().min(1).default('产量计数'),
 })
 
 export type ProductionConfig = z.infer<typeof productionConfigSchema>
@@ -117,11 +122,12 @@ function ProductionPage(props: { ctx: Context, config: ProductionConfig }): Reac
   const [selected, setSelected] = useState<ModelInfo | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  /** Hour-bucketed actual counts (this session, in-memory until counting is real). */
+  /** Hour-bucketed actual counts (session-scoped; theory derives from audit). */
   const actualRef = useRef<{ lastSample: number | bigint | null, total: number, buckets: Map<number, number> }>({
     lastSample: null, total: 0, buckets: new Map(),
   })
   const [, forceCount] = useState(0)
+  const countSample = usePoint(ctx, config.countVar)
 
   const refresh = (): void => {
     const midnight = new Date()
@@ -146,32 +152,29 @@ function ProductionPage(props: { ctx: Context, config: ProductionConfig }): Reac
     return () => { window.clearInterval(tick) }
   }, [])
 
-  // Count device samples on the configured point (deltas accumulate into the
-  // current hour bucket); without a point the actual total stays 0.
+  // Actual counting: follow the counting variable's live samples and
+  // accumulate positive deltas into the total and the current hour bucket.
+  // A counter reset (negative delta) is ignored; an abnormal (null) sample
+  // re-seeds the baseline; unmapped variables never produce samples.
   useEffect(() => {
-    const point = config.countPoint
-    if (point === undefined) return
-    const detach = ctx.client.link.subscribe('point/updated', payload => {
-      const frame = payload as { id?: string, sample?: { id?: string, value?: unknown } }
-      const id = frame.id ?? frame.sample?.id
-      if (id !== point) return
-      const value = frame.sample?.value
-      if (typeof value !== 'number' && typeof value !== 'bigint') return
-      const counter = actualRef.current
-      if (counter.lastSample !== null) {
-        const delta = Number(value) - Number(counter.lastSample)
-        if (delta > 0) {
-          counter.total += delta
-          const hourStart = new Date().setMinutes(0, 0, 0)
-          counter.buckets.set(hourStart, (counter.buckets.get(hourStart) ?? 0) + delta)
-          forceCount(value2 => value2 + 1)
-        }
+    const counter = actualRef.current
+    const value = countSample?.value
+    if (value === undefined || value === null) {
+      counter.lastSample = null
+      return
+    }
+    if (typeof value !== 'number' && typeof value !== 'bigint') return
+    if (counter.lastSample !== null) {
+      const delta = Number(value) - Number(counter.lastSample)
+      if (delta > 0) {
+        counter.total += delta
+        const hourStart = new Date().setMinutes(0, 0, 0)
+        counter.buckets.set(hourStart, (counter.buckets.get(hourStart) ?? 0) + delta)
+        forceCount(current => current + 1)
       }
-      counter.lastSample = value
-    })
-    void ctx.client.link.call('points.subscribe', { ids: [point] }).catch(() => {})
-    return () => { detach() }
-  }, [ctx, config.countPoint])
+    }
+    counter.lastSample = value
+  }, [countSample])
 
   const state: ProductionState = deriveState(events, config.models)
   const running = state.session !== null
@@ -269,10 +272,13 @@ function ProductionPage(props: { ctx: Context, config: ProductionConfig }): Reac
 /** The production workflow occupant; config arrives from its plugins.yml row. */
 const productionPlugin: Plugin.Object<ProductionConfig> = {
   name: 'process-production',
-  inject: ['uiSlots', 'client', 'session', 'workflows'],
+  inject: ['uiSlots', 'client', 'session', 'workflows', 'variables'],
   Config: productionConfigSchema,
   apply(ctx: Context, config: ProductionConfig): void {
     const resolved = config
+    // The counting variable: declared here, mapped onto a device address in
+    // the communication settings; positive deltas become actual output.
+    ctx.variables.register(ctx, [{ name: resolved.countVar, type: 'int', title: '实际产量计数' }])
     ctx.workflows.register(ctx, {
       id: 'production',
       title: '生产任务',

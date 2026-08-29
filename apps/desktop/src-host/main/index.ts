@@ -31,6 +31,7 @@ const RENDERER_PACKAGES: readonly string[] = [
   '@snap-rail/process-fault',
   '@snap-rail/process-downtime',
   '@snap-rail/settings-station',
+  '@snap-rail/modbus-station',
 ]
 
 async function start(): Promise<void> {

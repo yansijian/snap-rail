@@ -13,6 +13,7 @@
 
 import type { RpcResponse } from './rpc.ts'
 import type { ConnectionSnapshot, PointDescriptor, PointSample, PointValue } from './field.ts'
+import type { ModbusDeviceConfig, ModbusDevicesDocument, ModbusPointConfig, ModbusVarConfig } from './modbus.ts'
 
 /** Host-level introspection. */
 export interface HostApi {
@@ -128,6 +129,30 @@ export interface ClientConfigApi {
   list(payload: {}): Promise<RpcResponse<{ rows: readonly ClientConfigRow[] }>>
 }
 
+/**
+ * ModbusTCP device administration: CRUD over the driver's device table and
+ * variable mappings, plus a connection probe. Every mutation writes the
+ * driver's store tables and hot-applies per device.
+ */
+export interface ModbusApi {
+  /** The whole document the settings page renders: devices, mappings, manual vars. */
+  listDevices(payload: {}): Promise<RpcResponse<ModbusDevicesDocument>>
+  /** Insert or replace one device; reconnects only that device when live. */
+  upsertDevice(payload: { device: ModbusDeviceConfig }): Promise<RpcResponse<{ applied: true }>>
+  /** Remove one device and its mappings; drops the connection. */
+  removeDevice(payload: { id: string }): Promise<RpcResponse<{ applied: true }>>
+  /** Probe a device address without touching the stored table. */
+  testDevice(payload: { device: ModbusDeviceConfig }): Promise<RpcResponse<{ ok: boolean, error?: string | undefined }>>
+  /** Insert or replace one variable mapping (the variable must exist as a declared or manual var). */
+  upsertPoint(payload: { point: ModbusPointConfig }): Promise<RpcResponse<{ applied: true }>>
+  /** Remove one variable mapping by variable name. */
+  removePoint(payload: { id: string }): Promise<RpcResponse<{ applied: true }>>
+  /** Declare a hand debugging variable (name + semantic type). */
+  upsertVar(payload: { name: string, type: ModbusVarConfig['type'] }): Promise<RpcResponse<{ applied: true }>>
+  /** Remove a hand debugging variable; its mapping goes with it. */
+  removeVar(payload: { name: string }): Promise<RpcResponse<{ applied: true }>>
+}
+
 /** Every unary method callable by a client, keyed by its wire method name. */
 export interface RpcMethodMap {
   'host.describe': HostApi['describe']
@@ -147,6 +172,14 @@ export interface RpcMethodMap {
   'audit.list': AuditApi['list']
   'audit.record': AuditApi['record']
   'client-config.list': ClientConfigApi['list']
+  'modbus.devices.list': ModbusApi['listDevices']
+  'modbus.devices.upsert': ModbusApi['upsertDevice']
+  'modbus.devices.remove': ModbusApi['removeDevice']
+  'modbus.devices.test': ModbusApi['testDevice']
+  'modbus.vars.upsert': ModbusApi['upsertVar']
+  'modbus.vars.remove': ModbusApi['removeVar']
+  'modbus.points.upsert': ModbusApi['upsertPoint']
+  'modbus.points.remove': ModbusApi['removePoint']
 }
 
 /** Method names on the wire. */

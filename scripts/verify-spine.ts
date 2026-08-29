@@ -24,6 +24,7 @@ const spinePackages = [
   'packages/client/kernel',
   'packages/client/slots',
   'packages/client/settings',
+  'packages/client/variables',
   'packages/client/session',
   'packages/client/workflows',
   'packages/client/runtime',
@@ -33,12 +34,14 @@ const occupantNames = new Set([
   '@snap-rail/layout-station',
   '@snap-rail/chrome-titlebar',
   '@snap-rail/settings-station',
+  '@snap-rail/modbus-station',
   '@snap-rail/process-maintenance',
   '@snap-rail/process-production',
   '@snap-rail/process-sampling',
   '@snap-rail/process-fault',
   '@snap-rail/process-downtime',
   '@snap-rail/driver-mock',
+  '@snap-rail/driver-modbus',
 ])
 
 /** Expand one glob-ish package dir into its package name from the manifest. */

@@ -36,6 +36,7 @@ function snapRailSources(): Plugin {
     '@snap-rail/client-session': 'packages/client/session/src/index.ts',
     '@snap-rail/client-workflows': 'packages/client/workflows/src/index.ts',
     '@snap-rail/client-settings': 'packages/client/settings/src/index.ts',
+    '@snap-rail/client-variables': 'packages/client/variables/src/index.ts',
     '@snap-rail/client-runtime': 'packages/client/runtime/src/index.tsx',
     '@snap-rail/layout-station': 'packages/client/layout-station/src/index.tsx',
     '@snap-rail/chrome-titlebar': 'packages/client/chrome-titlebar/src/index.tsx',
@@ -45,6 +46,7 @@ function snapRailSources(): Plugin {
     '@snap-rail/process-fault': 'packages/client/process-fault/src/index.tsx',
     '@snap-rail/process-downtime': 'packages/client/process-downtime/src/index.tsx',
     '@snap-rail/settings-station': 'packages/client/settings-station/src/index.tsx',
+    '@snap-rail/modbus-station': 'packages/client/modbus-station/src/index.tsx',
   }
   const sourceOf = new Map<string, string>()
   for (const [name, rel] of Object.entries(sourceFiles)) {
