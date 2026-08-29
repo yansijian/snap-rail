@@ -130,14 +130,22 @@ describe('station assembly', () => {
 
     await loginAs('1001')
 
-    // Every checklist item checked, then 完成.
-    const boxes = [...document.querySelectorAll('button[role="checkbox"]')]
-    expect(boxes.length).toBe(5)
-    for (const box of boxes) box.click()
+    // Each item needs an explicit 完成维护/异常 choice before 完成 unlocks.
+    const page = document.querySelector('[data-page="maintenance"]')!
+    const pageButtons = (text: string): HTMLButtonElement[] =>
+      [...page.querySelectorAll('button')].filter(button => button.textContent === text)
+    expect(pageButtons('完成维护').length).toBe(5)
+    const complete = (): HTMLButtonElement | undefined => pageButtons('完成')[0]
+    expect(complete()?.disabled).toBe(true)
+
+    // Four answers are not enough, and 异常 counts as an answer too.
+    for (const button of pageButtons('完成维护').slice(0, 4)) button.click()
     await flush()
-    const complete = [...document.querySelectorAll('button')].find(button => button.textContent === '完成')
-    expect(complete?.disabled).toBe(false)
-    complete!.click()
+    expect(complete()?.disabled).toBe(true)
+    pageButtons('异常').at(-1)!.click()
+    await flush()
+    expect(complete()?.disabled).toBe(false)
+    complete()!.click()
     await flush(20)
 
     expect(document.body.textContent).toContain('今日自主维护已完成')

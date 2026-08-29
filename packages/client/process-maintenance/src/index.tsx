@@ -1,7 +1,8 @@
 /**
  * Workflow page: 自主维护 — the daily checklist that gates production. Each
- * placeholder item carries a name, instructions, and a reference photo; the
- * 完成 button unlocks only after every item is checked, then records
+ * placeholder item carries a name, instructions, and a reference photo, and
+ * must be answered 完成维护 or 异常 (default: neither); the 完成 button
+ * unlocks only after every item is answered, then records
  * `maintenance.complete` (actor = the operator) which the production page
  * requires for the current operator and day.
  *
@@ -10,7 +11,7 @@
 
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button, Card, CardContent, Checkbox, Label } from '@snap-rail/client-ui'
+import { Button, Card, CardContent } from '@snap-rail/client-ui'
 import cleanImage from './assets/clean.jpg'
 import lubricateImage from './assets/lubricate.jpg'
 import fastenImage from './assets/fasten.png'
@@ -24,8 +25,11 @@ import '@snap-rail/client-workflows'
 /** Audit action: this operator finished the maintenance checklist today. */
 export const MAINTENANCE_COMPLETE = 'maintenance.complete'
 
+/** Per-item outcome picked by the operator; null until a button is pressed. */
+type ItemResult = 'ok' | 'abnormal'
+
 interface MaintenanceItem {
-  /** Item name shown beside the checkbox. */
+  /** Item name shown atop the card. */
   name: string
   /** What the check involves. */
   content: string
@@ -44,7 +48,7 @@ const ITEMS: readonly MaintenanceItem[] = [
 
 function MaintenancePage(props: { ctx: Context }): ReactNode {
   const [, setTick] = useState(0)
-  const [checks, setChecks] = useState<boolean[]>(() => ITEMS.map(() => false))
+  const [results, setResults] = useState<Array<ItemResult | null>>(() => ITEMS.map(() => null))
   const [completedAt, setCompletedAt] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -74,11 +78,16 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
     return () => { active = false }
   }, [props.ctx, operator])
 
-  const checkedCount = checks.filter(Boolean).length
+  const answeredCount = results.filter(result => result !== null).length
+  const allAnswered = answeredCount === ITEMS.length
   const done = completedAt !== null
 
+  const setResult = (index: number, value: ItemResult): void => {
+    setResults(values => values.map((current, i) => i === index ? (current === value ? null : value) : current))
+  }
+
   const complete = (): void => {
-    if (done || busy || checkedCount < ITEMS.length) return
+    if (done || busy || !allAnswered) return
     setBusy(true)
     setError(null)
     void props.ctx.client.link.call('audit.record', { action: MAINTENANCE_COMPLETE })
@@ -99,22 +108,26 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
             <CardContent className="p-0">
               <img src={item.image} alt={item.name} className="h-36 w-full rounded-t-md object-cover" />
               <div className="space-y-2 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">{item.name}</span>
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={`maintenance-item-${index}`}
-                      aria-label={item.name}
-                      checked={done || checks[index] === true}
-                      disabled={done}
-                      onCheckedChange={checked => {
-                        setChecks(values => values.map((value, i) => i === index ? checked === true : value))
-                      }}
-                    />
-                    <Label htmlFor={`maintenance-item-${index}`}>{done ? '已完成' : '确认'}</Label>
-                  </div>
-                </div>
+                <span className="text-sm font-medium">{item.name}</span>
                 <p className="text-xs leading-relaxed text-muted-foreground">{item.content}</p>
+                <div className="flex gap-2">
+                  <Button
+                    variant={done || results[index] === 'ok' ? 'default' : 'outline'}
+                    disabled={done}
+                    className="flex-1"
+                    onClick={() => { setResult(index, 'ok') }}
+                  >
+                    完成维护
+                  </Button>
+                  <Button
+                    variant={results[index] === 'abnormal' ? 'destructive' : 'outline'}
+                    disabled={done}
+                    className="flex-1"
+                    onClick={() => { setResult(index, 'abnormal') }}
+                  >
+                    异常
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -132,10 +145,10 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
               <span className="text-sm text-muted-foreground">
                 {error !== null
                   ? <span className="text-destructive" role="alert">{error}</span>
-                  : <>已确认 {checkedCount}/{ITEMS.length} 项，全部确认后可完成。</>}
+                  : <>已选择 {answeredCount}/{ITEMS.length} 项，全部选择后可完成。</>}
               </span>
             )}
-        <Button disabled={done || checkedCount < ITEMS.length || busy} onClick={complete}>
+        <Button disabled={done || !allAnswered || busy} onClick={complete}>
           {busy ? '提交中…' : '完成'}
         </Button>
       </div>
