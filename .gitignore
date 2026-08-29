@@ -7,3 +7,4 @@ tsconfig.tsbuildinfo
 # electron-builder outputs (pack layouts keep the version in the dir name)
 apps/desktop/release*/
 .snap-rail/
+.zcode/*
