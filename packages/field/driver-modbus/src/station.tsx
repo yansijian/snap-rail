@@ -10,7 +10,11 @@
  * when everything reads, yellow when part of a group fails, red when
  * everything is down.
  *
- * @module @snap-rail/modbus-station
+ * The renderer face of the ModbusTCP package: the driver (host), its bridge
+ * (`./rpc`), and this settings page ship as one plugin package whose rows the
+ * plugin-management page groups under a single toggle.
+ *
+ * @module @snap-rail/driver-modbus/station
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
@@ -26,7 +30,7 @@ import {
 } from '@snap-rail/client-ui'
 import type {
   ModbusDeviceConfig, ModbusDevicesDocument, ModbusGroupConfig, ModbusPointConfig,
-} from '@snap-rail/driver-modbus/contract'
+} from './contract.ts'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 type PointType = ModbusGroupConfig['type']

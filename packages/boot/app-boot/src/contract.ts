@@ -15,12 +15,15 @@ export type PluginSource = 'builtin' | 'user' | 'pool'
 
 /** One plugin as the management surface sees it. */
 export interface PluginInfo {
-  /** Package name; also the entry id in the composed list. */
+  /** Package name (or subpath entry) — also the entry id in the composed list. */
   name: string
   /** Origin: shipped layer, user-layer insert, or available-in-pool only. */
   source: PluginSource
   /** Whether it is currently mounted (`false` covers disabled and unreferenced pool plugins). */
   enabled: boolean
+  /** The npm package the row belongs to (`@scope/pkg` of `@scope/pkg/sub`) —
+   * rows of one package render as one group under one master toggle. */
+  packageName: string
   /** The entry's current config when one is set. */
   config?: unknown
 }

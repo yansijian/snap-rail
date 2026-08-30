@@ -37,6 +37,8 @@ async function makeWorld(): Promise<HostChannel> {
   writeFileSync(builtinPath, [
     "- id: timer",
     "  name: '@snap-rail/cordis-plugin-timer'",
+    "- id: driver-modbus",
+    "  name: '@snap-rail/driver-modbus'",
     "- id: mock-demo",
     "  name: '@snap-rail/driver-mock'",
     "  config:",
@@ -54,7 +56,9 @@ async function makeWorld(): Promise<HostChannel> {
       builtinLayerPath: builtinPath,
       userLayerPath: join(home, 'plugins.yml'),
       poolDirs: [],
-      rendererPackages: [],
+      // The modbus package's renderer face: its row groups with the host
+      // entry's row under one master toggle.
+      rendererPackages: ['@snap-rail/driver-modbus/station'],
     },
     setUserRow: async (): Promise<void> => {
       // Succeed without touching a disk; the UI asserts on the rpc call only.
@@ -117,6 +121,53 @@ describe('settings dialog', () => {
     document.querySelector<HTMLButtonElement>('button[aria-label="关闭设置"]')!.click()
     await flush()
     expect(document.querySelector('[data-region="settings-dialog"]')).toBeNull()
+
+    await runtime.dispose()
+    element.remove()
+  }, 20_000)
+
+  it('groups one package\'s rows under a master toggle that flips both', async () => {
+    const calls: Array<{ method: string, name?: string }> = []
+    const channel = await makeWorld()
+    const spyingChannel: HostChannel = {
+      invoke: async request => {
+        if (request.method === 'plugins.set-enabled') {
+          calls.push({ method: request.method, name: (request.payload as { name: string }).name })
+        }
+        return channel.invoke(request)
+      },
+      openStream: channel.openStream,
+    }
+    const element = document.createElement('div')
+    document.body.append(element)
+    const handle = await bootClient({ element, channel: spyingChannel })
+    const runtime = await createClientRuntime(handle, { plugins: OCCUPANTS })
+    await flush()
+
+    document.querySelector<HTMLButtonElement>('button[aria-label="设置"]')!.click()
+    await flush()
+
+    // Single-row packages stay flat; the modbus package renders as one card.
+    expect(document.querySelector('[data-plugin-row="@snap-rail/driver-mock"]')).not.toBeNull()
+    const card = document.querySelector('[data-plugin-group="@snap-rail/driver-modbus"]')
+    expect(card).not.toBeNull()
+    expect(card!.textContent).toContain('2 个条目')
+
+    // Members expand for individual control.
+    card!.querySelector<HTMLButtonElement>('button:not([role="switch"])')!.click()
+    await flush()
+    expect(card!.querySelector('[data-plugin-row="@snap-rail/driver-modbus"]')).not.toBeNull()
+    expect(card!.querySelector('[data-plugin-row="@snap-rail/driver-modbus/station"]')).not.toBeNull()
+
+    // The master switch flips every member with one rpc call per row.
+    const master = card!.querySelector<HTMLButtonElement>('button[role="switch"]')!
+    expect(master.getAttribute('data-state')).toBe('checked')
+    master.click()
+    await flush()
+    expect(calls.map(call => call.name)).toEqual([
+      '@snap-rail/driver-modbus',
+      '@snap-rail/driver-modbus/station',
+    ])
 
     await runtime.dispose()
     element.remove()

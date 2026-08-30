@@ -3,7 +3,7 @@
  * station day. A login session's shift is fixed by its login time — the
  * whole session counts into that one bucket, and only a re-login re-picks.
  *
- * @module @snap-rail/production-stats/shift
+ * @module @snap-rail/process-production/shift
  */
 
 import { localDateString, type ShiftName } from './contract.ts'

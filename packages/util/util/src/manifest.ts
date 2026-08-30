@@ -43,7 +43,6 @@ export const OCCUPANT_PACKAGES: readonly string[] = [
   '@snap-rail/layout-station',
   '@snap-rail/chrome-titlebar',
   '@snap-rail/settings-station',
-  '@snap-rail/modbus-station',
   '@snap-rail/process-maintenance',
   '@snap-rail/process-production',
   '@snap-rail/process-sampling',
@@ -51,5 +50,4 @@ export const OCCUPANT_PACKAGES: readonly string[] = [
   '@snap-rail/process-downtime',
   '@snap-rail/driver-mock',
   '@snap-rail/driver-modbus',
-  '@snap-rail/production-stats',
 ]

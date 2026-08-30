@@ -15,7 +15,6 @@ import type { ModbusDeviceConfig } from '@snap-rail/driver-modbus/contract'
 import modbusSerial from 'modbus-serial'
 import { afterEach, describe, expect, it } from 'vitest'
 import driverPlugin from '../src/index.ts'
-import modbusRpcPlugin from '../src/rpc.ts'
 
 const { ServerTCP } = modbusSerial
 
@@ -62,8 +61,9 @@ async function makeWorld(): Promise<{ ctx: Context, client: InProcessApiClient }
   await ctx.plugin(fieldPlugin)
   await ctx.plugin(fieldRpcPlugin)
   await ctx.plugin(timerPlugin)
+  // The root entry mounts the bridge too; mounting it again here would
+  // double-claim the field.modbus domain.
   await ctx.plugin(driverPlugin)
-  await ctx.plugin(modbusRpcPlugin)
   return { ctx, client: new InProcessApiClient(request => ctx.rpc.handleClientRequest(request)) }
 }
 

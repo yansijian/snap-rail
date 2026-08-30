@@ -8,6 +8,13 @@
  * and retry every poll tick. Writes ride the field seam's write handler
  * (fc 5/6/16) and echo back as samples.
  *
+ * The entry mounts the driver and its rpc bridge (`./rpc`) as one unit —
+ * the bridge's `field.modbus.*` CRUD without the driver (or the reverse)
+ * has no standalone value, so the two share one loader row and one toggle
+ * in the plugin-management page. The package's other faces are the pure
+ * `./contract` (shared wire rows) and `./station` (the renderer settings
+ * page).
+ *
  * Config changes flow through the bridge's `modbus/config-changed` event;
  * reconciliation restarts only the devices whose link parameters or point
  * table actually changed.
@@ -33,6 +40,7 @@ import type { ModbusDeviceConfig, ModbusPointConfig } from './contract.ts'
 import { readDocument } from './document.ts'
 import '@snap-rail/store'
 import { decodePoint, encodeWrite, planPoll, type BlockPayload, type PollBlock } from './plc.ts'
+import modbusRpcPlugin from './rpc.ts'
 import { MODBUS_TABLES } from './tables.ts'
 
 export { probeDevice } from './probe.ts'
@@ -61,9 +69,11 @@ interface DeviceRuntime {
 }
 
 /**
- * The ModbusTCP driver. Per-device state rides closures over the runtime
- * map — traceable context proxies rebind `this`, so service-class fields
- * cannot back this plugin (the uiSlots lesson).
+ * The ModbusTCP host entry: the driver below plus the rpc bridge nested as a
+ * child plugin (its own injects resolve at its fiber start, and it disposes
+ * with this entry). Per-device state rides closures over the runtime map —
+ * traceable context proxies rebind `this`, so service-class fields cannot
+ * back this plugin (the uiSlots lesson).
  */
 declare module '@snap-rail/cordis' {
   interface Events {
@@ -74,8 +84,12 @@ declare module '@snap-rail/cordis' {
 
 const modbusDriverPlugin: Plugin.Object<void> = {
   name: 'driver-modbus',
-  inject: ['points', 'connections', 'timer', 'store'],
+  inject: ['points', 'connections', 'timer', 'store', 'rpc', 'field', 'audit', 'settings'],
   apply(ctx: Context): void {
+    // The bridge is a child fiber, not inlined: its own inject face stays
+    // declared where its body lives (`./rpc`), and its disposers ride this
+    // entry's teardown without the driver half having to know them.
+    ctx.plugin(modbusRpcPlugin)
     const store = ctx.store.register(ctx, 'driver_modbus', MODBUS_TABLES)
     const runtimes = new Map<string, DeviceRuntime>()
 
@@ -213,7 +227,10 @@ const modbusDriverPlugin: Plugin.Object<void> = {
 
     const closeClient = (runtime: DeviceRuntime): void => {
       try {
-        if (runtime.client.isOpen) void runtime.client.close()
+        // The callback flavor of close() never mints a promise; without one,
+        // the promise API rejects on a dead socket (ECONNRESET) and nobody
+        // would be there to handle it.
+        if (runtime.client.isOpen) runtime.client.close(() => {})
       } catch {
         // A half-open socket may refuse close; the OS reclaims it.
       }
@@ -263,6 +280,13 @@ const modbusDriverPlugin: Plugin.Object<void> = {
         queueTail: Promise.resolve(),
         stopInterval: () => {},
       }
+      // The client re-emits socket-level failures on itself; without a
+      // listener an unheard `emit('error')` throws inside the socket's error
+      // path (modbus-serial routes reads/writes through it), surfacing as an
+      // unhandled rejection when a device dies mid-request. The poll cycle
+      // already learns the failure through its request outcomes — this
+      // listener only stops the throw.
+      runtime.client.on('error', () => {})
       runtime.stopInterval = ctx.interval(() => { enqueue(runtime, () => pollDevice(runtime)) }, device.pollMs)
       return runtime
     }

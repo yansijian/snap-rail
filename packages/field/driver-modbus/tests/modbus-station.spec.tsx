@@ -7,21 +7,20 @@ import auditPlugin from '@snap-rail/audit'
 import gatewayPlugin from '@snap-rail/gateway'
 import settingsPlugin from '@snap-rail/settings'
 import storePlugin from '../../../store/store/src/index.ts'
-import fieldPlugin from '../../../field/field/src/index.ts'
-import fieldRpcPlugin from '../../../field/field/src/rpc.ts'
+import fieldPlugin from '../../field/src/index.ts'
+import fieldRpcPlugin from '../../field/src/rpc.ts'
 import timerPlugin from '../../../../vendor/timer/src/index.ts'
-import driverPlugin from '../../../field/driver-modbus/src/index.ts'
-import modbusRpcPlugin from '../../../field/driver-modbus/src/rpc.ts'
-import { MODBUS_TABLES } from '../../../field/driver-modbus/src/tables.ts'
-import { startFakePlc, type FakePlc } from '../../../field/driver-modbus/tests/fake-plc.ts'
-import type { HostChannel } from '../../connection/src/index.ts'
-import { bootClient } from '../../kernel/src/index.tsx'
-import { createClientRuntime } from '../../runtime/src/index.tsx'
-import layoutPlugin from '../../layout-station/src/index.tsx'
-import titlebarPlugin from '../../chrome-titlebar/src/index.tsx'
-import settingsStationPlugin from '../../settings-station/src/index.tsx'
+import driverPlugin from '../src/index.ts'
+import { MODBUS_TABLES } from '../src/tables.ts'
+import { startFakePlc, type FakePlc } from './fake-plc.ts'
+import type { HostChannel } from '../../../protocol/connection/src/index.ts'
+import { bootClient } from '../../../client/kernel/src/index.tsx'
+import { createClientRuntime } from '../../../client/runtime/src/index.tsx'
+import layoutPlugin from '../../../client/layout-station/src/index.tsx'
+import titlebarPlugin from '../../../client/chrome-titlebar/src/index.tsx'
+import settingsStationPlugin from '../../../client/settings-station/src/index.tsx'
 import { afterEach, describe, expect, it } from 'vitest'
-import modbusStationPlugin from '../src/index.tsx'
+import modbusStationPlugin from '../src/station.tsx'
 
 const contexts: Context[] = []
 const tempDirs: string[] = []
@@ -70,8 +69,9 @@ async function makeWorld(): Promise<HostChannel> {
   await host.plugin(fieldPlugin)
   await host.plugin(fieldRpcPlugin)
   await host.plugin(timerPlugin)
+  // The root entry mounts the driver and its rpc bridge as one unit — the
+  // same shape the loader row mounts in production.
   await host.plugin(driverPlugin)
-  await host.plugin(modbusRpcPlugin)
   host.provide('pluginLayers', {
     handles: { userLayerPath: join(tmpdir(), 'absent.yml'), rendererPackages: [] },
     setUserRow: async (): Promise<void> => {},

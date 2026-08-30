@@ -6,8 +6,8 @@
  * contract module (field → `@snap-rail/field` `./wire`, ModbusTCP →
  * `@snap-rail/driver-modbus/contract`, station →
  * `@snap-rail/station-rpc/contract`, production stats →
- * `@snap-rail/production-stats/contract`). A program sees the rows of every
- * contract it imports — the open-world rule.
+ * `@snap-rail/process-production/contract`). A program sees the rows of
+ * every contract it imports — the open-world rule.
  *
  * Naming: frames are `domain/event` — kebab-case segments joined by `/` —
  * while methods are `domain.resource.verb` joined by `.`. The first frame

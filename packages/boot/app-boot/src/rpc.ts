@@ -13,7 +13,7 @@ import { RpcBusinessError } from '@snap-rail/protocol'
 import type { GatewayService } from '@snap-rail/gateway'
 import type { AuditService } from '@snap-rail/audit'
 import { pluginsRequestSchemas, type PluginInfo, type PluginSource } from './contract.ts'
-import { loadBuiltinLayer, loadUserLayer } from './compose.ts'
+import { loadBuiltinLayer, loadUserLayer, packageNameOf } from './compose.ts'
 import { scanPluginPool } from './scan.ts'
 
 /** The plugin-admin bridge plugin; mount after rpc, audit, and boot. */
@@ -88,7 +88,13 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
 }
 
 function toInfo(name: string, source: PluginSource, enabled: boolean, config: unknown): PluginInfo {
-  return { name, source, enabled, ...config !== undefined ? { config } : {} }
+  return {
+    name,
+    source,
+    enabled,
+    packageName: packageNameOf(name),
+    ...config !== undefined ? { config } : {},
+  }
 }
 
 async function mutate(run: () => Promise<void>): Promise<void> {

@@ -3,6 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as net from 'node:net'
 import { Context } from '@snap-rail/cordis'
+import auditPlugin from '@snap-rail/audit'
+import gatewayPlugin from '@snap-rail/gateway'
+import settingsPlugin from '@snap-rail/settings'
 import timerPlugin from '@snap-rail/cordis-plugin-timer'
 import fieldPlugin, { type ConnectionRegistration } from '@snap-rail/field'
 import { pointKey, type ConnectionSnapshot, type PointRef, type PointSample } from '@snap-rail/field'
@@ -96,6 +99,11 @@ async function makeWorld(plc: FakePlc): Promise<World> {
   const ctx = new Context()
   worlds.push({ ctx, home })
   ctx.provide('snapRailHome', home)
+  // The root entry also mounts the rpc bridge, so its whole inject face
+  // (gateway/settings/audit included) must be up before it starts.
+  await ctx.plugin(gatewayPlugin, { name: 'driver-spec', version: '0.0.0', bin: 'test' })
+  await ctx.plugin(settingsPlugin)
+  await ctx.plugin(auditPlugin)
   await ctx.plugin(storePlugin)
   await ctx.plugin(fieldPlugin)
   await ctx.plugin(timerPlugin)

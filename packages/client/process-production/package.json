@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/process-production",
-  "description": "Workflow page: production task — model pick, live actual/theoretical output, hourly chart",
+  "description": "Production task in one package: the workflow page (model pick, live actual/theoretical output, hourly chart) plus its host-side shift counter (./stats) sharing the same contract",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -10,35 +10,52 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./stats": {
+      "types": "./lib/types/stats.d.ts",
+      "default": "./lib/stats.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
+    "lib/stats.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
-  "dependencies": {
+  "peerDependencies": {
     "@snap-rail/client-runtime": "workspace:^",
     "@snap-rail/client-settings": "workspace:^",
     "@snap-rail/client-ui": "workspace:^",
     "@snap-rail/client-variables": "workspace:^",
-    "@snap-rail/field": "workspace:^",
-    "@snap-rail/process-maintenance": "workspace:^",
-    "@snap-rail/production-stats": "workspace:^"
-  },
-  "peerDependencies": {
     "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/process-maintenance": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/store": "workspace:^",
     "react": ">=19",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@snap-rail/station-rpc": "workspace:^",
+    "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
     "@snap-rail/client-session": "workspace:^",
     "@snap-rail/client-slots": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^",
     "@snap-rail/client-variables": "workspace:^",
     "@snap-rail/client-workflows": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/process-maintenance": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/station-rpc": "workspace:^",
+    "@snap-rail/store": "workspace:^",
     "@types/react": "^19.2.14",
     "react": "^19.2.8",
     "zod": "^4.4.3"

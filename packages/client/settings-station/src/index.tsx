@@ -14,7 +14,7 @@ import '@snap-rail/app-boot/contract'
 import '@snap-rail/client-settings'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
-import { Badge, Button, Dialog, DialogContent, DialogTitle, Switch, useRefresh } from '@snap-rail/client-ui'
+import { Badge, Button, Collapsible, CollapsibleChevron, CollapsibleContent, CollapsibleTrigger, Dialog, DialogContent, DialogTitle, Switch, useRefresh } from '@snap-rail/client-ui'
 import { X } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 
@@ -23,9 +23,69 @@ interface PluginRow {
   name: string
   source: 'builtin' | 'user' | 'pool'
   enabled: boolean
+  packageName: string
 }
 
-/** The first-party plugin management page: every plugin with its enable switch. */
+/** One plugin's switch row: origin badge, name, and the enable toggle. */
+function PluginRowView(props: { row: PluginRow, onToggle: (name: string, enabled: boolean) => void }): ReactNode {
+  const { row } = props
+  return (
+    <div
+      data-plugin-row={row.name}
+      className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <Badge variant="secondary">{row.source === 'builtin' ? '内置' : row.source === 'user' ? '用户层' : '插件池'}</Badge>
+        <span className="truncate font-mono text-xs">{row.name}</span>
+      </div>
+      <Switch
+        aria-label={`启用 ${row.name}`}
+        checked={row.enabled}
+        onCheckedChange={checked => props.onToggle(row.name, checked)}
+      />
+    </div>
+  )
+}
+
+/** One package's card: rows of the same package (e.g. a host entry plus its
+ * `./station` renderer face) collapse under one master toggle that flips
+ * every member together — the package is the unit the user actually manages. */
+function PluginGroupCard(props: { pkg: string, members: readonly PluginRow[], onToggle: (name: string, enabled: boolean) => void }): ReactNode {
+  const allOn = props.members.every(row => row.enabled)
+  const setAll = (enabled: boolean): void => {
+    // Only the members that need to move issue writes; the rest keep their rows.
+    for (const row of props.members) {
+      if (row.enabled !== enabled) props.onToggle(row.name, enabled)
+    }
+  }
+  return (
+    <Collapsible data-plugin-group={props.pkg} className="rounded-md border border-border">
+      <div className="flex items-center justify-between px-3 py-2">
+        <CollapsibleTrigger className="flex min-w-0 items-center gap-2 text-left">
+          <CollapsibleChevron />
+          <span className="truncate font-mono text-xs">{props.pkg}</span>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">{props.members.length} 个条目</span>
+        </CollapsibleTrigger>
+        <Switch
+          aria-label={`启用 ${props.pkg}`}
+          checked={allOn}
+          onCheckedChange={setAll}
+        />
+      </div>
+      <CollapsibleContent>
+        <div className="flex flex-col gap-1 border-t border-border p-2">
+          {props.members.map(row => (
+            <PluginRowView key={row.name} row={row} onToggle={props.onToggle} />
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+/** The first-party plugin management page: packages as group cards with one
+ * master switch each (single-row packages render flat), members expandable
+ * for individual control. */
 function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
   const [rows, setRows] = useState<readonly PluginRow[]>([])
   const [failed, setFailed] = useState(false)
@@ -35,8 +95,11 @@ function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
     void ctx.client.link.call('plugins.list', {})
       .then(result => {
         if (cancelled) return
-        if (result.ok) setRows(result.value.plugins.map(info => ({ name: info.name, source: info.source, enabled: info.enabled })))
-        else setFailed(true)
+        if (result.ok) {
+          setRows(result.value.plugins.map(info => ({
+            name: info.name, source: info.source, enabled: info.enabled, packageName: info.packageName,
+          })))
+        } else setFailed(true)
       })
       .catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
@@ -53,28 +116,23 @@ function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
 
   if (failed) return <div className="text-sm text-muted-foreground">插件列表读取失败。</div>
 
+  // Rows keep their listed order; groups surface in first-appearance order.
+  const groups = new Map<string, PluginRow[]>()
+  for (const row of rows) {
+    const members = groups.get(row.packageName)
+    if (members === undefined) groups.set(row.packageName, [row])
+    else members.push(row)
+  }
+
   return (
     <div data-region="plugins-table" className="flex flex-col gap-1">
       <p className="mb-2 text-xs text-muted-foreground">
-        宿主插件的启停写入用户层配置并当场热生效；页面类（渲染端）插件的行同样写入该文件，但需重启应用后生效。启用状态与配置同源（文件即接口）。
+        宿主插件的启停写入用户层配置并当场热生效；页面类（渲染端）插件的行同样写入该文件，但需重启应用后生效。同一包的多个条目归为一组，组开关一并启停全部成员。启用状态与配置同源（文件即接口）。
       </p>
-      {rows.map(row => (
-        <div
-          key={row.name}
-          data-plugin-row={row.name}
-          className="flex items-center justify-between rounded-md border border-border px-3 py-2"
-        >
-          <div className="flex min-w-0 items-center gap-2">
-            <Badge variant="secondary">{row.source === 'builtin' ? '内置' : row.source === 'user' ? '用户层' : '插件池'}</Badge>
-            <span className="truncate font-mono text-xs">{row.name}</span>
-          </div>
-          <Switch
-            aria-label={`启用 ${row.name}`}
-            checked={row.enabled}
-            onCheckedChange={checked => toggle(row.name, checked)}
-          />
-        </div>
-      ))}
+      {[...groups.entries()].map(([pkg, members]) =>
+        members.length === 1
+          ? <PluginRowView key={members[0]!.name} row={members[0]!} onToggle={toggle} />
+          : <PluginGroupCard key={pkg} pkg={pkg} members={members} onToggle={toggle} />)}
     </div>
   )
 }

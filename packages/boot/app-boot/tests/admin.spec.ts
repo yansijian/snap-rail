@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import pluginAdminRpcPlugin from '../src/rpc.ts'
 import { boot } from '../src/index.ts'
 import type { LayerAdmin } from '../src/index.ts'
+import { loadUserLayer, packageNameOf } from '../src/compose.ts'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
@@ -28,7 +29,7 @@ afterAll(async () => {
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
 })
 
-async function makeWorld(builtinRows?: string[]): Promise<World> {
+async function makeWorld(builtinRows?: string[], rendererPackages?: readonly string[]): Promise<World> {
   const base = mkdtempSync(join(tmpdir(), 'snap-rail-admin-'))
   homes.push(base)
   const home = join(base, 'home')
@@ -66,6 +67,7 @@ async function makeWorld(builtinRows?: string[]): Promise<World> {
     builtinLayerPath: builtinPath,
     userLayerPath: join(home, 'plugins.yml'),
     appRoot,
+    rendererPackages,
   })
   await ctx.plugin(pluginAdminRpcPlugin)
   const world: World = {
@@ -114,6 +116,8 @@ describe('plugin layers admin', () => {
     expect(byName.get('@snap-rail/gateway')?.enabled).toBe(true)
     // Pool extras: plugins available in the app tree but not mounted.
     expect(byName.get('@snap-rail/settings')?.enabled).toBe(true)
+    // Every row carries its package so the management page can group.
+    expect(byName.get('@snap-rail/gateway')?.packageName).toBe('@snap-rail/gateway')
   })
 
   it('replaces a config through setConfig and hot-applies it', async () => {
@@ -170,5 +174,53 @@ describe('plugin layers admin', () => {
     const trail = readFileSync(join(world.home, 'audit.jsonl'), 'utf8')
     expect(trail).toContain('"action":"plugin.disable"')
     expect(trail).toContain('"action":"plugin.config"')
+  })
+
+  it('renames retired row names on load, first row winning collisions', async () => {
+    // Package merges retired several row names; rows still naming them
+    // rename to their successors in memory (the file converges on rewrite).
+    const world = await makeWorld()
+    writeFileSync(world.userPath, [
+      'plugins:',
+      "  - name: '@snap-rail/modbus-station'",
+      '    enabled: false',
+      "  - name: '@snap-rail/driver-modbus'",
+      "  - name: '@snap-rail/driver-modbus/rpc'",
+      '    enabled: false',
+      "  - name: '@snap-rail/production-stats'",
+      '    config:',
+      '      flushMs: 250',
+      '',
+    ].join('\n'))
+    const layer = loadUserLayer(world.userPath)
+    expect(layer.plugins.map(row => [row.name, row.enabled ?? null, row.config])).toEqual([
+      ['@snap-rail/driver-modbus/station', false, undefined],
+      ['@snap-rail/driver-modbus', null, undefined],
+      ['@snap-rail/process-production/stats', null, { flushMs: 250 }],
+    ])
+  })
+
+  it('composes a pre-merge renderer row: the rename lands it on the new name', async () => {
+    // The retired renderer-occupant row, renamed to its successor, rides the
+    // rendererPackages skip exactly like a row written after the merge —
+    // composition succeeds instead of failing on an unknown plugin.
+    const world = await makeWorld(undefined, ['@snap-rail/driver-modbus/station'])
+    writeFileSync(world.userPath, [
+      'plugins:',
+      "  - name: '@snap-rail/modbus-station'",
+      '    enabled: false',
+      '',
+    ].join('\n'))
+    await expect(world.layers.apply()).resolves.toBeDefined()
+  })
+})
+
+describe('packageNameOf', () => {
+  it('keeps the scope and package of a subpath entry, passes others through', () => {
+    expect(packageNameOf('@snap-rail/driver-modbus/station')).toBe('@snap-rail/driver-modbus')
+    expect(packageNameOf('@snap-rail/driver-modbus')).toBe('@snap-rail/driver-modbus')
+    expect(packageNameOf('@snap-rail')).toBe('@snap-rail')
+    expect(packageNameOf('cordis:timer')).toBe('cordis:timer')
+    expect(packageNameOf('./local/plugin')).toBe('./local/plugin')
   })
 })

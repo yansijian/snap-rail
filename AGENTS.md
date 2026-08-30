@@ -26,8 +26,9 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   `protocol/*`、`field/field`、
   `client/{kernel,slots,settings,variables,session,workflows,runtime,ui}`）
   不得 import 或依赖（package.json）任何住户（`client/layout-station|
-  chrome-titlebar|settings-station|modbus-station|process-*`、
-  `field/driver-mock|driver-modbus`、`production/stats`、`apps/*`）。
+  chrome-titlebar|settings-station|process-*`（production 含其
+  `./stats` 宿主面）、`field/driver-mock|driver-modbus`（含其
+  `./station` 渲染面）、`apps/*`）。
   `pnpm test` 里的门禁脚本断言这一点。
 - **注册皆 effect**：一切贡献经 `ctx.effect()`/`ctx.on()`；`register()`
   返回处置函数。effect 体返回 disposer——把函数本身传进去等于立即执行。

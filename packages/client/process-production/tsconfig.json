@@ -19,6 +19,9 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../../vendor/timer"
+    },
+    {
       "path": "../../field/field"
     },
     {
@@ -26,6 +29,15 @@
     },
     {
       "path": "../../protocol/protocol"
+    },
+    {
+      "path": "../../protocol/gateway"
+    },
+    {
+      "path": "../../settings/settings"
+    },
+    {
+      "path": "../../store/store"
     },
     {
       "path": "../slots"
@@ -47,9 +59,6 @@
     },
     {
       "path": "../process-maintenance"
-    },
-    {
-      "path": "../../production/stats"
     }
   ]
 }

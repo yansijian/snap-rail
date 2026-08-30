@@ -31,6 +31,23 @@ export interface UserLayer {
 }
 
 /**
+ * The npm package a plugin row belongs to: a scoped name keeps its first two
+ * segments (`@scope/pkg/sub` → `@scope/pkg`); anything else (`cordis:`
+ * specifiers, bare names, paths) is its own group. The management page groups
+ * rows by this so one package's entries share a single master toggle.
+ *
+ * @param name - a row name (package name or subpath entry name).
+ * @returns the package part of the name.
+ */
+export function packageNameOf(name: string): string {
+  if (!name.startsWith('@')) return name
+  const firstSlash = name.indexOf('/')
+  if (firstSlash < 0) return name
+  const secondSlash = name.indexOf('/', firstSlash + 1)
+  return secondSlash < 0 ? name : name.slice(0, secondSlash)
+}
+
+/**
  * Load the built-in layer: a YAML array of loader entries (bare package names
  * plus their default config). The file ships with the application.
  *
@@ -74,6 +91,22 @@ export function loadBuiltinLayer(path: string): EntryOptions[] {
 }
 
 /**
+ * Retired row names and their successors. The ModbusTCP collapse merged the
+ * bridge into the driver's root entry and moved the settings page in as
+ * `./station`; the production merge moved the shift counter in as the
+ * production page package's `./stats` face. User-layer rows still naming
+ * the old entries are renamed in-memory on load so an upgraded
+ * `plugins.yml` keeps composing (an unknown row would fail the whole
+ * file). The file itself converges on its next write, which serializes the
+ * renamed rows.
+ */
+const RENAMED_PLUGIN_ROWS: Readonly<Record<string, string>> = {
+  '@snap-rail/driver-modbus/rpc': '@snap-rail/driver-modbus',
+  '@snap-rail/modbus-station': '@snap-rail/driver-modbus/station',
+  '@snap-rail/production-stats': '@snap-rail/process-production/stats',
+}
+
+/**
  * Load the user layer. A missing file is a fresh home (nothing user-mounted);
  * a present file must parse as a document with a `plugins` array.
  *
@@ -99,11 +132,19 @@ export function loadUserLayer(path: string): UserLayer {
     throw new Error(`user layer: ${path} has a non-array "plugins" key`)
   }
   const rows: UserPluginRow[] = []
-  for (const row of plugins) {
-    if (row === null || typeof row !== 'object' || typeof (row as UserPluginRow).name !== 'string') {
+  const seen = new Set<string>()
+  for (const raw of plugins) {
+    if (raw === null || typeof raw !== 'object' || typeof (raw as UserPluginRow).name !== 'string') {
       throw new Error(`user layer: ${path} contains a row without a name`)
     }
-    rows.push(row as UserPluginRow)
+    const original = raw as UserPluginRow
+    const renamed = RENAMED_PLUGIN_ROWS[original.name]
+    const row = renamed === undefined ? original : { ...original, name: renamed }
+    // A rename can collide with a same-named row already in the file; the
+    // first row wins so one entry never receives two patches.
+    if (seen.has(row.name)) continue
+    seen.add(row.name)
+    rows.push(row)
   }
   return { plugins: rows }
 }

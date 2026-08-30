@@ -5,7 +5,7 @@
  * only reusable while both match. Rows survive plugin reload: data, not the
  * registering fiber, is the artifact.
  *
- * @module @snap-rail/production-stats/tables
+ * @module @snap-rail/process-production/tables
  */
 
 import type { StoreTableDef } from '@snap-rail/store'

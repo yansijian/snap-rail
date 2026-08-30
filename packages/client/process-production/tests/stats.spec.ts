@@ -8,7 +8,7 @@ import storePlugin from '@snap-rail/store'
 import { ConnectionId, type PointRef } from '@snap-rail/field'
 import fieldPlugin, { type ConnectionRegistration } from '@snap-rail/field'
 import timerPlugin from '../../../../vendor/timer/src/index.ts'
-import productionStatsPlugin, { shiftKeyOf, shiftOf } from '../src/index.ts'
+import productionStatsPlugin, { shiftKeyOf, shiftOf } from '../src/stats.ts'
 import { productionStatsSnapshotSchema, type ProductionStatsSnapshot } from '../src/contract.ts'
 import { afterEach, describe, expect, it } from 'vitest'
 

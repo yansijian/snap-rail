@@ -51,7 +51,7 @@
       "@snap-rail/field/rpc": ["./packages/field/field/src/rpc.ts"],
       "@snap-rail/driver-mock": ["./packages/field/driver-mock/src"],
       "@snap-rail/driver-modbus": ["./packages/field/driver-modbus/src"],
-      "@snap-rail/driver-modbus/rpc": ["./packages/field/driver-modbus/src/rpc.ts"],
+      "@snap-rail/driver-modbus/station": ["./packages/field/driver-modbus/src/station.tsx"],
       "@snap-rail/client-ui": ["./packages/client/ui/src"],
       "@snap-rail/client-ui/theme.css": ["./packages/client/ui/src/theme.css"],
       "@snap-rail/client-kernel": ["./packages/client/kernel/src"],
@@ -59,7 +59,6 @@
       "@snap-rail/client-settings": ["./packages/client/settings/src"],
       "@snap-rail/client-variables": ["./packages/client/variables/src"],
       "@snap-rail/settings-station": ["./packages/client/settings-station/src"],
-      "@snap-rail/modbus-station": ["./packages/client/modbus-station/src"],
       "@snap-rail/client-session": ["./packages/client/session/src"],
       "@snap-rail/client-workflows": ["./packages/client/workflows/src"],
       "@snap-rail/client-runtime": ["./packages/client/runtime/src"],
@@ -67,13 +66,12 @@
       "@snap-rail/chrome-titlebar": ["./packages/client/chrome-titlebar/src"],
       "@snap-rail/process-maintenance": ["./packages/client/process-maintenance/src"],
       "@snap-rail/process-production": ["./packages/client/process-production/src"],
+      "@snap-rail/process-production/stats": ["./packages/client/process-production/src/stats.ts"],
       "@snap-rail/process-sampling": ["./packages/client/process-sampling/src"],
       "@snap-rail/process-fault": ["./packages/client/process-fault/src"],
       "@snap-rail/process-downtime": ["./packages/client/process-downtime/src"],
       "@snap-rail/station-rpc": ["./packages/boot/station-rpc/src"],
-      "@snap-rail/station-rpc/contract": ["./packages/boot/station-rpc/src/contract.ts"],
-      "@snap-rail/production-stats": ["./packages/production/stats/src"],
-      "@snap-rail/production-stats/contract": ["./packages/production/stats/src/contract.ts"]
+      "@snap-rail/station-rpc/contract": ["./packages/boot/station-rpc/src/contract.ts"]
     }
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/driver-modbus",
-  "description": "ModbusTCP field driver: block-merged polling, change-only sampling, write support; modbus.* bridge and store tables ride along",
+  "description": "ModbusTCP in one package: host driver + field.modbus bridge + store tables, and the renderer settings page (./station) sharing the same contract",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -10,21 +10,21 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./rpc": {
-      "types": "./lib/types/rpc.d.ts",
-      "default": "./lib/rpc.js"
-    },
     "./contract": {
       "types": "./lib/types/contract.d.ts",
       "default": "./lib/contract.js"
+    },
+    "./station": {
+      "types": "./lib/types/station.d.ts",
+      "default": "./lib/station.js"
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
-    "lib/rpc.js",
     "lib/contract.js",
+    "lib/station.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
@@ -35,22 +35,35 @@
   },
   "peerDependencies": {
     "@snap-rail/audit": "workspace:^",
+    "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/client-variables": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-timer": "workspace:^",
     "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
     "@snap-rail/settings": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^",
-    "@snap-rail/store": "workspace:^"
+    "@snap-rail/store": "workspace:^",
+    "react": ">=19"
   },
   "devDependencies": {
     "@snap-rail/audit": "workspace:^",
+    "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/client-variables": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-timer": "workspace:^",
     "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
     "@snap-rail/settings": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^",
-    "@snap-rail/store": "workspace:^"
+    "@snap-rail/store": "workspace:^",
+    "@types/react": "^19.2.14",
+    "react": "^19.2.8"
   }
 }

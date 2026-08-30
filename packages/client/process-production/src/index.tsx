@@ -2,10 +2,10 @@
  * Workflow page: 生产任务 — pick a model, start, and watch the counters.
  * The theoretical total derives from the audit event stream (rate × net
  * running time, pauses unioned from fault + downtime events). The actual
- * shift production is a pure projection of the host-side production-stats
- * plugin: it counts the bound output point into three 8-hour shift buckets
- * (snap-rail.db, anchored at login time — only a re-login re-picks the
- * shift) and broadcasts the `production/stats-changed` frame this page
+ * shift production is a pure projection of this package's host-side counter
+ * (`./stats`): it counts the bound output point into three 8-hour shift
+ * buckets (snap-rail.db, anchored at login time — only a re-login re-picks
+ * the shift) and broadcasts the `production/stats-changed` frame this page
  * renders, so page switches never lose a count.
  *
  * The counting variable's (device, group, name) address is the counting
@@ -40,7 +40,7 @@ import {
   type CountBinding,
   type ProductionStatsSnapshot,
   type ShiftName,
-} from '@snap-rail/production-stats/contract'
+} from './contract.ts'
 import { MAINTENANCE_COMPLETE } from '@snap-rail/process-maintenance'
 import {
   deriveState,
@@ -91,11 +91,11 @@ export const productionConfigSchema = z.object({
 
 export type ProductionConfig = z.infer<typeof productionConfigSchema>
 
-// The counting binding contract lives with the host-side counter
-// (`@snap-rail/production-stats/contract`) and is re-exported here so this
-// plugin's public surface keeps its historical shape.
-export { COUNT_BINDING_KEY, DEFAULT_COUNT_BINDING, countBindingSchema } from '@snap-rail/production-stats/contract'
-export type { CountBinding } from '@snap-rail/production-stats/contract'
+// The counting binding contract is shared with this package's host-side
+// counter (`./stats`) and re-exported here for consumers of the page's
+// public surface.
+export { COUNT_BINDING_KEY, DEFAULT_COUNT_BINDING, countBindingSchema } from './contract.ts'
+export type { CountBinding } from './contract.ts'
 
 declare module '@snap-rail/cordis' {
   interface Events {

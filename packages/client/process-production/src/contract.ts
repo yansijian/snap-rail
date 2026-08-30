@@ -1,11 +1,11 @@
 /**
  * The production-stats contract: the shift vocabulary, the counting
  * binding's settings key, and the snapshot shape broadcast on the
- * `production/stats-changed` frame. Pure data + zod — the renderer imports
- * this module through the `./contract` subpath, so it must stay free of
+ * `production/stats-changed` frame. Pure data + zod — the page and the
+ * host counter (`./stats`) share this module, and it must stay free of
  * node- and host-side imports.
  *
- * @module @snap-rail/production-stats/contract
+ * @module @snap-rail/process-production/contract
  */
 
 import { z } from 'zod'

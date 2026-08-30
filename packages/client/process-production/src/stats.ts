@@ -1,24 +1,24 @@
 /**
- * 班产统计 (shift production stats): the host-side counter behind the
- * production page's 实际产量. It follows the counting binding (the same
- * `production.countBinding` settings key the renderer's 产量采集 page
- * writes) over the field seam's `point/updated` events and accumulates
- * positive deltas into three eight-hour shift buckets (8–16 早班, 16–24
- * 中班, 0–8 晚班), persisted in the store — page switches, logouts, and
- * restarts never lose a count.
+ * 班产统计 (shift production stats): the host-side counter behind this
+ * package's production page (实际产量). It follows the counting binding
+ * (the same `production.countBinding` settings key the page's settings
+ * dialog writes) over the field seam's `point/updated` events and
+ * accumulates positive deltas into three eight-hour shift buckets (8–16
+ * 早班, 16–24 中班, 0–8 晚班), persisted in the store — page switches,
+ * logouts, and restarts never lose a count.
  *
  * A shift is anchored at login time: the whole login session counts into
  * the bucket `shiftKeyOf(loginAt)` and only a re-login re-picks. A restart
  * with the operator still signed on restores the persisted anchor, so the
  * shift survives reboot; samples while nobody is signed on count nowhere.
  *
- * The renderer is a pure projection: every flush tick broadcasts the full
- * snapshot on the `production/stats-changed` frame (also when idle, so a
- * freshly booted renderer gets its initial state within one tick). The
- * payload contract lives in `./contract.ts` — business-owned, not a
- * protocol method.
+ * The renderer is a pure projection (this package's page): every flush tick
+ * broadcasts the full snapshot on the `production/stats-changed` frame
+ * (also when idle, so a freshly booted renderer gets its initial state
+ * within one tick). The payload contract lives in `./contract.ts` —
+ * business-owned, not a protocol method.
  *
- * @module @snap-rail/production-stats
+ * @module @snap-rail/process-production/stats
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'

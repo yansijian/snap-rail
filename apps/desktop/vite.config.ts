@@ -46,7 +46,6 @@ function snapRailSources(): Plugin {
     '@snap-rail/process-fault': 'packages/client/process-fault/src/index.tsx',
     '@snap-rail/process-downtime': 'packages/client/process-downtime/src/index.tsx',
     '@snap-rail/settings-station': 'packages/client/settings-station/src/index.tsx',
-    '@snap-rail/modbus-station': 'packages/client/modbus-station/src/index.tsx',
   }
   const sourceOf = new Map<string, string>()
   for (const [name, rel] of Object.entries(sourceFiles)) {
@@ -63,7 +62,9 @@ function snapRailSources(): Plugin {
   sourceOf.set('@snap-rail/app-boot/contract', `${repoRoot}/packages/boot/app-boot/src/contract.ts`)
   sourceOf.set('@snap-rail/station-rpc/contract', `${repoRoot}/packages/boot/station-rpc/src/contract.ts`)
   sourceOf.set('@snap-rail/driver-modbus/contract', `${repoRoot}/packages/field/driver-modbus/src/contract.ts`)
-  sourceOf.set('@snap-rail/production-stats/contract', `${repoRoot}/packages/production/stats/src/contract.ts`)
+  // The modbus settings page is the package's renderer face; its entry must
+  // never pull the node-side driver bundle into the client build.
+  sourceOf.set('@snap-rail/driver-modbus/station', `${repoRoot}/packages/field/driver-modbus/src/station.tsx`)
 
   return {
     name: 'snap-rail-source-plane',

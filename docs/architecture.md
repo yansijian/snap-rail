@@ -36,13 +36,13 @@ Electron 主进程                        renderer（每窗口）
 | --- | --- | --- |
 | 启动/组合 | `boot/app-boot` | 两层合成、boot()、LayerAdmin 热重载、`./rpc` 管理桥（认领 `plugins` 域；`./contract` 是方法行与 schema 的家）；`rendererPackages` 让渲染端住户行只作配置不进宿主树 |
 | 工作站桥 | `boot/station-rpc` | `session.*`/`settings.*`/`audit.*`/`client-config.list`（登录态落 settings + 审计；`./contract` 是方法/帧行与 schema 的家，渲染住户 import 它获得类型） |
-| 班产统计 | `production/stats` | 宿主侧计数器：跟随计数绑定的正增量，按三班（8-16/16-24/0-8）落 `ctx.store`，登录时刻锚定班次；`production/stats-changed` 帧广播快照，`./contract` 子路径是渲染端共享的纯契约（合并进 FrameMap） |
+| 班产统计 | `client/process-production` 的 `./stats` 面 | 生产任务整包：工作流页 + 宿主侧计数器（跟随计数绑定的正增量，按三班 8-16/16-24/0-8 落 `ctx.store`，登录时刻锚定班次，`production/stats-changed` 帧广播快照兼作渲染端初值心跳）；契约是包内 `./contract`（合并进 FrameMap），两行在插件管理页按包归组 |
 | RPC 协议 | `protocol/protocol` | **信封封闭、内容开放**：四象限消息模型、RpcMethodMap/FrameMap 两个开放合并基座（只有平台行 `host.*`/`rpc.*`/`window.*` 留在这里）、zod 信封校验、AbstractApiClient 双 overload（已知方法全类型、未知方法 `(string, unknown)`） |
 | RPC 宿主侧 | `protocol/gateway` | `ctx.rpc`：域名认领（`claimDomain` 首认即得、冲突 fail-loud）、`method`（请求 schema 必须随注册）、`frame`（载荷 schema 注册）、`bridgeEvent`（宿主事件→帧的标准桥）、`rpc.describe` 能力发现、帧泵 |
 | RPC 客户端侧 | `protocol/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势（一次 zod 解析，坏帧丢弃并记录）；`rpcErrorText` 统一错误文案 |
 | 工业通讯协议域 | `field/field` | `ctx.points`/`ctx.connections`/`ctx.field`：点表运行面 + 驱动注册面（`registerDriver`：身份 + `field.<id>.*` 子命名空间 + 可选通用映射投影）；`field.mappings.list` 跨驱动聚合方言无关的点表映射文档；`./rpc` 桥认领 `field` 域，`./wire` 是方法/帧行与 schema 的家 |
 | 模拟驱动 | `field/driver-mock` | 首方 Provider：四类型点流、离线模拟、写回显；经 `ctx.field.registerDriver` 登记身份 |
-| ModbusTCP 驱动 | `field/driver-modbus` | `field.modbus.*` 子域（设备/组/映射 CRUD + 连接探测）；方言 schema 与类型住在 `./contract` 子路径，不进 protocol |
+| ModbusTCP 驱动 | `field/driver-modbus` | ModbusTCP 整包：一个宿主入口同时挂驱动与 `field.modbus.*` 桥（设备/组/映射 CRUD + 连接探测），`./contract` 是方言 schema 与类型（不进 protocol），`./station` 是渲染端设置页；两行在插件管理页按包归组、一个总开关启停 |
 | 槽位词表 | `client/slots` | `ctx.uiSlots`：well-known slot ids + 缺槽降级 |
 | UI 原语 | `client/ui` | 主题令牌（theme.css，Tailwind v4）+ shadcn 共享组件 + `useRefresh`（ctx 事件→重渲染的标准 tick）；页面组件必须组合此包原语，缺原语按 shadcn 官方实现移植，不在页面手写交互组件 |
 | 操作人会话 | `client/session` | `ctx.session`：登录态镜像（宿主持久化，重启保持登录）、`session/changed` 事件；经 `settings/changed` 帧热跟随宿主侧换人 |
@@ -51,7 +51,7 @@ Electron 主进程                        renderer（每窗口）
 | 变量声明 | `client/variables` | `ctx.variables`：需求方声明业务变量（三元组+类型）；`watchBinding`/`useBinding`/`usePoint` 消费配方经 `field.mappings.list` + `field/mappings-changed` 解析绑定——对具体驱动零知识 |
 | 设置页 | `client/settings` | `ctx.settingsPages`：设置对话框的可扩展页注册表 |
 | 引导 | `client/kernel` | 启动页、carrier 握手、root 移交 |
-| 布局/住户 | `client/layout-station` 等 | 全部是插件：layout-station（登录门控+流程列表+内容区）、chrome-titlebar、settings-station、modbus-station（ModbusTCP 设置页）、process-maintenance/production/sampling/fault/downtime 五个流程页 |
+| 布局/住户 | `client/layout-station` 等 | 全部是插件：layout-station（登录门控+流程列表+内容区）、chrome-titlebar、settings-station、process-maintenance/production/sampling/fault/downtime 五个流程页（ModbusTCP 设置页是 `field/driver-modbus` 的 `./station` 面，随包归组管理） |
 | 设置持久化 | `settings/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
 | 审计 | `audit/audit` | 追加式 JSONL：启停/配置/控制写全记录；`list(filter)` 读回（工作站业务事件的真相源）；wire 类型（`AuditEntryInfo`）由它导出，单一来源 |
 | 工具 | `util/util` | Branded、assertNever、`formatClock`/`formatDuration`；`./manifest` 是脊柱/住户名单与门禁的单源 |
@@ -71,8 +71,9 @@ Electron 主进程                        renderer（每窗口）
   `operator-day` 门控自动重算（换人重做当日维护）。
 - **生产理论计数**：rate × 净运行时长；故障与停机区间取并集剔除，故障与
   停机可并发。
-- **班产统计（实际计数）**：计数在宿主侧 `production/stats` 插件运行——
-  监听 field 的 `point/updated`、只累计正增量（负增量=计数器复位忽略、
+- **班产统计（实际计数）**：计数在宿主侧运行——生产包的 `./stats` 面
+  （`@snap-rail/process-production/stats` 挂载条目）：监听 field 的
+  `point/updated`、只累计正增量（负增量=计数器复位忽略、
   `null`=异常重播种基线），按三班（8-16 早 / 16-24 中 / 0-8 晚）分桶落
   `snap-rail.db`（班行 + 小时桶 + 登录锚），页面开闭/注销/重启都不丢。
   班次以**登录时刻**锚定：整个登录会话计入登录时所在班，只有退出重登
@@ -100,6 +101,11 @@ Electron 主进程                        renderer（每窗口）
   需要即时生效的简单配置（点位绑定之类）不走行，走 settings.json 的
   `settings.get/set` + `settings/changed` 帧（见设置行）。
 - LayerAdmin 串行化所有变更；watch 层文件与池目录（150ms 去抖）。
+- 包是管理单元：`plugins.list` 给每行带 `packageName`，插件管理页把
+  同一包的多行（如 `driver-modbus` 的宿主行与 `./station` 渲染行）
+  归为一张组卡、一个总开关一并启停；单行包保持平铺。退役行名
+  （包合并遗留）在 `loadUserLayer` 内存态改名到后继行，老文件升级
+  不炸组合，下次写回自然收敛。
 - 坏文件（YAML 解析失败、未知插件引用）**保持当前树运行**并报错；
   修好文件后下一次写自然恢复。扫描池回答"有什么"，清单回答"挂什么"。
 
@@ -140,9 +146,9 @@ owner 自己的 contract 模块里（`declare module '@snap-rail/protocol'`
 5. **能力发现**：`rpc.describe` 列出活的域认领（含认领者）、方法
    （含 JSON Schema）、帧——设置页/Agent/未来插件安装器的内省面。
 6. **类型可见性 = 消费方 import 提供方 contract**：合并行只进入
-   import 了该 contract 的程序（modbus-station →
-   `@snap-rail/driver-modbus/contract`，渲染住户 →
-   `@snap-rail/station-rpc/contract`，点表消费 → `@snap-rail/field`）。
+   import 了该 contract 的程序（modbus 设置页 → 同包的
+   `./contract`，渲染住户 → `@snap-rail/station-rpc/contract`，
+   点表消费 → `@snap-rail/field`）。
    "谁能调什么域"显式落在 package.json。
 
 ### 高频点值与帧消费

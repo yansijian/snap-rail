@@ -25,7 +25,9 @@ import { projectMapping, readDocument } from './document.ts'
 import { SESSION_OPERATOR_KEY } from '@snap-rail/station-rpc/contract'
 import { MODBUS_TABLES } from './tables.ts'
 
-/** The modbus bridge plugin; mount after rpc, field, settings, audit, and store. */
+/** The modbus bridge plugin; mounted as a child of the root driver entry,
+ * whose inject union guarantees rpc, field, settings, audit, and store are
+ * up before this fiber starts. */
 const modbusRpcPlugin: Plugin.Object<void> = {
   name: 'modbus-rpc',
   inject: ['rpc', 'field', 'audit', 'settings', 'store'],
