@@ -562,7 +562,7 @@ function GroupPanel(props: {
         {/* The title zone stretches: its whitespace toggles the panel too. */}
         <CollapsibleTrigger className="w-auto min-w-0 flex-1">
           <Led tone={tone} aria-label={`分组状态 ${props.group.name}`} />
-          <span className="max-w-[200px] truncate text-left font-medium">{props.group.name}</span>
+          <span className="max-w-50 truncate text-left font-medium">{props.group.name}</span>
           <span className="whitespace-nowrap text-xs text-muted-foreground">{total} 个点位</span>
           <Badge variant={TYPE_VARIANT[props.group.type]}>{TYPE_LABEL[props.group.type]}</Badge>
         </CollapsibleTrigger>
@@ -585,13 +585,13 @@ function GroupPanel(props: {
         )}
         {total > 0 && (
           <div className="overflow-x-auto px-3">
-            <Table className="min-w-[640px]">
+            <Table className="min-w-160">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[110px] whitespace-nowrap pr-2">点位</TableHead>
-                  <TableHead className="min-w-[110px] whitespace-nowrap">功能码</TableHead>
+                  <TableHead className="min-w-27.5 whitespace-nowrap pr-2">点位</TableHead>
+                  <TableHead className="min-w-27.5 whitespace-nowrap">功能码</TableHead>
                   <TableHead className="whitespace-nowrap">地址</TableHead>
-                  <TableHead className="min-w-[90px] whitespace-nowrap">编码</TableHead>
+                  <TableHead className="min-w-22.5 whitespace-nowrap">编码</TableHead>
                   <TableHead className="whitespace-nowrap">可写</TableHead>
                   <TableHead className="whitespace-nowrap text-right">当前值</TableHead>
                   <TableHead className="whitespace-nowrap" />

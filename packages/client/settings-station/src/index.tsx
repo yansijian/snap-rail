@@ -160,7 +160,7 @@ function SettingsDialog({ ctx }: { ctx: Context }): ReactNode {
           </Button>
         </div>
         <div className="flex min-h-0 flex-1">
-          <nav data-region="settings-menu" className="flex w-[200px] shrink-0 flex-col gap-1 overflow-auto border-r border-border p-2">
+          <nav data-region="settings-menu" className="flex w-50 shrink-0 flex-col gap-1 overflow-auto border-r border-border p-2">
             {pages.map(page => (
               <button
                 key={page.id}
