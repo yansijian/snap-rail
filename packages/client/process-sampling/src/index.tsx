@@ -16,7 +16,7 @@ import '@snap-rail/cordis-plugin-timer'
 import '@snap-rail/station-rpc/contract'
 import { z } from 'zod'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, RadioGroup, RadioGroupItem } from '@snap-rail/client-ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, DragScroll, Label, NumberInput, RadioGroup, RadioGroupItem } from '@snap-rail/client-ui'
 import { PRODUCTION_START } from '@snap-rail/process-production'
 import { nextDue, parseCron, type CronSpec } from './schedule.ts'
 import '@snap-rail/client-slots'
@@ -103,31 +103,32 @@ function SamplingPage(props: { ctx: Context, dueState: DueState }): ReactNode {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4" data-page="sampling">
-      <div className="mx-auto max-w-xl space-y-3">
+    <DragScroll className="h-full p-6" data-page="sampling">
+      <div className="mx-auto max-w-3xl space-y-4">
         <Card>
           <CardHeader><CardTitle>抽检记录</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             {due === null
-              ? <div className="text-sm text-muted-foreground">今日开始生产后，抽检将按配置的计划时间进行。</div>
+              ? <div className="text-base text-muted-foreground">今日开始生产后，抽检将按配置的计划时间进行。</div>
               : remaining !== null && remaining >= 0
                 ? (
-                    <div className="text-sm" role="status">
+                    <div className="text-base" role="status">
                       下次抽检 <span className="font-mono">{formatClock(due)}</span>，还有 {formatRemaining(remaining)}。
                     </div>
                   )
-                : <div className="text-sm text-destructive" role="alert">抽检已逾期 {formatRemaining(remaining ?? 0)}，请尽快完成并提交。</div>}
+                : <div className="text-base text-destructive" role="alert">抽检已逾期 {formatRemaining(remaining ?? 0)}，请尽快完成并提交。</div>}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               {weights.map((weight, index) => (
-                <div key={index} className="space-y-1">
-                  <Label htmlFor={`sampling-weight-${index}`}>重量{index + 1}（g）</Label>
-                  <Input
-                    id={`sampling-weight-${index}`}
-                    inputMode="decimal"
+                <div key={index} className="space-y-1.5">
+                  <Label>重量{index + 1}（g）</Label>
+                  <NumberInput
+                    label={`重量${index + 1}（g）`}
+                    placeholder="点击输入"
+                    allowDecimal
                     value={weight}
-                    onChange={event => {
-                      setWeights(values => values.map((value, i) => i === index ? event.target.value : value))
+                    onChange={next => {
+                      setWeights(values => values.map((value, i) => i === index ? next : value))
                       setError(null)
                     }}
                   />
@@ -135,30 +136,30 @@ function SamplingPage(props: { ctx: Context, dueState: DueState }): ReactNode {
               ))}
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label>气密性合格</Label>
               <RadioGroup
                 {...airtight !== null ? { value: airtight } : {}}
                 onValueChange={value => { setAirtight(value === 'yes' ? 'yes' : 'no'); setError(null) }}
-                className="flex gap-6"
+                className="flex gap-8"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <RadioGroupItem value="yes" id="airtight-yes" />
-                  <Label htmlFor="airtight-yes">是</Label>
+                  <Label htmlFor="airtight-yes" className="text-base text-foreground">是</Label>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <RadioGroupItem value="no" id="airtight-no" />
-                  <Label htmlFor="airtight-no">否</Label>
+                  <Label htmlFor="airtight-no" className="text-base text-foreground">否</Label>
                 </div>
               </RadioGroup>
             </div>
 
-            {error !== null && <div className="text-xs text-destructive" role="alert">{error}</div>}
-            <Button className="w-full" disabled={busy} onClick={submit}>{busy ? '提交中…' : '确认提交'}</Button>
+            {error !== null && <div className="text-sm text-destructive" role="alert">{error}</div>}
+            <Button size="xl" className="w-full" disabled={busy} onClick={submit}>{busy ? '提交中…' : '确认提交'}</Button>
           </CardContent>
         </Card>
       </div>
-    </div>
+    </DragScroll>
   )
 }
 

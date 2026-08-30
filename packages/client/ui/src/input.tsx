@@ -13,7 +13,7 @@ export function Input({ className, type = 'text', ...props }: ComponentProps<'in
     <input
       type={type}
       className={cn(
-        'flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm',
+        'flex h-12 w-full rounded-md border border-input bg-transparent px-4 py-2 text-base',
         'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         'disabled:cursor-not-allowed disabled:opacity-50',
         className,

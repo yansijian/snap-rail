@@ -6,14 +6,16 @@
  */
 
 import type { ComponentProps } from 'react'
+import { DragScroll } from './drag-scroll.tsx'
 import { cn } from './utils.ts'
 
-/** The grid container with a hairline bottom rule. */
+/** The grid container with a hairline bottom rule; the wrapper pans under
+ * a held mouse drag (see {@link DragScroll}). */
 export function Table({ className, ...props }: ComponentProps<'table'>) {
   return (
-    <div className="w-full overflow-auto">
+    <DragScroll className="w-full">
       <table className={cn('w-full caption-bottom text-sm', className)} {...props} />
-    </div>
+    </DragScroll>
   )
 }
 
@@ -39,10 +41,10 @@ export function TableRow({ className, ...props }: ComponentProps<'tr'>) {
 
 /** One column head: muted, left-aligned unless overridden. */
 export function TableHead({ className, ...props }: ComponentProps<'th'>) {
-  return <th className={cn('h-8 px-2 text-left align-middle text-xs font-medium text-muted-foreground', className)} {...props} />
+  return <th className={cn('h-11 px-3 text-left align-middle text-sm font-medium text-muted-foreground', className)} {...props} />
 }
 
 /** One cell. */
 export function TableCell({ className, ...props }: ComponentProps<'td'>) {
-  return <td className={cn('p-2 align-middle', className)} {...props} />
+  return <td className={cn('px-3 py-3 align-middle', className)} {...props} />
 }

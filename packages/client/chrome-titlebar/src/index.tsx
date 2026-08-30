@@ -26,7 +26,7 @@ function LogoMark(): ReactNode {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="h-[18px] w-[18px] text-primary"
+      className="h-5 w-5 text-primary"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -52,27 +52,27 @@ function Titlebar(props: {
   const close = (): void => props.control('close')
 
   return (
-    <div className="drag-region relative flex h-12 select-none items-stretch justify-between border-b border-border">
-      <div className="flex items-center gap-2 pl-3">
+    <div className="drag-region relative flex h-14 select-none items-stretch justify-between border-b border-border">
+      <div className="flex items-center gap-3 pl-4">
         <LogoMark />
-        <span className="text-sm font-medium tracking-wide">snap-rail</span>
+        <span className="text-base font-medium tracking-wide">snap-rail</span>
       </div>
 
       <div className="no-drag flex items-stretch">
         {operator !== null && (
           <div className="mr-1 flex items-center gap-1 pr-1">
             <span
-              className="inline-flex h-6 items-center rounded border border-border px-2 font-mono text-xs text-muted-foreground"
+              className="inline-flex h-8 items-center rounded border border-border px-3 font-mono text-sm text-muted-foreground"
               data-operator={operator}
             >
               {operator}
             </span>
             <Button
               variant="ghost"
-              className="h-6 px-2 text-xs text-muted-foreground"
+              className="h-10 px-3 text-sm text-muted-foreground"
               onClick={() => { void props.ctx.session.logout().catch(() => {}) }}
             >
-              <LogOut className="h-3 w-3" />
+              <LogOut className="h-4 w-4" />
               退出登录
             </Button>
           </div>
@@ -82,34 +82,34 @@ function Titlebar(props: {
           <Button
             variant="ghost"
             aria-label="设置"
-            className="h-full w-11 rounded-none px-0"
+            className="h-full w-14 rounded-none px-0"
             onClick={() => props.ctx.settingsPages.open()}
           >
-            <Settings className="h-3.5 w-3.5" />
+            <Settings className="h-5 w-5" />
           </Button>
           <Button
             variant="ghost"
             aria-label="最小化"
-            className="h-full w-11 rounded-none px-0"
+            className="h-full w-14 rounded-none px-0"
             onClick={() => props.control('minimize')}
           >
-            <Minus className="h-3.5 w-3.5" />
+            <Minus className="h-5 w-5" />
           </Button>
           <Button
             variant="ghost"
             aria-label="最大化切换"
-            className="h-full w-11 rounded-none px-0"
+            className="h-full w-14 rounded-none px-0"
             onClick={() => props.control('toggle-maximize')}
           >
-            <Square className="h-3 w-3" />
+            <Square className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             aria-label="关闭"
-            className="h-full w-11 rounded-none px-0 rounded-r-none hover:bg-destructive/20 hover:text-destructive"
+            className="h-full w-14 rounded-none px-0 rounded-r-none hover:bg-destructive/20 hover:text-destructive"
             onClick={() => setConfirming(true)}
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </Button>
         </div>
       </div>
@@ -117,14 +117,14 @@ function Titlebar(props: {
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>退出客户端？</DialogTitle>
+            <DialogTitle className="text-lg font-medium">退出客户端？</DialogTitle>
             <DialogDescription>
               关闭后生产、抽检与异常记录入口将不可用；未提交的数据已随操作落盘。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirming(false)}>取消</Button>
-            <Button variant="destructive" onClick={() => { setConfirming(false); close() }}>退出</Button>
+            <Button variant="outline" size="lg" onClick={() => setConfirming(false)}>取消</Button>
+            <Button variant="destructive" size="lg" onClick={() => { setConfirming(false); close() }}>退出</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

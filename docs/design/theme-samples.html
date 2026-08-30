@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="zh-CN" data-mode="dark" data-accent="steel">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>snap-rail 主题样例 — 明暗 × 9 主题色</title>
+<style>
+  /*
+   * snap-rail 主题设计样例（静态单文件，无依赖）。
+   * 变量体系与正式实现一致：
+   *   [data-mode]  承载中性表面（暗=石墨钢 / 明=雾白面板）+ 光晕强度 + 图表派生
+   *   [data-accent]（与 mode 联合）承载主题色 --accent 与其上的文字色 --on-accent
+   *   图表系列：系列1=主题色，系列2/3 由主题色派生，系列4-6 为钢灰梯度
+   */
+  * { box-sizing: border-box; border-color: var(--border); }
+  html { color-scheme: dark; }
+  html[data-mode='light'] { color-scheme: light; }
+
+  [data-mode='dark'] {
+    --bg: #0b0f14;
+    --surface: #11161d;
+    --surface-2: #161b22;
+    --raise: #1c2430;
+    --border: #1f2933;
+    --fg: #c9d1d9;
+    --fg-strong: #e8eef4;
+    --fg-muted: #8b949e;
+    --on-accent: #07131e;
+    --ok: #3fb950; --warn: #d29922; --bad: #f85149;
+    --glow-a: 55%; --glow-b: 20%; --bar-glow: 45%;
+    --grad-tint: 8%;
+    --chart-2: color-mix(in srgb, var(--accent) 60%, var(--bg));
+    --chart-3: color-mix(in srgb, var(--accent) 45%, #7d8fa5);
+    --chart-4: #7d8fa5; --chart-5: #55677c; --chart-6: #33414f;
+    --app-gradient: radial-gradient(130% 100% at 50% 0%,
+      color-mix(in srgb, var(--accent) var(--grad-tint), var(--bg)) 0%,
+      var(--bg) 62%);
+  }
+  [data-mode='light'] {
+    --bg: #e4e9ef;
+    --surface: #f3f6f9;
+    --surface-2: #ffffff;
+    --raise: #dde4ec;
+    --border: #c7d0da;
+    --fg: #26323e;
+    --fg-strong: #101b26;
+    --fg-muted: #5d6d7e;
+    --on-accent: #ffffff;
+    --ok: #15803d; --warn: #b45309; --bad: #dc2626;
+    --glow-a: 20%; --glow-b: 7%; --bar-glow: 30%;
+    --grad-tint: 6%;
+    --chart-2: color-mix(in srgb, var(--accent) 72%, #ffffff);
+    --chart-3: color-mix(in srgb, var(--accent) 50%, #94a3b8);
+    --chart-4: #94a3b8; --chart-5: #b3c0cd; --chart-6: #ccd6e0;
+    --app-gradient: radial-gradient(130% 100% at 50% 0%,
+      color-mix(in srgb, var(--accent) var(--grad-tint), var(--bg)) 0%,
+      var(--bg) 62%);
+  }
+
+  /* 暗色 9 款主题色（luminous，配深色文字） */
+  [data-mode='dark'][data-accent='steel']   { --accent: #4493f8; }
+  [data-mode='dark'][data-accent='cobalt']  { --accent: #4a6cff; }
+  [data-mode='dark'][data-accent='cyan']    { --accent: #22d3ee; }
+  [data-mode='dark'][data-accent='emerald'] { --accent: #34d399; }
+  [data-mode='dark'][data-accent='teal']    { --accent: #2cc5b2; }
+  [data-mode='dark'][data-accent='amber']   { --accent: #f0b429; }
+  [data-mode='dark'][data-accent='copper']  { --accent: #ef7f3a; }
+  [data-mode='dark'][data-accent='rose']    { --accent: #f4587b; }
+  [data-mode='dark'][data-accent='violet']  { --accent: #a78bfa; }
+  /* 明色 9 款（加深保对比，配白色文字） */
+  [data-mode='light'][data-accent='steel']   { --accent: #0f6fdc; }
+  [data-mode='light'][data-accent='cobalt']  { --accent: #3857e8; }
+  [data-mode='light'][data-accent='cyan']    { --accent: #0891b2; }
+  [data-mode='light'][data-accent='emerald'] { --accent: #059669; }
+  [data-mode='light'][data-accent='teal']    { --accent: #0d9488; }
+  [data-mode='light'][data-accent='amber']   { --accent: #b7791f; }
+  [data-mode='light'][data-accent='copper']  { --accent: #c2410c; }
+  [data-mode='light'][data-accent='rose']    { --accent: #be123c; }
+  [data-mode='light'][data-accent='violet']  { --accent: #7c3aed; }
+
+  :root {
+    --mono: "Cascadia Code", Consolas, "JetBrains Mono", ui-monospace, monospace;
+  }
+  body {
+    margin: 0;
+    font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: var(--app-gradient);
+    background-attachment: fixed;
+    color: var(--fg);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  /* —— 数码光晕 —— */
+  .glow-number {
+    color: var(--accent);
+    text-shadow:
+      0 0 14px color-mix(in srgb, var(--accent) var(--glow-a), transparent),
+      0 0 44px color-mix(in srgb, var(--accent) var(--glow-b), transparent);
+  }
+  .glow-plain {
+    text-shadow:
+      0 0 16px color-mix(in srgb, var(--accent) var(--glow-b), transparent);
+  }
+  .glow-bar {
+    box-shadow: 0 0 12px color-mix(in srgb, var(--chart-1) var(--bar-glow), transparent);
+  }
+
+  /* —— 页面骨架 —— */
+  .page { max-width: 1280px; margin: 0 auto; padding: 28px 32px 64px; }
+  .page-head h1 { color: var(--fg-strong); font-size: 26px; margin: 0 0 6px; }
+  .page-head p { color: var(--fg-muted); margin: 0 0 18px; font-size: 14px; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 20px;
+  }
+  .controls .hint { color: var(--fg-muted); font-size: 13px; }
+  .seg { display: inline-flex; background: var(--raise); border-radius: 10px; padding: 4px; gap: 4px; }
+  .seg button {
+    border: 0; background: transparent; color: var(--fg-muted); cursor: pointer;
+    font: inherit; font-size: 15px; padding: 8px 20px; border-radius: 7px;
+  }
+  .seg button[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+  .swatch {
+    width: 44px; height: 44px; border-radius: 12px; cursor: pointer;
+    border: 2px solid transparent; background: var(--dot);
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .swatch[aria-pressed='true'] {
+    border-color: var(--fg-strong);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot) 35%, transparent);
+  }
+  .swatch .tick { display: none; }
+  .swatch[aria-pressed='true'] .tick { display: block; }
+
+  .section-title { color: var(--fg-strong); font-size: 18px; margin: 30px 0 12px; }
+
+  /* —— 大预览：模拟应用切片 —— */
+  .preview {
+    border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--border); box-shadow: 0 24px 60px -30px rgba(0,0,0,.55);
+  }
+  .tb {
+    display: flex; align-items: center; gap: 12px; height: 56px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 8px 0 18px; font-size: 16px; color: var(--fg-strong);
+  }
+  .tb .logo { width: 14px; height: 14px; border-radius: 4px; background: var(--accent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent); }
+  .tb .sub { color: var(--fg-muted); font-size: 14px; }
+  .tb .spacer { flex: 1; }
+  .chip { background: var(--raise); border-radius: 999px; padding: 6px 14px; font-size: 14px; color: var(--fg); }
+  .winbtn { width: 56px; height: 100%; display: grid; place-items: center; color: var(--fg-muted); }
+  .winbtn:hover { background: var(--raise); color: var(--fg-strong); }
+
+  .frame { display: flex; background: var(--app-gradient); }
+  .side { width: 216px; flex: none; border-right: 1px solid var(--border); padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .nav { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 14px; border-radius: 10px; font-size: 16px; color: var(--fg); }
+  .nav.active {
+    background: var(--raise); color: var(--fg-strong); font-weight: 600;
+    box-shadow: inset 3px 0 0 0 var(--accent);
+  }
+  .nav.locked { color: color-mix(in srgb, var(--fg-muted) 45%, transparent); }
+  .dot { width: 10px; height: 10px; border-radius: 999px; flex: none; }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 60%, transparent); }
+  .dot.warn { background: var(--warn); animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 4px color-mix(in srgb, var(--warn) 30%, transparent); opacity: .65; }
+    50% { box-shadow: 0 0 14px color-mix(in srgb, var(--warn) 80%, transparent); opacity: 1; }
+  }
+
+  .main { flex: 1; min-width: 0; padding: 20px; display: grid; gap: 16px;
+    grid-template-columns: minmax(300px, 5fr) minmax(320px, 6fr); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+  .card h4 { margin: 0 0 12px; font-size: 13px; font-weight: 500; color: var(--fg-muted);
+    letter-spacing: .08em; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px;
+    padding: 4px 10px; font-size: 13px; }
+  .badge.tonal { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+  .badge.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+  .badge.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+  .badge.mut { background: var(--raise); color: var(--fg-muted); }
+
+  .hero-label { font-size: 13px; color: var(--fg-muted); margin-bottom: 2px; }
+  .hero { display: flex; align-items: baseline; gap: 10px; }
+  .hero .num {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 56px; font-weight: 600; line-height: 1.05; letter-spacing: .01em;
+  }
+  .hero .unit { font-size: 15px; color: var(--fg-muted); }
+  .hero-2 .num { font-size: 36px; }
+  .rowline { display: flex; align-items: center; gap: 10px; font-size: 15px; margin: 10px 0; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 48px; padding: 0 20px; border-radius: 10px; border: 1px solid transparent;
+    font: inherit; font-size: 16px; cursor: pointer; font-weight: 500;
+  }
+  .btn.primary { background: var(--accent); color: var(--on-accent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .btn.second { background: var(--raise); color: var(--fg-strong); }
+  .btn.outline { border-color: var(--border); color: var(--fg-strong); background: transparent; }
+  .btn.danger { background: color-mix(in srgb, var(--bad) 88%, #000); color: #fff; }
+  .btn.block { width: 100%; margin-top: 12px; }
+  .btn.big { height: 56px; font-size: 17px; }
+
+  .pick { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    height: 56px; padding: 0 16px; border: 1px solid var(--border); border-radius: 10px;
+    font-size: 16px; margin-top: 8px; cursor: pointer; color: var(--fg-strong); }
+  .pick.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent);
+    box-shadow: inset 3px 0 0 0 var(--accent); }
+  .pick small { color: var(--fg-muted); }
+  .caret { color: var(--fg-muted); font-size: 12px; }
+
+  .switch { width: 44px; height: 24px; border-radius: 999px; background: var(--raise);
+    position: relative; flex: none; }
+  .switch.on { background: var(--accent); }
+  .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+    border-radius: 999px; background: #fff; transition: left .15s; }
+  .switch.on::after { left: 23px; }
+
+  /* 柱状图 */
+  .chart { display: flex; align-items: flex-end; gap: 6px; height: 180px; }
+  .chart .slot { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 100%; }
+  .bar { width: 100%; max-width: 18px; border-radius: 4px 4px 0 0; background: var(--chart-1); }
+  .bar.glow { box-shadow: 0 0 12px color-mix(in srgb, var(--chart-1) var(--bar-glow), transparent); }
+  .theory { width: 100%; max-width: 18px; border-radius: 4px 4px 0 0;
+    border: 1.5px dashed color-mix(in srgb, var(--chart-2) 85%, transparent); border-bottom: 0; }
+  .axis { display: flex; gap: 6px; margin-top: 6px; color: var(--fg-muted); font-size: 12px; }
+  .axis span { flex: 1; text-align: center; }
+  .legend { display: flex; gap: 18px; margin-top: 12px; color: var(--fg-muted); font-size: 13px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .legend .l1 i { background: var(--chart-1); }
+  .legend .l2 i { border: 1.5px dashed color-mix(in srgb, var(--chart-2) 85%, transparent); }
+
+  .stat-strip { display: flex; flex-direction: column; gap: 12px; }
+  .stat-strip .row { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+  .shifts { display: flex; gap: 14px; color: var(--fg-muted); font-size: 13px; margin-top: 14px;
+    border-top: 1px solid var(--border); padding-top: 12px; }
+  .shifts b { color: var(--fg-strong); font-family: var(--mono); font-weight: 600; }
+
+  /* —— 图表模板 —— */
+  .tpl { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+  .tpl-row { display: flex; gap: 12px; margin: 10px 0 14px; flex-wrap: wrap; }
+  .tpl-chip { display: flex; align-items: center; gap: 8px; background: var(--raise);
+    padding: 8px 12px; border-radius: 10px; font-size: 13px; color: var(--fg-muted); }
+  .tpl-chip i { width: 16px; height: 16px; border-radius: 5px; display: inline-block; }
+  .tpl ol { margin: 0; padding-left: 20px; color: var(--fg); font-size: 14px; }
+  .tpl li { margin: 4px 0; }
+  .tpl code { font-family: var(--mono); color: var(--accent); font-size: 13px; }
+
+  /* —— 18 张主题卡 —— */
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(246px, 1fr)); }
+  .mini { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: var(--app-gradient); }
+  .mini .mtb { display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    background: var(--surface); border-bottom: 1px solid var(--border); font-size: 13px; color: var(--fg-strong); }
+  .mini .mtb .logo { width: 10px; height: 10px; border-radius: 3px; background: var(--accent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent); }
+  .mini .mtb .tag { margin-left: auto; color: var(--fg-muted); font-size: 12px;
+    white-space: nowrap; flex: none; }
+  .mini .body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .mini .label { font-size: 11px; color: var(--fg-muted); }
+  .mini .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 34px;
+    font-weight: 600; line-height: 1; }
+  .mini .bars { display: flex; align-items: flex-end; gap: 5px; height: 54px; }
+  .mini .bars .bar { max-width: 12px; }
+  .mini .foot { display: flex; gap: 8px; align-items: center; }
+  .mini .btn { height: 38px; font-size: 14px; padding: 0 14px; border-radius: 8px; }
+  .mini .name { padding: 10px 14px; background: var(--surface-2); border-top: 1px solid var(--border);
+    font-size: 14px; color: var(--fg-strong); display: flex; justify-content: space-between; }
+  .mini .name small { color: var(--fg-muted); font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-head">
+    <h1>snap-rail 主题样例</h1>
+    <p>工业 HMI「机柜面板」方向：信号灯 + 大号等宽数码 + 主题色键线选中态；背景为轻微柔和渐变（随主题色晕染）；大数字与图表柱带光晕。下方大预览可切换 明/暗 × 9 主题色，再往下是 18 款主题卡与图表系列色模板。</p>
+  </div>
+
+  <div class="controls">
+    <div class="seg" id="modeSeg" role="group" aria-label="模式">
+      <button type="button" data-mode="dark" aria-pressed="true">黑夜</button>
+      <button type="button" data-mode="light" aria-pressed="false">白天</button>
+    </div>
+    <div class="swatches" id="swatches" role="group" aria-label="主题色"></div>
+    <span class="hint">点击切换大预览的主题</span>
+  </div>
+
+  <div class="section-title">大预览（页面切片）</div>
+  <div class="preview">
+    <div class="tb">
+      <span class="logo"></span>
+      <b>snap-rail</b><span class="sub">· 车间终端</span>
+      <span class="spacer"></span>
+      <span class="chip">操作员 1001</span>
+      <span class="winbtn">—</span><span class="winbtn">□</span><span class="winbtn">✕</span>
+    </div>
+    <div class="frame">
+      <div class="side">
+        <div class="nav active">生产任务</div>
+        <div class="nav"><span class="dot warn"></span>抽检记录</div>
+        <div class="nav"><span class="dot ok"></span>故障提报</div>
+        <div class="nav locked">停机休息</div>
+      </div>
+      <div class="main">
+        <div class="card">
+          <h4>生产任务</h4>
+          <div class="rowline">
+            <span class="badge tonal">早班 08:00–16:00</span>
+            <span style="color:var(--fg-muted);font-size:13px">1001 08:12 登录</span>
+          </div>
+          <div class="hero-label">本班实际产量</div>
+          <div class="hero"><span class="num glow-number">12,480</span><span class="unit">件</span></div>
+          <div class="rowline">
+            <span class="badge ok">● 运行中</span><span>SR-200</span>
+          </div>
+          <div class="hero-label">理论当前总产量</div>
+          <div class="hero hero-2"><span class="num glow-number">11,932</span></div>
+          <button class="btn danger block big" type="button">停止生产</button>
+          <div class="shifts">
+            <span>今日班产</span>
+            <span>早 <b>4,120</b></span><span>中 <b>3,905</b></span><span>晚 <b>—</b></span>
+          </div>
+        </div>
+        <div class="card">
+          <h4>每小时产量（近 24 小时）</h4>
+          <div class="chart" id="chart"></div>
+          <div class="axis" id="axis"></div>
+          <div class="legend">
+            <span class="l1"><i></i>实际产量</span>
+            <span class="l2"><i></i>理论产量</span>
+          </div>
+        </div>
+        <div class="card">
+          <h4>设备信号</h4>
+          <div class="stat-strip">
+            <div class="row"><span class="dot ok"></span>1# 注塑机 通讯正常</div>
+            <div class="row"><span class="dot warn"></span>2# 注塑机 待维护</div>
+            <div class="row"><span class="dot" style="background:var(--bad);opacity:.25"></span>3# 注塑机 停机</div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>控件与选择器</h4>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn primary" type="button">开始生产</button>
+            <button class="btn second" type="button">次要</button>
+            <button class="btn outline" type="button">描边</button>
+            <button class="btn danger" type="button">危险</button>
+          </div>
+          <div class="pick sel"><span>SR-200 <small>900 件/时</small></span><span class="caret">✓</span></div>
+          <div class="pick"><span>SR-100 <small>1,200 件/时</small></span></div>
+          <div class="pick"><span>选择设备：1# 注塑机</span><span class="caret">▲ 选择</span></div>
+          <div class="rowline" style="margin-top:14px"><span>自动采集</span><span style="flex:1"></span>
+            <span class="switch on"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">图表系列色模板（随主题自动派生）</div>
+  <div class="tpl">
+    <div class="tpl-row">
+      <span class="tpl-chip"><i style="background:var(--chart-1)"></i>系列 1 · 主题色</span>
+      <span class="tpl-chip"><i style="background:var(--chart-2)"></i>系列 2 · 主题色加深</span>
+      <span class="tpl-chip"><i style="background:var(--chart-3)"></i>系列 3 · 主题色 × 钢灰</span>
+      <span class="tpl-chip"><i style="background:var(--chart-4)"></i>系列 4 · 钢灰</span>
+      <span class="tpl-chip"><i style="background:var(--chart-5)"></i>系列 5 · 钢灰</span>
+      <span class="tpl-chip"><i style="background:var(--chart-6)"></i>系列 6 · 钢灰</span>
+    </div>
+    <ol>
+      <li>数据系列按 <code>--chart-1 … --chart-6</code> 顺序取色，上限 6 系列；红/黄/绿只作状态语义，不进数据系列。</li>
+      <li>「实际 vs 目标」类对比：实际 = 系列 1 实心 + 光晕；理论/目标 = 系列 2 虚线描边（空心）。</li>
+      <li>大数字读数统一等宽字体 + <code>tabular-nums</code>，主角数字带 <code>glow-number</code> 光晕。</li>
+      <li>页面背景为轻渐变（主题色 ≤8% 晕染）；表面（卡片/浮层）不透明，保证层级清晰。</li>
+    </ol>
+  </div>
+
+  <div class="section-title">18 款主题（暗 9 · 明 9）</div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+  const THEMES = [
+    { id: 'steel',   name: '钢蓝',   dark: '#4493f8', light: '#0f6fdc' },
+    { id: 'cobalt',  name: '钴蓝',   dark: '#4a6cff', light: '#3857e8' },
+    { id: 'cyan',    name: '电光青', dark: '#22d3ee', light: '#0891b2' },
+    { id: 'emerald', name: '翡翠',   dark: '#34d399', light: '#059669' },
+    { id: 'teal',    name: '石绿',   dark: '#2cc5b2', light: '#0d9488' },
+    { id: 'amber',   name: '信号琥珀', dark: '#f0b429', light: '#b7791f' },
+    { id: 'copper',  name: '铜橙',   dark: '#ef7f3a', light: '#c2410c' },
+    { id: 'rose',    name: '绯红',   dark: '#f4587b', light: '#be123c' },
+    { id: 'violet',  name: '紫晶',   dark: '#a78bfa', light: '#7c3aed' },
+  ]
+
+  const root = document.documentElement
+
+  // —— 模式切换 + 主题色板 ——
+  const modeSeg = document.getElementById('modeSeg')
+  modeSeg.addEventListener('click', event => {
+    const btn = event.target.closest('button[data-mode]')
+    if (btn === null) return
+    root.dataset.mode = btn.dataset.mode
+    for (const el of modeSeg.children) el.setAttribute('aria-pressed', String(el === btn))
+  })
+
+  const swatches = document.getElementById('swatches')
+  const currentAccent = () => root.dataset.accent
+  function paintSwatches() {
+    const mode = root.dataset.mode
+    for (const sw of swatches.children) {
+      const theme = THEMES.find(t => t.id === sw.dataset.accent)
+      sw.style.setProperty('--dot', theme[mode])
+      sw.setAttribute('aria-pressed', String(sw.dataset.accent === currentAccent()))
+    }
+  }
+  for (const theme of THEMES) {
+    const sw = document.createElement('button')
+    sw.type = 'button'
+    sw.className = 'swatch'
+    sw.dataset.accent = theme.id
+    sw.title = theme.name
+    sw.addEventListener('click', () => { root.dataset.accent = theme.id; paintSwatches() })
+    swatches.appendChild(sw)
+  }
+  paintSwatches()
+  new MutationObserver(paintSwatches).observe(root, { attributes: true, attributeFilter: ['data-mode'] })
+
+  // —— 大预览柱状图 ——
+  const hours = Array.from({ length: 16 }, (_, i) => (i + 8) % 24)
+  const actual = [30, 55, 40, 70, 62, 80, 46, 90, 76, 58, 84, 66, 95, 50, 38, 22]
+  const theory = [40, 60, 50, 75, 70, 82, 55, 88, 80, 62, 86, 70, 90, 58, 44, 30]
+  const chart = document.getElementById('chart')
+  const axis = document.getElementById('axis')
+  hours.forEach((h, i) => {
+    const slot = document.createElement('div')
+    slot.className = 'slot'
+    slot.innerHTML =
+      '<div class="theory" style="height:' + theory[i] + '%"></div>' +
+      '<div class="bar glow" style="height:' + actual[i] + '%"></div>'
+    chart.appendChild(slot)
+    const label = document.createElement('span')
+    label.textContent = i % 4 === 0 ? String(h).padStart(2, '0') + ':00' : ''
+    axis.appendChild(label)
+  })
+
+  // —— 18 张主题卡 ——
+  const grid = document.getElementById('grid')
+  for (const mode of ['dark', 'light']) {
+    for (const theme of THEMES) {
+      const hex = theme[mode]
+      const mini = document.createElement('div')
+      mini.className = 'mini'
+      mini.dataset.mode = mode
+      mini.dataset.accent = theme.id
+      mini.innerHTML =
+        '<div class="mtb"><span class="logo"></span><b>snap-rail</b>' +
+        '<span class="tag">' + hex + '</span></div>' +
+        '<div class="body">' +
+        '<div><div class="label">本班实际产量</div>' +
+        '<div class="num glow-number">12,480</div></div>' +
+        '<div class="bars">' +
+        [52, 78, 34, 90, 61].map((v, i) =>
+          '<div class="bar' + (i === 3 ? ' glow' : '') + '" style="height:' + v + '%"></div>').join('') +
+        '</div>' +
+        '<div class="foot"><button class="btn primary" type="button">开始生产</button>' +
+        '<span class="badge tonal">运行中</span></div>' +
+        '</div>' +
+        '<div class="name"><span>' + (mode === 'dark' ? '黑夜' : '白天') + ' · ' + theme.name + '</span>' +
+        '<small>' + theme.id + '</small></div>'
+      grid.appendChild(mini)
+    }
+  }
+</script>
+</body>
+</html>

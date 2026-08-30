@@ -87,14 +87,14 @@ async function flush(times = 12): Promise<void> {
   for (let i = 0; i < times; i += 1) await new Promise(resolve => setTimeout(resolve, 0))
 }
 
-/** Pick one option of a Select primitive: click the trigger, click the option. */
-async function pickSelect(ariaLabel: string, optionText: string): Promise<void> {
-  const trigger = document.querySelector<HTMLButtonElement>(`button[role="combobox"][aria-label="${ariaLabel}"]`)
-  expect(trigger, `select trigger ${ariaLabel}`).not.toBeNull()
+/** Pick one option of a TouchSelect: click the trigger, tap the option row. */
+async function pickSelect(label: string, optionText: string): Promise<void> {
+  const trigger = document.querySelector<HTMLButtonElement>(`button[data-touch-select-trigger="${label}"]`)
+  expect(trigger, `select trigger ${label}`).not.toBeNull()
   trigger!.click()
   await flush()
-  const option = [...document.querySelectorAll('[role="option"]')]
-    .find(candidate => candidate.textContent === optionText)
+  const option = [...document.querySelectorAll('[data-option]')]
+    .find(candidate => candidate.textContent?.includes(optionText))
   expect(option, `option ${optionText}`).toBeDefined()
   option!.click()
   await flush()
@@ -105,6 +105,31 @@ function setInput(input: HTMLInputElement, value: string): void {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
   setter?.call(input, value)
   input.dispatchEvent(new Event('input', { bubbles: true }))
+}
+
+/** Enter a number through a NumberInput's keypad modal (clear, digits, confirm).
+ * Key queries scope to the keypad dialog — the login card also embeds a
+ * NumberPad, and document-wide `[data-key]` lookups would hit that one. */
+async function enterNumber(label: string, value: string): Promise<void> {
+  const trigger = document.querySelector<HTMLButtonElement>(`button[data-number-input="${label}"]`)
+  expect(trigger, `number field ${label}`).not.toBeNull()
+  trigger!.click()
+  await flush()
+  const keypad = document.querySelector('[data-number-display]')?.closest('[role="dialog"]')
+  expect(keypad, `keypad for ${label}`).not.toBeNull()
+  const key = (name: string): HTMLButtonElement => {
+    const button = keypad!.querySelector<HTMLButtonElement>(`button[data-key="${name}"]`)
+    expect(button, `keypad ${name}`).not.toBeNull()
+    return button!
+  }
+  key('clear').click()
+  await flush(2)
+  for (const digit of value) {
+    key(digit).click()
+    await flush(2)
+  }
+  key('confirm').click()
+  await flush()
 }
 
 /** The dialog's right-most 保存 button. */
@@ -175,8 +200,7 @@ describe('ModbusTCP settings page', () => {
     setInput(pointDialog.querySelector<HTMLInputElement>('input[aria-label="点位名称"]')!, '主轴过载')
     await flush()
     await pickSelect('编码', '线圈')
-    setInput(pointDialog.querySelector<HTMLInputElement>('input[aria-label="地址"]')!, '20')
-    await flush()
+    await enterNumber('地址', '20')
     saveButton(pointDialog).click()
     await flush(24)
     await waitFor(() => document.querySelector('[data-modbus-var-row="主轴过载"]') !== null, 'fault point row')
@@ -196,11 +220,11 @@ describe('ModbusTCP settings page', () => {
     document.querySelector<HTMLButtonElement>('button[aria-label="编辑映射 主轴过载"]')!.click()
     await flush()
     const editRow = document.querySelector('[data-modbus-var-row="主轴过载"]')!
-    expect(editRow.querySelector('input[aria-label="地址 主轴过载"]')).not.toBeNull()
+    expect(editRow.querySelector('button[data-number-input="地址 主轴过载"]')).not.toBeNull()
     document.querySelector<HTMLButtonElement>('button[aria-label="保存映射 主轴过载"]')!.click()
     await waitFor(() => {
       const row = document.querySelector('[data-modbus-var-row="主轴过载"]')
-      return row !== null && row.querySelector('input[aria-label="地址 主轴过载"]') === null
+      return row !== null && row.querySelector('button[data-number-input="地址 主轴过载"]') === null
     }, 'row back to read-only')
     await waitFor(() =>
       document.querySelector('[data-modbus-var-row="主轴过载"] [data-cell="value"]')?.textContent === 'true', 'value survives save')
@@ -224,8 +248,7 @@ describe('ModbusTCP settings page', () => {
     expect(tempPoint.querySelector('datalist#modbus-unmapped-options option')?.getAttribute('value')).toBe('炉温')
     setInput(tempPoint.querySelector<HTMLInputElement>('input[aria-label="点位名称"]')!, '炉温')
     await flush()
-    setInput(tempPoint.querySelector<HTMLInputElement>('input[aria-label="地址"]')!, '0')
-    await flush()
+    await enterNumber('地址', '0')
     saveButton(tempPoint).click()
     await flush(24)
 
@@ -245,8 +268,7 @@ describe('ModbusTCP settings page', () => {
     setInput(deviceDialog.querySelector<HTMLInputElement>('input[aria-label="设备 ID"]')!, 'plc2')
     setInput(deviceDialog.querySelector<HTMLInputElement>('input[aria-label="设备名称"]')!, '2号炉')
     setInput(deviceDialog.querySelector<HTMLInputElement>('input[aria-label="IP 地址"]')!, '127.0.0.1')
-    setInput(deviceDialog.querySelector<HTMLInputElement>('input[aria-label="端口"]')!, String(plc2.port))
-    await flush()
+    await enterNumber('端口', String(plc2.port))
     saveButton(deviceDialog).click()
     await flush(24)
     await waitFor(() => document.querySelector('[data-modbus-device-tab="plc2"]') !== null, 'plc2 tab')

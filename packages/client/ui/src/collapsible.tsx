@@ -29,7 +29,7 @@ export function CollapsibleTrigger({ className, ...props }: ComponentProps<typeo
   return (
     <CollapsiblePrimitive.CollapsibleTrigger
       className={cn(
-        'group flex w-full items-center gap-2 text-xs font-medium',
+        'group flex w-full items-center gap-2 text-sm font-medium',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         className,
       )}
@@ -42,7 +42,7 @@ export function CollapsibleTrigger({ className, ...props }: ComponentProps<typeo
  * that trigger's open state. */
 export function CollapsibleChevron({ className }: { className?: string }): ReactNode {
   return (
-    <svg viewBox="0 0 12 12" className={cn('h-3 w-3 shrink-0 opacity-60 transition-transform duration-200 group-data-[state=open]:rotate-180', className)} fill="none" aria-hidden="true">
+    <svg viewBox="0 0 12 12" className={cn('h-4 w-4 shrink-0 opacity-60 transition-transform duration-200 group-data-[state=open]:rotate-180', className)} fill="none" aria-hidden="true">
       <path d="m2.5 4.5 3.5 3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )

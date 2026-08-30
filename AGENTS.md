@@ -44,12 +44,19 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   应用。要即时生效的渲染端配置走这条路，不要改 plugins.yml 行（那要
   重启）；值结构由消费方 zod 校验。
 - **页面组件必须用 shadcn UI**：客户端页面只组合 `@snap-rail/client-ui`
-  里的 shadcn 原语（Button/Card/Dialog/Select/Table/Tabs/Collapsible…）；
+  里的 shadcn 原语（Button/Card/Dialog/Table/Tabs/Collapsible…）；
   缺原语按 shadcn 官方实现移植进 ui 包（包 Radix、内联 SVG、`cn` 合并），
   不在页面里手写交互组件，也不自创变体（折叠面板用 Collapsible——
   曾经手包过一个 Accordion，已回退，勿再犯）。横切物不手搓：重渲染
   tick 用 `useRefresh`，错误文案用 `rpcErrorText`，时间用
   `formatClock`/`formatDuration`，色值用 theme 令牌。
+- **主题与图表色单源在 theme 令牌**：明暗两模式由 `html[data-mode]`
+  切换（设置键 `ui.theme`，经 `themeSettingsSchema`/`applyTheme` 热应用），
+  页面禁止硬编码色值或 `dark:` 变体；图表系列只用 `--chart-1…6`
+  （实际=系列1实心+`glow-bar`，理论=系列2虚线），红/黄/绿是状态语义
+  不进数据系列。触屏基线：数值输入用 `NumberInput`（数字键盘）、
+  单选用 `TouchSelect`（模态列表）、滚动容器用 `DragScroll`（按住拖动）。
+  细则见 [docs/theme.md](docs/theme.md)。
 - **模型可见 ⟺ 有事件**；模型/用户可见行为变更配可运行例子的无 key
   快照式测试（本仓以 vitest 直测装配链路为主）。
 - **协议扩展（开放注册，不改 protocol）**：protocol 只有信封是封闭的；

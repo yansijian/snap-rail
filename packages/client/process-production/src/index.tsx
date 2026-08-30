@@ -24,8 +24,7 @@ import { Context, type Plugin } from '@snap-rail/cordis'
 import { z } from 'zod'
 import { useEffect, useState, type ReactNode } from 'react'
 import {
-  Badge, Button, Card, CardContent, CardHeader, CardTitle, Label,
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn,
+  Badge, Button, Card, CardContent, CardHeader, CardTitle, DragScroll, Label, TouchSelect, cn,
 } from '@snap-rail/client-ui'
 import { rpcErrorText, subscribeFrame } from '@snap-rail/connection'
 import { pointKey, type PointDescriptor } from '@snap-rail/field'
@@ -155,30 +154,30 @@ function Chart(props: { theory: number[], actual: number[], labels: string[] }):
   const max = Math.max(1, ...theory, ...actual)
   return (
     <div>
-      <div className="flex h-40 items-end gap-[3px]" data-chart="hourly">
+      <div className="flex h-56 items-end gap-1" data-chart="hourly">
         {labels.map((label, index) => (
-          <div key={label} className="flex h-full flex-1 items-end justify-center gap-[2px]" title={`${label} 实际 ${Math.floor(actual[index] ?? 0)} / 理论 ${Math.floor(theory[index] ?? 0)}`}>
+          <div key={label} className="flex h-full flex-1 items-end justify-center gap-0.5" title={`${label} 实际 ${Math.floor(actual[index] ?? 0)} / 理论 ${Math.floor(theory[index] ?? 0)}`}>
             <div
-              className="w-full max-w-3 rounded-t bg-primary/80"
+              className="glow-bar w-full max-w-4 rounded-t bg-chart-1"
               style={{ height: `${((actual[index] ?? 0) / max) * 100}%` }}
               aria-label={`${label} 实际产量`}
             />
             <div
-              className="w-full max-w-3 rounded-t border border-dashed border-muted-foreground/70"
+              className="w-full max-w-4 rounded-t border border-dashed border-chart-2 border-b-0"
               style={{ height: `${((theory[index] ?? 0) / max) * 100}%` }}
               aria-label={`${label} 理论产量`}
             />
           </div>
         ))}
       </div>
-      <div className="mt-1 flex gap-[3px] text-[10px] text-muted-foreground">
+      <div className="mt-1 flex gap-1 text-xs text-muted-foreground">
         {labels.map((label, index) => (
           <div key={label} className="flex-1 text-center">{index % 4 === 0 ? label : ''}</div>
         ))}
       </div>
-      <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1"><span className="h-2 w-3 rounded-t bg-primary/80" />实际产量</span>
-        <span className="flex items-center gap-1"><span className="h-2 w-3 rounded-t border border-dashed border-muted-foreground/70" />理论产量</span>
+      <div className="mt-3 flex gap-4 text-sm text-muted-foreground">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-t bg-chart-1" />实际产量</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-4 rounded-t border border-dashed border-chart-2 border-b-0" />理论产量</span>
       </div>
     </div>
   )
@@ -254,67 +253,71 @@ function ProductionPage(props: { ctx: Context, config: ProductionConfig, stats: 
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4" data-page="production">
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+    <DragScroll className="h-full p-6" data-page="production">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-1">
           <CardHeader><CardTitle>生产任务</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {anchor !== null
               ? (
                   <div className="flex flex-wrap items-center gap-2 text-sm" data-region="shift">
                     <Badge variant="secondary" data-shift={anchor.shift}>
                       {SHIFT_LABEL[anchor.shift]} {windowText(anchor.shift)}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-sm text-muted-foreground">
                       {anchor.operator} {clockText(anchor.loginAt)} 登录，重新登录后更新班次
                     </span>
                   </div>
                 )
-              : <div className="text-xs text-muted-foreground" data-region="shift">班次在登录后确定。</div>}
+              : <div className="text-sm text-muted-foreground" data-region="shift">班次在登录后确定。</div>}
             <div className="space-y-1">
-              <div className="text-xs text-muted-foreground">本班实际产量</div>
-              <div className="font-mono text-3xl tabular-nums" data-value="actual">
-                {anchor === null ? '—' : Math.floor(anchor.count)}
+              <div className="text-sm text-muted-foreground">本班实际产量</div>
+              <div className="flex items-baseline gap-2.5">
+                <span className="glow-number font-mono text-5xl font-semibold tabular-nums" data-value="actual">
+                  {anchor === null ? '—' : Math.floor(anchor.count)}
+                </span>
+                <span className="text-sm text-muted-foreground">件</span>
               </div>
             </div>
             {running && state.session !== null
               ? (
                   <>
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-base">
                       <Badge variant="success">运行中</Badge>
                       <span>{state.session.model.name}</span>
                     </div>
-                    {state.faultActive && <div className="text-xs text-destructive">故障处理中：理论计数暂停。</div>}
-                    {state.downtimeActive && <div className="text-xs text-warning">停机休息中：理论计数暂停。</div>}
+                    {state.faultActive && <div className="text-sm text-destructive">故障处理中：理论计数暂停。</div>}
+                    {state.downtimeActive && <div className="text-sm text-warning">停机休息中：理论计数暂停。</div>}
                     <div className="space-y-1">
-                      <div className="text-xs text-muted-foreground">理论当前总产量</div>
-                      <div className="font-mono text-3xl tabular-nums text-primary" data-value="theory">{Math.floor(theory)}</div>
+                      <div className="text-sm text-muted-foreground">理论当前总产量</div>
+                      <div className="glow-number font-mono text-4xl font-semibold tabular-nums" data-value="theory">{Math.floor(theory)}</div>
                     </div>
-                    <Button variant="destructive" className="w-full" disabled={busy} onClick={() => act(PRODUCTION_STOP)}>
+                    <Button variant="destructive" size="lg" className="w-full" disabled={busy} onClick={() => act(PRODUCTION_STOP)}>
                       {busy ? '处理中…' : '停止生产'}
                     </Button>
                   </>
                 )
               : (
                   <>
-                    <div className="text-xs text-muted-foreground">选择要生产的产品型号</div>
+                    <div className="text-sm text-muted-foreground">选择要生产的产品型号</div>
                     <div className="space-y-2">
                       {config.models.map(model => (
                         <button
                           key={model.id}
                           type="button"
                           className={cn(
-                            'flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-sm transition-colors',
-                            selected?.id === model.id ? 'border-primary bg-primary/10' : 'hover:bg-accent',
+                            'flex h-14 w-full items-center justify-between rounded-md border border-border px-4 text-left text-base transition-colors',
+                            selected?.id === model.id ? 'channel-keyline border-primary bg-primary/10 font-medium' : 'hover:bg-accent',
                           )}
                           onClick={() => { setSelected(model) }}
                         >
                           <span>{model.name}</span>
-                          <span className="text-xs text-muted-foreground">{model.ratePerHour} 件/时</span>
+                          <span className="text-sm text-muted-foreground">{model.ratePerHour} 件/时</span>
                         </button>
                       ))}
                     </div>
                     <Button
+                      size="lg"
                       className="w-full"
                       disabled={selected === null || busy}
                       onClick={() => { if (selected !== null) act(PRODUCTION_START, { model: selected.id }) }}
@@ -323,7 +326,7 @@ function ProductionPage(props: { ctx: Context, config: ProductionConfig, stats: 
                     </Button>
                   </>
                 )}
-            <div className="flex flex-wrap items-center gap-3 border-t border-border pt-2 text-xs text-muted-foreground" data-region="shifts-today">
+            <div className="flex flex-wrap items-center gap-3 border-t border-border pt-3 text-sm text-muted-foreground" data-region="shifts-today">
               <span>今日班产</span>
               {(['morning', 'middle', 'night'] as const).map(shift => (
                 <span key={shift} data-shift-count={shift}>
@@ -331,7 +334,7 @@ function ProductionPage(props: { ctx: Context, config: ProductionConfig, stats: 
                 </span>
               ))}
             </div>
-            {error !== null && <div className="text-xs text-destructive" role="alert">{error}</div>}
+            {error !== null && <div className="text-sm text-destructive" role="alert">{error}</div>}
           </CardContent>
         </Card>
 
@@ -342,7 +345,7 @@ function ProductionPage(props: { ctx: Context, config: ProductionConfig, stats: 
           </CardContent>
         </Card>
       </div>
-    </div>
+    </DragScroll>
   )
 }
 
@@ -440,48 +443,46 @@ function CountingPage(props: { ctx: Context, binding: CountBinding }): ReactNode
       <Card>
         <CardHeader><CardTitle>产量自动采集</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-xs text-muted-foreground">实际产量跟随所选点位的正增量累计；保存后立即生效，无需重启。</p>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">实际产量跟随所选点位的正增量累计；保存后立即生效，无需重启。</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1.5" data-region="count-devices">
               <Label>设备</Label>
-              <Select value={device} onValueChange={pickDevice}>
-                <SelectTrigger aria-label="绑定设备"><SelectValue /></SelectTrigger>
-                <SelectContent data-region="count-devices">
-                  {devices.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <TouchSelect
+                label="绑定设备"
+                value={device}
+                options={devices.map(option => ({ value: option, label: option }))}
+                onValueChange={pickDevice}
+              />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5" data-region="count-groups">
               <Label>组</Label>
-              <Select value={group} onValueChange={pickGroup}>
-                <SelectTrigger aria-label="绑定分组"><SelectValue /></SelectTrigger>
-                <SelectContent data-region="count-groups">
-                  {groups.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <TouchSelect
+                label="绑定分组"
+                value={group}
+                options={groups.map(option => ({ value: option, label: option }))}
+                onValueChange={pickGroup}
+              />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5" data-region="count-points">
               <Label>点位</Label>
-              <Select value={name} onValueChange={next => { setName(next); setSaved(false) }}>
-                <SelectTrigger aria-label="绑定点位"><SelectValue /></SelectTrigger>
-                <SelectContent data-region="count-points">
-                  {candidates.map(option => (
-                    <SelectItem key={option.name} value={option.name}>
-                      <span className="flex items-center gap-1.5">
-                        <span>{option.name}</span>
-                        {option.type !== undefined && (
-                          <Badge variant={option.type === 'int' ? 'default' : option.type === 'float' ? 'warning' : 'success'}>
-                            {POINT_TYPE_LABEL[option.type] ?? option.type}
-                          </Badge>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <TouchSelect
+                label="绑定点位"
+                value={name}
+                options={candidates.map(option => ({
+                  value: option.name,
+                  label: option.name,
+                  triggerLabel: option.name,
+                  ...(option.type !== undefined && {
+                    hint: <Badge variant={option.type === 'int' ? 'default' : option.type === 'float' ? 'warning' : 'success'}>
+                      {POINT_TYPE_LABEL[option.type] ?? option.type}
+                    </Badge>,
+                  }),
+                }))}
+                onValueChange={next => { setName(next); setSaved(false) }}
+              />
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-cell="current-binding">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" data-cell="current-binding">
             <span>当前绑定：{binding.device} / {binding.group} / {binding.name}</span>
             {mapped ? <Badge variant="success">已映射</Badge> : <Badge variant="warning">未映射</Badge>}
             {!mapped && <span>未映射到任何驱动点位时，实际产量恒为 0。</span>}
@@ -489,10 +490,10 @@ function CountingPage(props: { ctx: Context, binding: CountBinding }): ReactNode
               <span className="text-warning">所选点位是{POINT_TYPE_LABEL[selectedType] ?? selectedType}；计数只累计数值增量。</span>
             )}
           </div>
-          {error !== null && <div className="text-xs text-destructive" role="alert">{error}</div>}
-          {saved && <div className="text-xs text-muted-foreground" data-cell="saved">已保存，已生效。</div>}
+          {error !== null && <div className="text-sm text-destructive" role="alert">{error}</div>}
+          {saved && <div className="text-sm text-muted-foreground" data-cell="saved">已保存，已生效。</div>}
           <div className="flex justify-end">
-            <Button disabled={busy || device === '' || group === '' || name === ''} onClick={save}>
+            <Button size="lg" disabled={busy || device === '' || group === '' || name === ''} onClick={save}>
               {busy ? '保存中…' : '保存'}
             </Button>
           </div>

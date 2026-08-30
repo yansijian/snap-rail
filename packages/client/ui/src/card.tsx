@@ -14,15 +14,15 @@ export function Card({ className, ...props }: ComponentProps<'div'>) {
 
 /** Top padding/heading zone of a card. */
 export function CardHeader({ className, ...props }: ComponentProps<'div'>) {
-  return <div className={cn('flex flex-col gap-1 p-3', className)} {...props} />
+  return <div className={cn('flex flex-col gap-1 p-5', className)} {...props} />
 }
 
 /** Card heading line. */
 export function CardTitle({ className, ...props }: ComponentProps<'h3'>) {
-  return <h3 className={cn('text-xs font-medium text-muted-foreground', className)} {...props} />
+  return <h3 className={cn('text-sm font-medium text-muted-foreground', className)} {...props} />
 }
 
 /** Body zone of a card. */
 export function CardContent({ className, ...props }: ComponentProps<'div'>) {
-  return <div className={cn('p-3 pt-0', className)} {...props} />
+  return <div className={cn('p-5 pt-0', className)} {...props} />
 }

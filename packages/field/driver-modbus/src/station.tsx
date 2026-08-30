@@ -25,8 +25,8 @@ import '@snap-rail/client-settings'
 import { useBinding, usePoint, type VariableEntry } from '@snap-rail/client-variables'
 import {
   Badge, Button, Checkbox, Collapsible, CollapsibleChevron, CollapsibleContent, CollapsibleTrigger, Dialog, DialogContent,
-  DialogTitle, Input, Label, Led, type LedTone, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Tabs, TabsContent, TabsList, TabsTrigger,
+  DialogTitle, Input, Label, Led, type LedTone, NumberInput, Table, TableBody, TableCell, TableHead, TableHeader,
+  TableRow, Tabs, TabsContent, TabsList, TabsTrigger, TouchSelect,
 } from '@snap-rail/client-ui'
 import type {
   ModbusDeviceConfig, ModbusDevicesDocument, ModbusGroupConfig, ModbusPointConfig,
@@ -67,23 +67,23 @@ const UNMAPPED_DATALIST = 'modbus-unmapped-options'
 
 /* Inline icon strokes (12×12) so the page needs no icon dependency. */
 function IconPlus(): ReactNode {
-  return <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden="true"><path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+  return <svg viewBox="0 0 12 12" className="h-4 w-4" fill="none" aria-hidden="true"><path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
 }
 
 function IconPencil(): ReactNode {
-  return <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden="true"><path d="m8.5 1.5 2 2L4 10H2V8z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>
+  return <svg viewBox="0 0 12 12" className="h-4 w-4" fill="none" aria-hidden="true"><path d="m8.5 1.5 2 2L4 10H2V8z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>
 }
 
 function IconCheck(): ReactNode {
-  return <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden="true"><path d="M2 6.5 4.8 9 10 3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  return <svg viewBox="0 0 12 12" className="h-4 w-4" fill="none" aria-hidden="true"><path d="M2 6.5 4.8 9 10 3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
 
 function IconTrash(): ReactNode {
-  return <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden="true"><path d="M2 3h8M4.5 3V1.5h3V3M3 3l.5 7.5h5L9 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  return <svg viewBox="0 0 12 12" className="h-4 w-4" fill="none" aria-hidden="true"><path d="M2 3h8M4.5 3V1.5h3V3M3 3l.5 7.5h5L9 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
 
 function IconX(): ReactNode {
-  return <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" aria-hidden="true"><path d="m3 3 6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+  return <svg viewBox="0 0 12 12" className="h-4 w-4" fill="none" aria-hidden="true"><path d="m3 3 6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
 }
 
 function useDoc(ctx: Context): { doc: ModbusDevicesDocument | null, reload: () => void } {
@@ -135,10 +135,10 @@ function fmtValue(value: unknown): string {
 /** The live value cell: bools as colored tags, numbers as mono text. */
 function ValueCell(props: { sample: { value: unknown } | undefined }): ReactNode {
   const value = props.sample?.value
-  if (value === undefined) return <span className="text-xs text-muted-foreground">—</span>
+  if (value === undefined) return <span className="text-sm text-muted-foreground">—</span>
   if (value === null) return <Badge variant="destructive">异常</Badge>
   if (typeof value === 'boolean') return <Badge variant={value ? 'success' : 'secondary'}>{String(value)}</Badge>
-  return <span className="whitespace-nowrap font-mono text-xs">{fmtValue(value)}</span>
+  return <span className="whitespace-nowrap font-mono text-sm">{fmtValue(value)}</span>
 }
 
 /** The create-device form (the + button). Editing happens inline on the
@@ -167,49 +167,51 @@ function DeviceDialog(props: { ctx: Context, onClose: () => void, onSaved: (id: 
   return (
     <Dialog open onOpenChange={next => { if (!next) props.onClose() }}>
       <DialogContent data-region="modbus-device-dialog" aria-describedby={undefined}>
-        <DialogTitle className="mb-3 text-sm font-medium">新增设备</DialogTitle>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
+        <DialogTitle className="mb-4 text-base font-medium">新增设备</DialogTitle>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
             <Label>设备 ID</Label>
             <Input aria-label="设备 ID" value={form.id}
               onChange={event => set({ id: event.target.value })} />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>名称</Label>
             <Input aria-label="设备名称" value={form.title} onChange={event => set({ title: event.target.value })} />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>IP 地址</Label>
             <Input aria-label="IP 地址" value={form.host} onChange={event => set({ host: event.target.value })} />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>端口</Label>
-            <Input aria-label="端口" type="number" value={form.port} onChange={event => set({ port: Number(event.target.value) })} />
+            <NumberInput label="端口" value={String(form.port)}
+              onChange={next => set({ port: Number(next) })} />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>从站号</Label>
-            <Input aria-label="从站号" type="number" value={form.unitId} onChange={event => set({ unitId: Number(event.target.value) })} />
+            <NumberInput label="从站号" value={String(form.unitId)}
+              onChange={next => set({ unitId: Number(next) })} />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>轮询周期 (ms)</Label>
-            <Input aria-label="轮询周期" type="number" value={form.pollMs} onChange={event => set({ pollMs: Number(event.target.value) })} />
+            <NumberInput label="轮询周期 (ms)" value={String(form.pollMs)}
+              onChange={next => set({ pollMs: Number(next) })} />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>字序</Label>
-            <Select value={form.byteOrder} onValueChange={next => set({ byteOrder: next as ModbusDeviceConfig['byteOrder'] })}>
-              <SelectTrigger aria-label="字序"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="abcd">abcd</SelectItem>
-                <SelectItem value="cdab">cdab</SelectItem>
-              </SelectContent>
-            </Select>
+            <TouchSelect
+              label="字序"
+              value={form.byteOrder}
+              options={[{ value: 'abcd', label: 'abcd' }, { value: 'cdab', label: 'cdab' }]}
+              onValueChange={next => set({ byteOrder: next as ModbusDeviceConfig['byteOrder'] })}
+            />
           </div>
         </div>
-        {probe !== null && <p className="mt-3 text-xs text-muted-foreground">{probe}</p>}
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={test}>测试连接</Button>
-          <Button variant="ghost" size="sm" onClick={props.onClose}>取消</Button>
-          <Button size="sm" disabled={form.id.trim() === '' || form.host.trim() === ''} onClick={save}>保存</Button>
+        {probe !== null && <p className="mt-4 text-sm text-muted-foreground">{probe}</p>}
+        <div className="mt-5 flex justify-end gap-3">
+          <Button variant="outline" onClick={test}>测试连接</Button>
+          <Button variant="ghost" onClick={props.onClose}>取消</Button>
+          <Button disabled={form.id.trim() === '' || form.host.trim() === ''} onClick={save}>保存</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -232,30 +234,31 @@ function GroupDialog(props: { ctx: Context, device: ModbusDeviceConfig, onClose:
   return (
     <Dialog open onOpenChange={next => { if (!next) props.onClose() }}>
       <DialogContent data-region="modbus-group-dialog" aria-describedby={undefined}>
-        <DialogTitle className="mb-3 text-sm font-medium">在 {props.device.title} 新增分组</DialogTitle>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
+        <DialogTitle className="mb-4 text-base font-medium">在 {props.device.title} 新增分组</DialogTitle>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
             <Label>分组名称</Label>
-            <Input aria-label="分组名称" autoFocus value={name}
+            <Input aria-label="分组名称" value={name}
               onChange={event => { setName(event.target.value) }} placeholder="如：故障报警" />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>数据类型</Label>
-            <Select value={type} onValueChange={next => setType(next as PointType)}>
-              <SelectTrigger aria-label="分组数据类型"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {(Object.keys(TYPE_LABEL) as PointType[]).map(option => (
-                  <SelectItem key={option} value={option}>{TYPE_LABEL[option]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <TouchSelect
+              label="分组数据类型"
+              value={type}
+              options={(Object.keys(TYPE_LABEL) as PointType[]).map(option => ({
+                value: option,
+                label: TYPE_LABEL[option],
+              }))}
+              onValueChange={next => setType(next as PointType)}
+            />
           </div>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">分组内的点位都使用这一数据类型；之后在此分组下新增点位。</p>
-        {error !== null && <p className="mt-2 text-xs text-destructive" data-cell="dialog-error">{error}</p>}
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={props.onClose}>取消</Button>
-          <Button size="sm" onClick={save} disabled={name.trim() === ''}>保存</Button>
+        <p className="mt-4 text-sm text-muted-foreground">分组内的点位都使用这一数据类型；之后在此分组下新增点位。</p>
+        {error !== null && <p className="mt-2 text-sm text-destructive" data-cell="dialog-error">{error}</p>}
+        <div className="mt-5 flex justify-end gap-3">
+          <Button variant="ghost" onClick={props.onClose}>取消</Button>
+          <Button onClick={save} disabled={name.trim() === ''}>保存</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -304,54 +307,53 @@ function PointDialog(props: {
   return (
     <Dialog open onOpenChange={next => { if (!next) props.onClose() }}>
       <DialogContent data-region="modbus-point-dialog" aria-describedby={undefined}>
-        <DialogTitle className="mb-1 text-sm font-medium">在分组 {props.group.name} 新增点位</DialogTitle>
-        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <DialogTitle className="mb-1 text-base font-medium">在分组 {props.group.name} 新增点位</DialogTitle>
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>{props.device.title}（{props.device.id}）</span>
           <Badge variant={TYPE_VARIANT[type]}>{TYPE_LABEL[type]}</Badge>
           <span>类型随分组固定</span>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
             <Label>点位名称</Label>
-            <Input aria-label="点位名称" autoFocus value={name} list={UNMAPPED_DATALIST}
+            <Input aria-label="点位名称" value={name} list={UNMAPPED_DATALIST}
               onChange={event => { setName(event.target.value) }} placeholder="如：主轴过载" />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>编码</Label>
-            <Select value={encoding} onValueChange={next => {
-              const chosen = next as ModbusPointConfig['encoding']
-              setEncoding(chosen)
-              setFc(fcOf(chosen, fc))
-            }}>
-              <SelectTrigger aria-label="编码"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ENCODINGS_BY_TYPE[type].map(option => (
-                  <SelectItem key={option} value={option}>{ENCODING_LABEL[option]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <TouchSelect
+              label="编码"
+              value={encoding}
+              options={ENCODINGS_BY_TYPE[type].map(option => ({
+                value: option,
+                label: ENCODING_LABEL[option] ?? option,
+              }))}
+              onValueChange={next => {
+                const chosen = next as ModbusPointConfig['encoding']
+                setEncoding(chosen)
+                setFc(fcOf(chosen, fc))
+              }}
+            />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>功能码</Label>
             {isRegister
               ? (
-                <Select value={String(fc)} onValueChange={next => setFc(Number(next) as 1 | 2 | 3 | 4)}>
-                  <SelectTrigger aria-label="功能码"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">03 保持寄存器</SelectItem>
-                    <SelectItem value="4">04 输入寄存器</SelectItem>
-                  </SelectContent>
-                </Select>
+                <TouchSelect
+                  label="功能码"
+                  value={String(fc)}
+                  options={[{ value: '3', label: '03 保持寄存器' }, { value: '4', label: '04 输入寄存器' }]}
+                  onValueChange={next => setFc(Number(next) as 1 | 2 | 3 | 4)}
+                />
               )
-              : <Input aria-label="功能码" disabled value={FC_LABEL[fc]} />}
+              : <div className="flex h-12 w-full items-center rounded-md border border-input bg-muted px-4 text-base text-muted-foreground">{FC_LABEL[fc]}</div>}
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <Label>地址</Label>
-            <Input aria-label="地址" type="number" value={address}
-              onChange={event => { setAddress(Number(event.target.value)) }} />
+            <NumberInput label="地址" value={String(address)} onChange={next => { setAddress(Number(next)) }} />
           </div>
           {canWrite && (
-            <div className="flex items-center gap-2 pt-5">
+            <div className="flex items-center gap-2.5 pt-10">
               <Checkbox id="new-point-writable" checked={writable}
                 onCheckedChange={checked => setWritable(checked === true)} />
               <Label htmlFor="new-point-writable">可写</Label>
@@ -361,10 +363,10 @@ function PointDialog(props: {
         <datalist id={UNMAPPED_DATALIST}>
           {props.unmapped.map(option => <option key={option} value={option} />)}
         </datalist>
-        {error !== null && <p className="mt-2 text-xs text-destructive" data-cell="dialog-error">{error}</p>}
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={props.onClose}>取消</Button>
-          <Button size="sm" onClick={save} disabled={name.trim() === ''}>保存</Button>
+        {error !== null && <p className="mt-2 text-sm text-destructive" data-cell="dialog-error">{error}</p>}
+        <div className="mt-5 flex justify-end gap-3">
+          <Button variant="ghost" onClick={props.onClose}>取消</Button>
+          <Button onClick={save} disabled={name.trim() === ''}>保存</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -430,87 +432,84 @@ function MappingRow(props: {
 
   return (
     <TableRow data-modbus-var-row={props.point.var}>
-      <TableCell className="py-2 pr-2">
-        <div className="flex items-center gap-1.5">
-          <span className="whitespace-nowrap font-mono text-xs">{props.point.var}</span>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <span className="whitespace-nowrap font-mono text-sm">{props.point.var}</span>
           {props.declared && <Badge variant="default">插件</Badge>}
         </div>
       </TableCell>
-      <TableCell className="whitespace-nowrap px-2 py-2">
+      <TableCell className="whitespace-nowrap">
         {editing
           ? (isRegister
               ? (
-                <Select value={String(fc)} onValueChange={next => setFc(Number(next) as 1 | 2 | 3 | 4)}>
-                  <SelectTrigger aria-label={`功能码 ${props.point.var}`} className="h-7 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">03 保持寄存器</SelectItem>
-                    <SelectItem value="4">04 输入寄存器</SelectItem>
-                  </SelectContent>
-                </Select>
+                <TouchSelect
+                  label={`功能码 ${props.point.var}`}
+                  className="h-10 w-36 text-sm"
+                  value={String(fc)}
+                  options={[{ value: '3', label: '03 保持寄存器' }, { value: '4', label: '04 输入寄存器' }]}
+                  onValueChange={next => setFc(Number(next) as 1 | 2 | 3 | 4)}
+                />
               )
-              : <span className="whitespace-nowrap text-xs text-muted-foreground">{FC_LABEL[fc]}</span>)
-          : <span className="whitespace-nowrap text-xs">{FC_LABEL[props.point.fc]}</span>}
+              : <span className="whitespace-nowrap text-sm text-muted-foreground">{FC_LABEL[fc]}</span>)
+          : <span className="whitespace-nowrap text-sm">{FC_LABEL[props.point.fc]}</span>}
       </TableCell>
-      <TableCell className="px-2 py-2">
+      <TableCell>
         {editing
-          ? <Input aria-label={`地址 ${props.point.var}`} type="number" className="h-7 w-20 text-xs" value={address}
-            onChange={event => setAddress(Number(event.target.value))} />
-          : <span className="whitespace-nowrap font-mono text-xs">{props.point.address}</span>}
+          ? <NumberInput label={`地址 ${props.point.var}`} className="h-10 w-28 text-sm" value={String(address)}
+            onChange={next => setAddress(Number(next))} />
+          : <span className="whitespace-nowrap font-mono text-sm">{props.point.address}</span>}
       </TableCell>
-      <TableCell className="whitespace-nowrap px-2 py-2">
+      <TableCell className="whitespace-nowrap">
         {editing
           ? (
-            <Select value={encoding}
+            <TouchSelect
+              label={`编码 ${props.point.var}`}
+              className="h-10 w-32 text-sm"
+              value={encoding}
+              options={ENCODINGS_BY_TYPE[props.group.type].map(option => ({
+                value: option,
+                label: ENCODING_LABEL[option] ?? option,
+              }))}
               onValueChange={next => {
                 const chosen = next as ModbusPointConfig['encoding']
                 setEncoding(chosen)
                 setFc(fcOf(chosen, fc))
-              }}>
-              <SelectTrigger aria-label={`编码 ${props.point.var}`} className="h-7 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ENCODINGS_BY_TYPE[props.group.type].map(option => (
-                  <SelectItem key={option} value={option}>{ENCODING_LABEL[option]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              }}
+            />
           )
-          : <span className="whitespace-nowrap text-xs">{ENCODING_LABEL[props.point.encoding]}</span>}
+          : <span className="whitespace-nowrap text-sm">{ENCODING_LABEL[props.point.encoding]}</span>}
       </TableCell>
-      <TableCell className="px-2 py-2">
+      <TableCell className="whitespace-nowrap">
         {editing
           ? (canWrite
               ? <Checkbox aria-label={`可写 ${props.point.var}`} checked={writable}
                 onCheckedChange={checked => setWritable(checked === true)} />
-              : <span className="text-xs text-muted-foreground">只读</span>)
-          : <span className="text-xs text-muted-foreground">{props.point.writable ? '可写' : '只读'}</span>}
+              : <span className="text-sm text-muted-foreground">只读</span>)
+          : <span className="text-sm text-muted-foreground">{props.point.writable ? '可写' : '只读'}</span>}
       </TableCell>
-      <TableCell className="whitespace-nowrap px-2 py-2 text-right" data-cell="value">
+      <TableCell className="whitespace-nowrap text-right" data-cell="value">
         <ValueCell sample={sample} />
       </TableCell>
-      <TableCell className="py-2 pl-2 text-right">
+      <TableCell className="text-right">
         <div className="flex items-center justify-end gap-2">
           {editing
             ? (
               <>
-                <Button variant="outline" size="sm" aria-label={`保存映射 ${props.point.var}`} onClick={save}>
+                <Button variant="outline" size="icon" aria-label={`保存映射 ${props.point.var}`} onClick={save}>
                   <IconCheck />
                 </Button>
-                <Button variant="outline" size="sm" aria-label={`取消编辑 ${props.point.var}`} onClick={cancel}>
+                <Button variant="outline" size="icon" aria-label={`取消编辑 ${props.point.var}`} onClick={cancel}>
                   <IconX />
                 </Button>
               </>
             )
             : (
               <>
-                <Button variant="outline" size="sm" aria-label={`编辑映射 ${props.point.var}`} onClick={() => setEditing(true)}>
+                <Button variant="outline" size="icon" aria-label={`编辑映射 ${props.point.var}`} onClick={() => setEditing(true)}>
                   <IconPencil />
                 </Button>
                 {!props.declared && (
-                  <Button variant="outline" size="sm" className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                  <Button variant="outline" size="icon" className="border-destructive/50 text-destructive hover:bg-destructive/10"
                     aria-label={`删除点位 ${props.point.var}`} onClick={remove}>
                     <IconTrash />
                   </Button>
@@ -518,7 +517,7 @@ function MappingRow(props: {
               </>
             )}
         </div>
-        {error !== null && <div className="mt-1 text-right text-[10px] text-destructive" data-cell="row-error">{error}</div>}
+        {error !== null && <div className="mt-1 text-right text-xs text-destructive" data-cell="row-error">{error}</div>}
       </TableCell>
     </TableRow>
   )
@@ -558,12 +557,12 @@ function GroupPanel(props: {
 
   return (
     <Collapsible open={props.open} onOpenChange={props.onToggle} data-group-row={`${props.device.id}:${props.group.name}`}>
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="flex items-center gap-3 px-4 py-3">
         {/* The title zone stretches: its whitespace toggles the panel too. */}
-        <CollapsibleTrigger className="w-auto min-w-0 flex-1">
+        <CollapsibleTrigger className="w-auto min-w-0 flex-1 py-2">
           <Led tone={tone} aria-label={`分组状态 ${props.group.name}`} />
-          <span className="max-w-50 truncate text-left font-medium">{props.group.name}</span>
-          <span className="whitespace-nowrap text-xs text-muted-foreground">{total} 个点位</span>
+          <span className="max-w-50 truncate text-left text-base font-medium">{props.group.name}</span>
+          <span className="whitespace-nowrap text-sm text-muted-foreground">{total} 个点位</span>
           <Badge variant={TYPE_VARIANT[props.group.type]}>{TYPE_LABEL[props.group.type]}</Badge>
         </CollapsibleTrigger>
         <Button variant="ghost" size="icon" data-testid="add-point" aria-label={`在分组 ${props.group.name} 新增点位`} onClick={props.onAddPoint}>
@@ -573,18 +572,18 @@ function GroupPanel(props: {
           aria-label={`删除分组 ${props.group.name}`} onClick={removeGroup}>
           <IconTrash />
         </Button>
-        <CollapsibleTrigger className="h-8 w-8 shrink-0 justify-center" aria-label={`展开或收起分组 ${props.group.name}`}>
+        <CollapsibleTrigger className="h-12 w-12 shrink-0 justify-center" aria-label={`展开或收起分组 ${props.group.name}`}>
           <CollapsibleChevron />
         </CollapsibleTrigger>
       </div>
-      <CollapsibleContent className="pb-3">
+      <CollapsibleContent className="pb-4">
         {total === 0 && (
-          <p className="px-3 pb-2 text-xs text-muted-foreground">
+          <p className="px-4 pb-2 text-sm text-muted-foreground">
             还没有点位。分组是点位的容器——点右上角"新增点位"加入第一个。
           </p>
         )}
         {total > 0 && (
-          <div className="overflow-x-auto px-3">
+          <div className="px-4">
             <Table className="min-w-160">
               <TableHeader>
                 <TableRow>
@@ -644,24 +643,24 @@ function DeviceDescriptions(props: {
   }
 
   return (
-    <div data-modbus-device-row={props.device.id} className="rounded-md border border-border p-3">
+    <div data-modbus-device-row={props.device.id} className="rounded-lg border border-border p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2.5 py-2">
           <Led tone={online ? 'green' : 'red'} aria-label={`设备状态 ${props.device.title}`} />
-          <span className="truncate text-xs font-medium">{props.device.title}</span>
-          <span className="whitespace-nowrap text-xs text-muted-foreground">{online ? '在线' : '离线'}</span>
+          <span className="truncate text-base font-medium">{props.device.title}</span>
+          <span className="whitespace-nowrap text-sm text-muted-foreground">{online ? '在线' : '离线'}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" data-testid="add-group" onClick={props.onAddGroup}>
+          <Button variant="ghost" size="icon" data-testid="add-group" aria-label="新增分组" onClick={props.onAddGroup}>
             <IconPlus />
           </Button>
           {editing
             ? (
               <>
-                <Button size="sm" aria-label={`保存设备 ${props.device.id}`} onClick={save}>
+                <Button aria-label={`保存设备 ${props.device.id}`} onClick={save}>
                   <IconCheck />保存
                 </Button>
-                <Button variant="ghost" size="sm" aria-label={`取消编辑设备 ${props.device.id}`}
+                <Button variant="ghost" aria-label={`取消编辑设备 ${props.device.id}`}
                   onClick={() => { setForm(props.device); setEditing(false); setError(null) }}>
                   <IconX />取消
                 </Button>
@@ -669,10 +668,10 @@ function DeviceDescriptions(props: {
             )
             : (
               <>
-                <Button variant="ghost" size="sm" aria-label={`编辑设备 ${props.device.id}`} onClick={() => setEditing(true)}>
+                <Button variant="ghost" size="icon" aria-label={`编辑设备 ${props.device.id}`} onClick={() => setEditing(true)}>
                   <IconPencil />
                 </Button>
-                <Button variant="ghost" size="sm" className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                <Button variant="ghost" size="icon" className="border-destructive/50 text-destructive hover:bg-destructive/10"
                   aria-label={`删除设备 ${props.device.id}`} onClick={remove}>
                   <IconTrash />
                 </Button>
@@ -682,64 +681,63 @@ function DeviceDescriptions(props: {
       </div>
       {editing
         ? (
-          <div className="mt-3 grid grid-cols-3 gap-3">
-            <div className="space-y-1">
+          <div className="mt-3 grid grid-cols-3 gap-4">
+            <div className="space-y-1.5">
               <Label>名称</Label>
               <Input aria-label="设备名称" value={form.title} onChange={event => set({ title: event.target.value })} />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label>IP 地址</Label>
               <Input aria-label="IP 地址" value={form.host} onChange={event => set({ host: event.target.value })} />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label>端口</Label>
-              <Input aria-label="端口" type="number" value={form.port} onChange={event => set({ port: Number(event.target.value) })} />
+              <NumberInput label="端口" value={String(form.port)} onChange={next => set({ port: Number(next) })} />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label>从站号</Label>
-              <Input aria-label="从站号" type="number" value={form.unitId} onChange={event => set({ unitId: Number(event.target.value) })} />
+              <NumberInput label="从站号" value={String(form.unitId)} onChange={next => set({ unitId: Number(next) })} />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label>轮询周期 (ms)</Label>
-              <Input aria-label="轮询周期" type="number" value={form.pollMs} onChange={event => set({ pollMs: Number(event.target.value) })} />
+              <NumberInput label="轮询周期 (ms)" value={String(form.pollMs)} onChange={next => set({ pollMs: Number(next) })} />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label>字序</Label>
-              <Select value={form.byteOrder} onValueChange={next => set({ byteOrder: next as ModbusDeviceConfig['byteOrder'] })}>
-                <SelectTrigger aria-label="字序"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="abcd">abcd</SelectItem>
-                  <SelectItem value="cdab">cdab</SelectItem>
-                </SelectContent>
-              </Select>
+              <TouchSelect
+                label="字序"
+                value={form.byteOrder}
+                options={[{ value: 'abcd', label: 'abcd' }, { value: 'cdab', label: 'cdab' }]}
+                onValueChange={next => set({ byteOrder: next as ModbusDeviceConfig['byteOrder'] })}
+              />
             </div>
           </div>
         )
         : (
-          <dl className="mt-3 grid grid-cols-3 gap-x-6 gap-y-2">
+          <dl className="mt-3 grid grid-cols-3 gap-x-6 gap-y-3">
             <div>
-              <dt className="text-[10px] text-muted-foreground">设备 ID</dt>
-              <dd className="truncate font-mono text-xs">{props.device.id}</dd>
+              <dt className="text-xs text-muted-foreground">设备 ID</dt>
+              <dd className="truncate font-mono text-sm">{props.device.id}</dd>
             </div>
             <div>
-              <dt className="text-[10px] text-muted-foreground">IP 地址</dt>
-              <dd className="truncate font-mono text-xs">{props.device.host}</dd>
+              <dt className="text-xs text-muted-foreground">IP 地址</dt>
+              <dd className="truncate font-mono text-sm">{props.device.host}</dd>
             </div>
             <div>
-              <dt className="text-[10px] text-muted-foreground">端口 / 从站号</dt>
-              <dd className="font-mono text-xs">{props.device.port} / {props.device.unitId}</dd>
+              <dt className="text-xs text-muted-foreground">端口 / 从站号</dt>
+              <dd className="font-mono text-sm">{props.device.port} / {props.device.unitId}</dd>
             </div>
             <div>
-              <dt className="text-[10px] text-muted-foreground">轮询周期</dt>
-              <dd className="font-mono text-xs">{props.device.pollMs}ms</dd>
+              <dt className="text-xs text-muted-foreground">轮询周期</dt>
+              <dd className="font-mono text-sm">{props.device.pollMs}ms</dd>
             </div>
             <div>
-              <dt className="text-[10px] text-muted-foreground">字序</dt>
-              <dd className="font-mono text-xs">{props.device.byteOrder}</dd>
+              <dt className="text-xs text-muted-foreground">字序</dt>
+              <dd className="font-mono text-sm">{props.device.byteOrder}</dd>
             </div>
           </dl>
         )}
-      {error !== null && <p className="mt-2 text-xs text-destructive" data-cell="row-error">{error}</p>}
+      {error !== null && <p className="mt-2 text-sm text-destructive" data-cell="row-error">{error}</p>}
     </div>
   )
 }
@@ -773,18 +771,18 @@ function DevicePanel(props: {
   }, [signature])
 
   return (
-    <div className="flex flex-col gap-3" data-region="modbus-device-panel">
+    <div className="flex flex-col gap-4" data-region="modbus-device-panel">
       <DeviceDescriptions ctx={ctx} device={device} status={props.status}
         onAddGroup={props.onAddGroup} onSaved={props.onSaved} />
 
       {groups.length === 0
         ? (
-          <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+          <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
             还没有分组。先点上方"新增分组"，再在分组里新增点位。
           </p>
         )
         : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             {groups.map(group => (
               <GroupPanel key={group.name} ctx={ctx} device={device} group={group} doc={doc}
                 points={doc.points.filter(point => point.deviceId === device.id && point.group === group.name)}
@@ -814,7 +812,7 @@ function ModbusPage(props: { ctx: Context }): ReactNode {
     return () => { detach() }
   }, [ctx])
 
-  if (doc === null) return <div className="text-sm text-muted-foreground">Modbus 配置读取中…</div>
+  if (doc === null) return <div className="text-base text-muted-foreground">Modbus 配置读取中…</div>
 
   // The controlled tab value must name an existing trigger; deleting the
   // active device falls back to the first survivor.
@@ -852,7 +850,7 @@ function ModbusPage(props: { ctx: Context }): ReactNode {
       </Tabs>
 
       {doc.devices.length === 0 && (
-        <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
           还没有设备。点击右上角 + 连接一台 PLC。
         </p>
       )}

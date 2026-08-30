@@ -27,7 +27,7 @@ import '@snap-rail/station-rpc/contract'
 import { watchBinding, type BindingView } from '@snap-rail/client-variables'
 import { useEffect, useState, type ReactNode } from 'react'
 import { z } from 'zod'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label } from '@snap-rail/client-ui'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DragScroll, NumberPad } from '@snap-rail/client-ui'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
 import '@snap-rail/client-session'
@@ -100,22 +100,23 @@ interface FaultController {
 
 function Step(props: { index: number, label: string, state: 'done' | 'active' | 'todo' }): ReactNode {
   return (
-    <div className="flex items-center gap-2" data-step={props.label} data-state={props.state}>
+    <div className="flex items-center gap-3" data-step={props.label} data-state={props.state}>
       <span className={
         props.state === 'done'
-          ? 'flex h-6 w-6 items-center justify-center rounded-full bg-success/20 text-xs text-success'
+          ? 'flex h-8 w-8 items-center justify-center rounded-full bg-success/20 text-sm text-success'
           : props.state === 'active'
-            ? 'flex h-6 w-6 items-center justify-center rounded-full bg-primary/20 text-xs text-primary'
-            : 'flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground'
+            ? 'glow-number flex h-8 w-8 items-center justify-center rounded-full bg-primary/20 text-sm text-primary'
+            : 'flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground'
       }>
         {props.index}
       </span>
-      <span className={props.state === 'todo' ? 'text-sm text-muted-foreground' : 'text-sm'}>{props.label}</span>
+      <span className={props.state === 'todo' ? 'text-base text-muted-foreground' : 'text-base'}>{props.label}</span>
     </div>
   )
 }
 
-/** The technician-id confirmation dialog (start and complete share it). */
+/** The technician-id confirmation dialog (start and complete share it); the
+ * numeric keypad is embedded — same entry style as the login screen. */
 function TechnicianDialog(props: {
   open: boolean
   title: string
@@ -130,25 +131,22 @@ function TechnicianDialog(props: {
     <Dialog open={props.open} onOpenChange={open => { if (!open) props.onCancel() }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{props.title}</DialogTitle>
+          <DialogTitle className="text-lg font-medium">{props.title}</DialogTitle>
           <DialogDescription>请技术员输入本人的工号确认。</DialogDescription>
         </DialogHeader>
-        <div className="space-y-1">
-          <Label htmlFor="technician-id">技术员工号</Label>
-          <Input
-            id="technician-id"
-            autoFocus
-            value={id}
-            onChange={event => { setId(event.target.value) }}
-            onKeyDown={event => { if (event.key === 'Enter' && trimmed !== '') props.onConfirm(trimmed) }}
-          />
+        <div
+          aria-label="技术员工号"
+          data-cell="technician-id"
+          className="mb-4 mt-2 flex h-14 items-center justify-end rounded-md border border-input px-4 font-mono text-2xl tabular-nums"
+        >
+          {id === '' ? <span className="text-base text-muted-foreground">请输入工号</span> : id}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={props.onCancel}>取消</Button>
-          <Button disabled={trimmed === '' || props.busy} onClick={() => props.onConfirm(trimmed)}>
-            {props.busy ? '确认中…' : '确认'}
-          </Button>
-        </DialogFooter>
+        <NumberPad
+          value={id}
+          onChange={setId}
+          confirmLabel={props.busy ? '确认中…' : '确认'}
+          onConfirm={() => { if (trimmed !== '' && !props.busy) props.onConfirm(trimmed) }}
+        />
       </DialogContent>
     </Dialog>
   )
@@ -193,7 +191,7 @@ function FaultPage(props: { ctx: Context, controller: FaultController }): ReactN
   }
 
   return (
-    <div className="grid h-full grid-cols-[1fr_360px] gap-3 p-4" data-page="fault">
+    <div className="grid h-full grid-cols-[1fr_400px] gap-4 p-6" data-page="fault">
       <Card className="flex flex-col">
         {deviceFault.kind === 'group' && (
           <div
@@ -201,10 +199,10 @@ function FaultPage(props: { ctx: Context, controller: FaultController }): ReactN
             data-state={faultStripState}
             className={
               faultStripState === 'fault'
-                ? 'flex flex-wrap items-center gap-2 rounded-t-lg border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive'
+                ? 'flex flex-wrap items-center gap-2 rounded-t-lg border-b border-destructive/40 bg-destructive/10 px-5 py-3 text-base text-destructive'
                 : faultStripState === 'abnormal'
-                  ? 'flex flex-wrap items-center gap-2 rounded-t-lg border-b border-border bg-muted px-4 py-2 text-sm text-muted-foreground'
-                  : 'flex flex-wrap items-center gap-2 rounded-t-lg border-b border-border bg-success/10 px-4 py-2 text-sm text-success'
+                  ? 'flex flex-wrap items-center gap-2 rounded-t-lg border-b border-border bg-muted px-5 py-3 text-base text-muted-foreground'
+                  : 'flex flex-wrap items-center gap-2 rounded-t-lg border-b border-border bg-success/10 px-5 py-3 text-base text-success'
             }
           >
             {faultStripState === 'fault' && deviceFault.kind === 'group' && (
@@ -221,12 +219,12 @@ function FaultPage(props: { ctx: Context, controller: FaultController }): ReactN
             {faultStripState === 'normal' && <span>设备正常</span>}
           </div>
         )}
-        <CardContent className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+        <CardContent className="flex flex-1 flex-col items-center justify-center gap-8 p-6">
           {step === 'idle' && (
             <button
               type="button"
               aria-label="故障提报"
-              className="flex h-40 w-40 items-center justify-center rounded-full bg-destructive text-lg font-semibold text-destructive-foreground shadow-lg transition-transform hover:scale-105 active:scale-100"
+              className="flex h-56 w-56 items-center justify-center rounded-full bg-destructive text-2xl font-semibold text-destructive-foreground shadow-lg transition-transform hover:scale-105 active:scale-100"
               disabled={busy}
               onClick={() => act(FAULT_REPORT)}
             >
@@ -235,42 +233,42 @@ function FaultPage(props: { ctx: Context, controller: FaultController }): ReactN
           )}
           {step !== 'idle' && (
             <>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 <Step index={1} label="故障提报" state="done" />
                 <Step index={2} label="等待技术员接单" state={step === 'waiting' ? 'active' : 'done'} />
                 <Step index={3} label="技术员维修中" state={step === 'repairing' ? 'active' : 'todo'} />
                 <Step index={4} label="完成" state="todo" />
               </div>
               {open !== null && (
-                <div className="text-xs text-muted-foreground">
+                <div className="text-sm text-muted-foreground">
                   发生于 {formatClock(open.reportedAt)}，已持续 {formatDuration(now - open.reportedAt)}
                 </div>
               )}
               {step === 'waiting' && (
-                <Button className="h-10 px-8" disabled={busy} onClick={() => setDialog('start')}>开始维修</Button>
+                <Button size="lg" className="px-10" disabled={busy} onClick={() => setDialog('start')}>开始维修</Button>
               )}
               {step === 'repairing' && (
-                <Button className="h-10 px-8" disabled={busy} onClick={() => setDialog('complete')}>完成维修</Button>
+                <Button size="lg" className="px-10" disabled={busy} onClick={() => setDialog('complete')}>完成维修</Button>
               )}
             </>
           )}
-          {error !== null && <div className="text-xs text-destructive" role="alert">{error}</div>}
+          {error !== null && <div className="text-sm text-destructive" role="alert">{error}</div>}
         </CardContent>
       </Card>
 
       <Card className="flex min-h-0 flex-col">
         <CardHeader><CardTitle>故障记录</CardTitle></CardHeader>
-        <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-          {records.length === 0 && <div className="text-xs text-muted-foreground">暂无故障记录。</div>}
+        <DragScroll className="min-h-0 flex-1 space-y-2 p-5 pt-0">
+          {records.length === 0 && <div className="text-sm text-muted-foreground">暂无故障记录。</div>}
           {records.map((record, index) => (
-            <div key={`${record.reportedAt}-${index}`} className="rounded-md border border-border p-2 text-xs" data-fault-row={index}>
-              <div className="mb-1 flex items-center gap-2">
+            <div key={`${record.reportedAt}-${index}`} className="rounded-md border border-border p-3 text-sm" data-fault-row={index}>
+              <div className="mb-1.5 flex items-center gap-2">
                 {record.completedAt === null
                   ? <Badge variant="destructive">进行中</Badge>
                   : <Badge variant="success">已修复</Badge>}
                 <span className="text-muted-foreground">#{records.length - index}</span>
               </div>
-              <div className="grid grid-cols-[64px_1fr] gap-y-1">
+              <div className="grid grid-cols-[80px_1fr] gap-y-1">
                 <span className="text-muted-foreground">发生时间</span><span className="font-mono">{formatClock(record.reportedAt)}</span>
                 <span className="text-muted-foreground">修复时间</span>
                 <span className="font-mono">{record.completedAt === null ? '—' : formatClock(record.completedAt)}</span>
@@ -285,7 +283,7 @@ function FaultPage(props: { ctx: Context, controller: FaultController }): ReactN
               </div>
             </div>
           ))}
-        </CardContent>
+        </DragScroll>
       </Card>
 
       <TechnicianDialog

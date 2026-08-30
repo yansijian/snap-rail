@@ -15,7 +15,7 @@
 import '@snap-rail/station-rpc/contract'
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { Button, Card, CardContent, Input, cn, useRefresh } from '@snap-rail/client-ui'
+import { Card, CardContent, DragScroll, NumberPad, cn, useRefresh } from '@snap-rail/client-ui'
 import type { WorkflowEntry } from '@snap-rail/client-workflows'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
@@ -55,38 +55,38 @@ function alertStyle(entry: WorkflowEntry): CSSProperties | undefined {
 
 function LoginScreen(props: { ctx: Context }): ReactNode {
   useRefresh(props.ctx, RAIL_EVENTS)
-  const [value, setValue] = useState('')
+  const [id, setId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const id = value.trim()
 
   const submit = (): void => {
-    if (id === '' || busy) return
+    const operator = id.trim()
+    if (operator === '' || busy) return
     setBusy(true)
     setError(null)
-    void props.ctx.session.login(id)
+    void props.ctx.session.login(operator)
       .catch(cause => { setError(cause instanceof Error ? cause.message : String(cause)) })
       .finally(() => { setBusy(false) })
   }
 
+  // Touch-first login: the operator id is numeric, so the keypad is the
+  // keyboard — no text field, no system soft input.
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center" data-region="login">
-      <Card className="w-80">
+      <Card className="w-96">
         <CardContent className="p-6">
-          <div className="mb-1 text-base font-medium">操作人登录</div>
-          <div className="mb-4 text-xs text-muted-foreground">输入工号开始当班作业，所有操作将以该工号记录。</div>
-          <Input
-            autoFocus
+          <div className="text-xl font-semibold text-foreground">操作人登录</div>
+          <div className="mb-4 mt-1 text-sm text-muted-foreground">输入工号开始当班作业，所有操作将以该工号记录。</div>
+          <div
             aria-label="工号"
-            placeholder="工号"
-            value={value}
-            onChange={event => { setValue(event.target.value); setError(null) }}
-            onKeyDown={event => { if (event.key === 'Enter') submit() }}
-          />
-          {error !== null && <div className="mt-2 text-xs text-destructive" role="alert">{error}</div>}
-          <Button className="mt-4 w-full" disabled={id === '' || busy} onClick={submit}>
-            {busy ? '登录中…' : '登录'}
-          </Button>
+            data-cell="operator-id"
+            className="mb-4 flex h-14 items-center justify-end rounded-md border border-input bg-transparent px-4 font-mono text-2xl tabular-nums"
+          >
+            {id === '' ? <span className="text-base text-muted-foreground">请输入工号</span> : id}
+          </div>
+          <NumberPad value={id} onChange={next => { setId(next); setError(null) }} onConfirm={submit} confirmLabel="登录" />
+          {busy && <div className="mt-3 text-sm text-muted-foreground">登录中…</div>}
+          {error !== null && <div className="mt-3 text-sm text-destructive" role="alert">{error}</div>}
         </CardContent>
       </Card>
     </div>
@@ -95,7 +95,7 @@ function LoginScreen(props: { ctx: Context }): ReactNode {
 
 function SidebarItem(props: { ctx: Context, entry: WorkflowEntry }): ReactNode {
   const { entry } = props
-  const base = 'flex h-11 w-full items-center rounded-md px-3 text-left text-sm transition-colors'
+  const base = 'flex h-14 w-full items-center rounded-md px-4 text-left text-base transition-colors'
   if (!entry.unlocked) {
     // Locked items stay plain gray — no icon, no explanation text.
     return <span className={cn(base, 'cursor-not-allowed text-muted-foreground/40')} data-workflow={entry.id} aria-disabled="true">{entry.title}</span>
@@ -106,7 +106,7 @@ function SidebarItem(props: { ctx: Context, entry: WorkflowEntry }): ReactNode {
       className={cn(
         base,
         'hover:bg-accent hover:text-accent-foreground',
-        entry.active && 'bg-accent text-accent-foreground',
+        entry.active && 'bg-accent font-medium text-accent-foreground channel-keyline',
         entry.alert !== null && 'breathe',
       )}
       style={alertStyle(entry)}
@@ -135,9 +135,11 @@ function WorkflowSidebar(props: { ctx: Context }): ReactNode {
 
   const active = entries.find(entry => entry.active && entry.unlocked)
   return (
-    <div className="flex min-h-0 w-56 shrink-0 flex-col border-r border-border p-2" data-region="workflow-list">
-      {entries.map(entry => <SidebarItem key={entry.id} ctx={props.ctx} entry={entry} />)}
-      {active === undefined && <div className="p-3 text-xs text-muted-foreground">暂无已解锁的作业流程</div>}
+    <div className="flex min-h-0 w-64 shrink-0 flex-col border-r border-border p-2" data-region="workflow-list">
+      <DragScroll className="flex min-h-0 flex-1 flex-col gap-1">
+        {entries.map(entry => <SidebarItem key={entry.id} ctx={props.ctx} entry={entry} />)}
+        {active === undefined && <div className="p-3 text-sm text-muted-foreground">暂无已解锁的作业流程</div>}
+      </DragScroll>
     </div>
   )
 }

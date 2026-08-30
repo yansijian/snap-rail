@@ -12,9 +12,9 @@ import { cn } from './utils.ts'
 export type LedTone = 'green' | 'yellow' | 'red'
 
 const TONE_CLASS: Record<LedTone, string> = {
-  green: 'bg-emerald-500',
-  yellow: 'bg-amber-500',
-  red: 'bg-red-500',
+  green: 'bg-success',
+  yellow: 'bg-warning',
+  red: 'bg-destructive',
 }
 
 /** One pulsing dot; pass `aria-label` when it is the only status surface. */
@@ -22,7 +22,7 @@ export function Led({ tone, className, ...props }: ComponentProps<'span'> & { to
   return (
     <span
       data-tone={tone}
-      className={cn('inline-block h-2 w-2 shrink-0 animate-pulse rounded-full', TONE_CLASS[tone], className)}
+      className={cn('inline-block h-3 w-3 shrink-0 animate-pulse rounded-full', TONE_CLASS[tone], className)}
       {...props}
     />
   )

@@ -19,8 +19,18 @@ export { Input } from './input.tsx'
 export { Label } from './label.tsx'
 export { Checkbox } from './checkbox.tsx'
 export { RadioGroup, RadioGroupItem } from './radio-group.tsx'
-export { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from './select.tsx'
+export { TouchSelect, type TouchSelectOption } from './touch-select.tsx'
+export { NumberInput, NumberPad } from './number-input.tsx'
+export { DragScroll } from './drag-scroll.tsx'
 export { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table.tsx'
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs.tsx'
 export { Collapsible, CollapsibleTrigger, CollapsibleChevron, CollapsibleContent } from './collapsible.tsx'
 export { Led, type LedTone } from './led.tsx'
+export {
+  THEME_SETTINGS_KEY,
+  DEFAULT_THEME,
+  applyTheme,
+  resolveThemeMode,
+  themeSettingsSchema,
+  type ThemeSettings,
+} from './theme.ts'

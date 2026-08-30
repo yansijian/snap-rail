@@ -93,31 +93,27 @@ async function flush(times = 12): Promise<void> {
   for (let i = 0; i < times; i += 1) await new Promise(resolve => setTimeout(resolve, 0))
 }
 
-/** Set a React controlled input's value the way React's tracker accepts. */
-function setNativeValue(input: HTMLInputElement, value: string): void {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-  setter?.call(input, value)
-  input.dispatchEvent(new Event('input', { bubbles: true }))
-}
-
+/** Sign on through the login card's embedded number pad (touch entry). */
 async function loginAs(id: string): Promise<void> {
-  const input = document.querySelector<HTMLInputElement>('input[aria-label="工号"]')
-  expect(input).not.toBeNull()
-  setNativeValue(input!, id)
-  await flush()
-  const login = [...document.querySelectorAll('button')].find(button => button.textContent === '登录')
-  expect(login).toBeDefined()
+  for (const digit of id) {
+    const key = document.querySelector<HTMLButtonElement>(`button[data-key="${digit}"]`)
+    expect(key, `keypad key ${digit}`).not.toBeNull()
+    key!.click()
+    await flush(2)
+  }
+  const login = document.querySelector<HTMLButtonElement>('button[data-key="confirm"]')
+  expect(login?.textContent).toContain('登录')
   login!.click()
   await flush(20)
 }
 
-/** Pick one option of a Select primitive: open the trigger, click the option. */
-async function pickSelect(ariaLabel: string, optionText: string): Promise<void> {
-  const trigger = document.querySelector<HTMLButtonElement>(`button[role="combobox"][aria-label="${ariaLabel}"]`)
-  expect(trigger, `select trigger ${ariaLabel}`).not.toBeNull()
+/** Pick one option of a TouchSelect: open the trigger, tap the option row. */
+async function pickSelect(label: string, optionText: string): Promise<void> {
+  const trigger = document.querySelector<HTMLButtonElement>(`button[data-touch-select-trigger="${label}"]`)
+  expect(trigger, `select trigger ${label}`).not.toBeNull()
   trigger!.click()
   await flush()
-  const option = [...document.querySelectorAll('[role="option"]')]
+  const option = [...document.querySelectorAll('[data-option]')]
     .find(candidate => candidate.textContent?.includes(optionText))
   expect(option, `option ${optionText}`).toBeDefined()
   option!.click()
@@ -168,24 +164,24 @@ describe('production counting settings page', () => {
 
     // Cascade: picking plc2 narrows groups to 产量 and auto-picks its point.
     await pickSelect('绑定设备', 'plc2')
-    const groupTrigger = document.querySelector<HTMLButtonElement>('button[role="combobox"][aria-label="绑定分组"]')!
+    const groupTrigger = document.querySelector<HTMLButtonElement>('button[data-touch-select-trigger="绑定分组"]')!
     expect(groupTrigger.textContent).toContain('产量')
     groupTrigger.click()
     await flush()
-    const groupOptions = [...document.querySelectorAll('[role="option"]')].map(option => option.textContent ?? '')
+    const groupOptions = [...document.querySelectorAll('[data-option]')].map(option => option.textContent ?? '')
     expect(groupOptions).toEqual(['产量'])
-    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    ;(document.querySelector('[data-option]') as HTMLElement).click()
     await flush()
 
     // The point select offers only plc2/产量's single member.
-    const pointTrigger = document.querySelector<HTMLButtonElement>('button[role="combobox"][aria-label="绑定点位"]')!
+    const pointTrigger = document.querySelector<HTMLButtonElement>('button[data-touch-select-trigger="绑定点位"]')!
     expect(pointTrigger.textContent).toContain('成品计数')
     pointTrigger.click()
     await flush()
-    const pointOptions = [...document.querySelectorAll('[role="option"]')].map(option => option.textContent ?? '')
+    const pointOptions = [...document.querySelectorAll('[data-option]')].map(option => option.textContent ?? '')
     expect(pointOptions.length).toBe(1)
     expect(pointOptions[0]).toContain('成品计数')
-    ;(document.querySelector('[role="option"]') as HTMLElement).click()
+    ;(document.querySelector('[data-option]') as HTMLElement).click()
     await flush()
 
     // Saving writes settings.json and hot-applies through the change frame.

@@ -70,20 +70,16 @@ function workflowItem(id: string): HTMLElement | null {
   return document.querySelector(`[data-workflow="${id}"]`)
 }
 
-/** Set a React controlled input's value the way React's tracker accepts. */
-function setNativeValue(input: HTMLInputElement, value: string): void {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-  setter?.call(input, value)
-  input.dispatchEvent(new Event('input', { bubbles: true }))
-}
-
+/** Sign on through the login card's embedded number pad (touch entry). */
 async function loginAs(id: string): Promise<void> {
-  const input = document.querySelector<HTMLInputElement>('input[aria-label="工号"]')
-  expect(input).not.toBeNull()
-  setNativeValue(input!, id)
-  await flush()
-  const login = [...document.querySelectorAll('button')].find(button => button.textContent === '登录')
-  expect(login).toBeDefined()
+  for (const digit of id) {
+    const key = document.querySelector<HTMLButtonElement>(`button[data-key="${digit}"]`)
+    expect(key, `keypad key ${digit}`).not.toBeNull()
+    key!.click()
+    await flush(2)
+  }
+  const login = document.querySelector<HTMLButtonElement>('button[data-key="confirm"]')
+  expect(login?.textContent).toContain('登录')
   login!.click()
   await flush(20)
 }

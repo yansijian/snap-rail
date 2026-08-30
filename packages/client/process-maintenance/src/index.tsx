@@ -15,7 +15,7 @@
 import '@snap-rail/station-rpc/contract'
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button, Card, CardContent } from '@snap-rail/client-ui'
+import { Button, Card, CardContent, DragScroll } from '@snap-rail/client-ui'
 import cleanImage from './assets/clean.jpg'
 import lubricateImage from './assets/lubricate.jpg'
 import fastenImage from './assets/fasten.png'
@@ -124,23 +124,24 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
   }
 
   return (
-    <div className="h-full overflow-y-auto p-4" data-page="maintenance">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <DragScroll className="h-full p-6" data-page="maintenance">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {ITEMS.map((item, index) => {
           const result = results[index] ?? null
           return (
             <Card key={item.name}>
               <CardContent className="p-0">
-                <img src={item.image} alt={item.name} className="h-36 w-full rounded-t-md object-cover" />
-                <div className="space-y-2 p-3">
-                  <span className="text-sm font-medium">{item.name}</span>
-                  <p className="text-xs leading-relaxed text-muted-foreground">{item.content}</p>
+                <img src={item.image} alt={item.name} className="h-44 w-full rounded-t-lg object-cover" />
+                <div className="space-y-3 p-4">
+                  <span className="text-base font-medium">{item.name}</span>
+                  <p className="text-sm leading-relaxed text-muted-foreground">{item.content}</p>
                   <div className="flex gap-2">
                     {done
                       ? result !== null && (
                           <Button
                             variant={result === 'ok' ? 'default' : 'destructive'}
                             disabled
+                            size="lg"
                             className="flex-1"
                           >
                             {result === 'ok' ? '完成维护' : '异常'}
@@ -150,6 +151,7 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
                           <>
                             <Button
                               variant={result === 'ok' ? 'default' : 'outline'}
+                              size="lg"
                               className="flex-1"
                               onClick={() => { setResult(index, 'ok') }}
                             >
@@ -157,6 +159,7 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
                             </Button>
                             <Button
                               variant={result === 'abnormal' ? 'destructive' : 'outline'}
+                              size="lg"
                               className="flex-1"
                               onClick={() => { setResult(index, 'abnormal') }}
                             >
@@ -172,29 +175,29 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
         })}
       </div>
 
-      <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-card p-3">
+      <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-card p-4">
         {done
           ? (
-              <span className="text-sm text-success" role="status">
+              <span className="text-base text-success" role="status">
                 今日自主维护已完成（{new Date(completedAt).toLocaleTimeString('zh-CN', { hour12: false })}），生产任务已解锁。
               </span>
             )
           : (
-              <span className="text-sm text-muted-foreground">
+              <span className="text-base text-muted-foreground">
                 {error !== null
                   ? <span className="text-destructive" role="alert">{error}</span>
                   : <>已选择 {answeredCount}/{ITEMS.length} 项，全部选择后可完成。</>}
               </span>
             )}
         {done
-          ? <Button variant="outline" onClick={redo}>重新维护</Button>
+          ? <Button variant="outline" size="lg" onClick={redo}>重新维护</Button>
           : (
-              <Button disabled={!allAnswered || busy} onClick={complete}>
+              <Button size="xl" disabled={!allAnswered || busy} onClick={complete}>
                 {busy ? '提交中…' : '完成'}
               </Button>
             )}
       </div>
-    </div>
+    </DragScroll>
   )
 }
 

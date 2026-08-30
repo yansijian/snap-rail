@@ -18,12 +18,12 @@ export const Dialog = DialogPrimitive.Root
 export function DialogContent({ className, children, ...props }: ComponentProps<typeof DialogPrimitive.Content>) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-background/80 backdrop-blur-[1px]" />
+      <DialogPrimitive.Overlay className="overlay-in fixed inset-0 z-50 bg-background/80 backdrop-blur-[1px]" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2',
-          'rounded-md border border-border bg-card text-card-foreground shadow-xl',
-          'p-4 focus:outline-none',
+          'dialog-in fixed left-1/2 top-1/2 z-50 w-[calc(100%-2.5rem)] max-w-md -translate-x-1/2 -translate-y-1/2',
+          'rounded-lg border border-border bg-card text-card-foreground shadow-xl',
+          'p-5 focus:outline-none',
           className,
         )}
         {...props}
@@ -36,7 +36,7 @@ export function DialogContent({ className, children, ...props }: ComponentProps<
 
 /** Title bar block inside a dialog. */
 export function DialogHeader({ className, ...props }: ComponentProps<'div'>) {
-  return <div className={cn('mb-3 space-y-1', className)} {...props} />
+  return <div className={cn('mb-4 space-y-1', className)} {...props} />
 }
 
 /** The dialog's accessible title. */
@@ -47,5 +47,5 @@ export const DialogDescription = DialogPrimitive.Description
 
 /** Action row (buttons) at the bottom; defaults to right-aligned. */
 export function DialogFooter({ className, ...props }: ComponentProps<'div'>) {
-  return <div className={cn('mt-4 flex justify-end gap-2', className)} {...props} />
+  return <div className={cn('mt-5 flex justify-end gap-3', className)} {...props} />
 }

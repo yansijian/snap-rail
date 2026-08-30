@@ -15,7 +15,7 @@ import '@snap-rail/cordis-plugin-timer'
 // Wire rows for the station-domain methods this resident calls.
 import '@snap-rail/station-rpc/contract'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@snap-rail/client-ui'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, DragScroll } from '@snap-rail/client-ui'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
 import '@snap-rail/client-session'
@@ -95,19 +95,19 @@ function DowntimePage(props: { ctx: Context, controller: DowntimeController }): 
   }
 
   return (
-    <div className="grid h-full grid-cols-[1fr_360px] gap-3 p-4" data-page="downtime">
+    <div className="grid h-full grid-cols-[1fr_400px] gap-4 p-6" data-page="downtime">
       <Card className="flex flex-col">
-        <CardContent className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+        <CardContent className="flex flex-1 flex-col items-center justify-center gap-8 p-6">
           {open === null
             ? (
                 <>
-                  <div className="text-sm text-muted-foreground">选择停机原因开始停机</div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="text-base text-muted-foreground">选择停机原因开始停机</div>
+                  <div className="grid grid-cols-3 gap-4">
                     {DOWNTIME_REASONS.map(reason => (
                       <Button
                         key={reason}
                         variant="secondary"
-                        className="h-16 w-28 text-sm"
+                        className="h-20 w-36 text-lg"
                         disabled={busy}
                         onClick={() => act(DOWNTIME_BEGIN, reason)}
                       >
@@ -119,33 +119,33 @@ function DowntimePage(props: { ctx: Context, controller: DowntimeController }): 
               )
             : (
                 <>
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2.5 text-base">
                     <Badge variant="destructive">停机中</Badge>
                     <span>{open.reason}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-sm text-muted-foreground">
                     自 {formatClock(open.beganAt)} 起，已停机 {formatDuration(now - open.beganAt)}
                   </div>
-                  <Button className="h-10 px-8" disabled={busy} onClick={() => act(DOWNTIME_RESUME)}>恢复生产</Button>
+                  <Button size="xl" disabled={busy} onClick={() => act(DOWNTIME_RESUME)}>恢复生产</Button>
                 </>
               )}
-          {error !== null && <div className="text-xs text-destructive" role="alert">{error}</div>}
+          {error !== null && <div className="text-sm text-destructive" role="alert">{error}</div>}
         </CardContent>
       </Card>
 
       <Card className="flex min-h-0 flex-col">
         <CardHeader><CardTitle>停机记录</CardTitle></CardHeader>
-        <CardContent className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-          {records.length === 0 && <div className="text-xs text-muted-foreground">暂无停机记录。</div>}
+        <DragScroll className="min-h-0 flex-1 space-y-2 p-5 pt-0">
+          {records.length === 0 && <div className="text-sm text-muted-foreground">暂无停机记录。</div>}
           {records.map((record, index) => (
-            <div key={`${record.beganAt}-${index}`} className="rounded-md border border-border p-2 text-xs" data-downtime-row={index}>
-              <div className="mb-1 flex items-center gap-2">
+            <div key={`${record.beganAt}-${index}`} className="rounded-md border border-border p-3 text-sm" data-downtime-row={index}>
+              <div className="mb-1.5 flex items-center gap-2">
                 {record.resumedAt === null
                   ? <Badge variant="destructive">进行中</Badge>
                   : <Badge variant="success">已恢复</Badge>}
                 <span>{record.reason}</span>
               </div>
-              <div className="grid grid-cols-[64px_1fr] gap-y-1">
+              <div className="grid grid-cols-[80px_1fr] gap-y-1">
                 <span className="text-muted-foreground">发生时间</span><span className="font-mono">{formatClock(record.beganAt)}</span>
                 <span className="text-muted-foreground">恢复时间</span>
                 <span className="font-mono">{record.resumedAt === null ? '—' : formatClock(record.resumedAt)}</span>
@@ -154,7 +154,7 @@ function DowntimePage(props: { ctx: Context, controller: DowntimeController }): 
               </div>
             </div>
           ))}
-        </CardContent>
+        </DragScroll>
       </Card>
     </div>
   )
