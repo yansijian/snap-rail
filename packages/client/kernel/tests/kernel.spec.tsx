@@ -13,7 +13,7 @@ afterEach(async () => {
 
 function inProcessChannel(ctx: Context): HostChannel {
   return {
-    invoke: request => ctx.gateway.handleClientRequest(request),
+    invoke: request => ctx.rpc.handleClientRequest(request),
     openStream: () => () => {},
   }
 }

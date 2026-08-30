@@ -16,6 +16,8 @@
   ],
   "references": [
     { "path": "../../../vendor/cordis" },
+    { "path": "../../field/field" },
+    { "path": "../../field/driver-modbus" },
     { "path": "../../protocol/protocol" },
     { "path": "../settings" },
     { "path": "../variables" },

@@ -12,8 +12,8 @@
 
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { LogOut, Minus, Settings, Square, X } from 'lucide-react'
-import { useEffect, useState, type ReactNode } from 'react'
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@snap-rail/client-ui'
+import { useState, type ReactNode } from 'react'
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, useRefresh } from '@snap-rail/client-ui'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
 import '@snap-rail/client-session'
@@ -45,12 +45,8 @@ function Titlebar(props: {
   ctx: Context
   control: (action: Action) => void
 }): ReactNode {
-  const [, setTick] = useState(0)
   const [confirming, setConfirming] = useState(false)
-  useEffect(() => {
-    const detach = props.ctx.on('session/changed', () => setTick(value => value + 1))
-    return () => { detach() }
-  }, [props.ctx])
+  useRefresh(props.ctx, ['session/changed'])
 
   const operator = props.ctx.session.current()
   const close = (): void => props.control('close')

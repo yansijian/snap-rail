@@ -1,93 +1,135 @@
 /**
- * The field seam's gateway bridge: registers the points/connections methods
- * and pumps field events into broadcast frames. `point/updated` frames flow
- * only for ids a client subscribed to; structural frames (added/removed,
- * status) always flow so lists stay current.
+ * The field seam's rpc bridge: claims the `field` wire domain and registers
+ * the point-table methods with their schemas, plus the driver-registry and
+ * generic-mapping faces. Field events pump into `field/*` broadcast frames;
+ * `field/point-updated` frames flow while at least one subscription
+ * reference holds the point's address — references are counted (a renderer
+ * often holds several consumers of one address; the last unsubscribe, not
+ * any unsubscribe, stops the frames), so one consumer unmounting never
+ * starves the rest. A renderer reload that skips its unsubscribes leaks
+ * counts — wasted broadcasts only, never lost ones. Structural frames
+ * (added/removed, status) always flow so lists stay current.
  *
  * @module @snap-rail/field/rpc
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
-import type { GatewayService } from '@snap-rail/gateway'
-import { RpcBusinessError, PointId } from '@snap-rail/protocol'
-import { FieldError } from './index.ts'
-import type { PointsService, ConnectionsService } from './index.ts'
 import type { AuditService } from '@snap-rail/audit'
+import type { GatewayService } from '@snap-rail/gateway'
+import { RpcBusinessError } from '@snap-rail/protocol'
+import { FieldError, pointKey } from './index.ts'
+import type { ConnectionsService, FieldService, PointsService } from './index.ts'
+import { fieldFrameSchemas, fieldRequestSchemas } from './wire.ts'
 
-/** The field-rpc bridge plugin; mount after gateway, field, and audit. */
+/** The field-rpc bridge plugin; mount after rpc, field, and audit. */
 const fieldRpcPlugin: Plugin.Object = {
   name: 'field-rpc',
-  inject: ['gateway', 'points', 'connections', 'audit'],
+  inject: ['rpc', 'points', 'connections', 'field', 'audit'],
   apply(ctx: Context): void {
-    const gateway: GatewayService = ctx.gateway
+    const rpc: GatewayService = ctx.rpc
     const points: PointsService = ctx.points
     const connections: ConnectionsService = ctx.connections
+    const field: FieldService = ctx.field
     const audit: AuditService = ctx.audit
-    const subscribed = new Set<string>()
+    /** Reference count per composite point key; frames flow above zero. */
+    const refcounts = new Map<string, number>()
 
-    gateway.registerMethod('points.list', () => ({ points: points.list() }))
+    rpc.claimDomain(ctx, 'field')
 
-    gateway.registerMethod('points.read', ({ ids }) => {
-      const known = new Set(points.list().map(point => point.id as string))
-      const unknown = ids.filter(id => !known.has(id))
+    rpc.method(ctx, 'field.points.list', { request: fieldRequestSchemas['field.points.list'] }, () => ({
+      points: points.list(),
+    }))
+
+    rpc.method(ctx, 'field.points.read', { request: fieldRequestSchemas['field.points.read'] }, ({ points: wanted }) => {
+      const known = new Set(points.list().map(point => pointKey(point)))
+      const unknown = wanted.filter(ref => !known.has(pointKey(ref)))
       if (unknown.length > 0) {
-        throw new RpcBusinessError({ code: 'not-found', details: { what: `unknown points: ${unknown.join(', ')}` } })
+        const what = unknown.map(ref => pointKey(ref)).join(', ')
+        throw new RpcBusinessError({ code: 'not-found', details: { what: `unknown points: ${what}` } })
       }
       // A registered point without its first sample reads as `null` (point
       // abnormal): `time` 0 marks "no observation yet".
-      return { samples: ids.map(id => points.read(PointId(id)) ?? { id: PointId(id), value: null, time: 0 }) }
+      return {
+        samples: wanted.map(ref => points.read(ref)
+          ?? { device: ref.device, group: ref.group, name: ref.name, value: null, time: 0 }),
+      }
     })
 
-    gateway.registerMethod('points.write', async ({ id, value }) => {
+    rpc.method(ctx, 'field.points.write', { request: fieldRequestSchemas['field.points.write'] }, async ({ point, value }) => {
       try {
-        await points.write(PointId(id), value)
+        await points.write(point, value)
       } catch (cause) {
-        throw mapWriteError(id, value, cause)
+        throw mapWriteError(pointKey(point), value, cause)
       }
-      audit.record({ actor: 'client', action: 'point.write', subject: id, detail: { value } })
+      audit.record({ actor: 'client', action: 'field.point.write', subject: pointKey(point), detail: { value } })
       return { accepted: true } as const
     })
 
-    gateway.registerMethod('points.subscribe', ({ ids }) => {
-      for (const id of ids) subscribed.add(id)
+    rpc.method(ctx, 'field.points.subscribe', { request: fieldRequestSchemas['field.points.subscribe'] }, ({ points: refs }) => {
+      for (const ref of refs) {
+        const key = pointKey(ref)
+        refcounts.set(key, (refcounts.get(key) ?? 0) + 1)
+      }
       return { subscribed: true } as const
     })
 
-    gateway.registerMethod('points.unsubscribe', ({ ids }) => {
-      for (const id of ids) subscribed.delete(id)
+    rpc.method(ctx, 'field.points.unsubscribe', { request: fieldRequestSchemas['field.points.unsubscribe'] }, ({ points: refs }) => {
+      for (const ref of refs) {
+        const key = pointKey(ref)
+        const next = Math.max(0, (refcounts.get(key) ?? 0) - 1)
+        if (next === 0) refcounts.delete(key)
+        else refcounts.set(key, next)
+      }
       return { unsubscribed: true } as const
     })
 
-    gateway.registerMethod('connections.list', () => ({ connections: connections.list() }))
+    rpc.method(ctx, 'field.connections.list', { request: fieldRequestSchemas['field.connections.list'] }, () => ({
+      connections: connections.list(),
+    }))
 
-    ctx.on('point/added', point => gateway.broadcast('point/added', { point }))
-    ctx.on('point/removed', id => gateway.broadcast('point/removed', { id }))
+    rpc.method(ctx, 'field.drivers.list', { request: fieldRequestSchemas['field.drivers.list'] }, () => ({
+      drivers: field.listDrivers(),
+    }))
+
+    rpc.method(ctx, 'field.mappings.list', { request: fieldRequestSchemas['field.mappings.list'] }, () => ({
+      mappings: field.mappings(),
+    }))
+
+    for (const [name, payload] of Object.entries(fieldFrameSchemas)) {
+      rpc.frame(ctx, name, { payload })
+    }
+
     ctx.on('point/updated', sample => {
-      if (subscribed.has(sample.id)) {
-        gateway.broadcast('point/updated', { id: sample.id, value: sample.value, time: sample.time })
+      if ((refcounts.get(pointKey(sample)) ?? 0) > 0) {
+        const { device, group, name, value, time } = sample
+        rpc.broadcast('field/point-updated', { device, group, name, value, time })
       }
     })
-    ctx.on('connection/added', connection => gateway.broadcast('connection/added', { connection }))
-    ctx.on('connection/removed', id => gateway.broadcast('connection/removed', { id }))
-    ctx.on('connection/status', frame => gateway.broadcast('connection/status', frame))
+    rpc.bridgeEvent(ctx, 'point/added', 'field/point-added', point => ({ point }))
+    rpc.bridgeEvent(ctx, 'point/removed', 'field/point-removed', ref => ({ device: ref.device, group: ref.group, name: ref.name }))
+    rpc.bridgeEvent(ctx, 'connection/added', 'field/connection-added', connection => ({ connection }))
+    rpc.bridgeEvent(ctx, 'connection/removed', 'field/connection-removed', id => ({ id }))
+    rpc.bridgeEvent(ctx, 'connection/status', 'field/connection-status', frame => frame)
+    rpc.bridgeEvent(ctx, 'field/mappings-changed', 'field/mappings-changed', () => ({}))
   },
 }
 
-function mapWriteError(id: string, value: unknown, cause: unknown): RpcBusinessError {
+function mapWriteError(key: string, value: unknown, cause: unknown): RpcBusinessError {
   if (cause instanceof FieldError) {
     switch (cause.kind) {
       case 'unknown-point':
-        return new RpcBusinessError({ code: 'not-found', details: { what: `unknown point: ${id}` } })
+        return new RpcBusinessError({ code: 'not-found', details: { what: `unknown point: ${key}` } })
       case 'type-mismatch':
         return new RpcBusinessError({ code: 'bad-request', details: { issues: [cause.message] } })
       case 'no-write-handler':
-        return new RpcBusinessError({ code: 'unavailable', details: { what: `point ${id} is not writable` } })
+        return new RpcBusinessError({ code: 'unavailable', details: { what: `point ${key} is not writable` } })
       case 'duplicate-connection':
       case 'duplicate-point':
+      case 'duplicate-driver':
         break
     }
   }
-  return new RpcBusinessError({ code: 'internal', details: { hint: `write to ${id} failed: ${String(value)}` } })
+  return new RpcBusinessError({ code: 'internal', details: { hint: `write to ${key} failed: ${String(value)}` } })
 }
 
 export default fieldRpcPlugin

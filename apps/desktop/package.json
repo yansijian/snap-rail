@@ -14,6 +14,7 @@
     "dist": "pnpm run build:faces && electron-builder --win nsis --config electron-builder.yml"
   },
   "dependencies": {
+    "zod": "^4.4.3",
     "@snap-rail/app-boot": "workspace:^",
     "@snap-rail/audit": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
@@ -22,6 +23,7 @@
     "@snap-rail/driver-modbus": "workspace:^",
     "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/production-stats": "workspace:^",
     "@snap-rail/settings": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^",
     "@snap-rail/store": "workspace:^",

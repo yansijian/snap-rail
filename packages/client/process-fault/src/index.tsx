@@ -9,13 +9,24 @@
  * The fault state and the alert live at plugin scope (not in the page), so
  * an open fault stays red after a restart even before the page is opened.
  *
+ * Field faults: when the config binds a device group (the 故障报警 group
+ * configured in the ModbusTCP settings), the page shows a live 设备故障
+ * strip — any member active lists the point names — and the sidebar also
+ * breathes red while the group is active. Field faults never write the
+ * audit stream; reporting stays a human act.
+ *
  * @module @snap-rail/process-fault
  */
 
+import { formatClock, formatDuration } from '@snap-rail/util'
 import { Context, type Plugin } from '@snap-rail/cordis'
 // Side-effect: pulls in the timer augmentation (`ctx.interval`).
 import '@snap-rail/cordis-plugin-timer'
+// Wire rows for the station-domain methods this resident calls.
+import '@snap-rail/station-rpc/contract'
+import { watchBinding, type BindingView } from '@snap-rail/client-variables'
 import { useEffect, useState, type ReactNode } from 'react'
+import { z } from 'zod'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label } from '@snap-rail/client-ui'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
@@ -31,6 +42,18 @@ export const FAULT_REPAIR_COMPLETE = 'fault.repair-complete'
 
 const WORKFLOW_ID = 'fault'
 const FAULT_ACTIONS: readonly string[] = [FAULT_REPORT, FAULT_REPAIR_START, FAULT_REPAIR_COMPLETE]
+
+/** Config schema: the optional device-fault group binding from plugins.yml. */
+export const faultConfigSchema = z.object({
+  /** Bind the 设备故障 strip to one device's business group (configured in
+   * the ModbusTCP settings); absent keeps the page purely manual. */
+  faultBinding: z.object({
+    device: z.string().min(1),
+    group: z.string().min(1),
+  }).optional(),
+})
+
+export type FaultConfig = z.infer<typeof faultConfigSchema>
 
 interface FaultEvent {
   action: string
@@ -71,22 +94,8 @@ export function deriveFaults(events: readonly FaultEvent[]): { records: FaultRec
 
 /** Plugin-scope state shared with the page: the page renders, the plugin owns. */
 interface FaultController {
-  state: { records: FaultRecord[], openIndex: number }
+  state: { records: FaultRecord[], openIndex: number, deviceFault: BindingView }
   refresh(): Promise<void>
-}
-
-function formatClock(time: number): string {
-  return new Date(time).toLocaleTimeString('zh-CN', { hour12: false })
-}
-
-function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000))
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
-  const seconds = total % 60
-  if (hours > 0) return `${hours}时${minutes}分`
-  if (minutes > 0) return `${minutes}分${seconds}秒`
-  return `${seconds}秒`
 }
 
 function Step(props: { index: number, label: string, state: 'done' | 'active' | 'todo' }): ReactNode {
@@ -158,10 +167,15 @@ function FaultPage(props: { ctx: Context, controller: FaultController }): ReactN
   }, [])
 
   const { records, openIndex } = controller.state
+  const deviceFault = controller.state.deviceFault
   const open = openIndex === -1 ? null : records[openIndex] ?? null
   const step: 'idle' | 'waiting' | 'repairing' = open === null
     ? 'idle'
     : open.repairStartedAt === null ? 'waiting' : 'repairing'
+  /** The strip's coarse state for tests and styling: fault beats abnormal. */
+  const faultStripState = deviceFault.kind === 'group'
+    ? deviceFault.status === 'active' ? 'fault' : deviceFault.abnormal.length > 0 ? 'abnormal' : 'normal'
+    : 'normal'
 
   const act = (action: 'fault.report' | 'fault.repair-start' | 'fault.repair-complete', technician?: string): void => {
     setBusy(true)
@@ -181,6 +195,32 @@ function FaultPage(props: { ctx: Context, controller: FaultController }): ReactN
   return (
     <div className="grid h-full grid-cols-[1fr_360px] gap-3 p-4" data-page="fault">
       <Card className="flex flex-col">
+        {deviceFault.kind === 'group' && (
+          <div
+            data-region="device-fault"
+            data-state={faultStripState}
+            className={
+              faultStripState === 'fault'
+                ? 'flex flex-wrap items-center gap-2 rounded-t-lg border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive'
+                : faultStripState === 'abnormal'
+                  ? 'flex flex-wrap items-center gap-2 rounded-t-lg border-b border-border bg-muted px-4 py-2 text-sm text-muted-foreground'
+                  : 'flex flex-wrap items-center gap-2 rounded-t-lg border-b border-border bg-success/10 px-4 py-2 text-sm text-success'
+            }
+          >
+            {faultStripState === 'fault' && deviceFault.kind === 'group' && (
+              <>
+                <span>设备故障：</span>
+                <span className="font-semibold" data-cell="device-fault-names">
+                  {deviceFault.active.map(member => member.name).join('、')}
+                </span>
+              </>
+            )}
+            {faultStripState === 'abnormal' && deviceFault.kind === 'group' && (
+              <span>设备通讯异常（{deviceFault.abnormal.length} 个点位待恢复）</span>
+            )}
+            {faultStripState === 'normal' && <span>设备正常</span>}
+          </div>
+        )}
         <CardContent className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
           {step === 'idle' && (
             <button
@@ -267,12 +307,13 @@ function FaultPage(props: { ctx: Context, controller: FaultController }): ReactN
 }
 
 /** The fault workflow occupant; fault state and alert run at plugin scope. */
-const faultPlugin: Plugin.Object<void> = {
+const faultPlugin: Plugin.Object<FaultConfig> = {
   name: 'process-fault',
   inject: ['uiSlots', 'client', 'session', 'workflows', 'timer'],
-  apply(ctx: Context): void {
+  Config: faultConfigSchema,
+  apply(ctx: Context, config: FaultConfig): void {
     const controller: FaultController = {
-      state: { records: [], openIndex: -1 },
+      state: { records: [], openIndex: -1, deviceFault: { kind: 'unresolved' } },
       async refresh(): Promise<void> {
         const result = await ctx.client.link.call('audit.list', { actions: FAULT_ACTIONS, limit: 500 })
         if (!result.ok) return
@@ -287,9 +328,27 @@ const faultPlugin: Plugin.Object<void> = {
         const derived = deriveFaults(events)
         controller.state.records = derived.records
         controller.state.openIndex = derived.openIndex
-        ctx.workflows.setAlert(WORKFLOW_ID, derived.openIndex === -1 ? null : { kind: 'steady', color: 'red' })
+        applyAlert()
       },
     }
+
+    /** Red breathe while a manual fault is open OR the bound group is active. */
+    function applyAlert(): void {
+      const groupActive = controller.state.deviceFault.kind === 'group' && controller.state.deviceFault.status === 'active'
+      ctx.workflows.setAlert(WORKFLOW_ID, controller.state.openIndex === -1 && !groupActive ? null : { kind: 'steady', color: 'red' })
+    }
+
+    const binding = config.faultBinding
+    if (binding !== undefined) {
+      // Effects take a body producing the disposer; watchBinding's stop
+      // function is exactly that. Re-resolves on modbus/config-changed, so
+      // re-mapping or re-grouping applies without reloading the page.
+      ctx.effect(() => watchBinding(ctx, binding, view => {
+        controller.state.deviceFault = view
+        applyAlert()
+      }))
+    }
+
     void controller.refresh()
     ctx.interval(() => { void controller.refresh() }, 2000)
 

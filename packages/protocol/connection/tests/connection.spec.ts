@@ -33,7 +33,7 @@ async function makeLink(): Promise<{ link: HostLink; channel: FakeChannel }> {
   const ctx = new Context()
   contexts.push(ctx)
   await ctx.plugin(gatewayPlugin, { name: 'snap-rail', version: '0.1.0', bin: 'test' })
-  const channel = makeChannel(request => ctx.gateway.handleClientRequest(request))
+  const channel = makeChannel(request => ctx.rpc.handleClientRequest(request))
   return { link: new HostLink(channel), channel }
 }
 

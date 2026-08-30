@@ -37,6 +37,9 @@
   --color-success: #3fb950;
   --color-success-foreground: #0b0f14;
 
+  --color-warning: #d29922;
+  --color-warning-foreground: #0b0f14;
+
   --color-border: #1e2630;
   --color-input: #1e2630;
   --color-ring: #2f81f7;

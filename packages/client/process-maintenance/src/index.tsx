@@ -3,12 +3,16 @@
  * placeholder item carries a name, instructions, and a reference photo, and
  * must be answered 完成维护 or 异常 (default: neither); the 完成 button
  * unlocks only after every item is answered, then records
- * `maintenance.complete` (actor = the operator) which the production page
- * requires for the current operator and day.
+ * `maintenance.complete` (actor = the operator, per-item results in `detail`)
+ * which the production page requires for the current operator and day. Once
+ * complete, each item keeps only its chosen outcome button; 重新维护
+ * re-opens the whole checklist for a fresh pass.
  *
  * @module @snap-rail/process-maintenance
  */
 
+// Wire rows for the station-domain methods this resident calls.
+import '@snap-rail/station-rpc/contract'
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Card, CardContent } from '@snap-rail/client-ui'
@@ -46,6 +50,16 @@ const ITEMS: readonly MaintenanceItem[] = [
   { name: '安全装置检查', content: '测试急停按钮与安全光栅：触发后设备应立即停止并保持锁定。', image: safetyImage },
 ]
 
+/** Parses `detail` of a `maintenance.complete` record back into item results. */
+const readResults = (detail: unknown): Array<ItemResult | null> | null => {
+  if (typeof detail !== 'object' || detail === null) return null
+  const { results } = detail as { results?: unknown }
+  if (!Array.isArray(results) || results.length !== ITEMS.length) return null
+  return results.every(value => value === null || value === 'ok' || value === 'abnormal')
+    ? (results as Array<ItemResult | null>)
+    : null
+}
+
 function MaintenancePage(props: { ctx: Context }): ReactNode {
   const [, setTick] = useState(0)
   const [results, setResults] = useState<Array<ItemResult | null>>(() => ITEMS.map(() => null))
@@ -74,6 +88,8 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
       const entries = result.value.entries
       const last = entries.length === 0 ? undefined : entries[entries.length - 1]
       setCompletedAt(last?.time ?? null)
+      const restored = last === undefined ? null : readResults(last.detail)
+      if (restored !== null) setResults(restored)
     })
     return () => { active = false }
   }, [props.ctx, operator])
@@ -86,11 +102,18 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
     setResults(values => values.map((current, i) => i === index ? (current === value ? null : value) : current))
   }
 
+  /** Re-opens the checklist: drops the day's completion from this session so the operator can answer again. */
+  const redo = (): void => {
+    setResults(ITEMS.map(() => null))
+    setCompletedAt(null)
+    setError(null)
+  }
+
   const complete = (): void => {
     if (done || busy || !allAnswered) return
     setBusy(true)
     setError(null)
-    void props.ctx.client.link.call('audit.record', { action: MAINTENANCE_COMPLETE })
+    void props.ctx.client.link.call('audit.record', { action: MAINTENANCE_COMPLETE, detail: { results } })
       .then(result => {
         if (!result.ok) throw new Error(`提交失败（${result.error.code}）`)
         setCompletedAt(result.value.time)
@@ -103,35 +126,50 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
   return (
     <div className="h-full overflow-y-auto p-4" data-page="maintenance">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {ITEMS.map((item, index) => (
-          <Card key={item.name}>
-            <CardContent className="p-0">
-              <img src={item.image} alt={item.name} className="h-36 w-full rounded-t-md object-cover" />
-              <div className="space-y-2 p-3">
-                <span className="text-sm font-medium">{item.name}</span>
-                <p className="text-xs leading-relaxed text-muted-foreground">{item.content}</p>
-                <div className="flex gap-2">
-                  <Button
-                    variant={done || results[index] === 'ok' ? 'default' : 'outline'}
-                    disabled={done}
-                    className="flex-1"
-                    onClick={() => { setResult(index, 'ok') }}
-                  >
-                    完成维护
-                  </Button>
-                  <Button
-                    variant={results[index] === 'abnormal' ? 'destructive' : 'outline'}
-                    disabled={done}
-                    className="flex-1"
-                    onClick={() => { setResult(index, 'abnormal') }}
-                  >
-                    异常
-                  </Button>
+        {ITEMS.map((item, index) => {
+          const result = results[index] ?? null
+          return (
+            <Card key={item.name}>
+              <CardContent className="p-0">
+                <img src={item.image} alt={item.name} className="h-36 w-full rounded-t-md object-cover" />
+                <div className="space-y-2 p-3">
+                  <span className="text-sm font-medium">{item.name}</span>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{item.content}</p>
+                  <div className="flex gap-2">
+                    {done
+                      ? result !== null && (
+                          <Button
+                            variant={result === 'ok' ? 'default' : 'destructive'}
+                            disabled
+                            className="flex-1"
+                          >
+                            {result === 'ok' ? '完成维护' : '异常'}
+                          </Button>
+                        )
+                      : (
+                          <>
+                            <Button
+                              variant={result === 'ok' ? 'default' : 'outline'}
+                              className="flex-1"
+                              onClick={() => { setResult(index, 'ok') }}
+                            >
+                              完成维护
+                            </Button>
+                            <Button
+                              variant={result === 'abnormal' ? 'destructive' : 'outline'}
+                              className="flex-1"
+                              onClick={() => { setResult(index, 'abnormal') }}
+                            >
+                              异常
+                            </Button>
+                          </>
+                        )}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       <div className="mt-4 flex items-center justify-between rounded-md border border-border bg-card p-3">
@@ -148,9 +186,13 @@ function MaintenancePage(props: { ctx: Context }): ReactNode {
                   : <>已选择 {answeredCount}/{ITEMS.length} 项，全部选择后可完成。</>}
               </span>
             )}
-        <Button disabled={done || !allAnswered || busy} onClick={complete}>
-          {busy ? '提交中…' : '完成'}
-        </Button>
+        {done
+          ? <Button variant="outline" onClick={redo}>重新维护</Button>
+          : (
+              <Button disabled={!allAnswered || busy} onClick={complete}>
+                {busy ? '提交中…' : '完成'}
+              </Button>
+            )}
       </div>
     </div>
   )

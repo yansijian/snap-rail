@@ -7,8 +7,8 @@
  * @module @snap-rail/driver-modbus/plc
  */
 
-import type { ModbusFc, ModbusPointConfig } from '@snap-rail/protocol'
-import type { PointValue } from '@snap-rail/protocol'
+import type { PointValue } from '@snap-rail/field'
+import type { ModbusByteOrder, ModbusFc, ModbusPointConfig } from './contract.ts'
 
 /** Register (or bit) width of one point's payload. */
 export function widthOf(point: ModbusPointConfig): number {
@@ -64,8 +64,14 @@ export interface BlockPayload {
   registers?: readonly number[]
 }
 
-/** Decode one point's value out of its block payload (scale applied to f32). */
-export function decodePoint(point: ModbusPointConfig, payload: BlockPayload, offset: number): PointValue {
+/** Decode one point's value out of its block payload (scale applied to f32).
+ * Word order is the device-wide link property the caller passes in. */
+export function decodePoint(
+  point: ModbusPointConfig,
+  payload: BlockPayload,
+  offset: number,
+  byteOrder: ModbusByteOrder,
+): PointValue {
   switch (point.encoding) {
     case 'coil':
     case 'discrete':
@@ -77,7 +83,7 @@ export function decodePoint(point: ModbusPointConfig, payload: BlockPayload, off
     }
     default: {
       const registers = payload.registers ?? [0, 0]
-      const [hi, lo] = point.byteOrder === 'cdab'
+      const [hi, lo] = byteOrder === 'cdab'
         ? [registers[offset + 1] ?? 0, registers[offset] ?? 0]
         : [registers[offset] ?? 0, registers[offset + 1] ?? 0]
       const word = (((hi & 0xffff) << 16) | (lo & 0xffff)) >>> 0
@@ -91,7 +97,11 @@ export function decodePoint(point: ModbusPointConfig, payload: BlockPayload, off
 }
 
 /** Encode a write: one coil flag or a register array in wire order. */
-export function encodeWrite(point: ModbusPointConfig, value: Exclude<PointValue, null>): { coil?: boolean, registers?: number[] } {
+export function encodeWrite(
+  point: ModbusPointConfig,
+  value: Exclude<PointValue, null>,
+  byteOrder: ModbusByteOrder,
+): { coil?: boolean, registers?: number[] } {
   if (point.encoding === 'coil') {
     if (typeof value !== 'boolean') throw new RangeError(`coil write to ${point.var} expects a boolean`)
     return { coil: value }
@@ -123,7 +133,7 @@ export function encodeWrite(point: ModbusPointConfig, value: Exclude<PointValue,
       }
       const hi = (word >>> 16) & 0xffff
       const lo = word & 0xffff
-      return { registers: point.byteOrder === 'cdab' ? [lo, hi] : [hi, lo] }
+      return { registers: byteOrder === 'cdab' ? [lo, hi] : [hi, lo] }
     }
   }
 }

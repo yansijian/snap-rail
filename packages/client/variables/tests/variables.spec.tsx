@@ -36,50 +36,54 @@ describe('variables registry', () => {
     const fiber = await ctx.plugin(Object.assign(
       function demand(sub): void {
         sub.variables.register(sub, [
-          { name: '温度1', type: 'float', title: '炉温' },
-          { name: '计数1', type: 'int' },
+          { device: 'plc1', group: '温度', name: '温度1', type: 'float', title: '炉温' },
+          { device: 'plc1', group: '计数', name: '计数1', type: 'int' },
         ])
       },
       { inject: ['variables'] },
     ))
 
     expect(ctx.variables.list().map(entry => entry.name)).toEqual(['温度1', '计数1'])
-    expect(ctx.variables.list()[0]).toMatchObject({ type: 'float', title: '炉温', source: 'plugin' })
+    expect(ctx.variables.list()[0]).toMatchObject({ device: 'plc1', group: '温度', type: 'float', title: '炉温', source: 'plugin' })
 
     await fiber.dispose()
     expect(ctx.variables.list()).toEqual([])
   })
 
-  it('replaces same-name registrations by identity and emits changes', async () => {
+  it('replaces same-address registrations by identity and emits changes', async () => {
     const ctx = await makeVariables()
     let changes = 0
     ctx.on('variables/changed', () => { changes += 1 })
 
-    const first = ctx.variables.register(ctx, [{ name: '温度1', type: 'float' }])
-    const second = ctx.variables.register(ctx, [{ name: '温度1', type: 'int' }])
-    expect(ctx.variables.list()).toHaveLength(1)
-    expect(ctx.variables.list()[0]?.type).toBe('int')
+    const first = ctx.variables.register(ctx, [{ device: 'plc1', group: '温度', name: '温度1', type: 'float' }])
+    // The same name in another group is a different variable.
+    ctx.variables.register(ctx, [{ device: 'plc1', group: '备用', name: '温度1', type: 'float' }])
+    expect(ctx.variables.list()).toHaveLength(2)
+    // The same address replaces.
+    const second = ctx.variables.register(ctx, [{ device: 'plc1', group: '温度', name: '温度1', type: 'int' }])
+    expect(ctx.variables.list()).toHaveLength(2)
+    expect(ctx.variables.list().find(entry => entry.group === '温度')?.type).toBe('int')
 
-    // The first disposer no longer owns the name: nothing changes.
+    // The first disposer no longer owns the address: nothing changes.
     first()
-    expect(ctx.variables.list()).toHaveLength(1)
+    expect(ctx.variables.list()).toHaveLength(2)
     // The second disposer does.
     second()
-    expect(ctx.variables.list()).toEqual([])
-    expect(changes).toBe(3)
+    expect(ctx.variables.list().map(entry => entry.group)).toEqual(['备用'])
+    expect(changes).toBe(4)
   })
 
-  it('rejects duplicate names within one call', async () => {
+  it('rejects duplicate addresses within one call', async () => {
     const ctx = await makeVariables()
     expect(() => ctx.variables.register(ctx, [
-      { name: 'x', type: 'bool' },
-      { name: 'x', type: 'int' },
-    ])).toThrow(/duplicate names/)
+      { device: 'plc1', group: 'g', name: 'x', type: 'bool' },
+      { device: 'plc1', group: 'g', name: 'x', type: 'int' },
+    ])).toThrow(/duplicate addresses/)
   })
 })
 
 describe('usePoint', () => {
-  /** A minimal field world: one connection with the 温度1 point. */
+  /** A minimal field world: one connection with the group-scoped point. */
   async function makeWorld(): Promise<{ channel: HostChannel, sample: (value: number) => void }> {
     const home = mkdtempSync(join(tmpdir(), 'snap-rail-usepoint-'))
     tempDirs.push(home)
@@ -94,20 +98,20 @@ describe('usePoint', () => {
     await host.plugin(Object.assign(
       function driver(sub): void {
         registration = sub.connections.register(sub, { id: 'c1', driver: 'test', title: 'Test' })
-        registration.setPoints([{ id: '温度1', connection: 'c1', type: 'float' }])
+        registration.setPoints([{ device: 'plc1', group: '温度', name: '温度1', connection: 'c1', type: 'float' }])
       },
       { inject: ['connections'] },
     ))
     return {
       channel: {
-        invoke: request => host.gateway.handleClientRequest(request),
-        openStream: listener => host.gateway.attachDownlink(frame => listener(frame)),
+        invoke: request => host.rpc.handleClientRequest(request),
+        openStream: listener => host.rpc.attachDownlink(frame => listener(frame)),
       },
-      sample: value => registration?.sample('温度1', value),
+      sample: value => registration?.sample({ device: 'plc1', group: '温度', name: '温度1' }, value),
     }
   }
 
-  it('seeds from points.read and follows point/updated increments', async () => {
+  it('seeds from field.points.read and follows field/point-updated increments', async () => {
     const { channel, sample } = await makeWorld()
     const calls: string[] = []
     const client = new Context()
@@ -130,7 +134,7 @@ describe('usePoint', () => {
     // Every render records the hook's current sample.
     const observed: Array<{ value: unknown, time: number } | undefined> = []
     function Hook(): ReactNode {
-      observed.push(usePoint(client, '温度1'))
+      observed.push(usePoint(client, { device: 'plc1', group: '温度', name: '温度1' }))
       return null
     }
     const element = document.createElement('div')
@@ -170,9 +174,9 @@ describe('usePoint', () => {
       element.remove()
       await flush()
     })
-    expect(calls).toContain('points.subscribe')
-    expect(calls).toContain('points.read')
-    expect(calls).toContain('points.unsubscribe')
+    expect(calls).toContain('field.points.subscribe')
+    expect(calls).toContain('field.points.read')
+    expect(calls).toContain('field.points.unsubscribe')
   }, 20_000)
 })
 

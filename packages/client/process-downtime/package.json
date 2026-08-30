@@ -28,6 +28,9 @@
     "react": ">=19"
   },
   "devDependencies": {
+    "@snap-rail/util": "workspace:^",
+    "@snap-rail/station-rpc": "workspace:^",
+    "@snap-rail/util": "workspace:^",
     "@snap-rail/client-session": "workspace:^",
     "@snap-rail/client-slots": "workspace:^",
     "@snap-rail/client-workflows": "workspace:^",

@@ -4,6 +4,9 @@
  * @module @snap-rail/util
  */
 
+export * from './manifest.ts'
+export * from './clock.ts'
+
 /**
  * Nominal-typing primitive: distinguishes values that share an underlying
  * representation (e.g. point ids vs connection ids, both strings) without

@@ -23,7 +23,8 @@
     "@snap-rail/client-settings": "workspace:^",
     "@snap-rail/client-variables": "workspace:^",
     "@snap-rail/client-ui": "workspace:^",
-    "@snap-rail/protocol": "workspace:^"
+    "@snap-rail/driver-modbus": "workspace:^",
+    "@snap-rail/field": "workspace:^"
   },
   "peerDependencies": {
     "@snap-rail/cordis": "workspace:^",

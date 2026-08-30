@@ -1,34 +1,40 @@
 /**
- * The layer administration's gateway bridge: exposes the merged plugin view
+ * The layer administration's rpc bridge: exposes the merged plugin view
  * and the user-layer write operations as wire methods. Every mutation goes
  * through `ctx.pluginLayers`, lands in `plugins.yml`, and hot-applies — the
  * file stays the single interface for UI, Agent, and hand edits alike.
+ * Claims the `plugins` domain; signatures and schemas live in `./contract`.
  *
  * @module @snap-rail/app-boot/rpc
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { RpcBusinessError } from '@snap-rail/protocol'
-import type { PluginInfo, PluginSource } from '@snap-rail/protocol'
 import type { GatewayService } from '@snap-rail/gateway'
 import type { AuditService } from '@snap-rail/audit'
+import { pluginsRequestSchemas, type PluginInfo, type PluginSource } from './contract.ts'
 import { loadBuiltinLayer, loadUserLayer } from './compose.ts'
 import { scanPluginPool } from './scan.ts'
 
-/** The plugin-admin bridge plugin; mount after gateway, audit, and boot. */
+/** The plugin-admin bridge plugin; mount after rpc, audit, and boot. */
 const pluginAdminRpcPlugin: Plugin.Object<void> = {
   name: 'plugins-rpc',
-  inject: ['gateway', 'audit', 'pluginLayers'],
+  inject: ['rpc', 'audit', 'pluginLayers'],
   apply(ctx: Context): void {
-    const gateway: GatewayService = ctx.gateway
+    const rpc: GatewayService = ctx.rpc
     const audit: AuditService = ctx.audit
     const layers = ctx.pluginLayers
 
-    gateway.registerMethod('plugins.list', () => {
+    rpc.claimDomain(ctx, 'plugins')
+
+    rpc.method(ctx, 'plugins.list', { request: pluginsRequestSchemas['plugins.list'] }, () => {
       const builtin = loadBuiltinLayer(layers.handles.builtinLayerPath)
       const user = loadUserLayer(layers.handles.userLayerPath)
       const pool = scanPluginPool(layers.handles.poolDirs)
       const composed = new Map(layers.recompose().map(entry => [entry.id as string, entry]))
+      // Renderer occupants ship with the app (never pool-resident); a user
+      // row can disable or re-config one, and absent rows mean enabled.
+      const userRows = new Map(user.plugins.map(row => [row.name, row]))
 
       const infos: PluginInfo[] = []
       const seen = new Set<string>()
@@ -39,7 +45,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       }
       for (const row of user.plugins) {
         if (seen.has(row.name)) continue
-        if (!pool.has(row.name)) continue
+        if (!pool.has(row.name) && !layers.handles.rendererPackages.includes(row.name)) continue
         seen.add(row.name)
         const live = composed.get(row.name)
         infos.push(toInfo(row.name, 'user', live?.disabled !== true, live?.config))
@@ -48,10 +54,17 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         if (seen.has(name)) continue
         infos.push(toInfo(name, 'pool', false, undefined))
       }
+      // Renderer rows are config-only in the host tree but still the user's
+      // plugins — list them (their enable toggle applies after a restart).
+      for (const name of layers.handles.rendererPackages) {
+        if (seen.has(name)) continue
+        const row = userRows.get(name)
+        infos.push(toInfo(name, 'builtin', row === undefined || row.enabled !== false, row?.config))
+      }
       return { plugins: infos }
     })
 
-    gateway.registerMethod('plugins.setEnabled', async ({ name, enabled }) => {
+    rpc.method(ctx, 'plugins.set-enabled', { request: pluginsRequestSchemas['plugins.set-enabled'] }, async ({ name, enabled }) => {
       await mutate(() => layers.setUserRow(name, { enabled }))
       audit.record({
         actor: 'client',
@@ -61,7 +74,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       return { applied: true } as const
     })
 
-    gateway.registerMethod('plugins.setConfig', async ({ name, config }) => {
+    rpc.method(ctx, 'plugins.set-config', { request: pluginsRequestSchemas['plugins.set-config'] }, async ({ name, config }) => {
       await mutate(() => layers.setUserRow(name, { config }))
       audit.record({
         actor: 'client',

@@ -30,6 +30,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@snap-rail/station-rpc": "workspace:^",
     "@snap-rail/client-session": "workspace:^",
     "@snap-rail/client-slots": "workspace:^",
     "@snap-rail/client-workflows": "workspace:^",

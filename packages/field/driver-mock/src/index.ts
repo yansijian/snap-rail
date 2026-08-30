@@ -1,13 +1,14 @@
 /**
  * The bundled mock field driver: the first provider of the point seam, and
  * the acceptance vehicle for client development. It registers one simulated
- * connection whose points tick on a timer (bool toggles, int counts,
- * float sine wave, string timestamp); `offline: true` pushes `null` samples
+ * connection whose points tick on a timer (bool toggles, int counts, float
+ * sine wave, string timestamp); `offline: true` pushes `null` samples
  * instead. Writes echo back as samples.
  *
- * Point ids are prefixed with the connection id (`<connection>.<tag>`), so
- * two instances never collide in the shared table; duplicate local tags fail
- * config validation at load.
+ * Points are addressed by the seam's (device, group, name) triple: device is
+ * the connection id, names are unique within their group (default `main`),
+ * so two instances never collide in the shared table; duplicate local names
+ * fail config validation at load.
  *
  * @module @snap-rail/driver-mock
  */
@@ -15,20 +16,21 @@
 import { Context, type Plugin } from '@snap-rail/cordis'
 import '@snap-rail/cordis-plugin-timer'
 // Consumer of the field seam: the import pulls in the `ctx.points` /
-// `ctx.connections` declaration merging alongside the runtime service.
+// `ctx.connections` / `ctx.field` declaration merging alongside the runtime
+// service.
 import '@snap-rail/field'
 import { z } from 'zod'
 import {
   ConnectionId,
-  PointId,
-  type PointDescriptor,
   type PointType,
   type PointValue,
-} from '@snap-rail/protocol'
+} from '@snap-rail/field'
 
-/** One mock tag: a local id plus its bus-semantic type. */
+/** One mock tag: a group-scoped name plus its bus-semantic type. */
 export interface MockPointConfig {
-  id: string
+  name: string
+  /** Group the tag lives in; the settings vocabulary's business section. */
+  group: string
   type: PointType
 }
 
@@ -48,12 +50,18 @@ const driverSchema = z.object({
   periodMs: z.number().int().min(10).default(1000),
   points: z.array(
     z.object({
-      id: z.string().min(1),
+      // Address parts reject `/` like every wire schema does — the mock is
+      // a trust boundary too (config comes from plugins.yml), and the seam's
+      // composite key stays unambiguous only if it never sees a slash.
+      name: z.string().min(1).max(128).refine(
+        value => !value.includes('/'), 'mock tag names must not contain "/"'),
+      group: z.string().trim().min(1).max(128).refine(
+        value => !value.includes('/'), 'mock group names must not contain "/"').default('main'),
       type: z.enum(['bool', 'int', 'float', 'string']),
     }),
   ).refine(
-    points => new Set(points.map(point => point.id)).size === points.length,
-    { message: 'mock tags must have unique ids' },
+    points => new Set(points.map(point => `${point.group}/${point.name}`)).size === points.length,
+    { message: 'mock tags must have unique group-scoped names' },
   ),
 }) satisfies z.ZodType<MockDriverConfig>
 
@@ -83,36 +91,44 @@ function makeGenerator(type: PointType): () => Exclude<PointValue, null> {
 /** The mock driver plugin. */
 const mockDriverPlugin: Plugin.Object<MockDriverConfig> = {
   name: 'driver-mock',
-  inject: ['points', 'connections', 'timer'],
+  inject: ['points', 'connections', 'field', 'timer'],
   Config: driverSchema,
   apply(ctx: Context, config: MockDriverConfig): void {
+    ctx.field.registerDriver(ctx, { id: 'mock', title: config.title })
     const connection = ConnectionId(config.connection)
     const registration = ctx.connections.register(ctx, {
       id: connection,
       driver: 'driver-mock',
       title: config.title,
     })
-    registration.setPoints(config.points.map((point): PointDescriptor => ({
-      id: PointId(`${config.connection}.${point.id}`),
+    registration.setPoints(config.points.map((point) => ({
+      device: config.connection,
+      group: point.group,
+      name: point.name,
       connection,
       type: point.type,
     })))
     registration.setStatus(config.offline ? 'offline' : 'online')
 
     if (!config.offline) {
-      registration.setWriteHandler((point, value) => registration.sample(point.id, value))
+      registration.setWriteHandler((point, value) =>
+        registration.sample({ device: point.device, group: point.group, name: point.name }, value))
     }
 
     const generators = new Map(config.points.map(point => [
-      PointId(`${config.connection}.${point.id}`),
+      point,
       makeGenerator(point.type),
     ]))
     ctx.interval(() => {
       if (config.offline) {
-        for (const id of generators.keys()) registration.sample(id, null)
+        for (const point of generators.keys()) {
+          registration.sample({ device: config.connection, group: point.group, name: point.name }, null)
+        }
         return
       }
-      for (const [id, next] of generators) registration.sample(id, next())
+      for (const [point, next] of generators) {
+        registration.sample({ device: config.connection, group: point.group, name: point.name }, next())
+      }
     }, config.periodMs)
   },
 }

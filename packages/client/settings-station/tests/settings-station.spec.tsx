@@ -64,8 +64,8 @@ async function makeWorld(): Promise<HostChannel> {
   await host.plugin(stationRpcPlugin)
   await host.plugin(pluginsRpcPlugin)
   return {
-    invoke: request => host.gateway.handleClientRequest(request),
-    openStream: listener => host.gateway.attachDownlink(frame => listener(frame)),
+    invoke: request => host.rpc.handleClientRequest(request),
+    openStream: listener => host.rpc.attachDownlink(frame => listener(frame)),
   }
 }
 
@@ -112,7 +112,7 @@ describe('settings dialog', () => {
     expect(enable.getAttribute('data-state')).toBe('checked')
     enable.click()
     await flush()
-    expect(calls).toContain('plugins.setEnabled')
+    expect(calls).toContain('plugins.set-enabled')
 
     document.querySelector<HTMLButtonElement>('button[aria-label="关闭设置"]')!.click()
     await flush()

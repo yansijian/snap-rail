@@ -16,6 +16,8 @@
   ],
   "references": [
     { "path": "../../../vendor/cordis" },
+    { "path": "../../field/field" },
+    { "path": "../../boot/app-boot" },
     { "path": "../settings" },
     { "path": "../runtime" },
     { "path": "../ui" }

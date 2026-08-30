@@ -13,6 +13,9 @@
     },
     {
       "path": "../../protocol/connection"
+    },
+    {
+      "path": "../../boot/station-rpc"
     }
   ]
 }

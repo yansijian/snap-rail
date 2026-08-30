@@ -20,6 +20,13 @@
   name: '@snap-rail/app-boot/rpc'
 - id: station-rpc
   name: '@snap-rail/station-rpc'
+# 班产统计: counts the bound output point into three 8-hour shift buckets
+# (snap-rail.db), anchored at login time; the production page is a pure
+# projection over its production/stats-changed frame.
+- id: production-stats
+  name: '@snap-rail/production-stats'
+  config:
+    flushMs: 1000
 # ModbusTCP: devices live in the driver's store tables and are edited from
 # the settings dialog (modbus-station); the driver mounts with an empty
 # table and reconciles on modbus/config-changed.
@@ -36,11 +43,15 @@
     title: Demo simulator
     periodMs: 500
     points:
-      - id: temperature
+      - name: temperature
+        group: main
         type: float
-      - id: counter
+      - name: counter
+        group: main
         type: int
-      - id: running
+      - name: running
+        group: main
         type: bool
-      - id: device
+      - name: device
+        group: main
         type: string

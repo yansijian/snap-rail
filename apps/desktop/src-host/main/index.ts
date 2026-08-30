@@ -11,6 +11,8 @@ import { app, BrowserWindow } from 'electron'
 import { boot } from '@snap-rail/app-boot'
 import type { Context } from '@snap-rail/cordis'
 import carrierPlugin from './carrier.ts'
+import windowRpcPlugin from './window-rpc.ts'
+import { RENDERER_PACKAGES } from './renderer-packages.ts'
 
 /**
  * The built-in layer ships inside the app directory (packed with the app in
@@ -20,19 +22,6 @@ import carrierPlugin from './carrier.ts'
 function builtinLayerPath(): string {
   return join(app.getAppPath(), 'resources', 'builtins.cordis.yml')
 }
-
-/** Renderer occupant packages: their plugins.yml rows are config-only (client-config.list). */
-const RENDERER_PACKAGES: readonly string[] = [
-  '@snap-rail/layout-station',
-  '@snap-rail/chrome-titlebar',
-  '@snap-rail/process-maintenance',
-  '@snap-rail/process-production',
-  '@snap-rail/process-sampling',
-  '@snap-rail/process-fault',
-  '@snap-rail/process-downtime',
-  '@snap-rail/settings-station',
-  '@snap-rail/modbus-station',
-]
 
 async function start(): Promise<void> {
   await app.whenReady()
@@ -49,6 +38,7 @@ async function start(): Promise<void> {
     prepare: prepared => {
       // Mounts immediately; activates once the gateway mounts in the tree.
       void prepared.plugin(carrierPlugin)
+      void prepared.plugin(windowRpcPlugin)
     },
   })
 

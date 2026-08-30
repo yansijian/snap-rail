@@ -74,6 +74,7 @@ export type RpcResult<T> = { ok: true, value: T } | { ok: false, error: RpcError
 export interface RpcErrorDetailsMap {
   'bad-request': { issues: readonly string[] }
   'not-found': { what: string }
+  'conflict': { what: string }
   'unavailable': { what: string }
   'internal': { hint?: string }
 }

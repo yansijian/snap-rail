@@ -20,6 +20,7 @@ import modbusStationPlugin from '@snap-rail/modbus-station'
 import layoutPlugin from '@snap-rail/layout-station'
 import { createClientRuntime, type OccupantSpec } from '@snap-rail/client-runtime'
 import type { Plugin } from '@snap-rail/cordis'
+import { RENDERER_PACKAGES } from '../../src-host/main/renderer-packages.ts'
 
 const element = document.getElementById('root')
 if (element === null) throw new Error('client: #root is missing from index.html')
@@ -45,6 +46,18 @@ const OCCUPANTS: ReadonlyArray<{ name: string, plugin: Plugin }> = [
   { name: '@snap-rail/settings-station', plugin: settingsStationPlugin },
   { name: '@snap-rail/modbus-station', plugin: modbusStationPlugin },
 ]
+
+// The pairing must cover the shipped manifest exactly — a drifted list
+// (a name here but not in the manifest, or vice versa) fails loud at boot
+// instead of silently dropping a page or its config row.
+{
+  const paired = new Set(OCCUPANTS.map(seat => seat.name))
+  const missing = RENDERER_PACKAGES.filter(name => !paired.has(name))
+  const extra = [...paired].filter(name => !RENDERER_PACKAGES.includes(name))
+  if (missing.length > 0 || extra.length > 0) {
+    throw new Error(`client: renderer manifest mismatch (missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`)
+  }
+}
 
 const seats: (Plugin | OccupantSpec)[] = []
 for (const seat of OCCUPANTS) {

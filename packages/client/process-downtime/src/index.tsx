@@ -8,9 +8,12 @@
  * @module @snap-rail/process-downtime
  */
 
+import { formatClock, formatDuration } from '@snap-rail/util'
 import { Context, type Plugin } from '@snap-rail/cordis'
 // Side-effect: pulls in the timer augmentation (`ctx.interval`).
 import '@snap-rail/cordis-plugin-timer'
+// Wire rows for the station-domain methods this resident calls.
+import '@snap-rail/station-rpc/contract'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@snap-rail/client-ui'
 import '@snap-rail/client-slots'
@@ -60,20 +63,6 @@ export function deriveDowntimes(events: readonly { action: string, time: number,
 interface DowntimeController {
   state: { records: DowntimeRecord[], openIndex: number }
   refresh(): Promise<void>
-}
-
-function formatClock(time: number): string {
-  return new Date(time).toLocaleTimeString('zh-CN', { hour12: false })
-}
-
-function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000))
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
-  const seconds = total % 60
-  if (hours > 0) return `${hours}时${minutes}分`
-  if (minutes > 0) return `${minutes}分${seconds}秒`
-  return `${seconds}秒`
 }
 
 function DowntimePage(props: { ctx: Context, controller: DowntimeController }): ReactNode {

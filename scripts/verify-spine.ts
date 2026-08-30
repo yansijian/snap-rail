@@ -2,47 +2,19 @@
  * Spine-independence gate: the spine (framework, boot, protocol, field seam,
  * client kernel/slots/runtime) must never import an occupant (UI residents,
  * drivers, the app assembly). Occupants extend the spine; the reverse edge
- * means the seam leaked. Run via `pnpm run verify:spine`.
+ * means the seam leaked. The package lists live in the util manifest — the
+ * single source shared with the docs. Run via `pnpm run verify:spine`.
  */
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { OCCUPANT_PACKAGES, SPINE_PACKAGE_DIRS } from '../packages/util/util/src/manifest.ts'
 
 const root = join(import.meta.dirname, '..')
 
-const spinePackages = [
-  'vendor/*',
-  'packages/util/util',
-  'packages/settings/settings',
-  'packages/store/store',
-  'packages/audit/audit',
-  'packages/boot/app-boot',
-  'packages/boot/station-rpc',
-  'packages/protocol/*',
-  'packages/field/field',
-  'packages/client/ui',
-  'packages/client/kernel',
-  'packages/client/slots',
-  'packages/client/settings',
-  'packages/client/variables',
-  'packages/client/session',
-  'packages/client/workflows',
-  'packages/client/runtime',
-]
+const spinePackages = SPINE_PACKAGE_DIRS
 
-const occupantNames = new Set([
-  '@snap-rail/layout-station',
-  '@snap-rail/chrome-titlebar',
-  '@snap-rail/settings-station',
-  '@snap-rail/modbus-station',
-  '@snap-rail/process-maintenance',
-  '@snap-rail/process-production',
-  '@snap-rail/process-sampling',
-  '@snap-rail/process-fault',
-  '@snap-rail/process-downtime',
-  '@snap-rail/driver-mock',
-  '@snap-rail/driver-modbus',
-])
+const occupantNames = new Set(OCCUPANT_PACKAGES)
 
 /** Expand one glob-ish package dir into its package name from the manifest. */
 function resolveName(dir: string): string | undefined {
@@ -84,18 +56,37 @@ function walk(dir: string): string[] {
   return files
 }
 
-const importPattern = /(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\s*['"]([^'"]+)['"]/g
+const importPattern = /(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)|require\(\s*['"]([^'"]+)['"]\s*\)/g
 
 const violations: string[] = []
 let scanned = 0
 
+/** A spine package's manifest must not depend on an occupant either — the
+ * edge would leak even without a literal import (types, bundlers, drift). */
+function checkManifest(dir: string): void {
+  let manifest: { dependencies?: Record<string, unknown>, peerDependencies?: Record<string, unknown> }
+  try {
+    manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
+  } catch {
+    return
+  }
+  for (const field of ['dependencies', 'peerDependencies'] as const) {
+    for (const name of Object.keys(manifest[field] ?? {})) {
+      if (occupantNames.has(name)) {
+        violations.push(`${join(dir, 'package.json')}: ${field} includes occupant ${name}`)
+      }
+    }
+  }
+}
+
 for (const pattern of spinePackages) {
   for (const dir of expand(pattern)) {
+    checkManifest(dir)
     for (const file of walk(dir)) {
       scanned += 1
       const source = readFileSync(file, 'utf8')
       for (const match of source.matchAll(importPattern)) {
-        const specifier = match[1] ?? match[2]
+        const specifier = match[1] ?? match[2] ?? match[3] ?? match[4]
         if (specifier === undefined) continue
         // Occupant packages, their subpaths, or a relative hop into apps/.
         if (occupantNames.has(specifier) || [...occupantNames].some(name => specifier.startsWith(`${name}/`))) {

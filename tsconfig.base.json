@@ -43,6 +43,7 @@
       "@snap-rail/audit": ["./packages/audit/audit/src"],
       "@snap-rail/app-boot": ["./packages/boot/app-boot/src"],
       "@snap-rail/app-boot/rpc": ["./packages/boot/app-boot/src/rpc.ts"],
+      "@snap-rail/app-boot/contract": ["./packages/boot/app-boot/src/contract.ts"],
       "@snap-rail/protocol": ["./packages/protocol/protocol/src"],
       "@snap-rail/gateway": ["./packages/protocol/gateway/src"],
       "@snap-rail/connection": ["./packages/protocol/connection/src"],
@@ -69,7 +70,10 @@
       "@snap-rail/process-sampling": ["./packages/client/process-sampling/src"],
       "@snap-rail/process-fault": ["./packages/client/process-fault/src"],
       "@snap-rail/process-downtime": ["./packages/client/process-downtime/src"],
-      "@snap-rail/station-rpc": ["./packages/boot/station-rpc/src"]
+      "@snap-rail/station-rpc": ["./packages/boot/station-rpc/src"],
+      "@snap-rail/station-rpc/contract": ["./packages/boot/station-rpc/src/contract.ts"],
+      "@snap-rail/production-stats": ["./packages/production/stats/src"],
+      "@snap-rail/production-stats/contract": ["./packages/production/stats/src/contract.ts"]
     }
   }
 }

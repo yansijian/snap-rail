@@ -28,6 +28,7 @@
     "react": ">=19"
   },
   "devDependencies": {
+    "@snap-rail/app-boot": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@types/react": "^19.2.14",
     "lucide-react": "^1.34.0",

@@ -19,6 +19,9 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../field/field"
+    },
+    {
       "path": "../slots"
     },
     {

@@ -71,7 +71,7 @@ async function makeWorld(builtinRows?: string[]): Promise<World> {
   const world: World = {
     ctx,
     layers: ctx.pluginLayers,
-    client: new InProcessApiClient(request => ctx.gateway.handleClientRequest(request)),
+    client: new InProcessApiClient(request => ctx.rpc.handleClientRequest(request)),
     home,
     userPath: join(home, 'plugins.yml'),
     builtinPath,
@@ -91,7 +91,7 @@ describe('plugin layers admin', () => {
     const world = await makeWorld()
     expect(world.ctx.get('timer')).toBeDefined()
 
-    const off = await world.client.call('plugins.setEnabled', { name: '@snap-rail/cordis-plugin-timer', enabled: false })
+    const off = await world.client.call('plugins.set-enabled', { name: '@snap-rail/cordis-plugin-timer', enabled: false })
     expect(off).toEqual({ ok: true, value: { applied: true } })
     expect(world.ctx.get('timer')).toBeUndefined()
 
@@ -99,7 +99,7 @@ describe('plugin layers admin', () => {
     expect(userLayer).toContain("'@snap-rail/cordis-plugin-timer'")
     expect(userLayer).toContain('enabled: false')
 
-    const on = await world.client.call('plugins.setEnabled', { name: '@snap-rail/cordis-plugin-timer', enabled: true })
+    const on = await world.client.call('plugins.set-enabled', { name: '@snap-rail/cordis-plugin-timer', enabled: true })
     expect(on.ok).toBe(true)
     expect(world.ctx.get('timer')).toBeDefined()
   })
@@ -118,7 +118,7 @@ describe('plugin layers admin', () => {
 
   it('replaces a config through setConfig and hot-applies it', async () => {
     const world = await makeWorld()
-    const result = await world.client.call('plugins.setConfig', {
+    const result = await world.client.call('plugins.set-config', {
       name: '@snap-rail/gateway',
       config: { name: 'renamed', version: '2.0.0', bin: 'test' },
     })
@@ -162,8 +162,8 @@ describe('plugin layers admin', () => {
 
   it('audits enable and config mutations', async () => {
     const world = await makeWorld()
-    await world.client.call('plugins.setEnabled', { name: '@snap-rail/settings', enabled: false })
-    await world.client.call('plugins.setConfig', {
+    await world.client.call('plugins.set-enabled', { name: '@snap-rail/settings', enabled: false })
+    await world.client.call('plugins.set-config', {
       name: '@snap-rail/settings',
       config: {},
     })

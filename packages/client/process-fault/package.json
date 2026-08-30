@@ -20,7 +20,8 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@snap-rail/client-runtime": "workspace:^",
-    "@snap-rail/client-ui": "workspace:^"
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/client-variables": "workspace:^"
   },
   "peerDependencies": {
     "@snap-rail/cordis": "workspace:^",
@@ -28,6 +29,9 @@
     "react": ">=19"
   },
   "devDependencies": {
+    "@snap-rail/util": "workspace:^",
+    "@snap-rail/station-rpc": "workspace:^",
+    "@snap-rail/util": "workspace:^",
     "@snap-rail/client-session": "workspace:^",
     "@snap-rail/client-slots": "workspace:^",
     "@snap-rail/client-workflows": "workspace:^",
@@ -35,6 +39,7 @@
     "@snap-rail/cordis-plugin-timer": "workspace:^",
     "@types/react": "^19.2.14",
     "lucide-react": "^1.34.0",
-    "react": "^19.2.8"
+    "react": "^19.2.8",
+    "zod": "^4.4.3"
   }
 }

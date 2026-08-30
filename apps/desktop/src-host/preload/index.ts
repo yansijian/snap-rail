@@ -25,7 +25,14 @@ function acquire(): void {
       if (port === undefined) return
       streamPort = port
       port.addEventListener('message', e => {
-        for (const listener of listeners) listener((e as MessageEvent).data)
+        for (const listener of listeners) {
+          try {
+            listener((e as MessageEvent).data)
+          } catch {
+            // One throwing listener (e.g. its frame parser rejecting a
+            // malformed frame) must not starve the listeners after it.
+          }
+        }
       })
       // addEventListener does not implicitly start the port (only the
       // onmessage setter does); without this no frame ever arrives.

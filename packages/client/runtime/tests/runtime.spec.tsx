@@ -47,8 +47,8 @@ async function makeWorld(): Promise<HostChannel> {
   } as never)
   await host.plugin(stationRpcPlugin)
   return {
-    invoke: request => host.gateway.handleClientRequest(request),
-    openStream: listener => host.gateway.attachDownlink(frame => listener(frame)),
+    invoke: request => host.rpc.handleClientRequest(request),
+    openStream: listener => host.rpc.attachDownlink(frame => listener(frame)),
   }
 }
 
@@ -87,6 +87,7 @@ async function loginAs(id: string): Promise<void> {
   login!.click()
   await flush(20)
 }
+
 
 describe('station assembly', () => {
   it('shows the login page first and the workflow rail after sign-on', async () => {
@@ -152,6 +153,29 @@ describe('station assembly', () => {
     expect(workflowItem('production')?.getAttribute('aria-disabled')).toBeNull()
     // Sampling stays locked until production starts today.
     expect(workflowItem('sampling')?.getAttribute('aria-disabled')).toBe('true')
+
+    // Done: each card keeps only the outcome the operator chose.
+    expect(pageButtons('完成维护').length).toBe(4)
+    expect(pageButtons('异常').length).toBe(1)
+    expect([...pageButtons('完成维护'), ...pageButtons('异常')].every(button => button.disabled)).toBe(true)
+
+    // 重新维护 re-opens the checklist: both options back, nothing answered.
+    pageButtons('重新维护')[0]!.click()
+    await flush()
+    expect(document.body.textContent).not.toContain('今日自主维护已完成')
+    expect(pageButtons('完成维护').length).toBe(5)
+    expect(pageButtons('异常').length).toBe(5)
+    expect(complete()?.disabled).toBe(true)
+
+    // A second pass completes again and production stays unlocked.
+    for (const button of pageButtons('完成维护')) button.click()
+    await flush()
+    expect(complete()?.disabled).toBe(false)
+    complete()!.click()
+    await flush(20)
+    expect(document.body.textContent).toContain('今日自主维护已完成')
+    expect(pageButtons('完成维护').length).toBe(5)
+    expect(workflowItem('production')?.getAttribute('aria-disabled')).toBeNull()
 
     await runtime.dispose()
     element.remove()

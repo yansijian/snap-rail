@@ -56,6 +56,10 @@ function snapRailSources(): Plugin {
   sourceOf.set('@snap-rail/client-ui/theme.css', `${repoRoot}/packages/client/ui/src/theme.css`)
   sourceOf.set('@snap-rail/field/rpc', `${repoRoot}/packages/field/field/src/rpc.ts`)
   sourceOf.set('@snap-rail/field', `${repoRoot}/packages/field/field/src/index.ts`)
+  // The renderer only ever touches the stats plugin's pure contract subpath —
+  // the plugin entry itself is host-side (node:sqlite) and stays out of the
+  // client bundle.
+  sourceOf.set('@snap-rail/production-stats/contract', `${repoRoot}/packages/production/stats/src/contract.ts`)
 
   return {
     name: 'snap-rail-source-plane',

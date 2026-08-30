@@ -19,6 +19,15 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../field/field"
+    },
+    {
+      "path": "../../util/util"
+    },
+    {
+      "path": "../../boot/station-rpc"
+    },
+    {
       "path": "../../../vendor/timer"
     },
     {

@@ -24,6 +24,7 @@
     { "path": "./packages/audit/audit" },
     { "path": "./packages/boot/app-boot" },
     { "path": "./packages/boot/station-rpc" },
+    { "path": "./packages/production/stats" },
     { "path": "./packages/protocol/protocol" },
     { "path": "./packages/protocol/gateway" },
     { "path": "./packages/protocol/connection" },

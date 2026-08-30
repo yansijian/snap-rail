@@ -37,7 +37,7 @@ async function makeWorld(rendererPackages: readonly string[] = []): Promise<Test
     handles: { userLayerPath, rendererPackages },
   } as never)
   await host.plugin(stationRpcPlugin)
-  return { home, client: new InProcessApiClient(request => host.gateway.handleClientRequest(request)) }
+  return { home, client: new InProcessApiClient(request => host.rpc.handleClientRequest(request)) }
 }
 
 describe('station-rpc', () => {
@@ -118,7 +118,7 @@ describe('station-rpc', () => {
     } as never)
     await host.plugin(stationRpcPlugin)
 
-    const client = new InProcessApiClient(request => host.gateway.handleClientRequest(request))
+    const client = new InProcessApiClient(request => host.rpc.handleClientRequest(request))
     const rows = await client.call('client-config.list', {})
     expect(rows.ok && rows.value.rows).toEqual([
       { name: '@snap-rail/process-sampling', enabled: true, config: { schedule: '*/20 * * * *' } },

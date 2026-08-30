@@ -1,6 +1,5 @@
 import { Context } from '@snap-rail/cordis'
-import { ConnectionId, PointId } from '@snap-rail/protocol'
-import type { PointDescriptor, PointType } from '@snap-rail/protocol'
+import { ConnectionId, pointKey, type PointDescriptor, type PointRef, type PointType } from '@snap-rail/field'
 import { afterEach, describe, expect, it } from 'vitest'
 import fieldPlugin, { FieldError } from '../src/index.ts'
 
@@ -17,8 +16,12 @@ async function makeField(): Promise<Context> {
   return ctx
 }
 
-function descriptor(connection: string, id: string, type: PointType = 'float'): PointDescriptor {
-  return { id: PointId(id), connection: ConnectionId(connection), type }
+function descriptor(connection: string, name: string, type: PointType = 'float', group = 'main'): PointDescriptor {
+  return { device: connection, group, name, connection: ConnectionId(connection), type }
+}
+
+function ref(device: string, name: string, group = 'main'): PointRef {
+  return { device, group, name }
 }
 
 describe('field seam', () => {
@@ -26,23 +29,23 @@ describe('field seam', () => {
     const ctx = await makeField()
     const added: string[] = []
     const removed: string[] = []
-    ctx.on('point/added', point => added.push(point.id))
-    ctx.on('point/removed', id => removed.push(id))
+    ctx.on('point/added', point => added.push(pointKey(point)))
+    ctx.on('point/removed', point => removed.push(pointKey(point)))
 
     const registration = ctx.connections.register(ctx, { id: ConnectionId('conn-a'), driver: 'test', title: 'A' })
     registration.setPoints([
-      descriptor('conn-a', 'a.one'),
-      descriptor('conn-a', 'a.two'),
+      descriptor('conn-a', 'one'),
+      descriptor('conn-a', 'two'),
     ])
-    expect(added).toEqual(['a.one', 'a.two'])
+    expect(added).toEqual(['conn-a/main/one', 'conn-a/main/two'])
 
     registration.setPoints([
-      descriptor('conn-a', 'a.two'),
-      descriptor('conn-a', 'a.three'),
+      descriptor('conn-a', 'two'),
+      descriptor('conn-a', 'three'),
     ])
-    expect(added).toEqual(['a.one', 'a.two', 'a.three'])
-    expect(removed).toEqual(['a.one'])
-    expect(ctx.points.list().map(point => point.id)).toEqual(['a.two', 'a.three'])
+    expect(added).toEqual(['conn-a/main/one', 'conn-a/main/two', 'conn-a/main/three'])
+    expect(removed).toEqual(['conn-a/main/one'])
+    expect(ctx.points.list().map(point => pointKey(point))).toEqual(['conn-a/main/two', 'conn-a/main/three'])
   })
 
   it('rejects duplicate connections and cross-owner points without partial state', async () => {
@@ -58,39 +61,43 @@ describe('field seam', () => {
     }
 
     const second = ctx.connections.register(ctx, { id: ConnectionId('conn-b'), driver: 'test', title: 'B' })
-    expect(() => second.setPoints([descriptor('conn-b', 'mine'), descriptor('conn-b', 'shared')]))
-      .toThrow(/already registered/)
+    // The same address claimed through another connection: conn-b declares a
+    // point on device conn-a, which conn-a already owns.
+    expect(() => second.setPoints([
+      descriptor('conn-b', 'mine'),
+      { device: 'conn-a', group: 'main', name: 'shared', connection: ConnectionId('conn-b'), type: 'float' },
+    ])).toThrow(/already registered/)
     // The rejected call mutated nothing.
-    expect(ctx.points.list().map(point => point.id)).toEqual(['shared'])
+    expect(ctx.points.list().map(point => pointKey(point))).toEqual(['conn-a/main/shared'])
   })
 
   it('moves samples through read and rejects unknown sampling', async () => {
     const ctx = await makeField()
     const registration = ctx.connections.register(ctx, { id: ConnectionId('conn-a'), driver: 'test', title: 'A' })
-    registration.setPoints([descriptor('conn-a', 'a.one')])
+    registration.setPoints([descriptor('conn-a', 'one')])
 
-    expect(ctx.points.read(PointId('a.one'))).toBeUndefined()
-    registration.sample(PointId('a.one'), 12.5)
-    expect(ctx.points.read(PointId('a.one'))?.value).toBe(12.5)
+    expect(ctx.points.read(ref('conn-a', 'one'))).toBeUndefined()
+    registration.sample(ref('conn-a', 'one'), 12.5)
+    expect(ctx.points.read(ref('conn-a', 'one'))?.value).toBe(12.5)
 
-    expect(() => registration.sample(PointId('a.ghost'), 1))
+    expect(() => registration.sample(ref('conn-a', 'ghost'), 1))
       .toThrow(FieldError)
-    expect(ctx.points.read(PointId('a.ghost'))).toBeUndefined()
+    expect(ctx.points.read(ref('conn-a', 'ghost'))).toBeUndefined()
   })
 
   it('routes writes to the owner with type checks and handler lifecycle', async () => {
     const ctx = await makeField()
     try {
-      await ctx.points.write(PointId('nowhere'), 1n)
+      await ctx.points.write(ref('nowhere', 'x'), 1n)
       expect.unreachable()
     } catch (cause) {
       expect((cause as FieldError).kind).toBe('unknown-point')
     }
 
     const readOnly = ctx.connections.register(ctx, { id: ConnectionId('ro'), driver: 'test', title: 'RO' })
-    readOnly.setPoints([descriptor('ro', 'ro.tag', 'string')])
+    readOnly.setPoints([descriptor('ro', 'tag', 'string')])
     try {
-      await ctx.points.write(PointId('ro.tag'), 'x')
+      await ctx.points.write(ref('ro', 'tag'), 'x')
       expect.unreachable()
     } catch (cause) {
       expect((cause as FieldError).kind).toBe('no-write-handler')
@@ -98,17 +105,17 @@ describe('field seam', () => {
 
     const received: Array<[PointDescriptor, string]> = []
     const writable = ctx.connections.register(ctx, { id: ConnectionId('rw'), driver: 'test', title: 'RW' })
-    writable.setPoints([descriptor('rw', 'rw.tag', 'string')])
+    writable.setPoints([descriptor('rw', 'tag', 'string')])
     writable.setWriteHandler((point, value) => {
       received.push([point, value])
     })
 
-    await ctx.points.write(PointId('rw.tag'), 'open')
-    expect(received).toEqual([[{ id: PointId('rw.tag'), connection: ConnectionId('rw'), type: 'string' }, 'open']])
+    await ctx.points.write(ref('rw', 'tag'), 'open')
+    expect(received).toEqual([[descriptor('rw', 'tag', 'string'), 'open']])
 
     for (const bad of [true, 3n]) {
       try {
-        await ctx.points.write(PointId('rw.tag'), bad as never)
+        await ctx.points.write(ref('rw', 'tag'), bad as never)
         expect.unreachable()
       } catch (cause) {
         expect((cause as FieldError).kind).toBe('type-mismatch')
@@ -119,17 +126,17 @@ describe('field seam', () => {
   it('keeps BigInt values lossless through subscription filtering', async () => {
     const ctx = await makeField()
     const seen: unknown[] = []
-    const unsubscribe = ctx.points.subscribe([PointId('big.tag')], sample => seen.push(sample.value))
+    const unsubscribe = ctx.points.subscribe([ref('conn-a', 'big')], sample => seen.push(sample.value))
 
     const registration = ctx.connections.register(ctx, { id: ConnectionId('conn-a'), driver: 'test', title: 'A' })
     registration.setPoints([
-      descriptor('conn-a', 'big.tag', 'int'),
-      descriptor('conn-a', 'side.tag'),
+      descriptor('conn-a', 'big', 'int'),
+      descriptor('conn-a', 'side'),
     ])
     const huge = 9_007_199_254_740_993n
-    registration.sample(PointId('side.tag'), 1.5)
-    registration.sample(PointId('big.tag'), huge)
-    registration.sample(PointId('big.tag'), huge + 2n)
+    registration.sample(ref('conn-a', 'side'), 1.5)
+    registration.sample(ref('conn-a', 'big'), huge)
+    registration.sample(ref('conn-a', 'big'), huge + 2n)
 
     await new Promise(resolve => setTimeout(resolve, 0))
     unsubscribe()
@@ -159,15 +166,15 @@ describe('field seam', () => {
     const ctx = await makeField()
     const removed: string[] = []
     let connectionRemoved: string | undefined
-    ctx.on('point/removed', id => removed.push(id))
+    ctx.on('point/removed', point => removed.push(pointKey(point)))
     ctx.on('connection/removed', id => { connectionRemoved = id })
 
     const mockDriver = Object.assign(
       function mockDriver(sub: Context): void {
         const registration = sub.connections.register(sub, { id: ConnectionId('drip'), driver: 'test', title: 'D' })
         registration.setPoints([
-          descriptor('drip', 'drip.one'),
-          descriptor('drip', 'drip.two'),
+          descriptor('drip', 'one'),
+          descriptor('drip', 'two'),
         ])
       },
       { inject: ["connections"] },
@@ -182,7 +189,7 @@ describe('field seam', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     fiber.dispose()
 
-    expect(removed.sort()).toEqual(['drip.one', 'drip.two'])
+    expect(removed.sort()).toEqual(['drip/main/one', 'drip/main/two'])
     expect(connectionRemoved).toBe(ConnectionId('drip'))
     expect(ctx.connections.list()).toEqual([])
     expect(ctx.points.list()).toEqual([])

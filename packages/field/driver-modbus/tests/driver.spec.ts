@@ -5,7 +5,7 @@ import * as net from 'node:net'
 import { Context } from '@snap-rail/cordis'
 import timerPlugin from '@snap-rail/cordis-plugin-timer'
 import fieldPlugin, { type ConnectionRegistration } from '@snap-rail/field'
-import { PointId, type ConnectionSnapshot, type PointSample } from '@snap-rail/protocol'
+import { pointKey, type ConnectionSnapshot, type PointRef, type PointSample } from '@snap-rail/field'
 import modbusSerial, { type ServerTCP as ServerTCPType } from 'modbus-serial'
 import { afterEach, describe, expect, it } from 'vitest'
 import driverPlugin from '../src/index.ts'
@@ -87,6 +87,10 @@ interface World {
   statuses: ConnectionSnapshot[]
 }
 
+const tempRef: PointRef = { device: 'plc1', group: '温度', name: '温度1' }
+const countRef: PointRef = { device: 'plc1', group: '计数', name: '计数1' }
+const switchRef: PointRef = { device: 'plc1', group: '开关', name: '开关1' }
+
 async function makeWorld(plc: FakePlc): Promise<World> {
   const home = mkdtempSync(join(tmpdir(), 'snap-rail-driver-modbus-'))
   const ctx = new Context()
@@ -99,7 +103,7 @@ async function makeWorld(plc: FakePlc): Promise<World> {
   const store = ctx.store.register(ctx, 'driver_modbus', MODBUS_TABLES)
   const samples: PointSample[] = []
   const statuses: ConnectionSnapshot[] = []
-  ctx.points.subscribe([PointId('温度1'), PointId('计数1'), PointId('开关1')], sample => samples.push(sample))
+  ctx.points.subscribe([tempRef, countRef, switchRef], sample => samples.push(sample))
   ctx.connections.subscribeStatus(frame => statuses.push({ id: frame.id, status: frame.status, time: frame.time, driver: 'driver-modbus', title: frame.id }))
   return { ctx, plc, store, samples, statuses }
 }
@@ -119,17 +123,21 @@ function seedDevice(store: World['store'], port: number): void {
     + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     ['plc1', '1号炉', '127.0.0.1', port, 1, 60, 250, 1],
   )
+  const groups = store.table('groups')
+  store.run(`INSERT INTO ${groups} (device_id, name, type) VALUES (?, ?, ?)`, ['plc1', '温度', 'float'])
+  store.run(`INSERT INTO ${groups} (device_id, name, type) VALUES (?, ?, ?)`, ['plc1', '计数', 'int'])
+  store.run(`INSERT INTO ${groups} (device_id, name, type) VALUES (?, ?, ?)`, ['plc1', '开关', 'bool'])
   const points = store.table('points')
-  store.run(`INSERT INTO ${points} (var, device_id, type, fc, address, encoding, byte_order, scale, writable, deadband) `
-    + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ['温度1', 'plc1', 'float', 3, 100, 'f32', 'abcd', 0.1, 0, null])
-  store.run(`INSERT INTO ${points} (var, device_id, type, fc, address, encoding, byte_order, scale, writable, deadband) `
-    + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ['计数1', 'plc1', 'int', 3, 104, 'u32', 'abcd', null, 0, null])
-  store.run(`INSERT INTO ${points} (var, device_id, type, fc, address, encoding, byte_order, scale, writable, deadband) `
-    + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ['开关1', 'plc1', 'bool', 1, 10, 'coil', 'abcd', null, 1, null])
+  store.run(`INSERT INTO ${points} (var, device_id, type, fc, address, encoding, scale, writable, deadband, group_name) `
+    + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ['温度1', 'plc1', 'float', 3, 100, 'f32', 0.1, 0, null, '温度'])
+  store.run(`INSERT INTO ${points} (var, device_id, type, fc, address, encoding, scale, writable, deadband, group_name) `
+    + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ['计数1', 'plc1', 'int', 3, 104, 'u32', null, 0, null, '计数'])
+  store.run(`INSERT INTO ${points} (var, device_id, type, fc, address, encoding, scale, writable, deadband, group_name) `
+    + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', ['开关1', 'plc1', 'bool', 1, 10, 'coil', null, 1, null, '开关'])
 }
 
-function latestSample(samples: PointSample[], id: string): PointSample | undefined {
-  return [...samples].reverse().find(sample => sample.id === id)
+function latestSample(samples: PointSample[], ref: PointRef): PointSample | undefined {
+  return [...samples].reverse().find(sample => pointKey(sample) === pointKey(ref))
 }
 
 describe('driver-modbus over a fake PLC', () => {
@@ -146,10 +154,10 @@ describe('driver-modbus over a fake PLC', () => {
     world.ctx.emit('modbus/config-changed')
 
     await waitFor(() => world.statuses.some(frame => frame.id === 'plc1' && frame.status === 'online'), 'online')
-    const temperature = latestSample(world.samples, '温度1')
+    const temperature = latestSample(world.samples, tempRef)
     expect(temperature?.value).toBeCloseTo(10)
-    expect(latestSample(world.samples, '计数1')?.value).toBe(7n)
-    expect(latestSample(world.samples, '开关1')?.value).toBe(false)
+    expect(latestSample(world.samples, countRef)?.value).toBe(7n)
+    expect(latestSample(world.samples, switchRef)?.value).toBe(false)
   }, 15_000)
 
   it('reports only on change', async () => {
@@ -160,17 +168,17 @@ describe('driver-modbus over a fake PLC', () => {
     const world = await makeWorld(plc)
     seedDevice(world.store, plc.port)
     world.ctx.emit('modbus/config-changed')
-    await waitFor(() => latestSample(world.samples, '计数1')?.value === 7n, 'first count')
+    await waitFor(() => latestSample(world.samples, countRef)?.value === 7n, 'first count')
 
     // Several quiet polls: no new 计数1 frames.
     await new Promise(resolve => setTimeout(resolve, 250))
-    const countAfterQuiet = world.samples.filter(sample => sample.id === '计数1').length
+    const countAfterQuiet = world.samples.filter(sample => pointKey(sample) === pointKey(countRef)).length
     expect(countAfterQuiet).toBe(1)
 
     // The value moves: exactly one fresh frame carries it.
     plc.holding.set(105, 8)
-    await waitFor(() => latestSample(world.samples, '计数1')?.value === 8n, 'changed count')
-    expect(world.samples.filter(sample => sample.id === '计数1')).toHaveLength(2)
+    await waitFor(() => latestSample(world.samples, countRef)?.value === 8n, 'changed count')
+    expect(world.samples.filter(sample => pointKey(sample) === pointKey(countRef))).toHaveLength(2)
   }, 15_000)
 
   it('writes coils through the field seam and echoes the sample', async () => {
@@ -182,9 +190,9 @@ describe('driver-modbus over a fake PLC', () => {
     world.ctx.emit('modbus/config-changed')
     await waitFor(() => world.statuses.some(frame => frame.id === 'plc1' && frame.status === 'online'), 'online')
 
-    await world.ctx.points.write(PointId('开关1'), true)
+    await world.ctx.points.write(switchRef, true)
     await waitFor(() => plc.coils.get(10) === true, 'coil state on the wire')
-    await waitFor(() => latestSample(world.samples, '开关1')?.value === true, 'echo sample')
+    await waitFor(() => latestSample(world.samples, switchRef)?.value === true, 'echo sample')
   }, 15_000)
 
   it('goes offline with one null round and recovers when the PLC returns', async () => {
@@ -199,7 +207,7 @@ describe('driver-modbus over a fake PLC', () => {
 
     await plc.stop()
     await waitFor(() => world.statuses.at(-1)?.status === 'offline', 'offline')
-    expect(latestSample(world.samples, '计数1')?.value).toBeNull()
+    expect(latestSample(world.samples, countRef)?.value).toBeNull()
 
     // Quiet while down: exactly one null round per point.
     const nulls = world.samples.filter(sample => sample.value === null).length
@@ -209,7 +217,7 @@ describe('driver-modbus over a fake PLC', () => {
     await plc.start()
     await waitFor(() => world.statuses.at(-1)?.status === 'online', 'recovered')
     // null → value is a change: values re-report without being re-seeded.
-    await waitFor(() => latestSample(world.samples, '计数1')?.value === 7n, 'value re-reported')
+    await waitFor(() => latestSample(world.samples, countRef)?.value === 7n, 'value re-reported')
   }, 20_000)
 })
 

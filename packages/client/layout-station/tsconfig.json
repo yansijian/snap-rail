@@ -19,6 +19,12 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../field/field"
+    },
+    {
+      "path": "../../boot/station-rpc"
+    },
+    {
       "path": "../slots"
     },
     {

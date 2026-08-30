@@ -19,6 +19,12 @@
       "path": "../../../vendor/cordis"
     },
     {
+      "path": "../../field/field"
+    },
+    {
+      "path": "../../boot/station-rpc"
+    },
+    {
       "path": "../../protocol/protocol"
     },
     {
@@ -41,6 +47,9 @@
     },
     {
       "path": "../process-maintenance"
+    },
+    {
+      "path": "../../production/stats"
     }
   ]
 }

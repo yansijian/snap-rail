@@ -15,6 +15,7 @@
     { "path": "../../field/field" },
     { "path": "../../store/store" },
     { "path": "../../audit/audit" },
-    { "path": "../../settings/settings" }
+    { "path": "../../settings/settings" },
+    { "path": "../../boot/station-rpc" }
   ]
 }

@@ -1,20 +1,34 @@
 /**
  * The variable seam: demand plugins declare the process variables they
- * listen to — a name and a semantic type, nothing protocol-specific — and
- * mapping surfaces (a driver's settings page) list the registry to wire
- * those names onto real devices. The variable name doubles as the field
- * point id, so consumers ride the existing `points.subscribe` /
- * `point/updated` path unchanged and a remap never re-keys the stream.
+ * listen to — a device, a group, a name, and a semantic type, nothing
+ * protocol-specific — and mapping surfaces (a driver's settings page) list
+ * the registry to wire those declarations onto real register addresses.
+ * Point names are unique only within their group, so a declaration is
+ * itself the full address — the same (device, group, name) triple the field
+ * seam speaks natively; consumers ride `field.points.subscribe` /
+ * `field/point-updated` with no id munging.
  *
- * Names are globally unique: a same-name registration replaces the earlier
- * one (the field seam would reject the duplicate point otherwise).
+ * Bindings (below the registry) generalize consumption: a page addresses
+ * field data as a device-qualified point (`{device, group, name}`) or a
+ * device's whole business group (`{device, group}`) and gets a live
+ * aggregated view (any member active ⇒ the group is active with the member
+ * names). Group membership is mapping configuration served by the field
+ * seam's generic mapping document (`field.mappings.list`, dialect-free), so
+ * a `field/mappings-changed` frame re-resolves the binding in place.
  *
  * @module @snap-rail/client-variables
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
-import type { HostLink } from '@snap-rail/connection'
-import type { PointType, PointValue } from '@snap-rail/protocol'
+import { subscribeFrame, type HostLink } from '@snap-rail/connection'
+import {
+  fieldFrameSchemas,
+  pointKey,
+  type MappingDocument,
+  type PointRef,
+  type PointType,
+  type PointValue,
+} from '@snap-rail/field'
 import { useEffect, useState } from 'react'
 
 /** The slice of `ctx.client` this package needs; typed locally so the
@@ -24,9 +38,14 @@ interface ClientLink {
   link: HostLink
 }
 
-/** What one demand plugin contributes: the variable it wants to hear about. */
+/** What one demand plugin contributes: the variable it wants to hear about,
+ * addressed by its full triple. */
 export interface VariableDef {
-  /** Globally unique variable name; also the field point id. */
+  /** The device the variable lives on. */
+  device: string
+  /** The business group the variable lives in. */
+  group: string
+  /** Point name within the group (unique there, not globally). */
   name: string
   /** Semantic value type (the field seam's type vocabulary). */
   type: PointType
@@ -45,10 +64,10 @@ export interface VariablesService {
   /** Registered variables in registration order. */
   list(): readonly VariableEntry[]
   /** Register variables; disposal (caller unload) removes them all.
-   * Same-name re-registration replaces; a name owned by another plugin's
-   * live registration is replaced too (names are the uniqueness contract).
+   * The (device, group, name) triple is the uniqueness contract: a
+   * same-address re-registration replaces the earlier one.
    * @param caller - owning context; unload drops every def in the call.
-   * @param defs - the declarations; duplicate names inside one call throw.
+   * @param defs - the declarations; duplicate addresses inside one call throw.
    */
   register(caller: Context, defs: readonly VariableDef[]): () => void
 }
@@ -79,24 +98,25 @@ const variablesPlugin: Plugin.Object<void> = {
         return [...variables.values()]
       },
       register(caller: Context, defs: readonly VariableDef[]): () => void {
-        const names = defs.map(def => def.name)
-        if (new Set(names).size !== names.length) {
-          throw new Error(`variables: duplicate names in one registration: ${names.join(', ')}`)
+        const keys = defs.map(def => pointKey(def))
+        if (new Set(keys).size !== keys.length) {
+          throw new Error(`variables: duplicate addresses in one registration: ${keys.join(', ')}`)
         }
-        const installed: Array<{ name: string, entry: VariableEntry }> = []
+        const installed: Array<{ key: string, entry: VariableEntry }> = []
         for (const def of defs) {
           const entry: VariableEntry = { ...def, source: 'plugin' }
-          installed.push({ name: def.name, entry })
-          variables.set(def.name, entry)
+          const key = pointKey(def)
+          installed.push({ key, entry })
+          variables.set(key, entry)
         }
         ctx.emit('variables/changed')
         const remove = (): void => {
           let changed = false
-          for (const { name, entry } of installed) {
-            // Identity check: only drop names this call still owns (a later
-            // re-registration by someone else stays).
-            if (variables.get(name) === entry) {
-              variables.delete(name)
+          for (const { key, entry } of installed) {
+            // Identity check: only drop addresses this call still owns (a
+            // later re-registration by someone else stays).
+            if (variables.get(key) === entry) {
+              variables.delete(key)
               changed = true
             }
           }
@@ -113,27 +133,244 @@ const variablesPlugin: Plugin.Object<void> = {
 
 export default variablesPlugin
 
+/** How a demand page addresses field data: one device-qualified point or a
+ * device's whole business group. The triple is mandatory — point names are
+ * group-scoped, so a bare name cannot address anything. */
+export type FieldBinding =
+  | { device: string, group: string, name: string }
+  | { device: string, group: string }
+
+/** One resolved group member: its field address plus display name. */
+export interface ResolvedMember {
+  ref: PointRef
+  name: string
+}
+
+/** A binding after resolution against the mapping document. */
+export type ResolvedBinding =
+  | { kind: 'point', ref: PointRef, name: string }
+  | { kind: 'group', device: string, group: string, members: readonly ResolvedMember[] }
+
+/**
+ * Resolve a binding against the generic mapping document. The device must
+ * exist, the group entity must exist on it, and the point form must find
+ * the point in exactly that group — an unknown group name must read as
+ * unresolved, never as "all normal". A group resolves with at least one
+ * member, in the document's order (the driver's projection defines it; the
+ * first active member is a stable "primary").
+ */
+export function resolveBinding(doc: MappingDocument, binding: FieldBinding): ResolvedBinding | undefined {
+  if (!doc.devices.some(device => device.id === binding.device)) return undefined
+  if (!doc.groups.some(group => group.deviceId === binding.device && group.name === binding.group)) return undefined
+  if ('name' in binding) {
+    const mapped = doc.points.some(point =>
+      point.deviceId === binding.device && point.group === binding.group && point.name === binding.name)
+    if (!mapped) return undefined
+    return {
+      kind: 'point',
+      ref: { device: binding.device, group: binding.group, name: binding.name },
+      name: binding.name,
+    }
+  }
+  const members = doc.points
+    .filter(point => point.deviceId === binding.device && point.group === binding.group)
+    .map(point => ({ ref: { device: point.deviceId, group: point.group, name: point.name }, name: point.name }))
+  if (members.length === 0) return undefined
+  return { kind: 'group', device: binding.device, group: binding.group, members }
+}
+
+/** Any-active truthiness: `true`, a nonzero number/bigint, a non-empty string. */
+function isActiveValue(value: PointValue): boolean {
+  if (value === null) return false
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'bigint') return value !== 0n
+  if (typeof value === 'number') return value !== 0
+  return value.length > 0
+}
+
+/** One active group member with the sample that activated it. */
+export interface BoundMember {
+  /** The point name — the business name a group view surfaces. */
+  name: string
+  value: PointValue
+  time: number
+}
+
+/** The live view of a binding a listener receives. */
+export type BindingView =
+  | { kind: 'unresolved' }
+  | { kind: 'point', ref: PointRef, name: string, sample: { value: PointValue, time: number } | undefined }
+  | {
+      kind: 'group'
+      device: string
+      group: string
+      /** `active` when any member is truthy; `normal` otherwise. */
+      status: 'normal' | 'active'
+      /** Active members in group display order (see `resolveBinding`). */
+      active: readonly BoundMember[]
+      /** Members whose latest sample is `null` (link abnormal after observing). */
+      abnormal: readonly string[]
+      /** Mapped members with no observation yet. */
+      pending: readonly string[]
+    }
+
+/**
+ * Watch one binding and emit a `BindingView` on every change. The watcher
+ * resolves the generic mapping document itself, seeds current values with
+ * one `field.points.read`, follows `field/point-updated` frames, and
+ * re-resolves on a `field/mappings-changed` frame — re-mapping takes effect
+ * without remounting the consumer.
+ *
+ * The returned stop function drops this watcher's subscription references;
+ * the host counts references per address, so overlapping watchers of one
+ * address never starve each other.
+ */
+export function watchBinding(
+  ctx: Context,
+  binding: FieldBinding,
+  listener: (view: BindingView) => void,
+): () => void {
+  const { link } = (ctx as Context & { client: ClientLink }).client
+  let live = true
+  let resolved: ResolvedBinding | undefined
+  let refs: readonly PointRef[] = []
+  const samples = new Map<string, { value: PointValue, time: number }>()
+
+  const compute = (): void => {
+    if (resolved === undefined) {
+      listener({ kind: 'unresolved' })
+      return
+    }
+    if (resolved.kind === 'point') {
+      listener({ kind: 'point', ref: resolved.ref, name: resolved.name, sample: samples.get(pointKey(resolved.ref)) })
+      return
+    }
+    const active: BoundMember[] = []
+    const abnormal: string[] = []
+    const pending: string[] = []
+    for (const member of resolved.members) {
+      const sample = samples.get(pointKey(member.ref))
+      // `null` with `time` 0 is the field seam's "registered but never
+      // observed" read; a `null` with a real timestamp is link abnormal.
+      if (sample === undefined || (sample.value === null && sample.time === 0)) pending.push(member.name)
+      else if (sample.value === null) abnormal.push(member.name)
+      else if (isActiveValue(sample.value)) active.push({ name: member.name, value: sample.value, time: sample.time })
+    }
+    listener({
+      kind: 'group',
+      device: resolved.device,
+      group: resolved.group,
+      status: active.length > 0 ? 'active' : 'normal',
+      active,
+      abnormal,
+      pending,
+    })
+  }
+
+  const resubscribe = (): void => {
+    void link.call('field.mappings.list', {})
+      .then(result => {
+        if (!live || !result.ok) return
+        const next = resolveBinding(result.value.mappings, binding)
+        const nextRefs = next === undefined ? [] : next.kind === 'point' ? [next.ref] : next.members.map(member => member.ref)
+        const wanted = new Set(nextRefs.map(pointKey))
+        for (const ref of refs) {
+          if (!wanted.has(pointKey(ref))) void link.call('field.points.unsubscribe', { points: [ref] }).catch(() => {})
+        }
+        for (const ref of nextRefs) {
+          if (!refs.some(current => pointKey(current) === pointKey(ref))) {
+            void link.call('field.points.subscribe', { points: [ref] }).catch(() => {})
+          }
+        }
+        refs = nextRefs
+        resolved = next
+        samples.clear()
+        if (nextRefs.length === 0) {
+          compute()
+          return
+        }
+        void link.call('field.points.read', { points: [...nextRefs] })
+          .then(read => {
+            if (!live) return
+            if (read.ok) {
+              for (const sample of read.value.samples) {
+                samples.set(pointKey(sample), { value: sample.value, time: sample.time })
+              }
+            }
+            // A read mixing registered and unregistered addresses fails
+            // wholesale (not-found); compute anyway — the missing members
+            // simply read as pending until the rig catches up.
+            compute()
+          })
+          .catch(() => {
+            // The call itself failed (carrier); the view observes nothing yet.
+            if (live) compute()
+          })
+      })
+      .catch(() => {})
+  }
+
+  const detachUpdates = subscribeFrame(link, 'field/point-updated', fieldFrameSchemas['field/point-updated'], frame => {
+    const ref: PointRef = { device: frame.device, group: frame.group, name: frame.name }
+    if (!refs.some(current => pointKey(current) === pointKey(ref))) return
+    samples.set(pointKey(ref), { value: frame.value, time: frame.time })
+    compute()
+  })
+  const detachConfig = link.subscribe('field/mappings-changed', () => { resubscribe() })
+
+  resubscribe()
+
+  return () => {
+    live = false
+    detachUpdates()
+    detachConfig()
+    if (refs.length > 0) void link.call('field.points.unsubscribe', { points: [...refs] }).catch(() => {})
+  }
+}
+
+/** Stable identity of a binding for hook dependency lists. */
+function bindingKey(binding: FieldBinding): string {
+  return 'name' in binding
+    ? `${binding.device}/${binding.group}/${binding.name}`
+    : `${binding.device}/${binding.group}`
+}
+
+/** The React recipe over `watchBinding`; `unresolved` until first observation. */
+export function useBinding(ctx: Context, binding: FieldBinding): BindingView {
+  const [view, setView] = useState<BindingView>({ kind: 'unresolved' })
+  const { link } = (ctx as Context & { client: ClientLink }).client
+  const key = bindingKey(binding)
+  useEffect(() => watchBinding(ctx, binding, setView), [link, key])
+  return view
+}
+
 /**
  * The consume recipe for demand plugins: seed the current value with a
- * `points.read`, then follow `point/updated` increments. Returns `undefined`
- * until the first observation — an unmapped variable stays undefined.
+ * `field.points.read`, then follow `field/point-updated` increments. Returns
+ * `undefined` until the first observation — an unmapped declaration stays
+ * undefined.
  *
- * The hook manages the wire subscription for its lifetime; the matching
- * `points.unsubscribe` fires on unmount so the host stops broadcasting.
+ * The hook holds one subscription reference for its lifetime; the matching
+ * `field.points.unsubscribe` fires on unmount, and the host's reference
+ * counting keeps other watchers of the same address live.
  */
-export function usePoint(ctx: Context, id: string): { value: PointValue, time: number } | undefined {
+export function usePoint(
+  ctx: Context,
+  binding: { device: string, group: string, name: string },
+): { value: PointValue, time: number } | undefined {
   const [sample, setSample] = useState<{ value: PointValue, time: number } | undefined>(undefined)
   const { link } = (ctx as Context & { client: ClientLink }).client
+  const key = pointKey(binding)
 
   useEffect(() => {
     let live = true
-    const detach = link.subscribe('point/updated', payload => {
-      const frame = payload as { id?: string, value?: PointValue, time?: number }
-      if (frame.id !== id || frame.time === undefined) return
-      if (live) setSample({ value: frame.value as PointValue, time: frame.time })
+    const detach = subscribeFrame(link, 'field/point-updated', fieldFrameSchemas['field/point-updated'], frame => {
+      const frameRef: PointRef = { device: frame.device, group: frame.group, name: frame.name }
+      if (pointKey(frameRef) !== key) return
+      if (live) setSample({ value: frame.value, time: frame.time })
     })
-    void link.call('points.subscribe', { ids: [id] }).catch(() => {})
-    void link.call('points.read', { ids: [id] })
+    void link.call('field.points.subscribe', { points: [binding] }).catch(() => {})
+    void link.call('field.points.read', { points: [binding] })
       .then(result => {
         if (!live || !result.ok) return
         const first = result.value.samples[0]
@@ -143,9 +380,9 @@ export function usePoint(ctx: Context, id: string): { value: PointValue, time: n
     return () => {
       live = false
       detach()
-      void link.call('points.unsubscribe', { ids: [id] }).catch(() => {})
+      void link.call('field.points.unsubscribe', { points: [binding] }).catch(() => {})
     }
-  }, [link, id])
+  }, [link, key])
 
   return sample
 }

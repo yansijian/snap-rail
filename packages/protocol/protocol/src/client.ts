@@ -45,12 +45,20 @@ export abstract class AbstractApiClient {
    * Call a unary method with the business payload directly; the carrier
    * mints the rpcId and wraps the envelope.
    *
+   * Two overloads, one open-world rule: a method known to {@link RpcMethodMap}
+   * (directly or via the caller's own declaration merge) is fully typed;
+   * any other method name is accepted as `(string, unknown)` — the caller
+   * owns the payload contract in that position. The same dual shape the
+   * cordis service surface uses: augmentation is opt-in, never required.
+   *
    * @param method - the wire method name.
    * @param payload - the business payload.
    * @returns the business result; `ok: false` is a normal outcome, not an
    * exception. Transport failures and rpcId echo mismatches throw.
    */
-  async call<K extends MethodName>(method: K, payload: RequestPayload<K>): Promise<RpcResult<ResponseValue<K>>> {
+  async call<K extends MethodName>(method: K, payload: RequestPayload<K>): Promise<RpcResult<ResponseValue<K>>>
+  async call(method: string, payload: unknown): Promise<RpcResult<unknown>>
+  async call(method: string, payload: unknown): Promise<RpcResult<unknown>> {
     const rpcId = RpcId(freshId())
     const response = await this.transport({
       type: 'client-request',
@@ -64,7 +72,7 @@ export abstract class AbstractApiClient {
     if (response.rpcId !== rpcId) {
       throw new RpcTransportError(`rpcId echo mismatch: sent ${rpcId}, received ${response.rpcId}`)
     }
-    return response.result as RpcResult<ResponseValue<K>>
+    return response.result
   }
 }
 

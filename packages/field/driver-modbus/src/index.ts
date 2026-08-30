@@ -1,12 +1,12 @@
 /**
  * The ModbusTCP field driver: store-declared devices become field
- * connections whose point ids are the variable names themselves. Each device
- * runs one serial I/O queue; polling merges mapped addresses into as few
- * block reads as possible and samples only on change (first read always
- * reports; float deadband configurable per point). Failures drop the
- * connection to offline with one `null` sample per point and retry every
- * poll tick. Writes ride the field seam's write handler (fc 5/6/16) and echo
- * back as samples.
+ * connections whose points are addressed by their (device, group, name)
+ * triples. Each device runs one serial I/O queue; polling merges mapped
+ * addresses into as few block reads as possible and samples only on change
+ * (first read always reports; float deadband configurable per point).
+ * Failures drop the connection to offline with one `null` sample per point
+ * and retry every poll tick. Writes ride the field seam's write handler
+ * (fc 5/6/16) and echo back as samples.
  *
  * Config changes flow through the bridge's `modbus/config-changed` event;
  * reconciliation restarts only the devices whose link parameters or point
@@ -21,74 +21,35 @@ import '@snap-rail/cordis-plugin-timer'
 // Consumer of the field seam: the import pulls in the `ctx.points` /
 // `ctx.connections` declaration merging alongside the runtime service.
 import '@snap-rail/field'
-import type { ConnectionRegistration } from '@snap-rail/field'
+import { FieldError, type ConnectionRegistration } from '@snap-rail/field'
 import {
   ConnectionId,
-  PointId,
-  type ModbusDeviceConfig,
-  type ModbusPointConfig,
+  pointKey,
   type PointDescriptor,
+  type PointRef,
   type PointValue,
-} from '@snap-rail/protocol'
+} from '@snap-rail/field'
+import type { ModbusDeviceConfig, ModbusPointConfig } from './contract.ts'
+import { readDocument } from './document.ts'
 import '@snap-rail/store'
-import type { StoreHandle } from '@snap-rail/store'
 import { decodePoint, encodeWrite, planPoll, type BlockPayload, type PollBlock } from './plc.ts'
 import { MODBUS_TABLES } from './tables.ts'
 
-/** Row layout of the driver's store namespace. */
-export interface ModbusDocument {
-  devices: ModbusDeviceConfig[]
-  points: ModbusPointConfig[]
-  vars: Array<{ name: string, type: 'bool' | 'int' | 'float' }>
-}
+export { probeDevice } from './probe.ts'
+export { projectMapping, readDocument } from './document.ts'
 
-/** Read the whole document (devices ascending, points by variable). */
-export function readDocument(store: StoreHandle): ModbusDocument {
-  const devices = store.all<Record<string, unknown>>(`SELECT * FROM ${store.table('devices')} ORDER BY id`)
-    .map(rowFromDevice)
-  const points = store.all<Record<string, unknown>>(`SELECT * FROM ${store.table('points')} ORDER BY var`)
-    .map(rowFromPoint)
-  const vars = store.all<{ name: string, type: 'bool' | 'int' | 'float' }>(
-    `SELECT name, type FROM ${store.table('vars')} ORDER BY name`)
-  return { devices, points, vars }
-}
-
-type DeviceRow = Record<string, unknown>
-
-function rowFromDevice(row: DeviceRow): ModbusDeviceConfig {
-  return {
-    id: String(row.id),
-    title: String(row.title),
-    host: String(row.host),
-    port: Number(row.port),
-    unitId: Number(row.unit_id),
-    pollMs: Number(row.poll_ms),
-    timeoutMs: Number(row.timeout_ms),
-    enabled: Number(row.enabled) === 1,
-  }
-}
-
-function rowFromPoint(row: DeviceRow): ModbusPointConfig {
-  return {
-    var: String(row.var),
-    deviceId: String(row.device_id),
-    type: row.type as ModbusPointConfig['type'],
-    fc: Number(row.fc) as ModbusPointConfig['fc'],
-    address: Number(row.address),
-    encoding: row.encoding as ModbusPointConfig['encoding'],
-    byteOrder: row.byte_order as ModbusPointConfig['byteOrder'],
-    scale: row.scale === null ? undefined : Number(row.scale),
-    writable: Number(row.writable) === 1,
-    deadband: row.deadband === null ? undefined : Number(row.deadband),
-  }
+/** The field address of one mapping row. */
+function refOf(point: ModbusPointConfig): PointRef {
+  return { device: point.deviceId, group: point.group, name: point.var }
 }
 
 interface DeviceRuntime {
   device: ModbusDeviceConfig
   registration: ConnectionRegistration
+  /** Points keyed by the composite point key (`device/group/name`). */
   points: Map<string, ModbusPointConfig>
   plan: PollBlock[]
-  /** Last value reported per variable; drives change detection. */
+  /** Last value reported per composite key; drives change detection. */
   last: Map<string, PointValue>
   /** Whether the current abnormal state already pushed one `null` round. */
   nulled: boolean
@@ -118,13 +79,16 @@ const modbusDriverPlugin: Plugin.Object<void> = {
     const store = ctx.store.register(ctx, 'driver_modbus', MODBUS_TABLES)
     const runtimes = new Map<string, DeviceRuntime>()
 
-    const enqueue = (runtime: DeviceRuntime, job: () => Promise<void>): void => {
-      runtime.queueTail = runtime.queueTail
-        .then(job)
-        .catch(() => {
-          // Poll jobs already mark the device abnormal; write jobs echo only
-          // on success. Anything left here is a queue-ordering anomaly.
-        })
+    /** Serialize one job behind the device's tail; the returned promise
+     * settles with the job's outcome (a write awaits its turn and reports
+     * its failure), while the tail itself recovers so later jobs still run. */
+    const enqueue = (runtime: DeviceRuntime, job: () => Promise<void>): Promise<void> => {
+      const run = runtime.queueTail.then(job)
+      runtime.queueTail = run.catch(() => {
+        // Poll jobs already mark the device abnormal; a write outcome
+        // returns to its caller. The tail stays healthy either way.
+      })
+      return run
     }
 
     /** Ports already carrying the write guard (one guard per port instance). */
@@ -190,17 +154,17 @@ const modbusDriverPlugin: Plugin.Object<void> = {
       if (runtime.nulled) return
       runtime.nulled = true
       runtime.last.clear()
-      for (const name of runtime.points.keys()) {
-        runtime.registration.sample(PointId(name), null)
+      for (const point of runtime.points.values()) {
+        runtime.registration.sample(refOf(point), null)
       }
     }
 
     /** Whether the fresh value is worth a frame (change-only reporting). */
-    const shouldReport = (runtime: DeviceRuntime, point: ModbusPointConfig, value: PointValue): boolean => {
-      const previous = runtime.last.get(point.var)
+    const shouldReport = (runtime: DeviceRuntime, key: string, value: PointValue): boolean => {
+      const previous = runtime.last.get(key)
       if (previous === undefined || value === null) return true
       if (typeof value === 'number' && typeof previous === 'number') {
-        const deadband = point.deadband ?? 0
+        const deadband = runtime.points.get(key)?.deadband ?? 0
         return Math.abs(value - previous) > deadband
       }
       return value !== previous
@@ -213,10 +177,11 @@ const modbusDriverPlugin: Plugin.Object<void> = {
         for (const block of runtime.plan) {
           const payload = await readBlock(runtime.client, block)
           for (const { point, offset } of block.entries) {
-            const value = decodePoint(point, payload, offset)
-            if (!shouldReport(runtime, point, value)) continue
-            runtime.last.set(point.var, value)
-            runtime.registration.sample(PointId(point.var), value)
+            const value = decodePoint(point, payload, offset, runtime.device.byteOrder)
+            const key = pointKey(refOf(point))
+            if (!shouldReport(runtime, key, value)) continue
+            runtime.last.set(key, value)
+            runtime.registration.sample(refOf(point), value)
           }
         }
         if (!runtime.online) {
@@ -229,11 +194,11 @@ const modbusDriverPlugin: Plugin.Object<void> = {
       }
     }
 
-    const writePoint = async (runtime: DeviceRuntime, name: string, value: Exclude<PointValue, null>): Promise<void> => {
-      const point = runtime.points.get(name)
-      if (point === undefined || !point.writable) throw new Error(`point ${name} is not writable`)
+    const writePoint = async (runtime: DeviceRuntime, key: string, value: Exclude<PointValue, null>): Promise<void> => {
+      const point = runtime.points.get(key)
+      if (point === undefined || !point.writable) throw new FieldError('no-write-handler', `point ${key} is not writable`)
       await ensureConnected(runtime)
-      const encoded = encodeWrite(point, value)
+      const encoded = encodeWrite(point, value, runtime.device.byteOrder)
       if (encoded.coil !== undefined) {
         await runtime.client.writeCoil(point.address, encoded.coil)
       } else if (encoded.registers !== undefined && encoded.registers.length === 1) {
@@ -242,8 +207,8 @@ const modbusDriverPlugin: Plugin.Object<void> = {
         await runtime.client.writeRegisters(point.address, encoded.registers)
       }
       // Echo the write as the fresh sample; the next poll compares against it.
-      runtime.last.set(name, value)
-      runtime.registration.sample(PointId(name), value)
+      runtime.last.set(key, value)
+      runtime.registration.sample(refOf(point), value)
     }
 
     const closeClient = (runtime: DeviceRuntime): void => {
@@ -261,9 +226,11 @@ const modbusDriverPlugin: Plugin.Object<void> = {
     }
 
     const createRuntime = (device: ModbusDeviceConfig, points: readonly ModbusPointConfig[]): DeviceRuntime => {
-      const pointMap = new Map(points.map(point => [point.var, point]))
+      const pointMap = new Map(points.map(point => [pointKey(refOf(point)), point]))
       const descriptors: PointDescriptor[] = points.map(point => ({
-        id: PointId(point.var),
+        device: point.deviceId,
+        group: point.group,
+        name: point.var,
         connection: ConnectionId(device.id),
         type: point.type,
       }))
@@ -278,7 +245,9 @@ const modbusDriverPlugin: Plugin.Object<void> = {
         registration.setWriteHandler((point, value) => {
           const runtime = runtimes.get(device.id)
           if (runtime === undefined) return Promise.resolve()
-          enqueue(runtime, async () => { await writePoint(runtime, point.id, value) })
+          // Await the queue: the caller (the field seam, then the rpc
+          // bridge's audit) learns the write's real outcome.
+          return enqueue(runtime, async () => { await writePoint(runtime, pointKey(point), value) })
         })
       }
       const runtime: DeviceRuntime = {
@@ -298,14 +267,16 @@ const modbusDriverPlugin: Plugin.Object<void> = {
       return runtime
     }
 
-    /** Same link parameters and same point table → keep the live runtime. */
+    /** Same link parameters (word order included) and same point table →
+     * keep the live runtime. Group rides in the point identity, so moving a
+     * point rebuilds its device — by design. */
     const sameShape = (runtime: DeviceRuntime, device: ModbusDeviceConfig, points: readonly ModbusPointConfig[]): boolean =>
       JSON.stringify(runtime.device) === JSON.stringify(device)
-      && runtime.points.size === points.length
-      && points.every(point => {
-        const existing = runtime.points.get(point.var)
-        return existing !== undefined && JSON.stringify(existing) === JSON.stringify(point)
-      })
+        && runtime.points.size === points.length
+        && points.every(point => {
+          const existing = runtime.points.get(pointKey(refOf(point)))
+          return existing !== undefined && JSON.stringify(existing) === JSON.stringify(point)
+        })
 
     const reconcile = (): void => {
       const doc = readDocument(store)

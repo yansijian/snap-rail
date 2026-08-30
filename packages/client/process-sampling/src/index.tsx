@@ -12,6 +12,8 @@
 import { Context, type Plugin } from '@snap-rail/cordis'
 // Side-effect: pulls in the timer augmentation (`ctx.interval`).
 import '@snap-rail/cordis-plugin-timer'
+// Wire rows for the station-domain methods this resident calls.
+import '@snap-rail/station-rpc/contract'
 import { z } from 'zod'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, RadioGroup, RadioGroupItem } from '@snap-rail/client-ui'

@@ -1,14 +1,19 @@
 /**
  * The operator session seam: `ctx.session` mirrors the host-side session
  * (persisted to settings, so a restart keeps the operator signed on) and
- * re-emits `session/changed` on every transition. The login page writes it;
- * every workflow consumer reads it for gating and audit attribution.
+ * re-emits `session/changed` on every transition — its own writes and any
+ * host-side change that rides the `settings/changed` frame. The login page
+ * writes it; every workflow consumer reads it for gating and audit
+ * attribution.
  *
  * @module @snap-rail/client-session
  */
 
+// Wire rows for the station-domain methods this resident calls.
+import '@snap-rail/station-rpc/contract'
 import { Context, type Plugin } from '@snap-rail/cordis'
-import type { HostLink } from '@snap-rail/connection'
+import { subscribeFrame, type HostLink } from '@snap-rail/connection'
+import { SESSION_OPERATOR_KEY, settingsChangedSchema } from '@snap-rail/station-rpc/contract'
 
 /** The slice of `ctx.client` this service needs; typed locally so the
  * session package never references the runtime project (a reference cycle:
@@ -56,6 +61,18 @@ const sessionPlugin: Plugin.Object<void> = {
     void link.call('session.current', {}).then(result => {
       if (result.ok) sync(result.value.operator)
     })
+
+    // Hot-follow host-side session changes (another surface signed in or
+    // out — the titlebar's 换人, or the host restarting with a different
+    // persisted operator): re-pull the truth and re-emit on any drift.
+    ctx.effect(() => subscribeFrame(link, 'settings/changed', settingsChangedSchema, change => {
+      if (change.key !== SESSION_OPERATOR_KEY) return
+      void link.call('session.current', {})
+        .then(result => {
+          if (result.ok && result.value.operator !== operator) sync(result.value.operator)
+        })
+        .catch(() => {})
+    }))
 
     ctx.provide('session', {
       current: (): string | null => operator,

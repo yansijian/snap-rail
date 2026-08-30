@@ -9,10 +9,12 @@
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
+// Wire rows for the plugins-domain methods this page calls.
+import '@snap-rail/app-boot/contract'
 import '@snap-rail/client-settings'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
-import { Badge, Button, Dialog, DialogContent, DialogTitle, Switch } from '@snap-rail/client-ui'
+import { Badge, Button, Dialog, DialogContent, DialogTitle, Switch, useRefresh } from '@snap-rail/client-ui'
 import { X } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 
@@ -42,7 +44,7 @@ function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
 
   const toggle = (name: string, enabled: boolean): void => {
     setRows(current => current.map(row => row.name === name ? { ...row, enabled } : row))
-    void ctx.client.link.call('plugins.setEnabled', { name, enabled })
+    void ctx.client.link.call('plugins.set-enabled', { name, enabled })
       .then(result => {
         if (!result.ok) setRows(current => current.map(row => row.name === name ? { ...row, enabled: !enabled } : row))
       })
@@ -54,7 +56,7 @@ function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
   return (
     <div data-region="plugins-table" className="flex flex-col gap-1">
       <p className="mb-2 text-xs text-muted-foreground">
-        插件的启停写入用户层配置并立即生效；启用状态与配置同源（文件即接口）。
+        宿主插件的启停写入用户层配置并当场热生效；页面类（渲染端）插件的行同样写入该文件，但需重启应用后生效。启用状态与配置同源（文件即接口）。
       </p>
       {rows.map(row => (
         <div
@@ -63,8 +65,8 @@ function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
           className="flex items-center justify-between rounded-md border border-border px-3 py-2"
         >
           <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-mono text-xs">{row.name}</span>
             <Badge variant="secondary">{row.source === 'builtin' ? '内置' : row.source === 'user' ? '用户层' : '插件池'}</Badge>
+            <span className="truncate font-mono text-xs">{row.name}</span>
           </div>
           <Switch
             aria-label={`启用 ${row.name}`}
@@ -79,13 +81,7 @@ function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
 
 /** The dialog shell: left menu over the registry, right content of the active page. */
 function SettingsDialog({ ctx }: { ctx: Context }): ReactNode {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const bump = (): void => setTick(value => value + 1)
-    const detachOpen = ctx.on('settings/open-changed', bump)
-    const detachPages = ctx.on('settings/pages-changed', bump)
-    return () => { detachOpen(); detachPages() }
-  }, [ctx])
+  useRefresh(ctx, ['settings/open-changed', 'settings/pages-changed'])
 
   const open = ctx.settingsPages.isOpen()
   const pages = ctx.settingsPages.list()

@@ -1,5 +1,6 @@
 /**
  * Badge: small status/label chip. `success` carries the online/live state,
+ * `warning` the attention state (e.g. partial failure, float type),
  * `destructive` the offline/abnormal one.
  *
  * @module @snap-rail/client-ui/badge
@@ -17,6 +18,7 @@ const badgeVariants = cva(
         default: 'border-transparent bg-primary text-primary-foreground',
         secondary: 'border-transparent bg-secondary text-secondary-foreground',
         success: 'border-transparent bg-success/15 text-success',
+        warning: 'border-transparent bg-warning/15 text-warning',
         destructive: 'border-transparent bg-destructive/15 text-destructive',
         outline: 'text-muted-foreground',
       },

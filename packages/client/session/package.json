@@ -25,6 +25,7 @@
     "@snap-rail/cordis": "workspace:^"
   },
   "devDependencies": {
+    "@snap-rail/station-rpc": "workspace:^",
     "@snap-rail/cordis": "workspace:^"
   }
 }

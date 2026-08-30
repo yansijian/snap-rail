@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/client-variables",
-  "description": "The variable seam: demand plugins declare the variables they listen to (ctx.variables) plus the usePoint consume helper",
+  "description": "The variable seam: demand plugins declare the variables they listen to (ctx.variables) plus binding/usePoint consume recipes over the generic mapping view",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -19,7 +19,7 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@snap-rail/protocol": "workspace:^"
+    "@snap-rail/field": "workspace:^"
   },
   "peerDependencies": {
     "@snap-rail/cordis": "workspace:^",
@@ -29,6 +29,7 @@
   "devDependencies": {
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "happy-dom": "^20.0.11",

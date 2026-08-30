@@ -11,9 +11,11 @@
  * @module @snap-rail/layout-station
  */
 
+// Wire rows for the station-domain methods this resident calls.
+import '@snap-rail/station-rpc/contract'
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { Button, Card, CardContent, Input, cn } from '@snap-rail/client-ui'
+import { Button, Card, CardContent, Input, cn, useRefresh } from '@snap-rail/client-ui'
 import type { WorkflowEntry } from '@snap-rail/client-workflows'
 import '@snap-rail/client-slots'
 import '@snap-rail/client-runtime'
@@ -35,7 +37,12 @@ function haloPeriod(progress: number): string {
   return `${(2.4 - 1.7 * progress).toFixed(2)}s`
 }
 
-const STEADY_COLORS = { red: '#f85149', yellow: '#d29922' } as const
+/** Sidebar events that re-render the rail and every slot consumer. */
+const RAIL_EVENTS = ['session/changed', 'workflow/changed', 'ui/slot-changed'] as const
+
+// Theme tokens by name — the breathing halo colors ride CSS custom properties,
+// so retinting the theme retints the alerts.
+const STEADY_COLORS = { red: 'var(--color-destructive)', yellow: 'var(--color-warning)' } as const
 
 function alertStyle(entry: WorkflowEntry): CSSProperties | undefined {
   const alert = entry.alert
@@ -46,21 +53,8 @@ function alertStyle(entry: WorkflowEntry): CSSProperties | undefined {
   return { '--breathe-color': haloColor(alert.progress), '--breathe-period': haloPeriod(alert.progress) } as CSSProperties
 }
 
-function useRefresh(ctx: Context): void {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const bump = (): void => setTick(value => value + 1)
-    const detachers = [
-      ctx.on('session/changed', bump),
-      ctx.on('workflow/changed', bump),
-      ctx.on('ui/slot-changed', bump),
-    ]
-    return () => { for (const detach of detachers) detach() }
-  }, [ctx])
-}
-
 function LoginScreen(props: { ctx: Context }): ReactNode {
-  useRefresh(props.ctx)
+  useRefresh(props.ctx, RAIL_EVENTS)
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -125,7 +119,7 @@ function SidebarItem(props: { ctx: Context, entry: WorkflowEntry }): ReactNode {
 }
 
 function WorkflowSidebar(props: { ctx: Context }): ReactNode {
-  useRefresh(props.ctx)
+  useRefresh(props.ctx, RAIL_EVENTS)
   const entries = props.ctx.workflows.list()
 
   // Keep an unlocked workflow active: after login, gating changes, or a
@@ -149,14 +143,14 @@ function WorkflowSidebar(props: { ctx: Context }): ReactNode {
 }
 
 function SlotRegion(props: { ctx: Context, slot: 'titlebar' }): ReactNode {
-  useRefresh(props.ctx)
+  useRefresh(props.ctx, RAIL_EVENTS)
   const occupants = props.ctx.uiSlots.list(props.slot)
   if (occupants.length === 0) return null
   return <>{occupants.map(occupant => <div key={occupant.id} className="flex flex-col">{occupant.render()}</div>)}</>
 }
 
 function Station(props: { ctx: Context }): ReactNode {
-  useRefresh(props.ctx)
+  useRefresh(props.ctx, RAIL_EVENTS)
   const operator = props.ctx.session.current()
   const body = operator === null
     ? <LoginScreen ctx={props.ctx} />

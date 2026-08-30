@@ -24,7 +24,9 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@snap-rail/protocol": "workspace:^"
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/util": "workspace:^",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@snap-rail/cordis": "workspace:^",
