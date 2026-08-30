@@ -56,9 +56,13 @@ function snapRailSources(): Plugin {
   sourceOf.set('@snap-rail/client-ui/theme.css', `${repoRoot}/packages/client/ui/src/theme.css`)
   sourceOf.set('@snap-rail/field/rpc', `${repoRoot}/packages/field/field/src/rpc.ts`)
   sourceOf.set('@snap-rail/field', `${repoRoot}/packages/field/field/src/index.ts`)
-  // The renderer only ever touches the stats plugin's pure contract subpath —
-  // the plugin entry itself is host-side (node:sqlite) and stays out of the
-  // client bundle.
+  // Wire-contract subpaths the renderer imports for types/rows. The stats
+  // plugin's plugin entry itself is host-side (node:sqlite) and stays out of
+  // the client bundle; the rest are pure contract modules beside their
+  // package entries.
+  sourceOf.set('@snap-rail/app-boot/contract', `${repoRoot}/packages/boot/app-boot/src/contract.ts`)
+  sourceOf.set('@snap-rail/station-rpc/contract', `${repoRoot}/packages/boot/station-rpc/src/contract.ts`)
+  sourceOf.set('@snap-rail/driver-modbus/contract', `${repoRoot}/packages/field/driver-modbus/src/contract.ts`)
   sourceOf.set('@snap-rail/production-stats/contract', `${repoRoot}/packages/production/stats/src/contract.ts`)
 
   return {
