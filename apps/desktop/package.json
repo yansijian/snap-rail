@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "start": "electron .",
-    "build:faces": "tsc -b && tsdown --config tsdown.config.ts && vite build",
+    "build:faces:host": "tsc -b && tsdown --config tsdown.config.ts",
+    "build:faces": "pnpm run build:faces:host && vite build",
     "pack": "pnpm run build:faces && electron-builder --win --dir --config electron-builder.yml",
     "dist": "pnpm run build:faces && electron-builder --win nsis --config electron-builder.yml"
   },
