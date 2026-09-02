@@ -69,8 +69,8 @@ export interface BlockPayload {
   registers?: readonly number[]
 }
 
-/** Decode one point's value out of its block payload (scale applied to f32).
- * Word order is the device-wide link property the caller passes in. */
+/** Decode one point's value out of its block payload. Word order is the
+ * device-wide link property the caller passes in. */
 export function decodePoint(
   point: ModbusPointConfig,
   payload: BlockPayload,
@@ -96,7 +96,7 @@ export function decodePoint(
       if (point.encoding === 'u32') return BigInt(word)
       const view = new DataView(new ArrayBuffer(4))
       view.setUint32(0, word)
-      return view.getFloat32(0) * (point.scale ?? 1)
+      return view.getFloat32(0)
     }
   }
 }
@@ -114,8 +114,7 @@ export function encodeWrite(
   if (point.encoding === 'discrete') throw new RangeError(`discrete input at address ${point.address} is read-only`)
   const number = typeof value === 'bigint' ? Number(value) : typeof value === 'number' ? value : Number.NaN
   if (Number.isNaN(number)) throw new RangeError(`write to address ${point.address} expects a numeric value`)
-  const scale = point.scale ?? 1
-  const raw = scale === 1 ? Math.round(number) : Math.round(number / scale)
+  const raw = Math.round(number)
   switch (point.encoding) {
     case 'i16':
       if (raw < -32_768 || raw > 32_767) throw new RangeError(`value ${number} out of i16 range`)
@@ -127,7 +126,7 @@ export function encodeWrite(
       let word: number
       if (point.encoding === 'f32') {
         const view = new DataView(new ArrayBuffer(4))
-        view.setFloat32(0, number / (point.scale ?? 1))
+        view.setFloat32(0, number)
         word = view.getUint32(0)
       } else if (point.encoding === 'i32') {
         if (raw < -2_147_483_648 || raw > 2_147_483_647) throw new RangeError(`value ${number} out of i32 range`)

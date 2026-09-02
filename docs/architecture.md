@@ -39,9 +39,9 @@ Electron 主进程                        renderer（每窗口）
 | RPC 协议 | `protocol/protocol` | **信封封闭、内容开放**：四象限消息模型、RpcMethodMap/FrameMap 两个开放合并基座（只有平台行 `host.*`/`rpc.*`/`window.*` 留在这里）、zod 信封校验、AbstractApiClient 双 overload（已知方法全类型、未知方法 `(string, unknown)`） |
 | RPC 宿主侧 | `protocol/gateway` | `ctx.rpc`：域名认领（`claimDomain` 首认即得、冲突 fail-loud）、`method`（请求 schema 必须随注册）、`frame`（载荷 schema 注册）、`bridgeEvent`（宿主事件→帧的标准桥）、`rpc.describe` 能力发现、帧泵 |
 | RPC 客户端侧 | `protocol/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势（一次 zod 解析，坏帧丢弃并记录）；`rpcErrorText` 统一错误文案 |
-| 工业通讯协议域 | `field/field` | **设备连接底座**：`data/field.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面 + 统一「设备管理」设置页（`./station`，schema 驱动表单）。`ctx.field.registerDriver` 上交 `{id, title, schemas, probe?, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。`field.config.list`/`field.devices|groups|points.*` CRUD、`field.devices.test` 探测、`field/structure-changed` 帧；`field.mappings.list` 读底座表投影（消费方零改动） |
+| 工业通讯协议域 | `field/field` | **设备连接底座**：`data/field.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面 + 统一「设备管理」设置页（`./station`，schema 驱动表单）。`ctx.field.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。`field.config.list`/`field.devices|groups|points.*` CRUD、`field/structure-changed` 帧；`field.mappings.list` 读底座表投影（消费方零改动） |
 | 模拟驱动 | `field/driver-mock` | 范本驱动（新驱动作者的活文档）：极简 schema（离线/周期）+ 模拟点流 + 写回显，点表走底座 |
-| ModbusTCP 驱动 | `field/driver-modbus` | 纯协议适配器：块轮询/编解码/探测；方言 schema（`.meta` 中文标题 → JSON Schema → 底座 SchemaForm）；无存储无渲染端，配置全在底座表 |
+| ModbusTCP 驱动 | `field/driver-modbus` | 纯协议适配器：块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema → 底座 SchemaForm）；无存储无渲染端，配置全在底座表 |
 | 槽位词表 | `client/slots` | `ctx.uiSlots`：well-known slot ids + 缺槽降级 |
 | UI 原语 | `client/ui` | 主题令牌（theme.css，Tailwind v4）+ shadcn 共享组件 + `SchemaForm`（JSON Schema→触屏表单：enum=TouchSelect、数字=NumberPad、布尔=Switch）+ `useRefresh`（ctx 事件→重渲染的标准 tick）；页面组件必须组合此包原语，缺原语按 shadcn 官方实现移植，不在页面手写交互组件 |
 | 操作人会话 | `client/session` | `ctx.session`：登录态镜像（宿主持久化，重启保持登录）、`session/changed` 事件；经 `settings/changed` 帧热跟随宿主侧换人 |
@@ -52,7 +52,7 @@ Electron 主进程                        renderer（每窗口）
 | 引导 | `client/kernel` | 启动页、carrier 握手、root 移交 |
 | 业务套件 | `suites/terminal-ops` | **套件 = 单包多入口**（`snapRail.kind='suite'`）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）+ 一个宿主行 `./stats`（班产计数：跟随计数绑定的正增量、按三班 8-16/16-24/0-8 落 `ctx.store`、登录时刻锚定班次、`production/stats-changed` 帧广播快照兼作渲染端初值心跳）。套件单活：启用一个套件经 `plugins.set-enabled` 自动停用其他套件包的全部行（一次批量写）——工业终端一次服务一个场景 |
 | 设置外壳 | `client/settings-station` | 设置对话框壳 + 插件管理页（三分区：套件/驱动/核心）+ 主题页；核心内置，不可外移（卸了无法自恢复） |
-| 统一设备管理页 | `field/field` 的 `./station` | 核心静态渲染面：设备 Tabs、连接灯、探测、分组健康、点位表实时值、SchemaForm 配置对话框（见 field 语义节） |
+| 统一设备管理页 | `field/field` 的 `./station` | 核心静态渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 field 语义节） |
 | 设置持久化 | `settings/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
 | 持久化 | `store/store` | `ctx.store`：drizzle over node:sqlite（自写适配器，零原生模块），**按命名空间分库**（`data/<ns>.db`）——文件隔离即插件时代的信任边界；schema 用 drizzle table 对象声明，注册即建表 + append-only 加列；跨命名空间协作走服务，永不共享表 |
 | 审计 | `audit/audit` | 追加式 JSONL：启停/配置/控制写全记录；`list(filter)` 读回（工作站业务事件的真相源）；wire 类型（`AuditEntryInfo`）由它导出，单一来源 |
@@ -177,7 +177,7 @@ owner 自己的 contract 模块里（`declare module '@snap-rail/protocol'`
 
 field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯协议适配器**。
 三层切分——`data/field.db`（设备/组/点 + 方言 config blob）、点表运行面
-（points/connections）、驱动注册面（`registerDriver`：schema + 可选探测 +
+（points/connections）、驱动注册面（`registerDriver`：schema +
 连接工厂）。底座编排“什么时候变”（reconcile：配置表 × 已注册驱动 → 连接
 集合，任何变更或驱动装卸都重算），驱动决策“怎么变”
 （`update(config, points)` 内部自决热调或重连；`dispose` 拆除）。
@@ -198,9 +198,8 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
   （`z.toJSONSchema`，input 形态）随 `field.drivers.list` 下发，底座
   SchemaForm（client-ui）渲染——驱动零渲染端代码。
 - 配置面 RPC：`field.config.list`（整棵配置树）、
-  `field.devices|groups|points.upsert/remove`、`field.devices.test`
-  （探测路由）；任何变更广播 `field/structure-changed`，且映射文档
-  随之重投影。
+  `field.devices|groups|points.upsert/remove`；任何变更广播
+  `field/structure-changed`，且映射文档随之重投影。
 - **通用映射面**：`field.mappings.list` 读底座表投影（设备[{id, driver}]/
   组[{deviceId, name, type}]/点[{deviceId, group, name}]，仅含驱动在线
   的设备）——绑定解析（client-variables）只消费这一个面，对具体驱动
@@ -271,7 +270,7 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
 ### 三、新增一个现场驱动（工业协议实现）
 
 1. 驱动 = 纯协议适配器：`ctx.field.registerDriver(ctx, { id, title,
-   schemas, probe?, createConnection })`。schemas 是 device/point 两个
+   schemas, createConnection })`。schemas 是 device/point 两个
    zod object（point 校验 `{type, ...config}`；`.meta({title})` 给统一
    表单中文标签）；mock 是最小范本。
 2. `createConnection(device, points, handle)` 返回
@@ -279,7 +278,7 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
    驱动装卸），驱动决定怎么落地（热调 vs 重连）。handle 上报
    `status(state, message?)` / `sample(ref, value)` / `onWrite(cb)`；
    点表注册是底座的事，驱动永不 setPoints。
-3. 设备/组/点 CRUD 与探测全部走底座（`field.devices.*` 等），驱动**没有**
+3. 设备/组/点 CRUD 全部走底座（`field.devices.*` 等），驱动**没有**
    自己的存储、RPC 子命名空间和渲染端页面。写路径 await 到 I/O 完成。
 
 ### 四、新增一个页面插件（渲染端住户）

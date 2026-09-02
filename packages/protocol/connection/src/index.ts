@@ -85,7 +85,9 @@ export class HostLink extends AbstractApiClient {
 
 /**
  * Human text for a business error (`what` and joined `issues` read better
- * than the code); the standard failure copy for surfaces.
+ * than the code); the standard failure copy for surfaces. An `internal`
+ * always names its corner — the hint carries the failing step, so even an
+ * unmapped failure never leaves the operator with a bare code.
  * @param error - the `error` leg of an `ok: false` result.
  */
 export function rpcErrorText(error: { code: string, details?: unknown }): string {
@@ -95,6 +97,10 @@ export function rpcErrorText(error: { code: string, details?: unknown }): string
     if (issues.length > 0) return issues.join('；')
   }
   if (typeof details.what === 'string') return details.what
+  if (error.code === 'internal') {
+    const hint = details.hint
+    return typeof hint === 'string' && hint !== '' ? `内部错误（${hint}）` : '内部错误'
+  }
   return error.code
 }
 

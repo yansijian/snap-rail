@@ -3,7 +3,7 @@
  * The base owns the device/group/point tables and calls `createConnection`
  * per configured device; this runtime runs one serial I/O queue per device,
  * merges mapped addresses into as few block reads as possible, and samples
- * only on change (first read always reports; float deadband per point).
+ * only on change (first read always reports; numeric deadband per point).
  * Failures drop the link to offline with one `null` sample per point and
  * retry every poll tick. Writes ride the base's write handler (fc 5/6/16)
  * and echo back as samples.
@@ -39,15 +39,23 @@ import {
   type ModbusPointConfig,
 } from './contract.ts'
 import { decodePoint, encodeWrite, planPoll, type BlockPayload, type PlannedPoint, type PollBlock } from './plc.ts'
-import { probeDevice } from './probe.ts'
 
-export { probeDevice } from './probe.ts'
 export { modbusDeviceSchema, modbusPointSchema } from './contract.ts'
 export type { ModbusDeviceConfig, ModbusPointConfig } from './contract.ts'
 
+/** Parse a stored point config; drift from schema evolution surfaces as a
+ * readable field error instead of a raw ZodError escaping the seam. */
+const parsePoint = (point: DriverPoint): ModbusPointConfig => {
+  const parsed = modbusPointSchema.safeParse({ type: point.type, ...point.config })
+  if (!parsed.success) {
+    throw new FieldError('invalid-config', `point ${pointKey(point)} config rejected: ${parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`)
+  }
+  return parsed.data
+}
+
 /** Dialect plus field address — the poll plan's shape for one point. */
 const plannedOf = (point: DriverPoint): PlannedPoint => ({
-  ...(modbusPointSchema.parse({ type: point.type, ...point.config }) as ModbusPointConfig),
+  ...parsePoint(point),
   ref: { device: point.device, group: point.group, name: point.name },
 })
 
@@ -77,10 +85,9 @@ interface DeviceRuntime {
 
 /** Parse the base's stored dialect config back into the typed point. */
 function mapPoint(point: DriverPoint): MappedPoint {
-  const dialect = modbusPointSchema.parse({ type: point.type, ...point.config })
   return {
     ref: { device: point.device, group: point.group, name: point.name },
-    dialect,
+    dialect: parsePoint(point),
   }
 }
 
@@ -167,9 +174,10 @@ const markAbnormal = (runtime: DeviceRuntime, message?: string): void => {
 const shouldReport = (runtime: DeviceRuntime, key: string, value: PointValue): boolean => {
   const previous = runtime.last.get(key)
   if (previous === undefined || value === null) return true
-  if (typeof value === 'number' && typeof previous === 'number') {
+  if ((typeof value === 'number' || typeof value === 'bigint')
+    && (typeof previous === 'number' || typeof previous === 'bigint')) {
     const deadband = runtime.points.get(key)?.dialect.deadband ?? 0
-    return Math.abs(value - previous) > deadband
+    return Math.abs(Number(value) - Number(previous)) > deadband
   }
   return value !== previous
 }
@@ -228,10 +236,19 @@ const closeClient = (runtime: DeviceRuntime): void => {
   }
 }
 
+/** Parse a stored device config (the same drift guard points get). */
+const parseDevice = (config: DriverDevice['config']): ModbusDeviceConfig => {
+  const parsed = modbusDeviceSchema.safeParse(config)
+  if (!parsed.success) {
+    throw new FieldError('invalid-config', `device config rejected: ${parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`)
+  }
+  return parsed.data
+}
+
 /** Build the per-device runtime: the connection controller this driver owns. */
 const createRuntime = (ctx: Context, device: DriverDevice, points: readonly DriverPoint[], handle: DriverHandle): DriverConnection => {
   const runtime: DeviceRuntime = {
-    device: modbusDeviceSchema.parse(device.config),
+    device: parseDevice(device.config),
     handle,
     points: new Map(points.map(point => {
       const mapped = mapPoint(point)
@@ -264,7 +281,7 @@ const createRuntime = (ctx: Context, device: DriverDevice, points: readonly Driv
   return {
     update(nextDevice, nextPoints): void {
       const previous = runtime.device
-      const device = modbusDeviceSchema.parse(nextDevice.config)
+      const device = parseDevice(nextDevice.config)
       const pointsChanged = nextPoints.length !== runtime.points.size
         || nextPoints.some(point => {
           const existing = runtime.points.get(pointKey(point))
@@ -319,12 +336,6 @@ const modbusDriverPlugin: Plugin.Object<void> = {
       id: 'modbus',
       title: 'Modbus TCP',
       schemas: { device: modbusDeviceSchema, point: modbusPointSchema },
-      probe: async (config) => {
-        const probe = await probeDevice(modbusDeviceSchema.parse(config))
-        return probe.ok
-          ? { ok: true, message: '连接成功' }
-          : { ok: false, message: probe.error }
-      },
       createConnection: (device, points, handle) => createRuntime(ctx, device, points, handle),
     })
   },

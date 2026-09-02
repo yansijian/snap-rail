@@ -162,7 +162,7 @@ function SchemaField(props: {
             onChange(Number.isNaN(parsed) ? undefined : parsed)
           }}
           allowDecimal={field.kind === 'number'}
-          placeholder={field.placeholder ?? '0'}
+          placeholder={field.placeholder ?? '—'}
           disabled={disabled}
         />
       )}

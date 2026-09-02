@@ -57,9 +57,12 @@ async function makeWorld(): Promise<World> {
         title: 'Rig 驱动',
         schemas: {
           device: z.object({ rate: z.number().int().min(1).default(5).meta({ title: '速率' }) }).strict(),
-          point: z.object({ type: z.enum(['bool', 'int', 'float', 'string']) }).strict(),
+          point: z.object({
+            type: z.enum(['bool', 'int', 'float', 'string']),
+            factor: z.number().int().optional().meta({ title: '系数' }),
+            fast: z.boolean().default(false).meta({ title: '快速' }),
+          }).strict(),
         },
-        probe: async () => ({ ok: true, message: '探测成功' }),
         createConnection: (device, _points, handle) => {
           world.rig = handle
           return { update: () => undefined, dispose: () => undefined }
@@ -169,13 +172,23 @@ describe('设备管理 page', () => {
     await flush(2)
   })
 
-  it('runs the driver probe and shows the verdict', async () => {
+  it('renders schema-derived dialect columns beside the live values', async () => {
     const world = await makeWorld()
+    world.host.field.upsertPoint('plc1', '温度', { name: '温度3', config: { factor: 7, fast: true } })
     world.open()
-    await waitFor(() => expect(screen.getByRole('button', { name: '测试连接' })).not.toBeNull())
 
-    fireEvent.click(screen.getByRole('button', { name: '测试连接' }))
-    await waitFor(() => expect(screen.getByText(/探测成功/)).not.toBeNull())
+    await waitFor(() => expect(screen.getByText('温度3')).not.toBeNull())
+    expect(screen.getByRole('columnheader', { name: '系数' })).not.toBeNull()
+    expect(screen.getByRole('columnheader', { name: '快速' })).not.toBeNull()
+
+    const rich = screen.getByText('温度3').closest('tr')!
+    expect(within(rich).getByText('7')).not.toBeNull()
+    expect(within(rich).getByText('是')).not.toBeNull()
+
+    // Unset optionals show the muted dash; booleans commit their default.
+    const plain = screen.getByText('温度1').closest('tr')!
+    expect(within(plain).getByText('—')).not.toBeNull()
+    expect(within(plain).getByText('否')).not.toBeNull()
     await flush(2)
   })
 })

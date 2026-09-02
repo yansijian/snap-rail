@@ -2,7 +2,7 @@ import { Context } from '@snap-rail/cordis'
 import { RpcTransportError, type ClientRequest, type ServerRequest, type ServerResponse } from '@snap-rail/protocol'
 import { afterEach, describe, expect, it } from 'vitest'
 import gatewayPlugin from '@snap-rail/gateway'
-import { HostLink, type HostChannel } from '../src/index.ts'
+import { HostLink, rpcErrorText, type HostChannel } from '../src/index.ts'
 
 const contexts: Context[] = []
 
@@ -78,5 +78,16 @@ describe('HostLink', () => {
     link.subscribe('point/updated', payload => received.push(payload))
 
     expect(() => channel.push({ method: 'point/updated', payload: {} })).toThrow(/invalid|required/i)
+  })
+})
+
+describe('rpcErrorText', () => {
+  it('prefers issues, then what, and never leaves internal bare', () => {
+    expect(rpcErrorText({ code: 'bad-request', details: { issues: ['地址无效', '功能码无效'] } })).toBe('地址无效；功能码无效')
+    expect(rpcErrorText({ code: 'conflict', details: { what: '点位已存在' } })).toBe('点位已存在')
+    // The masked-internal regression: the hint always names the failing step.
+    expect(rpcErrorText({ code: 'internal', details: { hint: 'field point upsert failed' } })).toBe('内部错误（field point upsert failed）')
+    expect(rpcErrorText({ code: 'internal' })).toBe('内部错误')
+    expect(rpcErrorText({ code: 'unavailable' })).toBe('unavailable')
   })
 })

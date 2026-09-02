@@ -152,7 +152,6 @@ describe('field rpc bridge', () => {
       {
         id: 'rig',
         title: 'Rig',
-        canProbe: false,
         schemas: {
           device: { type: 'object', properties: {}, additionalProperties: false },
           point: {

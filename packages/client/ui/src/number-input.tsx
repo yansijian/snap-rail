@@ -132,7 +132,7 @@ export function NumberInput(props: {
           </div>
           <div className="px-5 pb-5 pt-4">
             <div className="mb-4 min-h-14 rounded-md border border-border bg-muted px-4 py-3 text-right font-mono text-2xl tabular-nums" data-number-display>
-              {draft === '' ? <span className="text-muted-foreground">0</span> : draft}
+              {draft === '' ? <span className="text-muted-foreground">—</span> : draft}
             </div>
             <NumberPad value={draft} onChange={setDraft} onConfirm={confirm} allowDecimal={allowDecimal} />
           </div>

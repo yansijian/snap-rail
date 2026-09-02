@@ -67,7 +67,7 @@ function seedDevice(ctx: Context, port: number): void {
   ctx.field.upsertGroup('plc1', { name: '开关', type: 'bool' })
   ctx.field.upsertPoint('plc1', '温度', {
     name: '温度1',
-    config: { fc: 3, address: 100, encoding: 'f32', scale: 0.1, writable: false },
+    config: { fc: 3, address: 100, encoding: 'f32', writable: false },
   })
   ctx.field.upsertPoint('plc1', '计数', {
     name: '计数1',
@@ -86,7 +86,7 @@ function latestSample(samples: PointSample[], ref: PointRef): PointSample | unde
 describe('driver-modbus over the field base', () => {
   it('polls, decodes, and reports the first observation once online', async () => {
     const plc = await startFakePlc(server => servers.push(server))
-    plc.holding.set(100, floatRegs(100)[0] as number) // f32 raw 100.0 → scale 0.1 → 10
+    plc.holding.set(100, floatRegs(100)[0] as number) // f32 raw 100.0
     plc.holding.set(101, floatRegs(100)[1] as number)
     plc.holding.set(104, 0)
     plc.holding.set(105, 7) // u32 = 7
@@ -96,7 +96,7 @@ describe('driver-modbus over the field base', () => {
 
     await waitFor(() => world.statuses.some(frame => frame.id === 'plc1' && frame.status === 'online'), 'online')
     const temperature = latestSample(world.samples, tempRef)
-    expect(temperature?.value).toBeCloseTo(10)
+    expect(temperature?.value).toBeCloseTo(100)
     expect(latestSample(world.samples, countRef)?.value).toBe(7n)
     expect(latestSample(world.samples, switchRef)?.value).toBe(false)
   }, 15_000)

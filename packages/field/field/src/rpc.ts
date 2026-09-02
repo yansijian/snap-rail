@@ -96,7 +96,7 @@ const fieldRpcPlugin: Plugin.Object = {
     }))
 
     rpc.method(ctx, 'field.config.list', { request: fieldRequestSchemas['field.config.list'] }, () => ({
-      config: field.config(),
+      config: attempt('config read', () => field.config()),
     }))
 
     rpc.method(ctx, 'field.devices.upsert', { request: fieldRequestSchemas['field.devices.upsert'] }, ({ device }) => {
@@ -114,14 +114,6 @@ const fieldRpcPlugin: Plugin.Object = {
       attempt('device remove', () => field.removeDevice(id))
       audit.record({ actor: 'client', action: 'field.device.remove', subject: id })
       return { removed: true } as const
-    })
-
-    rpc.method(ctx, 'field.devices.test', { request: fieldRequestSchemas['field.devices.test'] }, async ({ device }) => {
-      try {
-        return await field.probe(device.driver, device.config)
-      } catch (cause) {
-        throw mapConfigError('device test', cause)
-      }
     })
 
     rpc.method(ctx, 'field.groups.upsert', { request: fieldRequestSchemas['field.groups.upsert'] }, ({ device, group }) => {
@@ -170,7 +162,7 @@ const fieldRpcPlugin: Plugin.Object = {
     }))
 
     rpc.method(ctx, 'field.mappings.list', { request: fieldRequestSchemas['field.mappings.list'] }, () => ({
-      mappings: field.mappings(),
+      mappings: attempt('mappings read', () => field.mappings()),
     }))
 
     for (const [name, payload] of Object.entries(fieldFrameSchemas)) {
@@ -211,8 +203,6 @@ function mapConfigError(what: string, cause: unknown): RpcBusinessError {
       case 'duplicate-point':
       case 'duplicate-driver':
         return new RpcBusinessError({ code: 'conflict', details: { what: cause.message } })
-      case 'no-probe':
-        return new RpcBusinessError({ code: 'unavailable', details: { what: cause.message } })
     }
   }
   return new RpcBusinessError({ code: 'internal', details: { hint: `field ${what} failed` } })

@@ -95,8 +95,6 @@ export interface ConfigApi {
 export interface DevicesApi {
   upsert(payload: { device: { id?: string, name: string, driver: string, config: DialectConfig } }): Promise<RpcResponse<{ device: ConfigDevice }>>
   remove(payload: { id: string }): Promise<RpcResponse<{ removed: true }>>
-  /** One-shot connectivity probe through the owning driver (`canProbe` drivers only). */
-  test(payload: { device: { driver: string, config: DialectConfig } }): Promise<RpcResponse<{ ok: boolean, message: string }>>
 }
 
 /** Group CRUD; type is immutable once the group has points. */
@@ -113,8 +111,8 @@ export interface PointConfigApi {
 
 /** Driver discovery and the generic mapping view. */
 export interface FieldMetaApi {
-  /** Every registered driver: identity, probe capability, and the JSON
-   * Schema projections of its dialect forms. */
+  /** Every registered driver: identity and the JSON Schema projections of
+   * its dialect forms. */
   listDrivers(payload: {}): Promise<RpcResponse<{ drivers: readonly DriverInfo[] }>>
   /** The aggregated, dialect-free mapping document (live devices only). */
   listMappings(payload: {}): Promise<RpcResponse<{ mappings: MappingDocument }>>
@@ -124,8 +122,6 @@ export interface FieldMetaApi {
 export interface DriverInfo {
   id: string
   title: string
-  /** Whether the driver offers `field.devices.test`. */
-  canProbe: boolean
   /** JSON Schema (input form) of the dialect forms — what the settings page renders. */
   schemas: { device: DialectSchema, point: DialectSchema }
 }
@@ -141,7 +137,6 @@ declare module '@snap-rail/protocol' {
     'field.config.list': ConfigApi['list']
     'field.devices.upsert': DevicesApi['upsert']
     'field.devices.remove': DevicesApi['remove']
-    'field.devices.test': DevicesApi['test']
     'field.groups.upsert': GroupsApi['upsert']
     'field.groups.remove': GroupsApi['remove']
     'field.points.upsert': PointConfigApi['upsert']
@@ -207,12 +202,6 @@ export const fieldRequestSchemas = {
     }).strict(),
   }).strict(),
   'field.devices.remove': z.object({ id: configName }).strict(),
-  'field.devices.test': z.object({
-    device: z.object({
-      driver: driverId,
-      config: dialectConfig,
-    }).strict(),
-  }).strict(),
   'field.groups.upsert': z.object({
     device: configName,
     group: z.object({

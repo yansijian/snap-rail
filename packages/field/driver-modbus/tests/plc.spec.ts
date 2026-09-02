@@ -76,12 +76,10 @@ describe('decodePoint', () => {
     expect(decodePoint(wide, { registers: [1, 0] }, 0, 'abcd')).toBe(65536n)
   })
 
-  it('decodes f32 with word order and applies scale', () => {
+  it('decodes f32 verbatim in both word orders', () => {
     const plain = point({ var: 'a', encoding: 'f32', type: 'float' })
     expect(decodePoint(plain, { registers: floatRegs(23.5) }, 0, 'abcd')).toBeCloseTo(23.5)
     expect(decodePoint(plain, { registers: floatRegs(23.5, 'cdab') }, 0, 'cdab')).toBeCloseTo(23.5)
-    const scaled = point({ var: 'c', encoding: 'f32', type: 'float', scale: 0.1 })
-    expect(decodePoint(scaled, { registers: floatRegs(100) }, 0, 'abcd')).toBeCloseTo(10)
   })
 
   it('reads coils as booleans', () => {
@@ -111,12 +109,12 @@ describe('encodeWrite', () => {
     expect(encodeWrite(big, -2n, 'cdab')).toEqual({ registers: [0xfffe, 0xffff] })
   })
 
-  it('reverses scale on f32 writes', () => {
-    const scaled = point({ var: 'a', encoding: 'f32', type: 'float', scale: 0.1, writable: true })
-    const encoded = encodeWrite(scaled, 10, 'abcd')
+  it('encodes f32 writes verbatim', () => {
+    const plain = point({ var: 'a', encoding: 'f32', type: 'float', writable: true })
+    const encoded = encodeWrite(plain, 23.5, 'abcd')
     const view = new DataView(new ArrayBuffer(4))
     view.setUint16(0, encoded.registers![0] as number)
     view.setUint16(2, encoded.registers![1] as number)
-    expect(view.getFloat32(0)).toBeCloseTo(100)
+    expect(view.getFloat32(0)).toBeCloseTo(23.5)
   })
 })

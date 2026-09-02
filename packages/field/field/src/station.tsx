@@ -1,7 +1,8 @@
 /**
  * 设备管理 (the unified field settings page): every configured device as a
- * tab — its connection LED and one-shot probe, typed group panels with
- * health LEDs, and point tables with live values. Everything is driven by
+ * tab — its connection LED, typed group panels with health LEDs, and point
+ * tables (schema-derived dialect columns beside the live values).
+ * Everything is driven by
  * the base's own tables (`field.config.list`) plus each driver's JSON-Schema
  * forms (SchemaForm); drivers ship zero renderer code. The base fields —
  * device name, group name and type, point name — are first-class controls
@@ -13,7 +14,7 @@
 import { Context, type Plugin } from '@snap-rail/cordis'
 // The settings-page seam's declaration merging (the inject below needs it).
 import '@snap-rail/client-settings'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { rpcErrorText, subscribeFrame, type HostLink } from '@snap-rail/connection'
 import {
   Badge,
@@ -41,9 +42,11 @@ import {
   TabsTrigger,
   TouchSelect,
   compactSchemaValue,
+  planSchemaFields,
   schemaDefaults,
   type SchemaFormValue,
 } from '@snap-rail/client-ui'
+import { Pencil, Trash2 } from 'lucide-react'
 import {
   fieldFrameSchemas,
   type ConfigDevice,
@@ -86,6 +89,18 @@ function groupTypesOf(driver: DriverInfo | undefined): string[] {
     if (values.length > 0) return values
   }
   return ['bool', 'int', 'float', 'string']
+}
+
+/** One planned dialect column (the same planner the settings form uses). */
+type SchemaFieldPlan = ReturnType<typeof planSchemaFields>[number]
+
+/** One schema-derived dialect cell: booleans as 是/否, unset optionals as a
+ * muted dash, everything else as its own string. */
+function dialectCellText(field: SchemaFieldPlan, config: Record<string, unknown>): string {
+  const value = config[field.name]
+  if (field.kind === 'boolean') return value === true ? '是' : '否'
+  if (value === undefined || value === null || value === '') return '—'
+  return String(value)
 }
 
 /** The connection line of one device as the header renders it. */
@@ -171,6 +186,12 @@ function GroupPanel(props: {
   const onSample = useCallback((name: string, sample: PointSample) => {
     setSamples(previous => ({ ...previous, [name]: sample }))
   }, [])
+  /** Dialect columns from the driver's point schema — the same planner the
+   * settings form uses; `type` rides the group badge, not a column. */
+  const dialectColumns = useMemo(
+    () => planSchemaFields(driver?.schemas.point ?? {}, ['type']),
+    [driver],
+  )
 
   let tone: 'green' | 'yellow' | 'red' = 'green'
   if (group.points.length > 0) {
@@ -223,9 +244,10 @@ function GroupPanel(props: {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-1/3">点位</TableHead>
+                    <TableHead className="w-1/4">点位</TableHead>
                     <TableHead>实时值</TableHead>
-                    <TableHead className="w-28 text-right">操作</TableHead>
+                    {dialectColumns.map(field => <TableHead key={field.name}>{field.label}</TableHead>)}
+                    <TableHead className="text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -239,41 +261,53 @@ function GroupPanel(props: {
                           onSample={onSample}
                         />
                       </TableCell>
+                      {dialectColumns.map(column => {
+                        const text = dialectCellText(column, point.config)
+                        return (
+                          <TableCell key={column.name} className={text === '—' ? 'text-muted-foreground' : undefined}>
+                            {text}
+                          </TableCell>
+                        )
+                      })}
                       <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            onDialog({
-                              kind: 'point-edit',
-                              deviceId,
-                              group,
-                              name: point.name,
-                              config: point.config,
-                            })
-                          }}
-                        >
-                          编辑
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => {
-                            onDialog({
-                              kind: 'confirm',
-                              title: '删除点位',
-                              message: `删除点位「${device}/${group.name}/${point.name}」？`,
-                              danger: () => {
-                                void link.call('field.points.remove', { device, group: group.name, name: point.name })
-                              },
-                            })
-                          }}
-                        >
-                          删除
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="编辑"
+                            onClick={() => {
+                              onDialog({
+                                kind: 'point-edit',
+                                deviceId,
+                                group,
+                                name: point.name,
+                                config: point.config,
+                              })
+                            }}
+                          >
+                            <Pencil className="h-5 w-5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="删除"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => {
+                              onDialog({
+                                kind: 'confirm',
+                                title: '删除点位',
+                                message: `删除点位「${device}/${group.name}/${point.name}」？`,
+                                danger: () => {
+                                  void link.call('field.points.remove', { device, group: group.name, name: point.name })
+                                },
+                              })
+                            }}
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -285,7 +319,7 @@ function GroupPanel(props: {
   )
 }
 
-/** One device tab body: link line, probe, groups. */
+/** One device tab body: link line, groups. */
 function DevicePanel(props: {
   link: HostLink
   device: ConfigDevice
@@ -294,32 +328,12 @@ function DevicePanel(props: {
   onDialog: (dialog: DialogState) => void
 }): ReactNode {
   const { link, device, snapshot, driver, onDialog } = props
-  const [probe, setProbe] = useState<{ phase: 'idle' | 'running', ok?: boolean, message?: string }>({ phase: 'idle' })
-
-  const runProbe = (): void => {
-    setProbe({ phase: 'running' })
-    void link.call('field.devices.test', { device: { driver: device.driver, config: device.config } })
-      .then(result => {
-        if (result.ok) setProbe({ phase: 'idle', ok: result.value.ok, message: result.value.message })
-        else setProbe({ phase: 'idle', ok: false, message: rpcErrorText(result.error) })
-      })
-  }
 
   return (
     <div className="grid gap-4" data-device-panel={device.id}>
       <div className="flex flex-wrap items-center gap-3">
         <DeviceLinkLine snapshot={snapshot} />
         <Badge variant="outline">{driver?.title ?? device.driver}</Badge>
-        {driver?.canProbe === true && (
-          <Button type="button" variant="outline" size="sm" disabled={probe.phase === 'running'} onClick={runProbe}>
-            {probe.phase === 'running' ? '测试中…' : '测试连接'}
-          </Button>
-        )}
-        {probe.message !== undefined && (
-          <span className={`text-sm ${probe.ok === true ? 'text-success' : 'text-destructive'}`} data-probe-result>
-            {probe.ok === true ? '✓' : '✕'} {probe.message}
-          </span>
-        )}
         <span className="flex-1" />
         <Button type="button" variant="outline" size="sm" onClick={() => { onDialog({ kind: 'device-edit', device }) }}>
           编辑设备

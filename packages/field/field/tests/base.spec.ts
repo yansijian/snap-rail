@@ -33,6 +33,8 @@ interface RigDriver {
   disposed: string[]
   handles: Map<string, DriverHandle>
   points: Map<string, readonly DriverPoint[]>
+  /** When set, createConnection throws — the schema-drift fixture. */
+  failCreate: boolean
 }
 
 function makeRigDriver(): RigDriver {
@@ -42,6 +44,7 @@ function makeRigDriver(): RigDriver {
     disposed: [],
     handles: new Map(),
     points: new Map(),
+    failCreate: false,
     plugin: undefined as never,
   }
   rig.plugin = Object.assign(function rigDriver(ctx: Context): void {
@@ -52,8 +55,8 @@ function makeRigDriver(): RigDriver {
         device: z.object({ rate: z.number().int().min(1).default(1) }).strict(),
         point: z.object({ type: z.enum(['bool', 'int', 'float', 'string']), factor: z.number().optional() }).strict(),
       },
-      probe: async config => ({ ok: config.rate !== 7, message: config.rate !== 7 ? 'ok' : '拒绝 7' }),
       createConnection: (device, points, handle): DriverConnection => {
+        if (rig.failCreate) throw new Error('dialect drifted')
         rig.created.push({ id: device.id, name: device.name, config: device.config })
         rig.handles.set(device.id, handle)
         rig.points.set(device.id, points)
@@ -83,7 +86,7 @@ interface World {
   connectionRemoved: string[]
 }
 
-async function makeWorld(): Promise<World> {
+async function makeWorld(opts: { failCreate?: boolean } = {}): Promise<World> {
   const home = mkdtempSync(join(tmpdir(), 'snap-rail-field-base-'))
   const ctx = new Context()
   worlds.push({ ctx, home })
@@ -91,6 +94,7 @@ async function makeWorld(): Promise<World> {
   await ctx.plugin(storePlugin)
   await ctx.plugin(fieldPlugin)
   const rig = makeRigDriver()
+  rig.failCreate = opts.failCreate === true
   await ctx.plugin(rig.plugin)
 
   const world: World = {
@@ -246,18 +250,35 @@ describe('field base: orchestration', () => {
     // in between changed nothing for the driver and was skipped.
     expect(world.rig.updates).toHaveLength(2)
 
-    // A point lands: setPoints diffs it in, the controller sees update().
+    // A point lands: setPoints diffs it in, the controller sees update()
+    // on the next microtask (the hop keeps sync throws out of the RPC).
     world.ctx.field.upsertPoint(id, 'main', { name: 'extra', config: {} })
+    await new Promise(resolve => setTimeout(resolve, 0))
     expect(world.pointAdded.at(-1)).toBe(`${id}/main/extra`)
     expect(world.rig.updates).toHaveLength(3)
     expect(world.rig.points.get(id)).toHaveLength(3)
 
     // A device config change rides update() without a rebuild.
     world.ctx.field.upsertDevice({ id, name: 'rig-1', driver: 'rig', config: { rate: 5 } })
+    await new Promise(resolve => setTimeout(resolve, 0))
     expect(world.rig.updates).toHaveLength(4)
     expect(world.rig.updates[3]?.config).toEqual({ rate: 5 })
     expect(world.rig.created).toHaveLength(1)
     expect(world.rig.disposed).toEqual([])
+  })
+
+  it('parks a device whose driver refuses its connection, without failing mutations', async () => {
+    const world = await makeWorld({ failCreate: true })
+    // The upserts land (the tables are the source of truth); the driver's
+    // refusal parks the device lifeless instead of failing the mutation.
+    const device = world.ctx.field.upsertDevice({ name: 'drift', driver: 'rig', config: {} })
+    world.ctx.field.upsertGroup(device.id, { name: 'g', type: 'int' })
+    expect(world.ctx.field.upsertPoint(device.id, 'g', { name: 'p', config: {} })).toEqual({ name: 'p', config: {} })
+    expect(world.ctx.connections.list()).toEqual([])
+    expect(world.ctx.points.list()).toEqual([])
+    // Later mutations keep working (no duplicate-connection explosion).
+    expect(() => world.ctx.field.upsertPoint(device.id, 'g', { name: 'p2', config: {} })).not.toThrow()
+    expect(world.ctx.field.config().devices[0]?.groups[0]?.points).toHaveLength(2)
   })
 
   it('rebuilds the connection when the device renames; re-registration replaces', async () => {
@@ -276,14 +297,6 @@ describe('field base: orchestration', () => {
     expect(world.rig.disposed).toEqual([id, id])
     expect(world.rig.created).toHaveLength(3)
     expect(world.ctx.points.list().map(point => pointKey(point))).toHaveLength(2)
-  })
-
-  it('routes probes through the driver with schema validation', async () => {
-    const world = await makeWorld()
-    await expect(world.ctx.field.probe('rig', {})).resolves.toEqual({ ok: true, message: 'ok' })
-    await expect(world.ctx.field.probe('rig', { rate: 7 })).resolves.toEqual({ ok: false, message: '拒绝 7' })
-    await expect(world.ctx.field.probe('rig', { rate: 'x' as never })).rejects.toMatchObject({ kind: 'invalid-config' })
-    await expect(world.ctx.field.probe('ghost', {})).rejects.toMatchObject({ kind: 'unknown-driver' })
   })
 
   it('serves the aggregated mapping document from its own tables', async () => {

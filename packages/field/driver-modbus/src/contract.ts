@@ -49,19 +49,19 @@ const encodingType: Record<ModbusEncoding, PointType> = {
 
 /** The dialect part of a point config: addressing, encoding, write policy.
  * `type` arrives from the group (the base supplies it; the unified settings
- * form hides the field); the refinement pins encoding against it. */
+ * form hides the field); the refinement pins encoding against it. Unknown
+ * keys strip (not reject) so dialect fields retired from the schema never
+ * brick rows already stored. */
 export const modbusPointSchema = z.object({
   type: z.enum(['bool', 'int', 'float']).meta({ title: '类型' }),
   fc: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).meta({ title: '功能码' }),
   /** Zero-based raw address (no 4xxxx convention). */
   address: z.number().int().min(0).max(65_535).meta({ title: '地址' }),
   encoding: z.enum(['coil', 'discrete', 'i16', 'u16', 'i32', 'u32', 'f32']).meta({ title: '编码' }),
-  /** Multiply the raw value on decode (f32 only); defaults to 1. */
-  scale: z.number().refine(value => value !== 0).optional().meta({ title: '缩放系数' }),
   writable: z.boolean().default(false).meta({ title: '可写' }),
-  /** Deadband for float change detection; 0 (exact compare) by default. */
+  /** Deadband for numeric change detection; 0 (exact compare) by default. */
   deadband: z.number().min(0).optional().meta({ title: '变化死区' }),
-}).strict().superRefine((point, issues) => {
+}).superRefine((point, issues) => {
   if (encodingType[point.encoding] !== point.type) {
     issues.addIssue({ code: 'custom', message: `encoding ${point.encoding} carries type ${encodingType[point.encoding]}, not ${point.type}`, path: ['encoding'] })
   }
@@ -80,11 +80,8 @@ export const modbusPointSchema = z.object({
   if (point.writable && point.encoding === 'discrete') {
     issues.addIssue({ code: 'custom', message: 'discrete inputs are read-only', path: ['writable'] })
   }
-  if (point.scale !== undefined && point.encoding !== 'f32') {
-    issues.addIssue({ code: 'custom', message: 'scale applies to f32 only', path: ['scale'] })
-  }
-  if (point.deadband !== undefined && point.encoding !== 'f32') {
-    issues.addIssue({ code: 'custom', message: 'deadband applies to f32 only', path: ['deadband'] })
+  if (point.deadband !== undefined && (point.encoding === 'coil' || point.encoding === 'discrete')) {
+    issues.addIssue({ code: 'custom', message: 'deadband applies to numeric encodings only', path: ['deadband'] })
   }
 })
 

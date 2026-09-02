@@ -1,8 +1,8 @@
 /**
  * The field seam: the device-connection base. It owns the configuration
  * tables (devices/groups/points, `data/field.db`) and the live point table.
- * Drivers register as pure protocol adapters — dialect schemas, an optional
- * probe, and a connection factory; the base orchestrates: it computes the
+ * Drivers register as pure protocol adapters — dialect schemas and a
+ * connection factory; the base orchestrates: it computes the
  * desired state from its tables and calls `createConnection`/`update`/
  * `dispose`, while the driver decides how a change lands (hot-apply versus
  * reconnect). Consumers (dashboards, alarms, agents) subscribe, read, and
@@ -56,7 +56,7 @@ export type FieldErrorKind =
   | 'duplicate-connection' | 'duplicate-point' | 'duplicate-driver'
   | 'unknown-point' | 'unknown-driver' | 'unknown-device' | 'unknown-group'
   | 'driver-conflict' | 'type-conflict' | 'type-mismatch' | 'invalid-config'
-  | 'no-probe' | 'no-write-handler'
+  | 'no-write-handler'
 
 /** A field-seam failure carrying a machine-readable kind. */
 export class FieldError extends Error {
@@ -111,12 +111,6 @@ export interface DriverConnection {
   dispose(): Promise<void> | void
 }
 
-/** The verdict of a one-shot connectivity probe. */
-export interface ProbeResult {
-  ok: boolean
-  message: string
-}
-
 /** The dialect schemas a driver registers: zod objects whose JSON Schema
  * projections drive the base's settings forms. The point schema validates
  * the merged `{ type, ...config }` object — the base supplies `type` from
@@ -138,9 +132,6 @@ export interface DriverRegistration {
   title: string
   /** The dialect schemas (validated configs, form projections). */
   schemas: DriverSchemas
-  /** One-shot connectivity check behind `field.devices.test`; omit when the
-   * protocol has no pre-connection test. */
-  probe?: (config: DialectConfig) => Promise<ProbeResult>
   /** Build the connection for a configured device. Called whenever the
    * device (re)enters the desired state under this driver. */
   createConnection: (device: DriverDevice, points: readonly DriverPoint[], handle: DriverHandle) => DriverConnection
@@ -173,7 +164,6 @@ interface DriverEntry {
   info: DriverInfo
   deviceSchema: z.ZodType<DialectConfig>
   pointSchema: z.ZodType<DialectConfig>
-  probe?: DriverRegistration['probe']
   createConnection: DriverRegistration['createConnection']
 }
 
@@ -283,8 +273,6 @@ export interface FieldService {
   upsertPoint(device: string, group: string, point: { name: string, config: DialectConfig }): ConfigPoint
   /** Remove a point. */
   removePoint(ref: PointRef): void
-  /** One-shot connectivity probe through the driver. */
-  probe(driver: string, config: DialectConfig): Promise<ProbeResult>
 }
 
 function expectedValueType(type: PointType): string {
@@ -305,10 +293,15 @@ function projectSchema(schema: z.ZodType<DialectConfig>): DialectSchema {
   return projected
 }
 
-/** Parse a stored config blob; a malformed one reads as empty (write paths
- * guarantee valid JSON, so this only guards hand-edited files). */
+/** Parse a stored config blob; malformed JSON is a readable field failure
+ * (write paths guarantee valid JSON, so this only guards hand-edited files). */
 function parseConfig(raw: string): DialectConfig {
-  const parsed: unknown = JSON.parse(raw)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new FieldError('invalid-config', `stored config is not valid JSON: ${raw.slice(0, 80)}`)
+  }
   return typeof parsed === 'object' && parsed !== null ? parsed as DialectConfig : {}
 }
 
@@ -350,7 +343,6 @@ class FieldCore {
       info: {
         id: desc.id,
         title: desc.title,
-        canProbe: desc.probe !== undefined,
         schemas: {
           device: projectSchema(desc.schemas.device),
           point: projectSchema(desc.schemas.point),
@@ -358,7 +350,6 @@ class FieldCore {
       },
       deviceSchema: desc.schemas.device,
       pointSchema: desc.schemas.point,
-      ...(desc.probe !== undefined ? { probe: desc.probe } : {}),
       createConnection: desc.createConnection,
     }
     // A same-id registration replaces (hot-reload semantics): the old
@@ -613,21 +604,6 @@ class FieldCore {
     this.afterMutation()
   }
 
-  async probe(driverId: string, config: DialectConfig): Promise<ProbeResult> {
-    const driver = this.drivers.get(driverId)
-    if (driver === undefined) {
-      throw new FieldError('unknown-driver', `driver "${driverId}" is not registered`)
-    }
-    if (driver.probe === undefined) {
-      throw new FieldError('no-probe', `driver "${driverId}" offers no connectivity test`)
-    }
-    const parsed = driver.deviceSchema.safeParse(config)
-    if (!parsed.success) {
-      throw new FieldError('invalid-config', `device config rejected by driver "${driverId}": ${issuesOf(parsed.error)}`)
-    }
-    return driver.probe(parsed.data)
-  }
-
   // ---- the mapping view ----
 
   mappings(): MappingDocument {
@@ -700,14 +676,30 @@ class FieldCore {
           sample: (ref, value) => connection.sample(ref, value),
           onWrite: handler => connection.setWriteHandler(handler),
         }
-        const controller = driver.createConnection(device, points, handle)
+        let controller: DriverConnection
+        try {
+          controller = driver.createConnection(device, points, handle)
+        } catch (cause) {
+          // A driver refusing the desired state (a stored config its schema
+          // no longer accepts) must not take the mutation — or the whole
+          // plugin load — with it: park the device lifeless with the reason
+          // on its connection line; the next reconcile retries.
+          const reason = cause instanceof Error ? cause.message : String(cause)
+          connection.setStatus('offline', `驱动连接创建失败：${reason}`)
+          this.ctx.logger.error('field: driver connection failed for %s', row.id, cause)
+          connection.dispose()
+          continue
+        }
         this.controllers.set(row.id, { driverId: row.driverId, title: row.name, connection, controller, applied })
         continue
       }
       existing.connection.setPoints(descriptors)
       if (existing.applied !== applied) {
         existing.applied = applied
-        void Promise.resolve(existing.controller.update(device, points)).catch(cause => {
+        // The microtask hop turns a synchronous throw from `update` into a
+        // rejection this catch absorbs; calling it directly would let the
+        // throw escape reconcile into the triggering RPC as `internal`.
+        void Promise.resolve().then(() => existing.controller.update(device, points)).catch(cause => {
           this.ctx.logger.error('field: driver connection update failed for %s', row.id, cause)
         })
       }
@@ -921,9 +913,6 @@ class FieldServiceImpl extends Service {
     this.core.removePoint(ref)
   }
 
-  probe(driver: string, config: DialectConfig): Promise<ProbeResult> {
-    return this.core.probe(driver, config)
-  }
 }
 
 /** The field seam plugin: mounts `ctx.points`, `ctx.connections`, and `ctx.field`. */
