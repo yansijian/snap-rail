@@ -48,11 +48,9 @@ import {
   fieldFrameSchemas,
   type ConfigDevice,
   type ConfigGroup,
-  type ConnectionSnapshot,
   type DriverInfo,
-  type PointRef,
-  type PointSample,
-} from './index.ts'
+} from './wire.ts'
+import type { ConnectionSnapshot, PointRef, PointSample } from './model.ts'
 
 /** The settings page id this face registers under. */
 const PAGE_ID = 'field'

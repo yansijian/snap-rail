@@ -23,6 +23,7 @@ function snapRailSources(): Plugin {
     '@snap-rail/cordis': 'vendor/cordis/src/index.ts',
     '@snap-rail/cordis-plugin-timer': 'vendor/timer/src/index.ts',
     '@snap-rail/cosmokit': 'vendor/cosmokit/src/index.ts',
+    '@snap-rail/util': 'packages/util/util/src/index.ts',
     '@snap-rail/protocol': 'packages/protocol/protocol/src/index.ts',
     '@snap-rail/connection': 'packages/protocol/connection/src/index.ts',
     '@snap-rail/gateway': 'packages/protocol/gateway/src/index.ts',
@@ -38,6 +39,8 @@ function snapRailSources(): Plugin {
     '@snap-rail/client-settings': 'packages/client/settings/src/index.ts',
     '@snap-rail/client-variables': 'packages/client/variables/src/index.ts',
     '@snap-rail/client-runtime': 'packages/client/runtime/src/index.tsx',
+    '@snap-rail/client-modules': 'packages/client/modules/src/index.ts',
+    '@snap-rail/client-fallback': 'packages/client/fallback/src/index.tsx',
     '@snap-rail/suite-terminal-ops': 'packages/suites/terminal-ops/src/index.tsx',
     '@snap-rail/settings-station': 'packages/client/settings-station/src/index.tsx',
   }
@@ -56,6 +59,7 @@ function snapRailSources(): Plugin {
   sourceOf.set('@snap-rail/app-boot/contract', `${repoRoot}/packages/boot/app-boot/src/contract.ts`)
   sourceOf.set('@snap-rail/station-rpc/contract', `${repoRoot}/packages/boot/station-rpc/src/contract.ts`)
   sourceOf.set('@snap-rail/driver-modbus/contract', `${repoRoot}/packages/field/driver-modbus/src/contract.ts`)
+  sourceOf.set('@snap-rail/field/contract', `${repoRoot}/packages/field/field/src/contract.ts`)
   // The unified 设备管理 settings page is the field base's renderer face; its
   // entry must never pull the node-side base (store/drizzle) into the client
   // build — it consumes the base only through the wire.

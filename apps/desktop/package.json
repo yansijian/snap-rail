@@ -31,7 +31,9 @@
     "electron-updater": "^6.6.2"
   },
   "devDependencies": {
+    "@snap-rail/client-fallback": "workspace:^",
     "@snap-rail/client-kernel": "workspace:^",
+    "@snap-rail/client-modules": "workspace:^",
     "@snap-rail/client-runtime": "workspace:^",
     "@snap-rail/client-settings": "workspace:^",
     "@snap-rail/client-variables": "workspace:^",

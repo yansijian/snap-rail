@@ -27,7 +27,7 @@ import {
   Badge, Button, Card, CardContent, CardHeader, CardTitle, DragScroll, Label, TouchSelect, cn,
 } from '@snap-rail/client-ui'
 import { rpcErrorText, subscribeFrame } from '@snap-rail/connection'
-import { pointKey, type PointDescriptor } from '@snap-rail/field'
+import { pointKey, type PointDescriptor } from '@snap-rail/field/contract'
 import { settingsChangedSchema } from '@snap-rail/station-rpc/contract'
 import {
   COUNT_BINDING_KEY,

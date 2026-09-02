@@ -27,6 +27,7 @@
     "kind": "suite"
   },
   "dependencies": {
+    "@snap-rail/util": "workspace:^",
     "drizzle-orm": "^0.45.2",
     "zod": "^4.4.3"
   },

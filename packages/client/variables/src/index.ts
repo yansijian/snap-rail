@@ -28,7 +28,7 @@ import {
   type PointRef,
   type PointType,
   type PointValue,
-} from '@snap-rail/field'
+} from '@snap-rail/field/contract'
 import { useEffect, useState } from 'react'
 
 /** The slice of `ctx.client` this package needs; typed locally so the
