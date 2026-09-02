@@ -5,14 +5,17 @@
  * tokens with the fog-white shop-floor set (accent: cobalt #4a6cff/#3857e8,
  * picked in docs/design/theme-samples.html). Data series colors live in
  * --color-chart-1…6 (see docs/theme.md); red/amber/green stay reserved for
- * state semantics. Class scanning is explicit (auto-detection roots at the
- * Vite cwd, which is the app, not the workspace), and respects gitignore —
- * build outputs under lib/dist are skipped naturally.
+ * state semantics. Class scanning is explicit (auto-detection roots at
+ * the Vite cwd, which is the app, not the workspace), @source globs
+ * resolve relative to this file, and gitignore is respected — build
+ * outputs under lib/lib-client/dist are skipped naturally. One broad
+ * glob covers every package's sources (spine client faces, suites,
+ * field stations alike), so the occupant roster is never re-listed
+ * here; the theme.spec gate fails loud if a package falls outside it.
  */
 @import "tailwindcss";
 
-@source "../../**/*.{ts,tsx}";
-@source "../../../apps/desktop/src/client/**/*.html";
+@source "../../../**/src/**/*.{ts,tsx}";
 
 @theme {
   --color-background: #0b0f14;

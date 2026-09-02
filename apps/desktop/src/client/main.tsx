@@ -127,8 +127,14 @@ const OCCUPANTS: ReadonlyArray<{ name: string, plugin: Plugin }> = [
   }
 }
 
+// Pool-installed faces shadow the shipped occupant of the same name — the
+// host compose side resolves the same way (pool rows win), so both ends
+// mount exactly one instance per package.
 const seats: (Plugin | OccupantSpec)[] = []
-for (const seat of [...OCCUPANTS, ...installed]) {
+const mounted = new Set<string>()
+for (const seat of [...installed, ...OCCUPANTS]) {
+  if (mounted.has(seat.name)) continue
+  mounted.add(seat.name)
   const row = rows.get(seat.name)
   if (row?.enabled === false) continue
   seats.push(row?.config === undefined ? seat.plugin : { plugin: seat.plugin, config: row.config })

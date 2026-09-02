@@ -18,6 +18,17 @@ Tailwind v4 `@theme` 里的令牌就是黑夜模式（石墨钢面板 + 钴蓝�
 页面代码永远只用令牌工具类（`bg-card`、`text-muted-foreground`…），**不得出现
 硬编码色值或 `dark:` 变体**——模式切换靠令牌自动生效。
 
+## 类扫描（工具类从哪来）
+
+全仓唯一样式表就是 `theme.css`，工具类靠 Tailwind 扫源码生成。`@source`
+按 **CSS 文件自身位置** 解析（不是 Vite cwd，自动探测只覆盖
+`apps/desktop/src/client`）：一条宽 glob `../../../**/src/**/*.{ts,tsx}`
+覆盖 `packages/` 下所有包的 src（脊柱 client 面、套件、field 站点一起），
+住户名单不在此复列；构建产物被 gitignore 天然排除。**放进 `packages/` 的
+新渲染包无需改扫描**；但把渲染源码挪出 `packages/` 的 src 会让它独有的
+类静默消失——`packages/client/ui/tests/theme-scan.spec.ts` 的门禁（每条
+`@source` 前缀真实存在 + 覆盖每个包）会当场红。
+
 ## 调色板
 
 | 令牌 | 黑夜 | 白天 | 用途 |
