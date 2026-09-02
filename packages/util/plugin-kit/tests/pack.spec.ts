@@ -61,9 +61,11 @@ describe('final-format assembly (built tree)', () => {
     expect(paths).toContain('lib-client/client.js')
     expect(paths.some(path => path.startsWith('lib-client/assets/'))).toBe(true)
     // Multi-entry host builds emit shared chunks beside the entries — the
-    // whole built directory ships, declarations and maps never.
+    // whole built directory ships, declarations, maps, and the tsc staging
+    // tree never.
     expect(paths.filter(path => path.startsWith('lib/') && path.endsWith('.js')).length).toBeGreaterThan(1)
     expect(paths.every(path => !path.startsWith('src/'))).toBe(true)
+    expect(paths.every(path => !path.startsWith('lib/types/'))).toBe(true)
     expect(paths.every(path => !path.endsWith('.d.ts') && !path.endsWith('.js.map'))).toBe(true)
     const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!))
     expect(manifest.name).toBe('@snap-rail/suite-terminal-ops')

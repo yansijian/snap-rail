@@ -112,6 +112,12 @@ export async function releaseFiles(spec: ReleaseSpec): Promise<Record<string, Ui
     'package.json': new TextEncoder().encode(releaseManifest(source, spec.hostFace)),
   }
   Object.assign(files, await collectDir(join(spec.dir, spec.hostDir), spec.dir))
+  // The tsc staging tree (`<hostDir>/types` — type-stripped intermediates the
+  // two-stage build emits beside the faces, stale files included) is build
+  // plumbing like declarations and maps; it never ships.
+  for (const path of Object.keys(files)) {
+    if (path === `${spec.hostDir}/types` || path.startsWith(`${spec.hostDir}/types/`)) delete files[path]
+  }
   if (files[spec.hostFace] === undefined) {
     throw new Error(`pack: ${spec.name} is missing its host face ${spec.hostFace} under ${spec.hostDir}`)
   }
