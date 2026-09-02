@@ -13,8 +13,10 @@
 import { Context, type Plugin } from '@snap-rail/cordis'
 import type { ReactNode } from 'react'
 
-/** Well-known slot ids (the closed phase-1 vocabulary). */
-export type SlotId = 'titlebar' | 'sidebar' | 'view' | 'statusbar' | 'layout' | `custom:${string}`
+/** Well-known slot ids (the closed phase-1 vocabulary). `titlebar-actions`
+ * hosts icon-button occupants (flush window-button styling) rendered inside
+ * a titlebar's right-side control group. */
+export type SlotId = 'titlebar' | 'titlebar-actions' | 'sidebar' | 'view' | 'statusbar' | 'layout' | `custom:${string}`
 
 /** What one occupant contributes to a slot. */
 export interface SlotOccupant {

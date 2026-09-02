@@ -56,14 +56,19 @@ export interface RpcIntrospectApi {
 }
 
 /**
- * Native window controls for frameless shells. The handler targets the
- * shell's single main window; phase 1 is one-window by design.
+ * Native window controls for frameless shells. Controls default to the main
+ * window; `target: 'forge'` routes to the singleton AI 创造 studio window
+ * (the one `openForge` opens) so its own titlebar drives its own window.
  */
 export interface WindowApi {
   /** Apply a window action (`minimize`, `toggle-maximize`, `close`); `false` when no window exists to act on. */
-  control(payload: { action: 'minimize' | 'toggle-maximize' | 'close' }): Promise<RpcResponse<{ applied: boolean }>>
+  control(payload: { action: 'minimize' | 'toggle-maximize' | 'close', target?: 'forge' | undefined }): Promise<RpcResponse<{ applied: boolean }>>
   /** Native zip picker for the plugin installer; `null` when cancelled. */
   pickZip(payload: { title?: string | undefined }): Promise<RpcResponse<string | null>>
+  /** Native zip saver (generated-plugin export); `null` when cancelled. */
+  saveZip(payload: { title?: string | undefined, defaultFileName: string }): Promise<RpcResponse<string | null>>
+  /** Open (or focus) the AI 创造 studio window — the app's second window, a singleton. */
+  openForge(payload: Record<string, never>): Promise<RpcResponse<{ applied: true }>>
   /** Relaunch the app (suite switches need a fresh boot to remount). */
   relaunch(payload: Record<string, never>): Promise<RpcResponse<{ applied: true }>>
 }
@@ -75,6 +80,8 @@ export interface RpcMethodMap {
   'rpc.describe': RpcIntrospectApi['describe']
   'window.control': WindowApi['control']
   'window.pick-zip': WindowApi['pickZip']
+  'window.save-zip': WindowApi['saveZip']
+  'window.open-forge': WindowApi['openForge']
   'window.relaunch': WindowApi['relaunch']
 }
 

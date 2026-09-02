@@ -14,7 +14,7 @@ import '@snap-rail/client-settings'
 import '@snap-rail/client-slots'
 import { Button, useRefresh } from '@snap-rail/client-ui'
 import type { HostLink } from '@snap-rail/connection'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 
 /**
  * The renderer's host-link service (declared by client-runtime; reached via
@@ -60,6 +60,11 @@ function FallbackShell(props: { ctx: Context, link: HostLink }): ReactNode {
       <div className="flex h-10 shrink-0 items-center justify-between border-b border-border pl-4 select-none" style={{ WebkitAppRegion: 'drag' } as never}>
         <span className="text-sm text-muted-foreground">snap-rail</span>
         <div className="flex items-center" style={{ WebkitAppRegion: 'no-drag' } as never}>
+          {/* Occupant-contributed icon buttons (e.g. forge's AI 创造 entry)
+           * stay reachable even with no suite active. */}
+          {props.ctx.uiSlots.list('titlebar-actions').map(occupant => (
+            <Fragment key={occupant.id}>{occupant.render()}</Fragment>
+          ))}
           <button
             type="button"
             aria-label="设置"
