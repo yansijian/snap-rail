@@ -3,7 +3,8 @@
  * dragged with the mouse (both axes). Touch and pen keep Chromium's native
  * pan, so only mouse pointers are intercepted. A 6px threshold separates a
  * pan from a press; the click that follows a pan is swallowed so dragged
- * rows never fire.
+ * rows never fire. DragScrolls nest (a table inside a scrolled page); only
+ * the innermost container under the pressed target takes the gesture.
  *
  * @module @snap-rail/client-ui/drag-scroll
  */
@@ -22,12 +23,26 @@ export function DragScroll({ className, children, ...props }: ComponentProps<'di
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.pointerType !== 'mouse' || event.button !== 0) return
+    // DragScrolls nest (a table inside a scrolled page). If both armed on
+    // one press, the ancestor's setPointerCapture would steal the pointer
+    // from the innermost container mid-gesture: its pan freezes and its
+    // state leaks past the release into a hover-follow. Only the innermost
+    // container under the pressed target arms.
+    if (container.current === null) return
+    const innermost = event.target instanceof Element ? event.target.closest('[data-drag-scroll]') : null
+    if (innermost !== null && innermost !== container.current) return
     pan.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }
   }
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
     const state = pan.current
     if (state === null || state.id !== event.pointerId) return
+    // A buttonless move means the press ended without our pointerup — the
+    // capture was stolen. Drop the stale pan instead of following hover.
+    if (event.buttons === 0) {
+      pan.current = null
+      return
+    }
     const el = container.current
     if (el === null) return
     const dx = state.x - event.clientX
@@ -60,6 +75,7 @@ export function DragScroll({ className, children, ...props }: ComponentProps<'di
   return (
     <div
       ref={container}
+      data-drag-scroll=""
       className={cn('overflow-auto', className)}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
