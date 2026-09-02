@@ -538,6 +538,12 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@snap-rail/audit':
+        specifier: workspace:^
+        version: link:../../audit/audit
+      '@snap-rail/client-settings':
+        specifier: workspace:^
+        version: link:../../client/settings
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
@@ -547,9 +553,18 @@ importers:
       '@snap-rail/field':
         specifier: workspace:^
         version: link:../field
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../protocol/gateway
       '@snap-rail/store':
         specifier: workspace:^
         version: link:../../store/store
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.0
       rolldown:
         specifier: ^1.2.5
         version: 1.2.5

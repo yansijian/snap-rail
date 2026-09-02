@@ -2,10 +2,11 @@
  * SchemaForm: the settings vocabulary's generic form engine. It renders one
  * labeled control per property of a JSON Schema (the input-form projection
  * drivers register with the field base — zod's `toJSONSchema`), on the touch
- * baseline: enums become TouchSelect rows, numbers open the NumberPad,
- * booleans ride a Switch. Property `title`s (zod `.meta({ title })`) label
- * the fields; the host's zod schemas remain the only validator — this form
- * shapes input, it does not judge it.
+ * baseline: enums and literal unions become TouchSelect rows (committing the
+ * literal's own type — a number const rides back as a number), numbers open
+ * the NumberPad, booleans ride a Switch. Property `title`s (zod
+ * `.meta({ title })`) label the fields; the host's zod schemas remain the
+ * only validator — this form shapes input, it does not judge it.
  *
  * The vocabulary is meant to grow (discovery pickers, repeatable groups);
  * what a schema expresses beyond today's subset renders as a plain text
@@ -29,6 +30,7 @@ export type SchemaFormValue = Record<string, string | number | boolean | undefin
 interface PropertySchema {
   type?: unknown
   enum?: unknown
+  anyOf?: unknown
   title?: unknown
   description?: unknown
   default?: unknown
@@ -47,6 +49,9 @@ interface FieldPlan {
   required: boolean
   kind: 'enum' | 'string' | 'integer' | 'number' | 'boolean' | 'text'
   options?: TouchSelectOption[]
+  /** option value → the schema-native value to commit — number literals stay
+   * numbers (a union of `z.literal(1)`s must round-trip as 1, never "1"). */
+  literalOf?: Record<string, string | number | boolean>
   placeholder?: string
 }
 
@@ -66,12 +71,25 @@ export function planSchemaFields(
     const property = rawProperty as PropertySchema
     const label = typeof property.title === 'string' && property.title !== '' ? property.title : name
     const field: FieldPlan = { name, label, required: required.has(name), kind: 'string' }
-    if (Array.isArray(property.enum) && property.enum.length > 0) {
+    // zod emits a union of literals either way: plain enums as `enum`, and
+    // `z.union([z.literal(1), …])` as `anyOf: [{const: 1}, …]`.
+    const literals = Array.isArray(property.enum) ? property.enum
+      : Array.isArray(property.anyOf)
+        ? property.anyOf.map(entry => isPropertySchema(entry) && 'const' in entry
+          ? (entry as { const: unknown }).const
+          : undefined)
+        : undefined
+    const typed = literals?.filter((value): value is string | number | boolean =>
+      typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')
+    if (literals !== undefined && typed !== undefined && typed.length > 0 && typed.length === literals.length) {
+      const valueOf: Record<string, string | number | boolean> = {}
       field.kind = 'enum'
-      field.options = property.enum.map((value): TouchSelectOption => ({
-        value: String(value),
-        label: String(value),
-      }))
+      field.options = typed.map(value => {
+        const key = String(value)
+        valueOf[key] = value
+        return { value: key, label: key }
+      })
+      field.literalOf = valueOf
     } else {
       switch (property.type) {
         case 'integer': field.kind = 'integer'; break
@@ -130,7 +148,7 @@ function SchemaField(props: {
           label={field.label}
           value={value === undefined ? '' : String(value)}
           options={field.options}
-          onValueChange={onChange}
+          onValueChange={next => { onChange(field.literalOf?.[next] ?? next) }}
           disabled={disabled}
         />
       )}

@@ -61,6 +61,21 @@ describe('planSchemaFields', () => {
     expect(fields[3]?.options?.map(option => option.value)).toEqual(['abcd', 'cdab'])
   })
 
+  it('plans a union of number literals (anyOf consts) as a typed enum', () => {
+    const fields = planSchemaFields({
+      type: 'object',
+      properties: {
+        fc: { title: '功能码', anyOf: [{ type: 'number', const: 1 }, { type: 'number', const: 3 }] },
+        mixed: { title: '混合', anyOf: [{ const: 1 }, { type: 'string' }] },
+      },
+    })
+    expect(fields[0]?.kind).toBe('enum')
+    expect(fields[0]?.options?.map(option => option.value)).toEqual(['1', '3'])
+    expect(fields[0]?.literalOf).toEqual({ '1': 1, '3': 3 })
+    // A non-literal arm (no const) is not an enum; it degrades to text.
+    expect(fields[1]?.kind).toBe('text')
+  })
+
   it('falls back to the property name when no title rides along', () => {
     const fields = planSchemaFields({ type: 'object', properties: { host: { type: 'string' } } })
     expect(fields[0]?.label).toBe('host')
@@ -81,6 +96,24 @@ describe('SchemaForm', () => {
     fireEvent.click(screen.getByRole('button', { name: '字序' }))
     fireEvent.click(screen.getByRole('button', { name: 'cdab' }).closest('button') ?? document.body)
     expect(onChange).toHaveBeenCalledWith({ byteOrder: 'cdab' })
+  })
+
+  it('commits a literal union selection as the literal\'s own type', () => {
+    const onChange = vi.fn()
+    render(
+      <SchemaForm
+        schema={{
+          type: 'object',
+          properties: { fc: { title: '功能码', anyOf: [{ type: 'number', const: 1 }, { type: 'number', const: 3 }] } },
+        }}
+        value={{}}
+        onChange={onChange}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '功能码' }))
+    fireEvent.click(screen.getByRole('button', { name: '3' }).closest('button') ?? document.body)
+    expect(onChange).toHaveBeenCalledWith({ fc: 3 })
   })
 
   it('commits numeric edits as numbers and empty text as unset', () => {

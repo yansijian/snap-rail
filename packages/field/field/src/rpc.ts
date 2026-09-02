@@ -205,6 +205,11 @@ function mapConfigError(what: string, cause: unknown): RpcBusinessError {
         return new RpcBusinessError({ code: 'bad-request', details: { issues: [cause.message] } })
       case 'type-conflict':
       case 'driver-conflict':
+      // Registry collisions (a live connection/point re-registering) are
+      // consistency failures the operator can act on, not internal ones.
+      case 'duplicate-connection':
+      case 'duplicate-point':
+      case 'duplicate-driver':
         return new RpcBusinessError({ code: 'conflict', details: { what: cause.message } })
       case 'no-probe':
         return new RpcBusinessError({ code: 'unavailable', details: { what: cause.message } })
