@@ -12,6 +12,7 @@ import { boot } from '@snap-rail/app-boot'
 import type { Context } from '@snap-rail/cordis'
 import carrierPlugin from './carrier.ts'
 import windowRpcPlugin from './window-rpc.ts'
+import { handlePluginScheme, registerPluginScheme } from './plugin-protocol.ts'
 import { RENDERER_PACKAGES } from './renderer-packages.ts'
 
 /**
@@ -24,10 +25,14 @@ function builtinLayerPath(): string {
 }
 
 async function start(): Promise<void> {
+  registerPluginScheme()
   await app.whenReady()
   wireUpdateChannel()
 
   const home = app.getPath('userData')
+  // Pool plugin assets reach the renderer over the privileged scheme; the
+  // handler binds to the same pool dir the boot composition scans.
+  handlePluginScheme(join(home, 'plugins'))
   const ctx: Context = await boot({
     binName: 'desktop',
     home,

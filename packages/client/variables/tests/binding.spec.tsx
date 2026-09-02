@@ -5,9 +5,11 @@ import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
 import auditPlugin from '@snap-rail/audit'
 import gatewayPlugin from '@snap-rail/gateway'
+import storePlugin from '@snap-rail/store'
 import fieldPlugin from '@snap-rail/field'
 import fieldRpcPlugin from '@snap-rail/field/rpc'
-import type { ConnectionRegistration, MappingDocument, MappingPoint, PointType } from '@snap-rail/field'
+import { z } from 'zod'
+import type { DriverHandle, MappingDocument, MappingPoint } from '@snap-rail/field'
 import { afterEach, describe, expect, it } from 'vitest'
 import variablesPlugin, {
   resolveBinding,
@@ -73,11 +75,11 @@ describe('resolveBinding', () => {
 
 describe('watchBinding', () => {
   /**
-   * A world whose mapping document comes from a test driver registered with
-   * the field seam (`ctx.field.registerDriver` + projection — the spine
-   * never imports a real driver) and whose field rig provides the mapped
-   * points. `field.mappings.list` and `field/mappings-changed` are the real
-   * bridge outputs.
+   * A world whose mapping document comes from the field base's own tables:
+   * a test driver registers as a pure adapter and the device/group/point
+   * rows below it are seeded through the base's CRUD (`ctx.field` — the
+   * spine never imports a real driver). `field.mappings.list` and
+   * `field/mappings-changed` are the real bridge outputs.
    */
   async function makeWorld(): Promise<{
     setDoc: (doc: MappingDocument) => void
@@ -92,22 +94,42 @@ describe('watchBinding', () => {
     host.provide('snapRailHome', home)
     await host.plugin(gatewayPlugin, { name: 'test', version: '0.0.0', bin: 'test' })
     await host.plugin(auditPlugin)
+    await host.plugin(storePlugin)
     await host.plugin(fieldPlugin)
     await host.plugin(fieldRpcPlugin)
 
-    let doc = DOC
-    let registration: ConnectionRegistration | undefined
+    let handle: DriverHandle | undefined
     await host.plugin(Object.assign(
       function driver(sub: Context): void {
-        sub.field.registerDriver(sub, { id: 'rig', title: 'Rig', mappings: () => doc })
-        registration = sub.connections.register(sub, { id: 'rig', driver: 'rig', title: 'Rig' })
-        registration.setPoints(DOC.points.map(entry => ({
-          device: entry.deviceId, group: entry.group, name: entry.name,
-          connection: 'rig', type: typeOf(entry),
-        })))
+        sub.field.registerDriver(sub, {
+          id: 'rig',
+          title: 'Rig',
+          schemas: {
+            device: z.object({}).strict(),
+            point: z.object({ type: z.enum(['bool', 'int', 'float', 'string']) }).strict(),
+          },
+          createConnection: (device, _points, driverHandle) => {
+            handle = driverHandle
+            return { update: () => undefined, dispose: () => undefined }
+          },
+        })
       },
-      { inject: ['connections', 'field'] },
+      { inject: ['field'] },
     ))
+
+    /** Bring the base's tables to a document (the name mints the stable id). */
+    const seed = (doc: MappingDocument): void => {
+      for (const device of doc.devices) {
+        host.field.upsertDevice({ name: device.id, driver: device.driver, config: {} })
+      }
+      for (const group of doc.groups) {
+        host.field.upsertGroup(group.deviceId, { name: group.name, type: group.type ?? 'bool' })
+      }
+      for (const point of doc.points) {
+        host.field.upsertPoint(point.deviceId, point.group, { name: point.name, config: {} })
+      }
+    }
+    seed(DOC)
 
     // A client context: the variables plugin plus a client link over the
     // host channel (call unwraps the envelope like HostLink does).
@@ -128,23 +150,16 @@ describe('watchBinding', () => {
       },
     })
 
-    /** The rig derives a point's type from its group (the generic doc has none). */
-    function typeOf(entry: MappingPoint): PointType {
-      return doc.groups.find(group => group.deviceId === entry.deviceId && group.name === entry.group)?.type ?? 'bool'
-    }
-
     return {
       setDoc: next => {
-        doc = next
-        // The rig follows the document: a re-grouped point changes its
-        // address, so the registered points follow too.
-        registration?.setPoints(next.points.map(entry => ({
-          device: entry.deviceId, group: entry.group, name: entry.name, connection: 'rig', type: typeOf(entry),
-        })))
+        // Re-seed wholesale: the device (and its groups/points) is rebuilt,
+        // so a re-grouped point changes its address through the real path.
+        host.field.removeDevice('plc1')
+        seed(next)
       },
       notifyMappingsChanged: () => { host.emit('field/mappings-changed') },
       sample: (group, name, value) => {
-        registration?.sample({ device: 'plc1', group, name }, value)
+        handle?.sample({ device: 'plc1', group, name }, value)
       },
       attach: binding => {
         const views: BindingView[] = []
@@ -164,9 +179,10 @@ describe('watchBinding', () => {
     await flush()
 
     // Both members read back "never observed" (null, time 0) → pending.
+    // Member order is the base's document order (by name within the group).
     expect(views.at(-1)).toEqual({
       kind: 'group', device: 'plc1', group: '故障报警', status: 'normal',
-      active: [], abnormal: [], pending: ['液压低压', '主轴过载'],
+      active: [], abnormal: [], pending: ['主轴过载', '液压低压'],
     })
 
     // One member trips: active with the point name.
@@ -213,7 +229,7 @@ describe('watchBinding', () => {
     await flush()
 
     const regrouped = views.at(-1)
-    expect(regrouped?.kind === 'group' && regrouped.pending).toEqual(['液压低压', '冷却异常'])
+    expect(regrouped?.kind === 'group' && regrouped.pending).toEqual(['冷却异常', '液压低压'])
     // The leaving member no longer drives the view.
     world.sample('其他', '主轴过载', true)
     world.sample('故障报警', '冷却异常', true)

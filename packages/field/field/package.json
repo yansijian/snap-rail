@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/field",
-  "description": "The field seam: live point table (ctx.points) and connections (ctx.connections)",
+  "description": "The device-connection base: configuration tables (devices/groups/points), the live point table, the driver registry, and the unified 设备管理 settings page (./station)",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -14,28 +14,47 @@
       "types": "./lib/types/rpc.d.ts",
       "default": "./lib/rpc.js"
     },
+    "./station": {
+      "types": "./lib/types/station.d.ts",
+      "default": "./lib/station.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
     "lib/rpc.js",
+    "lib/station.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "dependencies": {
     "@snap-rail/protocol": "workspace:^",
     "@snap-rail/util": "workspace:^",
+    "drizzle-orm": "^0.45.2",
     "zod": "^4.4.3"
   },
   "peerDependencies": {
+    "@snap-rail/audit": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
-    "@snap-rail/audit": "workspace:^"
+    "@snap-rail/store": "workspace:^",
+    "react": ">=19"
   },
   "devDependencies": {
+    "@snap-rail/audit": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
-    "@snap-rail/audit": "workspace:^"
+    "@snap-rail/store": "workspace:^",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.2.14",
+    "happy-dom": "^18.0.0",
+    "react": "^19.2.8"
   }
 }

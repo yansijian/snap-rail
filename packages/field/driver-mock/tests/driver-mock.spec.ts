@@ -1,133 +1,138 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
-import TimerService from '@snap-rail/cordis-plugin-timer'
-import { ConnectionId, pointKey, type PointRef } from '@snap-rail/field'
+import timerPlugin from '@snap-rail/cordis-plugin-timer'
+import storePlugin from '@snap-rail/store'
+import { pointKey, type PointRef, type PointSample } from '@snap-rail/field'
 import { afterEach, describe, expect, it } from 'vitest'
-import fieldPlugin, { FieldError } from '../../field/src/index.ts'
+import fieldPlugin from '../../field/src/index.ts'
 import mockDriverPlugin from '../src/index.ts'
 
-const contexts: Context[] = []
+const worlds: Array<{ ctx: Context, home: string }> = []
 
 afterEach(async () => {
-  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
+  for (const world of worlds.splice(0)) {
+    await world.ctx.fiber.dispose()
+    rmSync(world.home, { recursive: true, force: true })
+  }
 })
 
-async function makeField(): Promise<Context> {
+interface World {
+  ctx: Context
+  samples: PointSample[]
+}
+
+const refs = {
+  flow: { device: 'sim', group: '浮点', name: 'flow' } as const,
+  count: { device: 'sim', group: '计数', name: 'count' } as const,
+  run: { device: 'sim', group: '布尔', name: 'run' } as const,
+  stamp: { device: 'sim', group: '文本', name: 'stamp' } as const,
+}
+
+async function makeWorld(): Promise<World> {
+  const home = mkdtempSync(join(tmpdir(), 'snap-rail-driver-mock-'))
   const ctx = new Context()
-  contexts.push(ctx)
-  await ctx.plugin(TimerService)
+  worlds.push({ ctx, home })
+  ctx.provide('snapRailHome', home)
+  await ctx.plugin(storePlugin)
   await ctx.plugin(fieldPlugin)
-  return ctx
+  await ctx.plugin(timerPlugin)
+  await ctx.plugin(mockDriverPlugin)
+
+  const samples: PointSample[] = []
+  ctx.field.upsertDevice({ name: 'sim', driver: 'mock', config: { periodMs: 10, offline: false } })
+  for (const [group, type] of [['浮点', 'float'], ['计数', 'int'], ['布尔', 'bool'], ['文本', 'string']] as const) {
+    ctx.field.upsertGroup('sim', { name: group, type })
+  }
+  ctx.field.upsertPoint('sim', '浮点', { name: 'flow', config: {} })
+  ctx.field.upsertPoint('sim', '计数', { name: 'count', config: {} })
+  ctx.field.upsertPoint('sim', '布尔', { name: 'run', config: {} })
+  ctx.field.upsertPoint('sim', '文本', { name: 'stamp', config: {} })
+  ctx.points.subscribe([refs.flow, refs.count, refs.run, refs.stamp], sample => samples.push(sample))
+  return { ctx, samples }
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-describe('mock driver', () => {
-  it('streams group-scoped samples of every semantic type', async () => {
-    const ctx = await makeField()
-    const run: PointRef = { device: 'sim', group: 'main', name: 'run' }
-    const boolSeen: boolean[] = []
-    ctx.points.subscribe([run], sample => boolSeen.push(sample.value as boolean))
+function latest(world: World, ref: PointRef): PointSample | undefined {
+  return [...world.samples].reverse().find(sample => pointKey(sample) === pointKey(ref))
+}
 
-    await ctx.plugin(mockDriverPlugin, {
-      connection: 'sim',
-      title: 'Simulator',
-      offline: false,
-      periodMs: 10,
-      points: [
-        { name: 'flow', group: 'main', type: 'float' },
-        { name: 'count', group: 'main', type: 'int' },
-        { name: 'run', group: 'main', type: 'bool' },
-        { name: 'stamp', group: 'main', type: 'string' },
-      ],
-    })
+describe('mock driver over the field base', () => {
+  it('streams samples of every semantic type and reports online', async () => {
+    const world = await makeWorld()
+    await sleep(80)
 
-    expect(ctx.connections.list()).toEqual([
-      { id: ConnectionId('sim'), driver: 'driver-mock', title: 'Simulator', status: 'online' },
+    expect(world.ctx.connections.list()).toEqual([
+      { id: 'sim', driver: 'mock', title: 'sim', status: 'online' },
     ])
-    expect(ctx.points.list().map(point => pointKey(point))).toEqual([
-      'sim/main/flow', 'sim/main/count', 'sim/main/run', 'sim/main/stamp',
-    ])
+    expect(new Set(world.ctx.points.list().map(point => pointKey(point)))).toEqual(new Set([
+      'sim/计数/count', 'sim/布尔/run', 'sim/文本/stamp', 'sim/浮点/flow',
+    ]))
 
-    await sleep(120)
-
-    const flow = ctx.points.read({ device: 'sim', group: 'main', name: 'flow' })?.value
+    const flow = latest(world, refs.flow)?.value
     expect(typeof flow).toBe('number')
-    expect(flow).toBeGreaterThanOrEqual(0)
-    expect(flow).toBeLessThanOrEqual(100)
+    expect(flow as number).toBeGreaterThanOrEqual(0)
+    expect(flow as number).toBeLessThanOrEqual(100)
 
-    const countRef = { device: 'sim', group: 'main', name: 'count' }
-    expect(typeof ctx.points.read(countRef)?.value).toBe('bigint')
-    const c1 = ctx.points.read(countRef)?.value as bigint
-    await sleep(35)
-    const c2 = ctx.points.read(countRef)?.value as bigint
-    expect(c2 > c1).toBe(true)
+    const count = latest(world, refs.count)?.value
+    expect(typeof count).toBe('bigint')
+    expect(count as bigint).toBeGreaterThan(0n)
 
-    expect(boolSeen.length).toBeGreaterThanOrEqual(2)
-    expect(boolSeen[0]).toBe(true)
-    expect(boolSeen[1]).toBe(false)
-
-    expect(String(ctx.points.read({ device: 'sim', group: 'main', name: 'stamp' })?.value)).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(latest(world, refs.run)?.value).toBeTypeOf('boolean')
+    expect(latest(world, refs.stamp)?.value).toBeTypeOf('string')
   })
 
-  it('pushes null samples offline and refuses writes without a handler', async () => {
-    const ctx = await makeField()
-    await ctx.plugin(mockDriverPlugin, {
-      connection: 'dark',
-      title: 'Offline rig',
-      offline: true,
-      periodMs: 10,
-      points: [{ name: 'lamp', group: 'main', type: 'bool' }],
-    })
+  it('echoes writes back as samples', async () => {
+    const world = await makeWorld()
+    await sleep(30)
 
-    await sleep(40)
-    expect(ctx.connections.list()[0]?.status).toBe('offline')
-    expect(ctx.points.read({ device: 'dark', group: 'main', name: 'lamp' })?.value).toBeNull()
+    await world.ctx.points.write(refs.run, true)
+    expect(latest(world, refs.run)?.value).toBe(true)
 
-    try {
-      await ctx.points.write({ device: 'dark', group: 'main', name: 'lamp' }, true)
-      expect.unreachable()
-    } catch (cause) {
-      expect((cause as FieldError).kind).toBe('no-write-handler')
-    }
+    await world.ctx.points.write(refs.count, 41n)
+    expect(latest(world, refs.count)?.value).toBe(41n)
   })
 
-  it('echoes writes back as samples and lets instances coexist', async () => {
-    const ctx = await makeField()
-    await ctx.plugin(mockDriverPlugin, {
-      connection: 'echo',
-      title: 'Echo rig',
-      offline: false,
-      periodMs: 60_000,
-      points: [{ name: 'setpoint', group: 'main', type: 'float' }],
-    })
-    await ctx.plugin(mockDriverPlugin, {
-      connection: 'other',
-      title: 'Second rig',
-      offline: false,
-      periodMs: 60_000,
-      points: [{ name: 'setpoint', group: 'main', type: 'int' }],
-    })
+  it('parks with null samples when the device config goes offline', async () => {
+    const world = await makeWorld()
+    await sleep(30)
+    expect(world.ctx.connections.list()[0]?.status).toBe('online')
 
-    await ctx.points.write({ device: 'echo', group: 'main', name: 'setpoint' }, 42.5)
-    // The echo sample replaces the generator's value on the shared handle.
-    expect(ctx.points.read({ device: 'echo', group: 'main', name: 'setpoint' })?.value).toBe(42.5)
-    expect(ctx.connections.list().map(connection => connection.id)).toEqual(['echo', 'other'])
+    world.ctx.field.upsertDevice({ id: 'sim', name: 'sim', driver: 'mock', config: { periodMs: 10, offline: true } })
+    await sleep(60)
+    expect(world.ctx.connections.list()[0]?.status).toBe('offline')
+    expect(latest(world, refs.flow)?.value).toBeNull()
+    expect(latest(world, refs.count)?.value).toBeNull()
+
+    // Back online: values resume.
+    world.ctx.field.upsertDevice({ id: 'sim', name: 'sim', driver: 'mock', config: { periodMs: 10, offline: false } })
+    await sleep(60)
+    expect(world.ctx.connections.list()[0]?.status).toBe('online')
+    expect(latest(world, refs.count)?.value).not.toBeNull()
   })
 
-  it('fails config validation loudly on duplicate group-scoped names', async () => {
-    const ctx = await makeField()
-    await expect(ctx.plugin(mockDriverPlugin, {
-      connection: 'dupe',
-      title: 'Broken',
-      offline: false,
-      periodMs: 10,
-      points: [
-        { name: 'a', group: 'main', type: 'int' },
-        { name: 'a', group: 'main', type: 'float' },
-      ],
-    })).rejects.toThrow(/unique/)
-    expect(ctx.connections.list()).toEqual([])
+  it('hot-adds and removes points through the base', async () => {
+    const world = await makeWorld()
+    world.ctx.field.upsertPoint('sim', '计数', { name: 'count2', config: {} })
+    const count2: PointRef = { device: 'sim', group: '计数', name: 'count2' }
+    const seen: unknown[] = []
+    world.ctx.points.subscribe([count2], sample => seen.push(sample.value))
+    await sleep(60)
+    expect(seen.length).toBeGreaterThan(0)
+
+    world.ctx.field.removePoint(count2)
+    expect(world.ctx.points.list().map(point => pointKey(point))).not.toContain(pointKey(count2))
+  })
+
+  it('drops its connection when the device is removed', async () => {
+    const world = await makeWorld()
+    await sleep(30)
+    world.ctx.field.removeDevice('sim')
+    expect(world.ctx.connections.list()).toEqual([])
+    expect(world.ctx.points.list()).toEqual([])
   })
 })

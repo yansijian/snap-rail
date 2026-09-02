@@ -1,16 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { decodePoint, encodeWrite, planPoll, widthOf } from '../src/plc.ts'
-import type { ModbusPointConfig } from '../src/contract.ts'
+import { decodePoint, encodeWrite, planPoll, widthOf, type PlannedPoint } from '../src/plc.ts'
 
-function point(overrides: Partial<ModbusPointConfig> & { var: string }): ModbusPointConfig {
+function point(overrides: Partial<PlannedPoint> & { var: string }): PlannedPoint {
   return {
-    deviceId: 'plc1',
     type: 'int',
     fc: 3,
     address: 0,
     encoding: 'u16',
     writable: false,
-    group: '测试',
+    ref: { device: 'plc1', group: '测试', name: overrides.var },
     ...overrides,
   }
 }
@@ -38,7 +36,7 @@ describe('planPoll', () => {
     const holding = blocks.find(block => block.fc === 3 && block.start === 100)
     expect(holding?.count).toBe(6) // 100..105 covers both two-register points
     // Entries keep ascending-address order.
-    expect(holding?.entries.map(entry => entry.point.var)).toEqual(['温度1', '计数1'])
+    expect(holding?.entries.map(entry => entry.point.ref.name)).toEqual(['温度1', '计数1'])
     expect(blocks.some(block => block.fc === 3 && block.start === 200)).toBe(true)
     const coils = blocks.find(block => block.fc === 1)
     expect(coils?.count).toBe(6) // bits 10..15
@@ -54,7 +52,7 @@ describe('planPoll', () => {
     // (0..124 then 126..138); every point stays covered by exactly one block.
     expect(blocks.map(block => [block.start, block.count])).toEqual([[0, 125], [126, 13]])
     const covered = blocks.flatMap(block =>
-      block.entries.map(entry => entry.point.var))
+      block.entries.map(entry => entry.point.ref.name))
     expect(new Set(covered).size).toBe(70)
   })
 

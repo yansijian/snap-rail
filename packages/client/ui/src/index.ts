@@ -21,6 +21,13 @@ export { Checkbox } from './checkbox.tsx'
 export { RadioGroup, RadioGroupItem } from './radio-group.tsx'
 export { TouchSelect, type TouchSelectOption } from './touch-select.tsx'
 export { NumberInput, NumberPad } from './number-input.tsx'
+export {
+  SchemaForm,
+  schemaDefaults,
+  planSchemaFields,
+  compactSchemaValue,
+  type SchemaFormValue,
+} from './schema-form.tsx'
 export { DragScroll } from './drag-scroll.tsx'
 export { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table.tsx'
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs.tsx'

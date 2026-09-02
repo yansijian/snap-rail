@@ -33,6 +33,14 @@ const fieldRpcPlugin: Plugin.Object = {
     const audit: AuditService = ctx.audit
     /** Reference count per composite point key; frames flow above zero. */
     const refcounts = new Map<string, number>()
+    /** Run a config mutation, translating seam failures to wire errors. */
+    const attempt = <T>(what: string, fn: () => T): T => {
+      try {
+        return fn()
+      } catch (cause) {
+        throw mapConfigError(what, cause)
+      }
+    }
 
     rpc.claimDomain(ctx, 'field')
 
@@ -87,6 +95,76 @@ const fieldRpcPlugin: Plugin.Object = {
       connections: connections.list(),
     }))
 
+    rpc.method(ctx, 'field.config.list', { request: fieldRequestSchemas['field.config.list'] }, () => ({
+      config: field.config(),
+    }))
+
+    rpc.method(ctx, 'field.devices.upsert', { request: fieldRequestSchemas['field.devices.upsert'] }, ({ device }) => {
+      const saved = attempt('device upsert', () => field.upsertDevice(device))
+      audit.record({
+        actor: 'client',
+        action: 'field.device.upsert',
+        subject: saved.id,
+        detail: { name: saved.name, driver: saved.driver },
+      })
+      return { device: saved }
+    })
+
+    rpc.method(ctx, 'field.devices.remove', { request: fieldRequestSchemas['field.devices.remove'] }, ({ id }) => {
+      attempt('device remove', () => field.removeDevice(id))
+      audit.record({ actor: 'client', action: 'field.device.remove', subject: id })
+      return { removed: true } as const
+    })
+
+    rpc.method(ctx, 'field.devices.test', { request: fieldRequestSchemas['field.devices.test'] }, async ({ device }) => {
+      try {
+        return await field.probe(device.driver, device.config)
+      } catch (cause) {
+        throw mapConfigError('device test', cause)
+      }
+    })
+
+    rpc.method(ctx, 'field.groups.upsert', { request: fieldRequestSchemas['field.groups.upsert'] }, ({ device, group }) => {
+      const saved = attempt('group upsert', () => field.upsertGroup(device, group))
+      audit.record({
+        actor: 'client',
+        action: 'field.group.upsert',
+        subject: `${device}/${group.name}`,
+        detail: { type: group.type },
+      })
+      return { group: saved }
+    })
+
+    rpc.method(ctx, 'field.groups.remove', { request: fieldRequestSchemas['field.groups.remove'] }, ({ device, group }) => {
+      attempt('group remove', () => field.removeGroup(device, group))
+      audit.record({ actor: 'client', action: 'field.group.remove', subject: `${device}/${group}` })
+      return { removed: true } as const
+    })
+
+    rpc.method(ctx, 'field.points.upsert', { request: fieldRequestSchemas['field.points.upsert'] }, ({ device, group, point }) => {
+      const saved = attempt('point upsert', () => field.upsertPoint(device, group, point))
+      audit.record({
+        actor: 'client',
+        action: 'field.point.upsert',
+        subject: `${device}/${group}/${point.name}`,
+      })
+      return { point: saved }
+    })
+
+    rpc.method(ctx, 'field.points.remove', { request: fieldRequestSchemas['field.points.remove'] }, payload => {
+      attempt('point remove', () => field.removePoint({
+        device: payload.device,
+        group: payload.group,
+        name: payload.name,
+      }))
+      audit.record({
+        actor: 'client',
+        action: 'field.point.remove',
+        subject: `${payload.device}/${payload.group}/${payload.name}`,
+      })
+      return { removed: true } as const
+    })
+
     rpc.method(ctx, 'field.drivers.list', { request: fieldRequestSchemas['field.drivers.list'] }, () => ({
       drivers: field.listDrivers(),
     }))
@@ -111,7 +189,28 @@ const fieldRpcPlugin: Plugin.Object = {
     rpc.bridgeEvent(ctx, 'connection/removed', 'field/connection-removed', id => ({ id }))
     rpc.bridgeEvent(ctx, 'connection/status', 'field/connection-status', frame => frame)
     rpc.bridgeEvent(ctx, 'field/mappings-changed', 'field/mappings-changed', () => ({}))
+    rpc.bridgeEvent(ctx, 'field/structure-changed', 'field/structure-changed', () => ({}))
   },
+}
+
+function mapConfigError(what: string, cause: unknown): RpcBusinessError {
+  if (cause instanceof FieldError) {
+    switch (cause.kind) {
+      case 'unknown-device':
+      case 'unknown-group':
+      case 'unknown-driver':
+      case 'unknown-point':
+        return new RpcBusinessError({ code: 'not-found', details: { what: cause.message } })
+      case 'invalid-config':
+        return new RpcBusinessError({ code: 'bad-request', details: { issues: [cause.message] } })
+      case 'type-conflict':
+      case 'driver-conflict':
+        return new RpcBusinessError({ code: 'conflict', details: { what: cause.message } })
+      case 'no-probe':
+        return new RpcBusinessError({ code: 'unavailable', details: { what: cause.message } })
+    }
+  }
+  return new RpcBusinessError({ code: 'internal', details: { hint: `field ${what} failed` } })
 }
 
 function mapWriteError(key: string, value: unknown, cause: unknown): RpcBusinessError {

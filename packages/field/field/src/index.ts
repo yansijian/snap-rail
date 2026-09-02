@@ -1,12 +1,16 @@
 /**
- * The field seam: the live point table. Drivers (providers) register
- * connections and push samples; dashboards, alarms, and agents (consumers)
- * subscribe, read, and write. The seam is protocol-agnostic; the `./rpc`
- * subpath is its gateway bridge.
+ * The field seam: the device-connection base. It owns the configuration
+ * tables (devices/groups/points, `data/field.db`) and the live point table.
+ * Drivers register as pure protocol adapters — dialect schemas, an optional
+ * probe, and a connection factory; the base orchestrates: it computes the
+ * desired state from its tables and calls `createConnection`/`update`/
+ * `dispose`, while the driver decides how a change lands (hot-apply versus
+ * reconnect). Consumers (dashboards, alarms, agents) subscribe, read, and
+ * write through triples; the `./rpc` subpath is the gateway bridge.
  *
  * Addressing: a point's address is the (device, group, name) triple — there
  * is no opaque id; the composite `pointKey` exists only as the host-side
- * map key and audit subject.
+ * map key and audit subject. A point's semantic type is its group's type.
  *
  * Semantics: a `null` value means the point is abnormal (unreadable or
  * stale); connection-level failure is the connection status. Writes are
@@ -17,6 +21,10 @@
  */
 
 import { Context, Service, type Plugin } from '@snap-rail/cordis'
+import { and, eq } from 'drizzle-orm'
+import { z } from 'zod'
+import type { StoreDatabase } from '@snap-rail/store'
+import '@snap-rail/store'
 import type { MappingDevice, MappingDocument, MappingGroup, MappingPoint } from './mapping.ts'
 import {
   ConnectionId,
@@ -32,7 +40,8 @@ import {
   type PointType,
   type PointValue,
 } from './model.ts'
-import type { DriverInfo } from './wire.ts'
+import { FIELD_SCHEMA, fieldDevices, fieldGroups, fieldPoints } from './schema.ts'
+import type { ConfigDevice, ConfigGroup, ConfigPoint, DialectSchema, DriverInfo } from './wire.ts'
 
 export { ConnectionId, pointKey, pointRefSchema }
 export type {
@@ -40,11 +49,14 @@ export type {
   PointDescriptor, PointRef, PointSample, PointType, PointValue,
 }
 export type { MappingDevice, MappingDocument, MappingGroup, MappingPoint }
-export type { DriverInfo }
 export * from './wire.ts'
 
 /** Failure kinds raised by the field seam (the rpc bridge maps them to wire errors). */
-export type FieldErrorKind = 'duplicate-connection' | 'duplicate-point' | 'duplicate-driver' | 'unknown-point' | 'type-mismatch' | 'no-write-handler'
+export type FieldErrorKind =
+  | 'duplicate-connection' | 'duplicate-point' | 'duplicate-driver'
+  | 'unknown-point' | 'unknown-driver' | 'unknown-device' | 'unknown-group'
+  | 'driver-conflict' | 'type-conflict' | 'type-mismatch' | 'invalid-config'
+  | 'no-probe' | 'no-write-handler'
 
 /** A field-seam failure carrying a machine-readable kind. */
 export class FieldError extends Error {
@@ -57,6 +69,83 @@ export class FieldError extends Error {
 /** Handler receiving writes routed to a driver's connection. */
 export type WriteHandler = (point: PointDescriptor, value: Exclude<PointValue, null>) => Promise<void> | void
 
+/** A dialect config blob as drivers and the base pass it around. */
+export type DialectConfig = Record<string, unknown>
+
+/** The provider-side handle the base hands a connection: report link state,
+ * push samples, accept writes. The point table itself is base-owned — the
+ * driver never registers points directly. */
+export interface DriverHandle {
+  /** Announce link state; `offline` leaves reads to the driver's null samples.
+   * A message carries the latest verdict (failure reason). */
+  status(status: ConnectionStatus, message?: string): void
+  /** Push one sample for the addressed point; `null` marks it abnormal. */
+  sample(ref: PointRef, value: PointValue): void
+  /** Install the write handler (once); writes before this fail `no-write-handler`. */
+  onWrite(handler: WriteHandler): void
+}
+
+/** One configured device as its driver sees it. */
+export interface DriverDevice {
+  /** Stable address identity (part of every point triple). */
+  id: string
+  /** Human-facing label. */
+  name: string
+  /** The driver-validated dialect config. */
+  config: DialectConfig
+}
+
+/** One configured point as its driver sees it: the triple, its type (the
+ * group's), and the driver-validated dialect config. */
+export interface DriverPoint extends PointRef {
+  type: PointType
+  config: DialectConfig
+}
+
+/** The driver-side controller the base orchestrates. */
+export interface DriverConnection {
+  /** The device's config or point set changed; the driver decides hot-apply
+   * versus reconnect (it knows which fields touch the link). */
+  update(device: DriverDevice, points: readonly DriverPoint[]): Promise<void> | void
+  /** Tear the connection down (device removed, driver unloaded, base shutting down). */
+  dispose(): Promise<void> | void
+}
+
+/** The verdict of a one-shot connectivity probe. */
+export interface ProbeResult {
+  ok: boolean
+  message: string
+}
+
+/** The dialect schemas a driver registers: zod objects whose JSON Schema
+ * projections drive the base's settings forms. The point schema validates
+ * the merged `{ type, ...config }` object — the base supplies `type` from
+ * the group; the stored config is the dialect part alone. */
+export interface DriverSchemas {
+  /** Validates a device's dialect config. */
+  device: z.ZodType<DialectConfig>
+  /** Validates a point's dialect config with its group type in context. */
+  point: z.ZodType<DialectConfig>
+}
+
+/** What a driver registers with the field seam. The id doubles as the
+ * driver's wire sub-namespace (`field.<id>.*`, claimed by the driver's own
+ * rpc module). */
+export interface DriverRegistration {
+  /** Driver id — lowercase kebab; unique across registered drivers. */
+  id: string
+  /** Human-facing title served by `field.drivers.list`. */
+  title: string
+  /** The dialect schemas (validated configs, form projections). */
+  schemas: DriverSchemas
+  /** One-shot connectivity check behind `field.devices.test`; omit when the
+   * protocol has no pre-connection test. */
+  probe?: (config: DialectConfig) => Promise<ProbeResult>
+  /** Build the connection for a configured device. Called whenever the
+   * device (re)enters the desired state under this driver. */
+  createConnection: (device: DriverDevice, points: readonly DriverPoint[], handle: DriverHandle) => DriverConnection
+}
+
 /** The provider-side handle returned by connection registration. */
 export interface ConnectionRegistration {
   /** Replace this connection's point set wholesale; diffed into added/removed events. */
@@ -64,7 +153,7 @@ export interface ConnectionRegistration {
   /** Push one sample for the addressed point; `null` marks it abnormal. */
   sample(ref: PointRef, value: PointValue): void
   /** Announce connection status; offline leaves reads to the driver's null samples. */
-  setStatus(status: ConnectionStatus): void
+  setStatus(status: ConnectionStatus, message?: string): void
   /** Install the write handler (once); writes before this fail `no-write-handler`. */
   setWriteHandler(handler: WriteHandler): void
   /** Remove the connection and its points; also runs automatically when the registering fiber unloads. */
@@ -74,6 +163,7 @@ export interface ConnectionRegistration {
 interface ConnectionEntry {
   desc: ConnectionDescriptor
   status: ConnectionStatus
+  message?: string
   points: Map<string, PointDescriptor>
   values: Map<string, PointSample>
   writeHandler?: WriteHandler
@@ -81,7 +171,19 @@ interface ConnectionEntry {
 
 interface DriverEntry {
   info: DriverInfo
-  mappings?: () => MappingDocument
+  deviceSchema: z.ZodType<DialectConfig>
+  pointSchema: z.ZodType<DialectConfig>
+  probe?: DriverRegistration['probe']
+  createConnection: DriverRegistration['createConnection']
+}
+
+interface ControllerEntry {
+  driverId: string
+  title: string
+  connection: ConnectionRegistration
+  controller: DriverConnection
+  /** Last state handed to the driver; unchanged states skip `update()`. */
+  applied: string
 }
 
 declare module '@snap-rail/cordis' {
@@ -102,7 +204,7 @@ declare module '@snap-rail/cordis' {
      * @param sample - the fresh sample. */
     'point/updated'(sample: PointSample): void
     /** A connection was registered.
-     * @param snapshot - descriptor plus initial (offline) status. */
+     * @param snapshot - descriptor plus initial (connecting) status. */
     'connection/added'(snapshot: ConnectionSnapshot): void
     /** A connection was removed.
      * @param id - the removed connection id. */
@@ -113,6 +215,8 @@ declare module '@snap-rail/cordis' {
     /** A driver's mapping tables changed; the rpc bridge rebroadcasts the
      * `field/mappings-changed` wire frame. */
     'field/mappings-changed'(): void
+    /** The base's configuration tables changed (device/group/point CRUD). */
+    'field/structure-changed'(): void
   }
 }
 
@@ -142,34 +246,45 @@ export interface ConnectionsService {
   register(caller: Context, desc: ConnectionDescriptor): ConnectionRegistration
 }
 
-/** What a driver registers with the field seam: identity plus an optional
- * dialect-free mapping projection. The id doubles as the driver's wire
- * sub-namespace (`field.<id>.*`, claimed by the driver's own rpc module). */
-export interface DriverRegistration {
-  /** Driver id — lowercase kebab; unique across registered drivers. */
-  id: string
-  /** Human-facing title served by `field.drivers.list`. */
-  title: string
-  /** The driver's mapping tables projected into the generic view; omit when
-   * the driver declares points statically (mock) and has no mapping tables. */
-  mappings?: () => MappingDocument
+/** A device upsert as the service takes it (`id` absent = create). */
+export interface DeviceUpsert {
+  id?: string | undefined
+  name: string
+  driver: string
+  config: DialectConfig
 }
 
-/** The field domain's driver registry: who is plugged in and how demand-side
- * bindings see their mapping tables. */
+/** The field domain's face: the driver registry, the configuration tables,
+ * and the generic mapping view. */
 export interface FieldService {
-  /** Registered drivers in registration order. */
+  /** Registered drivers in registration order (schemas included). */
   listDrivers(): readonly DriverInfo[]
-  /** The aggregated mapping document across drivers that provide projections. */
+  /** The full configuration tree, including devices whose driver is absent. */
+  config(): { devices: readonly ConfigDevice[] }
+  /** The aggregated mapping document across live devices (driver registered). */
   mappings(): MappingDocument
-  /** A driver calls this after its mapping tables change; the rpc bridge
-   * rebroadcasts the `field/mappings-changed` frame so bindings re-resolve. */
+  /** Notify mappings consumers (the rpc bridge rebroadcasts the frame). */
   mappingsChanged(): void
   /** Register a driver; disposal rides the caller's fiber.
-   * @param caller - the driver's context; unloading it removes the registration.
-   * @param desc - identity plus the optional mapping projection.
+   * @param caller - the driver's context; unloading it removes the registration
+   * (and the connections it served — configured devices stay, just lifeless).
    */
   registerDriver(caller: Context, desc: DriverRegistration): () => void
+  /** Create or update a device (config validated by the driver's schema). */
+  upsertDevice(input: DeviceUpsert): ConfigDevice
+  /** Remove a device and everything under it. */
+  removeDevice(id: string): void
+  /** Create a group, or retype it while it has no points. */
+  upsertGroup(device: string, group: { name: string, type: PointType }): ConfigGroup
+  /** Remove a group and its points. */
+  removeGroup(device: string, group: string): void
+  /** Create or update a point (config validated by the driver's schema with
+   * the group's type in context). */
+  upsertPoint(device: string, group: string, point: { name: string, config: DialectConfig }): ConfigPoint
+  /** Remove a point. */
+  removePoint(ref: PointRef): void
+  /** One-shot connectivity probe through the driver. */
+  probe(driver: string, config: DialectConfig): Promise<ProbeResult>
 }
 
 function expectedValueType(type: PointType): string {
@@ -181,52 +296,437 @@ function expectedValueType(type: PointType): string {
   }
 }
 
+/** Project a driver's zod schema into the JSON Schema the settings forms
+ * render (input form — defaults read as optional; the `$schema` boilerplate
+ * is stripped for a clean wire payload). */
+function projectSchema(schema: z.ZodType<DialectConfig>): DialectSchema {
+  const { $schema, ...projected } = z.toJSONSchema(schema, { io: 'input' }) as DialectSchema & { $schema?: string }
+  void $schema
+  return projected
+}
+
+/** Parse a stored config blob; a malformed one reads as empty (write paths
+ * guarantee valid JSON, so this only guards hand-edited files). */
+function parseConfig(raw: string): DialectConfig {
+  const parsed: unknown = JSON.parse(raw)
+  return typeof parsed === 'object' && parsed !== null ? parsed as DialectConfig : {}
+}
+
+/** Issue text from a failed zod parse. */
+function issuesOf(error: z.ZodError): string {
+  return error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ')
+}
+
+interface DeviceRow { id: string, name: string, driverId: string, config: DialectConfig }
+interface GroupRow { deviceId: string, name: string, type: PointType }
+interface PointRow { deviceId: string, group: string, name: string, config: DialectConfig }
+
 class FieldCore {
   readonly connections = new Map<ConnectionId, ConnectionEntry>()
   /** Composite point key → owning connection id. */
   readonly pointIndex = new Map<string, ConnectionId>()
   readonly drivers = new Map<string, DriverEntry>()
+  /** Device id → live controller (device row × registered driver). */
+  private readonly controllers = new Map<string, ControllerEntry>()
+  private readonly db: StoreDatabase<typeof FIELD_SCHEMA>
 
-  constructor(private readonly ctx: Context) {}
+  constructor(private readonly ctx: Context) {
+    this.db = ctx.store.register(ctx, 'field', FIELD_SCHEMA)
+    // Pool-loaded devices meet their drivers later; both events trigger a
+    // reconcile, so one here only covers "driver loaded before field" order.
+    this.reconcile()
+    ctx.effect(() => () => {
+      for (const [id, entry] of [...this.controllers]) this.teardown(id, entry)
+    })
+  }
+
+  // ---- driver registry ----
 
   registerDriver(caller: Context, desc: DriverRegistration): () => void {
     if (!/^[a-z][a-z0-9-]*$/.test(desc.id) || desc.title.trim() === '') {
       throw new FieldError('duplicate-driver', `invalid driver registration (id "${desc.id}", title "${desc.title}")`)
     }
     const entry: DriverEntry = {
-      info: { id: desc.id, title: desc.title },
-      ...(desc.mappings !== undefined ? { mappings: desc.mappings } : {}),
+      info: {
+        id: desc.id,
+        title: desc.title,
+        canProbe: desc.probe !== undefined,
+        schemas: {
+          device: projectSchema(desc.schemas.device),
+          point: projectSchema(desc.schemas.point),
+        },
+      },
+      deviceSchema: desc.schemas.device,
+      pointSchema: desc.schemas.point,
+      ...(desc.probe !== undefined ? { probe: desc.probe } : {}),
+      createConnection: desc.createConnection,
     }
-    // A same-id registration replaces (hot-reload semantics; two instances
-    // of one driver package are one driver with two connections).
+    // A same-id registration replaces (hot-reload semantics): the old
+    // controllers die first, the new ones rise in the reconcile below.
+    for (const [id, controller] of [...this.controllers]) {
+      if (controller.driverId === desc.id) this.teardown(id, controller)
+    }
     this.drivers.set(desc.id, entry)
+    this.reconcile()
     const dispose = (): void => {
-      if (this.drivers.get(desc.id) === entry) this.drivers.delete(desc.id)
+      if (this.drivers.get(desc.id) !== entry) return
+      this.drivers.delete(desc.id)
+      for (const [id, controller] of [...this.controllers]) {
+        if (controller.driverId === desc.id) this.teardown(id, controller)
+      }
     }
     caller.effect(() => dispose)
     return dispose
   }
 
+  // ---- configuration tables ----
+
+  private readRows(): { devices: DeviceRow[], groups: GroupRow[], points: PointRow[] } {
+    const devices = this.db.select().from(fieldDevices).orderBy(fieldDevices.id).all()
+      .map(row => ({ id: row.id, name: row.name, driverId: row.driverId, config: parseConfig(row.config) }))
+    const groups = this.db.select().from(fieldGroups).orderBy(fieldGroups.deviceId, fieldGroups.name).all()
+      .map(row => ({ deviceId: row.deviceId, name: row.name, type: row.type as PointType }))
+    const points = this.db.select().from(fieldPoints).orderBy(fieldPoints.deviceId, fieldPoints.group, fieldPoints.name).all()
+      .map(row => ({ deviceId: row.deviceId, group: row.group, name: row.name, config: parseConfig(row.config) }))
+    return { devices, groups, points }
+  }
+
+  private deviceById(id: string, rows = this.readRows()): DeviceRow | undefined {
+    return rows.devices.find(row => row.id === id)
+  }
+
+  /** The device's points as its driver sees them (group types in context). */
+  private driverPointsOf(device: DeviceRow, rows: { groups: GroupRow[], points: PointRow[] }): DriverPoint[] {
+    const types = new Map(rows.groups.filter(g => g.deviceId === device.id).map(g => [g.name, g.type]))
+    return rows.points
+      .filter(point => point.deviceId === device.id)
+      .map(point => ({
+        device: point.deviceId,
+        group: point.group,
+        name: point.name,
+        type: types.get(point.group) ?? 'string',
+        config: point.config,
+      }))
+  }
+
+  config(): { devices: readonly ConfigDevice[] } {
+    const rows = this.readRows()
+    return {
+      devices: rows.devices.map((device): ConfigDevice => ({
+        id: device.id,
+        name: device.name,
+        driver: device.driverId,
+        config: device.config,
+        groups: this.configGroupsOf(device, rows),
+      })),
+    }
+  }
+
+  private configGroupsOf(device: DeviceRow, rows: { groups: GroupRow[], points: PointRow[] }): ConfigGroup[] {
+    return rows.groups
+      .filter(group => group.deviceId === device.id)
+      .map((group): ConfigGroup => ({
+        name: group.name,
+        type: group.type,
+        points: rows.points
+          .filter(point => point.deviceId === device.id && point.group === group.name)
+          .map(point => ({ name: point.name, config: point.config })),
+      }))
+  }
+
+  private configDeviceOf(id: string): ConfigDevice {
+    const rows = this.readRows()
+    const device = this.deviceById(id, rows)
+    if (device === undefined) throw new FieldError('unknown-device', `device "${id}" vanished mid-mutation`)
+    return {
+      id: device.id,
+      name: device.name,
+      driver: device.driverId,
+      config: device.config,
+      groups: this.configGroupsOf(device, rows),
+    }
+  }
+
+  private configGroupOf(device: string, group: string): ConfigGroup {
+    const rows = this.readRows()
+    const row = rows.groups.find(candidate => candidate.deviceId === device && candidate.name === group)
+    if (row === undefined) throw new FieldError('unknown-group', `group "${group}" vanished mid-mutation`)
+    return {
+      name: row.name,
+      type: row.type,
+      points: rows.points
+        .filter(point => point.deviceId === device && point.group === group)
+        .map(point => ({ name: point.name, config: point.config })),
+    }
+  }
+
+  private mintDeviceId(name: string): string {
+    const taken = new Set(this.db.select({ id: fieldDevices.id }).from(fieldDevices).all().map(row => row.id))
+    if (!taken.has(name)) return name
+    for (let suffix = 2; ; suffix++) {
+      const candidate = `${name}-${suffix}`
+      if (!taken.has(candidate)) return candidate
+    }
+  }
+
+  /** Mutations land, then the desired state is recomputed and consumers notified. */
+  private afterMutation(): void {
+    this.reconcile()
+    this.ctx.emit('field/structure-changed')
+    this.ctx.emit('field/mappings-changed')
+  }
+
+  upsertDevice(input: DeviceUpsert): ConfigDevice {
+    const driver = this.drivers.get(input.driver)
+    if (driver === undefined) {
+      throw new FieldError('unknown-driver', `driver "${input.driver}" is not registered`)
+    }
+    const parsed = driver.deviceSchema.safeParse(input.config)
+    if (!parsed.success) {
+      throw new FieldError('invalid-config', `device config rejected by driver "${input.driver}": ${issuesOf(parsed.error)}`)
+    }
+    const config = JSON.stringify(parsed.data)
+    if (input.id === undefined) {
+      const id = this.mintDeviceId(input.name)
+      this.db.insert(fieldDevices).values({ id, name: input.name, driverId: input.driver, config }).run()
+      this.afterMutation()
+      return this.configDeviceOf(id)
+    }
+    const existing = this.db.select().from(fieldDevices).where(eq(fieldDevices.id, input.id)).get()
+    if (existing === undefined) {
+      throw new FieldError('unknown-device', `device "${input.id}" does not exist`)
+    }
+    if (existing.driverId !== input.driver) {
+      throw new FieldError('driver-conflict', `device "${input.id}" belongs to driver "${existing.driverId}"`)
+    }
+    this.db.update(fieldDevices).set({ name: input.name, config }).where(eq(fieldDevices.id, input.id)).run()
+    this.afterMutation()
+    return this.configDeviceOf(input.id)
+  }
+
+  removeDevice(id: string): void {
+    const existing = this.db.select({ id: fieldDevices.id }).from(fieldDevices).where(eq(fieldDevices.id, id)).get()
+    if (existing === undefined) {
+      throw new FieldError('unknown-device', `device "${id}" does not exist`)
+    }
+    this.db.transaction(tx => {
+      tx.delete(fieldPoints).where(eq(fieldPoints.deviceId, id)).run()
+      tx.delete(fieldGroups).where(eq(fieldGroups.deviceId, id)).run()
+      tx.delete(fieldDevices).where(eq(fieldDevices.id, id)).run()
+    })
+    this.afterMutation()
+  }
+
+  upsertGroup(device: string, group: { name: string, type: PointType }): ConfigGroup {
+    const owner = this.db.select({ id: fieldDevices.id }).from(fieldDevices).where(eq(fieldDevices.id, device)).get()
+    if (owner === undefined) {
+      throw new FieldError('unknown-device', `device "${device}" does not exist`)
+    }
+    const existing = this.db.select().from(fieldGroups)
+      .where(and(eq(fieldGroups.deviceId, device), eq(fieldGroups.name, group.name))).get()
+    if (existing === undefined) {
+      this.db.insert(fieldGroups).values({ deviceId: device, name: group.name, type: group.type }).run()
+    } else if (existing.type !== group.type) {
+      const members = this.db.select({ name: fieldPoints.name }).from(fieldPoints)
+        .where(and(eq(fieldPoints.deviceId, device), eq(fieldPoints.group, group.name))).all()
+      if (members.length > 0) {
+        throw new FieldError('type-conflict', `group "${device}/${group.name}" still has points; retype means remove + recreate`)
+      }
+      this.db.update(fieldGroups).set({ type: group.type })
+        .where(and(eq(fieldGroups.deviceId, device), eq(fieldGroups.name, group.name))).run()
+    }
+    this.afterMutation()
+    return this.configGroupOf(device, group.name)
+  }
+
+  removeGroup(device: string, group: string): void {
+    const existing = this.db.select().from(fieldGroups)
+      .where(and(eq(fieldGroups.deviceId, device), eq(fieldGroups.name, group))).get()
+    if (existing === undefined) {
+      throw new FieldError('unknown-group', `group "${device}/${group}" does not exist`)
+    }
+    this.db.transaction(tx => {
+      tx.delete(fieldPoints)
+        .where(and(eq(fieldPoints.deviceId, device), eq(fieldPoints.group, group))).run()
+      tx.delete(fieldGroups)
+        .where(and(eq(fieldGroups.deviceId, device), eq(fieldGroups.name, group))).run()
+    })
+    this.afterMutation()
+  }
+
+  upsertPoint(device: string, group: string, point: { name: string, config: DialectConfig }): ConfigPoint {
+    const owner = this.db.select().from(fieldDevices).where(eq(fieldDevices.id, device)).get()
+    if (owner === undefined) {
+      throw new FieldError('unknown-device', `device "${device}" does not exist`)
+    }
+    const groupRow = this.db.select().from(fieldGroups)
+      .where(and(eq(fieldGroups.deviceId, device), eq(fieldGroups.name, group))).get()
+    if (groupRow === undefined) {
+      throw new FieldError('unknown-group', `group "${device}/${group}" does not exist; create the group first`)
+    }
+    const driver = this.drivers.get(owner.driverId)
+    if (driver === undefined) {
+      throw new FieldError('unknown-driver', `driver "${owner.driverId}" is not registered`)
+    }
+    const parsed = driver.pointSchema.safeParse({ type: groupRow.type, ...point.config })
+    if (!parsed.success) {
+      throw new FieldError('invalid-config', `point config rejected by driver "${owner.driverId}": ${issuesOf(parsed.error)}`)
+    }
+    const { type: _type, ...dialect } = parsed.data
+    const config = JSON.stringify(dialect)
+    const existing = this.db.select().from(fieldPoints)
+      .where(and(
+        eq(fieldPoints.deviceId, device),
+        eq(fieldPoints.group, group),
+        eq(fieldPoints.name, point.name),
+      )).get()
+    if (existing === undefined) {
+      this.db.insert(fieldPoints).values({ deviceId: device, group, name: point.name, config }).run()
+    } else {
+      this.db.update(fieldPoints).set({ config })
+        .where(and(
+          eq(fieldPoints.deviceId, device),
+          eq(fieldPoints.group, group),
+          eq(fieldPoints.name, point.name),
+        )).run()
+    }
+    this.afterMutation()
+    return { name: point.name, config: dialect }
+  }
+
+  removePoint(ref: PointRef): void {
+    const existing = this.db.select({ name: fieldPoints.name }).from(fieldPoints)
+      .where(and(
+        eq(fieldPoints.deviceId, ref.device),
+        eq(fieldPoints.group, ref.group),
+        eq(fieldPoints.name, ref.name),
+      )).get()
+    if (existing === undefined) {
+      throw new FieldError('unknown-point', `point ${pointKey(ref)} does not exist`)
+    }
+    this.db.delete(fieldPoints)
+      .where(and(
+        eq(fieldPoints.deviceId, ref.device),
+        eq(fieldPoints.group, ref.group),
+        eq(fieldPoints.name, ref.name),
+      )).run()
+    this.afterMutation()
+  }
+
+  async probe(driverId: string, config: DialectConfig): Promise<ProbeResult> {
+    const driver = this.drivers.get(driverId)
+    if (driver === undefined) {
+      throw new FieldError('unknown-driver', `driver "${driverId}" is not registered`)
+    }
+    if (driver.probe === undefined) {
+      throw new FieldError('no-probe', `driver "${driverId}" offers no connectivity test`)
+    }
+    const parsed = driver.deviceSchema.safeParse(config)
+    if (!parsed.success) {
+      throw new FieldError('invalid-config', `device config rejected by driver "${driverId}": ${issuesOf(parsed.error)}`)
+    }
+    return driver.probe(parsed.data)
+  }
+
+  // ---- the mapping view ----
+
   mappings(): MappingDocument {
+    const rows = this.readRows()
     const devices: MappingDevice[] = []
     const groups: MappingGroup[] = []
     const points: MappingPoint[] = []
-    for (const entry of this.drivers.values()) {
-      if (entry.mappings === undefined) continue
-      const doc = entry.mappings()
-      // The seam stamps the owning driver — projections stay honest for free.
-      for (const device of doc.devices) devices.push({ id: device.id, driver: entry.info.id })
-      groups.push(...doc.groups)
-      points.push(...doc.points)
+    const live = new Set<string>()
+    for (const device of rows.devices) {
+      if (!this.drivers.has(device.driverId)) continue
+      live.add(device.id)
+      devices.push({ id: device.id, driver: device.driverId })
+    }
+    for (const group of rows.groups) {
+      if (!live.has(group.deviceId)) continue
+      groups.push({ deviceId: group.deviceId, name: group.name, type: group.type })
+    }
+    for (const point of rows.points) {
+      if (!live.has(point.deviceId)) continue
+      points.push({ deviceId: point.deviceId, group: point.group, name: point.name })
     }
     return { devices, groups, points }
   }
+
+  // ---- orchestration: tables × drivers → live connections ----
+
+  private reconcile(): void {
+    const rows = this.readRows()
+    const byId = new Map(rows.devices.map(device => [device.id, device]))
+
+    // Controllers whose device (or its driver) vanished die first.
+    for (const [id, entry] of [...this.controllers]) {
+      const row = byId.get(id)
+      if (row === undefined || !this.drivers.has(row.driverId)) {
+        this.teardown(id, entry)
+        continue
+      }
+      // Driver swap never happens in place (driver-conflict), but a rename
+      // must rebuild: the connection descriptor is immutable.
+      if (entry.driverId !== row.driverId || entry.title !== row.name) {
+        this.teardown(id, entry)
+      }
+    }
+
+    for (const row of rows.devices) {
+      const driver = this.drivers.get(row.driverId)
+      if (driver === undefined) continue
+      const points = this.driverPointsOf(row, rows)
+      const device = { id: row.id, name: row.name, config: row.config }
+      const applied = JSON.stringify([device, points])
+      const descriptors = points.map((point): PointDescriptor => ({
+        device: point.device,
+        group: point.group,
+        name: point.name,
+        type: point.type,
+        connection: ConnectionId(row.id),
+      }))
+      const existing = this.controllers.get(row.id)
+      if (existing === undefined) {
+        const connection = this.ctx.connections.register(this.ctx, {
+          id: ConnectionId(row.id),
+          driver: row.driverId,
+          title: row.name,
+        })
+        // The live table reflects the configuration immediately; the driver's
+        // first samples follow whenever its link comes up.
+        connection.setPoints(descriptors)
+        const handle: DriverHandle = {
+          status: (status, message) => connection.setStatus(status, message),
+          sample: (ref, value) => connection.sample(ref, value),
+          onWrite: handler => connection.setWriteHandler(handler),
+        }
+        const controller = driver.createConnection(device, points, handle)
+        this.controllers.set(row.id, { driverId: row.driverId, title: row.name, connection, controller, applied })
+        continue
+      }
+      existing.connection.setPoints(descriptors)
+      if (existing.applied !== applied) {
+        existing.applied = applied
+        void Promise.resolve(existing.controller.update(device, points)).catch(cause => {
+          this.ctx.logger.error('field: driver connection update failed for %s', row.id, cause)
+        })
+      }
+    }
+  }
+
+  private teardown(id: string, entry: ControllerEntry): void {
+    this.controllers.delete(id)
+    void Promise.resolve(entry.controller.dispose()).catch(() => undefined)
+    entry.connection.dispose()
+  }
+
+  // ---- the live connection registry (internal) ----
 
   register(caller: Context, desc: ConnectionDescriptor): ConnectionRegistration {
     if (this.connections.has(desc.id)) {
       throw new FieldError('duplicate-connection', `connection ${desc.id} is already registered`)
     }
-    const entry: ConnectionEntry = { desc, status: 'offline', points: new Map(), values: new Map() }
+    const entry: ConnectionEntry = { desc, status: 'connecting', points: new Map(), values: new Map() }
     this.connections.set(desc.id, entry)
     this.ctx.emit('connection/added', { ...desc, status: entry.status })
     const dispose = () => this.remove(desc.id)
@@ -248,10 +748,17 @@ class FieldCore {
         entry.values.set(pointKey(point), sample)
         this.ctx.emit('point/updated', sample)
       },
-      setStatus: status => {
-        if (entry.status === status) return
+      setStatus: (status, message) => {
+        if (entry.status === status && entry.message === message) return
         entry.status = status
-        this.ctx.emit('connection/status', { id: desc.id, status, time: Date.now() })
+        if (message === undefined) delete entry.message
+        else entry.message = message
+        this.ctx.emit('connection/status', {
+          id: desc.id,
+          status,
+          ...(message !== undefined ? { message } : {}),
+          time: Date.now(),
+        })
       },
       setWriteHandler: handler => {
         entry.writeHandler = handler
@@ -349,7 +856,11 @@ class ConnectionsServiceImpl extends Service {
   }
 
   list(): readonly ConnectionSnapshot[] {
-    return [...this.core.connections.values()].map(entry => ({ ...entry.desc, status: entry.status }))
+    return [...this.core.connections.values()].map(entry => ({
+      ...entry.desc,
+      status: entry.status,
+      ...(entry.message !== undefined ? { message: entry.message } : {}),
+    }))
   }
 
   subscribeStatus(listener: (frame: ConnectionStatusFrame) => void): () => void {
@@ -370,6 +881,10 @@ class FieldServiceImpl extends Service {
     return [...this.core.drivers.values()].map(entry => entry.info)
   }
 
+  config(): { devices: readonly ConfigDevice[] } {
+    return this.core.config()
+  }
+
   mappings(): MappingDocument {
     return this.core.mappings()
   }
@@ -381,11 +896,40 @@ class FieldServiceImpl extends Service {
   registerDriver(caller: Context, desc: DriverRegistration): () => void {
     return this.core.registerDriver(caller, desc)
   }
+
+  upsertDevice(input: DeviceUpsert): ConfigDevice {
+    return this.core.upsertDevice(input)
+  }
+
+  removeDevice(id: string): void {
+    this.core.removeDevice(id)
+  }
+
+  upsertGroup(device: string, group: { name: string, type: PointType }): ConfigGroup {
+    return this.core.upsertGroup(device, group)
+  }
+
+  removeGroup(device: string, group: string): void {
+    this.core.removeGroup(device, group)
+  }
+
+  upsertPoint(device: string, group: string, point: { name: string, config: DialectConfig }): ConfigPoint {
+    return this.core.upsertPoint(device, group, point)
+  }
+
+  removePoint(ref: PointRef): void {
+    this.core.removePoint(ref)
+  }
+
+  probe(driver: string, config: DialectConfig): Promise<ProbeResult> {
+    return this.core.probe(driver, config)
+  }
 }
 
 /** The field seam plugin: mounts `ctx.points`, `ctx.connections`, and `ctx.field`. */
 const fieldPlugin: Plugin.Object<Record<string, never>> = {
   name: 'field',
+  inject: ['store'],
   apply(ctx: Context): void {
     const core = new FieldCore(ctx)
     new PointsServiceImpl(ctx, core)

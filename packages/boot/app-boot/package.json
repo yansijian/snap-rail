@@ -18,6 +18,10 @@
       "types": "./lib/types/contract.d.ts",
       "default": "./lib/contract.js"
     },
+    "./scan": {
+      "types": "./lib/types/scan.d.ts",
+      "default": "./lib/scan.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
@@ -25,10 +29,12 @@
     "lib/index.js",
     "lib/rpc.js",
     "lib/contract.js",
+    "lib/scan.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "dependencies": {
+    "fflate": "^0.8.3",
     "js-yaml": "^4.2.0"
   },
   "peerDependencies": {

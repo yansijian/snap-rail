@@ -68,8 +68,9 @@ export interface PointSample {
   time: number
 }
 
-/** Connection lifecycle status; `offline` leaves point reads `null`. */
-export type ConnectionStatus = 'online' | 'offline'
+/** Connection lifecycle status: `connecting` until the driver's first verdict,
+ * `offline` leaves point reads `null`. */
+export type ConnectionStatus = 'connecting' | 'online' | 'offline'
 
 /** Static description of one connection. */
 export interface ConnectionDescriptor {
@@ -83,12 +84,15 @@ export interface ConnectionDescriptor {
 /** A connection plus its live status, as consumers see it. */
 export interface ConnectionSnapshot extends ConnectionDescriptor {
   status: ConnectionStatus
+  /** Last driver verdict on the link, when it carried one (failure reason). */
+  message?: string
 }
 
 /** Payload of the `field/connection-status` frame. */
 export interface ConnectionStatusFrame {
   id: ConnectionId
   status: ConnectionStatus
+  message?: string
   time: number
 }
 

@@ -38,13 +38,7 @@ function snapRailSources(): Plugin {
     '@snap-rail/client-settings': 'packages/client/settings/src/index.ts',
     '@snap-rail/client-variables': 'packages/client/variables/src/index.ts',
     '@snap-rail/client-runtime': 'packages/client/runtime/src/index.tsx',
-    '@snap-rail/layout-station': 'packages/client/layout-station/src/index.tsx',
-    '@snap-rail/chrome-titlebar': 'packages/client/chrome-titlebar/src/index.tsx',
-    '@snap-rail/process-maintenance': 'packages/client/process-maintenance/src/index.tsx',
-    '@snap-rail/process-production': 'packages/client/process-production/src/index.tsx',
-    '@snap-rail/process-sampling': 'packages/client/process-sampling/src/index.tsx',
-    '@snap-rail/process-fault': 'packages/client/process-fault/src/index.tsx',
-    '@snap-rail/process-downtime': 'packages/client/process-downtime/src/index.tsx',
+    '@snap-rail/suite-terminal-ops': 'packages/suites/terminal-ops/src/index.tsx',
     '@snap-rail/settings-station': 'packages/client/settings-station/src/index.tsx',
   }
   const sourceOf = new Map<string, string>()
@@ -62,9 +56,10 @@ function snapRailSources(): Plugin {
   sourceOf.set('@snap-rail/app-boot/contract', `${repoRoot}/packages/boot/app-boot/src/contract.ts`)
   sourceOf.set('@snap-rail/station-rpc/contract', `${repoRoot}/packages/boot/station-rpc/src/contract.ts`)
   sourceOf.set('@snap-rail/driver-modbus/contract', `${repoRoot}/packages/field/driver-modbus/src/contract.ts`)
-  // The modbus settings page is the package's renderer face; its entry must
-  // never pull the node-side driver bundle into the client build.
-  sourceOf.set('@snap-rail/driver-modbus/station', `${repoRoot}/packages/field/driver-modbus/src/station.tsx`)
+  // The unified 设备管理 settings page is the field base's renderer face; its
+  // entry must never pull the node-side base (store/drizzle) into the client
+  // build — it consumes the base only through the wire.
+  sourceOf.set('@snap-rail/field/station', `${repoRoot}/packages/field/field/src/station.tsx`)
 
   return {
     name: 'snap-rail-source-plane',

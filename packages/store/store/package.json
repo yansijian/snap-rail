@@ -23,5 +23,8 @@
   },
   "devDependencies": {
     "@snap-rail/cordis": "workspace:^"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2"
   }
 }

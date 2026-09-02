@@ -102,9 +102,30 @@ export function loadBuiltinLayer(path: string): EntryOptions[] {
  */
 const RENAMED_PLUGIN_ROWS: Readonly<Record<string, string>> = {
   '@snap-rail/driver-modbus/rpc': '@snap-rail/driver-modbus',
+  '@snap-rail/production-stats': '@snap-rail/suite-terminal-ops/stats',
+  '@snap-rail/process-production/stats': '@snap-rail/suite-terminal-ops/stats',
+  // The suite merge: the five process pages + layout + chrome collapsed into
+  // one package; renderer rows naming the old members rename onto the suite
+  // row (first row wins collisions).
+  '@snap-rail/layout-station': '@snap-rail/suite-terminal-ops',
+  '@snap-rail/chrome-titlebar': '@snap-rail/suite-terminal-ops',
+  '@snap-rail/process-maintenance': '@snap-rail/suite-terminal-ops',
+  '@snap-rail/process-production': '@snap-rail/suite-terminal-ops',
+  '@snap-rail/process-sampling': '@snap-rail/suite-terminal-ops',
+  '@snap-rail/process-fault': '@snap-rail/suite-terminal-ops',
+  '@snap-rail/process-downtime': '@snap-rail/suite-terminal-ops',
   '@snap-rail/modbus-station': '@snap-rail/driver-modbus/station',
-  '@snap-rail/production-stats': '@snap-rail/process-production/stats',
 }
+
+/**
+ * Rows that no longer exist anywhere (renamed away first, then matched).
+ * The unified field settings page replaced the ModbusTCP driver's renderer
+ * station face, so its row has nowhere to land — dropping it on load keeps
+ * an upgraded `plugins.yml` composing; the next write converges the file.
+ */
+const RETIRED_PLUGIN_ROWS: ReadonlySet<string> = new Set([
+  '@snap-rail/driver-modbus/station',
+])
 
 /**
  * Load the user layer. A missing file is a fresh home (nothing user-mounted);
@@ -140,6 +161,7 @@ export function loadUserLayer(path: string): UserLayer {
     const original = raw as UserPluginRow
     const renamed = RENAMED_PLUGIN_ROWS[original.name]
     const row = renamed === undefined ? original : { ...original, name: renamed }
+    if (RETIRED_PLUGIN_ROWS.has(row.name)) continue
     // A rename can collide with a same-named row already in the file; the
     // first row wins so one entry never receives two patches.
     if (seen.has(row.name)) continue
@@ -233,4 +255,33 @@ export function composeEntries(options: {
     throw new Error(`composition: ${message} ${args.map(String).join(' ')}`)
   })
   return composed.map(entry => ({ ...entry, name: resolveModuleSpecifier(entry.name, options.pool, options.appRoot) }))
+}
+
+/**
+ * Resolve a plugin package's declared `snapRail.kind`. A pool manifest wins
+ * (pool packages shadow built-ins on name collisions); otherwise the package
+ * resolves through the app root's dependency tree and its manifest is read
+ * directly. Unresolvable or undeclared → `undefined` — the common plugin
+ * carries no kind.
+ *
+ * @param name - a row name (package or subpath entry).
+ * @param appRoot - directory whose dependency tree resolves built-in names.
+ * @param pool - the scanned plugin pool, if any.
+ */
+export function packageKindOf(
+  name: string,
+  appRoot: string,
+  pool: ReadonlyMap<string, PluginDescriptor> = new Map(),
+): string | undefined {
+  const packageName = packageNameOf(name)
+  const poolKind = pool.get(packageName)?.kind
+  if (poolKind !== undefined) return poolKind
+  try {
+    const require = createRequire(join(appRoot, 'package.json'))
+    const manifestPath = require.resolve(`${packageName}/package.json`)
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { snapRail?: { kind?: unknown } }
+    return typeof manifest.snapRail?.kind === 'string' ? manifest.snapRail.kind : undefined
+  } catch {
+    return undefined
+  }
 }

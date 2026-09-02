@@ -13,6 +13,10 @@ import { pathToFileURL } from 'node:url'
 export interface SnapRailManifest {
   /** Reserved permission declarations; recorded but unenforced in phase 1. */
   permissions?: readonly string[]
+  /** The package's declared kind: `suite` rows are mutually exclusive on enable. */
+  kind?: string
+  /** The renderer face: the client bundle path inside the package. */
+  client?: { entry: string }
 }
 
 /**
@@ -29,6 +33,10 @@ export interface PluginDescriptor {
   entryUrl: string
   /** Permission declarations from the `snapRail` manifest field. */
   permissions: readonly string[]
+  /** The manifest's `snapRail.kind`, when declared. */
+  kind?: string
+  /** The renderer bundle path (`snapRail.client.entry`), when declared. */
+  clientEntry?: string
 }
 
 interface PluginPackageJson {
@@ -72,6 +80,8 @@ export function scanPluginPool(dirs: readonly string[]): Map<string, PluginDescr
         dir: pluginDir,
         entryUrl: pathToFileURL(join(pluginDir, main)).href,
         permissions: manifest.snapRail?.permissions ?? [],
+        ...(typeof manifest.snapRail?.kind === 'string' ? { kind: manifest.snapRail.kind } : {}),
+        ...(typeof manifest.snapRail?.client?.entry === 'string' ? { clientEntry: manifest.snapRail.client.entry } : {}),
       })
     }
   }

@@ -1,0 +1,35 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "lib": [
+      "ES2024",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "jsx": "react-jsx",
+    "types": []
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/timer" },
+    { "path": "../../field/field" },
+    { "path": "../../boot/station-rpc" },
+    { "path": "../../protocol/protocol" },
+    { "path": "../../protocol/gateway" },
+    { "path": "../../protocol/connection" },
+    { "path": "../../settings/settings" },
+    { "path": "../../store/store" },
+    { "path": "../../client/slots" },
+    { "path": "../../client/runtime" },
+    { "path": "../../client/session" },
+    { "path": "../../client/variables" },
+    { "path": "../../client/workflows" },
+    { "path": "../../client/ui" },
+    { "path": "../../client/settings" }
+  ]
+}

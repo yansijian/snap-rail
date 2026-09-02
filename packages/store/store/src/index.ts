@@ -1,16 +1,21 @@
 /**
- * The persistence seam: one SQLite database under the snap-rail home
- * (`snap-rail.db`), owned by `ctx.store`. Consumers declare their tables on
- * registration (create-if-missing plus append-only column additions) and get
- * a thin SQL handle bound to their prefixed namespace. Tables survive plugin
- * unload — data, not the registering fiber, is the artifact.
+ * The persistence seam: one SQLite database **per namespace** under the
+ * snap-rail home (`data/<namespace>.db`), owned by `ctx.store`. Consumers
+ * declare their tables as drizzle schema objects and receive a type-safe
+ * database bound to that schema; table creation and append-only column
+ * additions are derived from the schema itself at registration. Tables
+ * survive plugin unload — data, not the registering fiber, is the artifact.
  *
- * Portability contract: consumers issue plain, dialect-free CRUD SQL —
- * primary-key selects, whole-table lists, inserts, updates, deletes. No
- * vendor functions (date/time/json), no CTEs, no window functions; anything
- * richer belongs in application code. Switching the engine then means
- * re-implementing this one package while consumer statements migrate
- * mechanically.
+ * Physical isolation is the trust boundary of the plugin era: a namespace can
+ * only ever touch its own file, so one plugin's data is unreachable from
+ * every other namespace, and uninstalling a plugin is a file delete.
+ * Cross-namespace collaboration goes through services, never shared tables.
+ *
+ * Portability contract: consumers use drizzle's query builder only — no raw
+ * `sql` fragments beyond `excluded.*` upsert references, no vendor functions,
+ * no CTEs, no window functions; anything richer belongs in application code.
+ * Switching the engine then means re-implementing this one package while
+ * consumer statements migrate mechanically.
  *
  * @module @snap-rail/store
  */
@@ -19,51 +24,120 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync, type StatementSync } from 'node:sqlite'
 import { Context, type Plugin } from '@snap-rail/cordis'
+import { BetterSQLiteSession } from 'drizzle-orm/better-sqlite3/session'
+import { createTableRelationsHelpers, extractTablesRelationalConfig } from 'drizzle-orm/relations'
+import {
+  BaseSQLiteDatabase,
+  SQLiteSyncDialect,
+  getTableConfig,
+  type SQLiteColumn,
+  type SQLiteTable,
+} from 'drizzle-orm/sqlite-core'
 
-/** One consumer table: its local name and creation/migration DDL. */
-export interface StoreTableDef {
-  /** Local table name; the physical name is `<prefix>__<name>`. */
-  name: string
-  /**
-   * The full column definition list, as it goes between the parentheses of
-   * `CREATE TABLE (...)` — constraints included.
-   */
-  create: string
-  /**
-   * Columns added after the table first shipped; each is applied as
-   * `ALTER TABLE ... ADD COLUMN` when missing. Append-only by design: the
-   * seam never drops or rewrites existing columns.
-   */
-  addColumns?: readonly string[]
+/** A consumer's drizzle schema: physical table name → drizzle sqlite table. */
+export type StoreSchema = Record<string, SQLiteTable>
+
+/** The run-result shape drizzle's sync sqlite dialect reads back. */
+interface RunResult {
+  changes: number | bigint
+  lastInsertRowid: number | bigint
 }
 
-/** A consumer's SQL handle: every statement is namespaced by construction. */
-export interface StoreHandle {
-  /** The physical (prefixed) table name for use in SQL text. */
-  table(name: string): string
-  /** Execute a write statement; parameters bind positionally. */
-  run(sql: string, params?: readonly unknown[]): void
-  /** Read at most one row, or `undefined`. */
-  get<T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): T | undefined
-  /** Read every matching row. */
-  all<T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): T[]
-  /** Run `fn` inside one transaction (nested calls join the outer one). */
-  tx<T>(fn: () => T): T
+/** The typed database a registered namespace hands back. */
+export type StoreDatabase<S extends StoreSchema> = BaseSQLiteDatabase<'sync', RunResult, S>
+
+/** A better-sqlite3-shaped statement facade over node:sqlite's sync API. */
+interface AdaptedStatement {
+  run(...params: unknown[]): RunResult
+  all(...params: unknown[]): Record<string, unknown>[]
+  get(...params: unknown[]): Record<string, unknown> | undefined
+  raw(): { all(...params: unknown[]): unknown[][], get(...params: unknown[]): unknown[] | undefined }
+}
+
+/** node:sqlite's positional binding parameters. */
+type SyncParams = Parameters<StatementSync['run']>
+
+/**
+ * drizzle's better-sqlite3 dialect duck-types onto node:sqlite's synchronous
+ * statements. The one genuine gap is raw mode (positional rows): node:sqlite
+ * only emits object rows, but its binding writes object keys in result-column
+ * order, so `Object.values` recovers the positional form.
+ */
+function adaptStatement(stmt: StatementSync): AdaptedStatement {
+  return {
+    run: (...params) => stmt.run(...(params as SyncParams)) as RunResult,
+    all: (...params) => stmt.all(...(params as SyncParams)) as Record<string, unknown>[],
+    get: (...params) => stmt.get(...(params as SyncParams)) as Record<string, unknown> | undefined,
+    raw: () => ({
+      all: (...params) => (stmt.all(...(params as SyncParams)) as object[]).map(row => Object.values(row)),
+      get: (...params) => {
+        const row = stmt.get(...(params as SyncParams)) as object | undefined
+        return row === undefined ? undefined : Object.values(row)
+      },
+    }),
+  }
+}
+
+/** A better-sqlite3-shaped client facade: prepare + transaction thunks. */
+function adaptClient(db: DatabaseSync): { prepare: (sql: string) => AdaptedStatement, transaction(fn: (argument?: unknown) => unknown): { deferred(argument?: unknown): unknown, immediate(argument?: unknown): unknown, exclusive(argument?: unknown): unknown } } {
+  return {
+    prepare: sql => adaptStatement(db.prepare(sql)),
+    transaction: (fn: (argument?: unknown) => unknown) => {
+      // better-sqlite3 semantics: each thunk opens the transaction and hands
+      // its argument (drizzle's tx object) to the body.
+      const run = (mode: string) => (argument?: unknown): unknown => {
+        db.exec(mode === '' ? 'BEGIN' : `BEGIN ${mode}`)
+        try {
+          const result = fn(argument)
+          db.exec('COMMIT')
+          return result
+        } catch (cause) {
+          db.exec('ROLLBACK')
+          throw cause
+        }
+      }
+      return { deferred: run(''), immediate: run('IMMEDIATE'), exclusive: run('EXCLUSIVE') }
+    },
+  }
+}
+
+/**
+ * Assemble drizzle's sync sqlite database over node:sqlite. The package's
+ * `drizzle-orm/better-sqlite3` entry cannot be used: its top level imports
+ * the native `better-sqlite3` module, which this seam deliberately does not
+ * ship (node:sqlite keeps the host free of native rebuilds).
+ */
+function drizzleOverNodeSqlite<S extends StoreSchema>(client: DatabaseSync, schema: S): StoreDatabase<S> {
+  const dialect = new SQLiteSyncDialect()
+  const tablesConfig = extractTablesRelationalConfig(schema, createTableRelationsHelpers)
+  const relational = {
+    fullSchema: schema,
+    schema: tablesConfig.tables,
+    tableNamesMap: tablesConfig.tableNamesMap,
+  }
+  const session = new BetterSQLiteSession(adaptClient(client), dialect, relational)
+  // The generic plumbing (session ↔ schema variance) is wider than the public
+  // type needs; the runtime binding is exactly S.
+  const db = new BaseSQLiteDatabase('sync', dialect, session as never, relational as never)
+  return db as unknown as StoreDatabase<S>
 }
 
 /** The persistence service exposed on `ctx.store`. */
 export interface StoreService {
   /**
-   * Register a consumer namespace: creates missing tables, applies pending
-   * column additions, and returns the SQL handle. Idempotent — repeat
-   * registrations converge on the same physical tables.
+   * Open the namespace's database (`<home>/data/<namespace>.db`, created on
+   * first use) and bring its tables to the declared shape: missing tables
+   * are created, columns added since the last registration are appended
+   * (append-only by design — the seam never drops or rewrites columns, and
+   * appended columns arrive without constraints so old rows stay readable).
+   * Idempotent — repeat registrations converge on the same physical tables.
    *
    * @param caller - owning context (registration is scoped to the call site).
-   * @param prefix - the consumer's stable short name (sanitized to
-   * `[a-z0-9_]`); two prefixes sharing a table name share one physical table.
-   * @param tables - the table declarations.
+   * @param namespace - stable short name, sanitized to `[a-z0-9_]`; it is the
+   * database file name and the isolation boundary.
+   * @param schema - the drizzle tables this namespace owns.
    */
-  register(caller: Context, prefix: string, tables: readonly StoreTableDef[]): StoreHandle
+  register<S extends StoreSchema>(caller: Context, namespace: string, schema: S): StoreDatabase<S>
 }
 
 declare module '@snap-rail/cordis' {
@@ -72,14 +146,60 @@ declare module '@snap-rail/cordis' {
   }
 }
 
-/** Lowercase and flatten anything non-alphanumeric so names are SQL-safe. */
+/** Lowercase and flatten anything non-alphanumeric so names are file-safe. */
 function sanitize(raw: string): string {
   return raw.toLowerCase().replaceAll(/[^a-z0-9]+/g, '_')
 }
 
-/** First token of a column definition — its name (`"note TEXT"` → `note`). */
-function columnName(columnDef: string): string {
-  return columnDef.trim().split(/[\s(]+/)[0] as string
+/** The SQL type of a drizzle column (`text`, `integer`, `real`, …). */
+function sqlType(column: SQLiteColumn): string {
+  return (column as unknown as { getSQLType(): string }).getSQLType().toUpperCase()
+}
+
+/**
+ * `CREATE TABLE IF NOT EXISTS` synthesized from the drizzle table object —
+ * column NOT NULL flags ride along, a single primary key lands on its column,
+ * composite keys become a table-level clause. Column DEFAULTs are omitted:
+ * drizzle applies JS-side defaults at query-build time, and appended columns
+ * must arrive constraint-free anyway.
+ */
+function createTableSql(table: SQLiteTable): string {
+  const config = getTableConfig(table)
+  const primary = new Set<string>()
+  for (const key of config.primaryKeys) {
+    for (const column of key.columns) primary.add(column.name)
+  }
+  for (const column of config.columns) {
+    if (column.primary) primary.add(column.name)
+  }
+  const defs: string[] = []
+  for (const column of config.columns) {
+    const parts = [`"${column.name}"`, sqlType(column)]
+    if (column.notNull) parts.push('NOT NULL')
+    if (primary.size === 1 && primary.has(column.name)) parts.push('PRIMARY KEY')
+    defs.push(parts.join(' '))
+  }
+  if (primary.size > 1) {
+    const names = config.columns.filter(c => primary.has(c.name)).map(c => `"${c.name}"`)
+    defs.push(`PRIMARY KEY (${names.join(', ')})`)
+  }
+  return `CREATE TABLE IF NOT EXISTS "${config.name}" (${defs.join(', ')})`
+}
+
+/** Bring the namespace's physical tables to the declared shape (idempotent). */
+function bringToShape(client: DatabaseSync, schema: StoreSchema): void {
+  for (const table of Object.values(schema)) {
+    const config = getTableConfig(table)
+    client.exec(createTableSql(table))
+    const existing = new Set(
+      (client.prepare(`PRAGMA table_info("${config.name}")`).all() as Array<{ name: string }>)
+        .map(info => info.name),
+    )
+    for (const column of config.columns) {
+      if (existing.has(column.name)) continue
+      client.exec(`ALTER TABLE "${config.name}" ADD COLUMN "${column.name}" ${sqlType(column)}`)
+    }
+  }
 }
 
 /**
@@ -91,69 +211,35 @@ const storePlugin: Plugin.Function = Object.assign(
   function store(ctx: Context): void {
     const home = ctx.get('snapRailHome') as string | undefined
     if (home === undefined) throw new Error('store: snapRailHome is not provided')
-    const file = join(home, 'snap-rail.db')
-    mkdirSync(home, { recursive: true })
+    mkdirSync(join(home, 'data'), { recursive: true })
 
-    const db = new DatabaseSync(file)
-    db.exec('PRAGMA journal_mode = WAL')
-
-    const statements = new Map<string, StatementSync>()
-    const prepare = (sql: string): StatementSync => {
-      let stmt = statements.get(sql)
-      if (stmt === undefined) {
-        stmt = db.prepare(sql)
-        statements.set(sql, stmt)
+    // One database file per namespace; registration converges on the same
+    // physical client, so multiple entries of one package share the handle.
+    const clients = new Map<string, DatabaseSync>()
+    const clientFor = (namespace: string): DatabaseSync => {
+      let client = clients.get(namespace)
+      if (client === undefined) {
+        client = new DatabaseSync(join(home, 'data', `${namespace}.db`))
+        client.exec('PRAGMA journal_mode = WAL')
+        clients.set(namespace, client)
       }
-      return stmt
-    }
-
-    let inTransaction = false
-
-    const makeHandle = (prefix: string, tables: readonly StoreTableDef[]): StoreHandle => {
-      const physical = (local: string): string => `${sanitize(prefix)}__${sanitize(local)}`
-      for (const def of tables) {
-        const table = physical(def.name)
-        db.exec(`CREATE TABLE IF NOT EXISTS ${table} (${def.create})`)
-        for (const column of def.addColumns ?? []) {
-          const existing = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
-          if (existing.some(info => info.name === columnName(column))) continue
-          db.exec(`ALTER TABLE ${table} ADD COLUMN ${column}`)
-        }
-      }
-      return {
-        table: physical,
-        run: (sql, params) => { prepare(sql).run(...((params ?? []) as Parameters<StatementSync['run']>)) },
-        get: <T,>(sql: string, params?: readonly unknown[]): T | undefined =>
-          prepare(sql).get(...((params ?? []) as Parameters<StatementSync['run']>)) as T | undefined,
-        all: <T,>(sql: string, params?: readonly unknown[]): T[] =>
-          prepare(sql).all(...((params ?? []) as Parameters<StatementSync['run']>)) as T[],
-        tx: <T,>(fn: () => T): T => {
-          if (inTransaction) return fn()
-          inTransaction = true
-          try {
-            db.exec('BEGIN IMMEDIATE')
-            const result = fn()
-            db.exec('COMMIT')
-            return result
-          } catch (cause) {
-            db.exec('ROLLBACK')
-            throw cause
-          } finally {
-            inTransaction = false
-          }
-        },
-      }
+      return client
     }
 
     ctx.provide('store', {
-      register(_caller: Context, prefix: string, tables: readonly StoreTableDef[]): StoreHandle {
-        return makeHandle(prefix, tables)
+      register<S extends StoreSchema>(_caller: Context, namespace: string, schema: S): StoreDatabase<S> {
+        const client = clientFor(sanitize(namespace))
+        bringToShape(client, schema)
+        return drizzleOverNodeSqlite(client, schema)
       },
     })
 
-    // Release the file handle when the host tree unloads; on Windows an open
+    // Release file handles when the host tree unloads; on Windows an open
     // handle would block removing the home directory.
-    ctx.effect(() => () => { db.close() })
+    ctx.effect(() => () => {
+      for (const client of clients.values()) client.close()
+      clients.clear()
+    })
   },
   { inject: ['snapRailHome'] },
 )

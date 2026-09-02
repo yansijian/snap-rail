@@ -1,7 +1,9 @@
 /**
- * The in-process fake PLC: a modbus-serial ServerTCP bound to an ephemeral
- * port with addressable holding registers and coils. Lives in this package
- * so its `modbus-serial` import resolves; UI specs import it from here.
+ * The in-process fake PLC: modbus-serial ServerTCP servers bound to one
+ * ephemeral port with addressable holding registers and coils. `stop()`
+ * closes the listener; `restart()` binds a fresh server on the same port
+ * with the same registers (modbus-serial's ServerTCP cannot re-listen after
+ * close). Lives in this package so its `modbus-serial` import resolves.
  *
  * @module @snap-rail/driver-modbus/tests/fake-plc
  */
@@ -20,10 +22,15 @@ export interface FakePlc {
   port: number
   holding: Map<number, number>
   coils: Map<number, boolean>
+  stop(): Promise<void>
+  restart(register: (server: { close: (cb: () => void) => void }) => void): Promise<void>
 }
 
-/** Start a fake PLC on a free port; register the server for caller cleanup. */
-export async function startFakePlc(register: (server: { close: (cb: () => void) => void }) => void): Promise<FakePlc> {
+/** Start a fake PLC on a free port; every server instance is handed to the
+ * caller's cleanup register (initial and restarted alike). */
+export async function startFakePlc(
+  register: (server: { close: (cb: () => void) => void }) => void,
+): Promise<FakePlc> {
   const netProbe = net.createServer()
   await new Promise<void>(resolve => netProbe.listen(0, '127.0.0.1', resolve))
   const port = (netProbe.address() as net.AddressInfo).port
@@ -31,17 +38,25 @@ export async function startFakePlc(register: (server: { close: (cb: () => void) 
 
   const holding = new Map<number, number>()
   const coils = new Map<number, boolean>()
-  const server = new ServerTCP(
-    {
-      getHoldingRegister: (addr: number): number => holding.get(addr) ?? 0,
-      getCoil: (addr: number): boolean => coils.get(addr) ?? false,
-      setCoil: (addr: number, value: boolean): void => { coils.set(addr, value) },
-    },
-    { host: '127.0.0.1', port, unitID: 1 },
-  )
-  await new Promise<void>(resolve => server.on('initialized', resolve))
-  register(server)
-  return { port, holding, coils }
+  const vector = {
+    getHoldingRegister: (addr: number): number => holding.get(addr) ?? 0,
+    getCoil: (addr: number): boolean => coils.get(addr) ?? false,
+    setCoil: (addr: number, value: boolean): void => { coils.set(addr, value) },
+  }
+  const listen = (): Promise<{ close: (cb: () => void) => void }> => {
+    const server = new ServerTCP(vector, { host: '127.0.0.1', port, unitID: 1 })
+    return new Promise(resolve => server.on('initialized', () => resolve(server)))
+  }
+
+  const initial = await listen()
+  register(initial)
+  return {
+    port,
+    holding,
+    coils,
+    stop: () => new Promise<void>(resolve => initial.close(() => resolve())),
+    restart: async reRegister => reRegister(await listen()),
+  }
 }
 
 /** Register pair encoding an IEEE-754 float32 (big-endian word first). */

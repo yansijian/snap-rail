@@ -19,6 +19,9 @@ importers:
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       happy-dom:
         specifier: ^20.0.11
         version: 20.11.6
@@ -67,9 +70,6 @@ importers:
       '@snap-rail/gateway':
         specifier: workspace:^
         version: link:../../packages/protocol/gateway
-      '@snap-rail/process-production':
-        specifier: workspace:^
-        version: link:../../packages/client/process-production
       '@snap-rail/settings':
         specifier: workspace:^
         version: link:../../packages/settings/settings
@@ -79,6 +79,9 @@ importers:
       '@snap-rail/store':
         specifier: workspace:^
         version: link:../../packages/store/store
+      '@snap-rail/suite-terminal-ops':
+        specifier: workspace:^
+        version: link:../../packages/suites/terminal-ops
       electron-updater:
         specifier: ^6.6.2
         version: 6.8.9(supports-color@9.4.0)
@@ -86,9 +89,6 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@snap-rail/chrome-titlebar':
-        specifier: workspace:^
-        version: link:../../packages/client/chrome-titlebar
       '@snap-rail/client-kernel':
         specifier: workspace:^
         version: link:../../packages/client/kernel
@@ -107,21 +107,6 @@ importers:
       '@snap-rail/connection':
         specifier: workspace:^
         version: link:../../packages/protocol/connection
-      '@snap-rail/layout-station':
-        specifier: workspace:^
-        version: link:../../packages/client/layout-station
-      '@snap-rail/process-downtime':
-        specifier: workspace:^
-        version: link:../../packages/client/process-downtime
-      '@snap-rail/process-fault':
-        specifier: workspace:^
-        version: link:../../packages/client/process-fault
-      '@snap-rail/process-maintenance':
-        specifier: workspace:^
-        version: link:../../packages/client/process-maintenance
-      '@snap-rail/process-sampling':
-        specifier: workspace:^
-        version: link:../../packages/client/process-sampling
       '@snap-rail/settings-station':
         specifier: workspace:^
         version: link:../../packages/client/settings-station
@@ -170,6 +155,9 @@ importers:
 
   packages/boot/app-boot:
     dependencies:
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       js-yaml:
         specifier: ^4.2.0
         version: 4.3.1
@@ -223,33 +211,26 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
-  packages/client/chrome-titlebar:
-    dependencies:
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../runtime
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../session
+  packages/client/fallback:
+    devDependencies:
       '@snap-rail/client-settings':
         specifier: workspace:^
         version: link:../settings
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../ui
-    devDependencies:
       '@snap-rail/client-slots':
         specifier: workspace:^
         version: link:../slots
+      '@snap-rail/client-ui':
+        specifier: workspace:^
+        version: link:../ui
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../protocol/connection
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
-      lucide-react:
-        specifier: ^1.34.0
-        version: 1.34.0(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -282,253 +263,7 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
 
-  packages/client/layout-station:
-    dependencies:
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../runtime
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../ui
-    devDependencies:
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../session
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../slots
-      '@snap-rail/client-workflows':
-        specifier: workspace:^
-        version: link:../workflows
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/station-rpc':
-        specifier: workspace:^
-        version: link:../../boot/station-rpc
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-
-  packages/client/process-downtime:
-    dependencies:
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../runtime
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../ui
-    devDependencies:
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../session
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../slots
-      '@snap-rail/client-workflows':
-        specifier: workspace:^
-        version: link:../workflows
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/cordis-plugin-timer':
-        specifier: workspace:^
-        version: link:../../../vendor/timer
-      '@snap-rail/station-rpc':
-        specifier: workspace:^
-        version: link:../../boot/station-rpc
-      '@snap-rail/util':
-        specifier: workspace:^
-        version: link:../../util/util
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-
-  packages/client/process-fault:
-    dependencies:
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../runtime
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../ui
-      '@snap-rail/client-variables':
-        specifier: workspace:^
-        version: link:../variables
-    devDependencies:
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../session
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../slots
-      '@snap-rail/client-workflows':
-        specifier: workspace:^
-        version: link:../workflows
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/cordis-plugin-timer':
-        specifier: workspace:^
-        version: link:../../../vendor/timer
-      '@snap-rail/station-rpc':
-        specifier: workspace:^
-        version: link:../../boot/station-rpc
-      '@snap-rail/util':
-        specifier: workspace:^
-        version: link:../../util/util
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      lucide-react:
-        specifier: ^1.34.0
-        version: 1.34.0(react@19.2.8)
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  packages/client/process-maintenance:
-    dependencies:
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../runtime
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../ui
-    devDependencies:
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../session
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../slots
-      '@snap-rail/client-workflows':
-        specifier: workspace:^
-        version: link:../workflows
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/station-rpc':
-        specifier: workspace:^
-        version: link:../../boot/station-rpc
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-
-  packages/client/process-production:
-    devDependencies:
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../runtime
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../session
-      '@snap-rail/client-settings':
-        specifier: workspace:^
-        version: link:../settings
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../slots
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../ui
-      '@snap-rail/client-variables':
-        specifier: workspace:^
-        version: link:../variables
-      '@snap-rail/client-workflows':
-        specifier: workspace:^
-        version: link:../workflows
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/cordis-plugin-timer':
-        specifier: workspace:^
-        version: link:../../../vendor/timer
-      '@snap-rail/field':
-        specifier: workspace:^
-        version: link:../../field/field
-      '@snap-rail/gateway':
-        specifier: workspace:^
-        version: link:../../protocol/gateway
-      '@snap-rail/process-maintenance':
-        specifier: workspace:^
-        version: link:../process-maintenance
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../protocol/protocol
-      '@snap-rail/settings':
-        specifier: workspace:^
-        version: link:../../settings/settings
-      '@snap-rail/station-rpc':
-        specifier: workspace:^
-        version: link:../../boot/station-rpc
-      '@snap-rail/store':
-        specifier: workspace:^
-        version: link:../../store/store
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  packages/client/process-sampling:
-    dependencies:
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../runtime
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../ui
-      '@snap-rail/process-production':
-        specifier: workspace:^
-        version: link:../process-production
-    devDependencies:
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../session
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../slots
-      '@snap-rail/client-workflows':
-        specifier: workspace:^
-        version: link:../workflows
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/cordis-plugin-timer':
-        specifier: workspace:^
-        version: link:../../../vendor/timer
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../protocol/protocol
-      '@snap-rail/station-rpc':
-        specifier: workspace:^
-        version: link:../../boot/station-rpc
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
+  packages/client/modules: {}
 
   packages/client/runtime:
     dependencies:
@@ -750,6 +485,9 @@ importers:
       react-dom:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/client/workflows:
     devDependencies:
@@ -765,9 +503,6 @@ importers:
 
   packages/field/driver-mock:
     dependencies:
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../protocol/protocol
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -784,9 +519,6 @@ importers:
 
   packages/field/driver-modbus:
     dependencies:
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../protocol/protocol
       modbus-serial:
         specifier: 8.0.23-no-serial-port
         version: 8.0.23-no-serial-port(supports-color@9.4.0)
@@ -794,24 +526,6 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@snap-rail/audit':
-        specifier: workspace:^
-        version: link:../../audit/audit
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../../client/runtime
-      '@snap-rail/client-settings':
-        specifier: workspace:^
-        version: link:../../client/settings
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../../client/ui
-      '@snap-rail/client-variables':
-        specifier: workspace:^
-        version: link:../../client/variables
-      '@snap-rail/connection':
-        specifier: workspace:^
-        version: link:../../protocol/connection
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
@@ -821,24 +535,9 @@ importers:
       '@snap-rail/field':
         specifier: workspace:^
         version: link:../field
-      '@snap-rail/gateway':
-        specifier: workspace:^
-        version: link:../../protocol/gateway
-      '@snap-rail/settings':
-        specifier: workspace:^
-        version: link:../../settings/settings
-      '@snap-rail/station-rpc':
-        specifier: workspace:^
-        version: link:../../boot/station-rpc
       '@snap-rail/store':
         specifier: workspace:^
         version: link:../../store/store
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
 
   packages/field/field:
     dependencies:
@@ -848,6 +547,9 @@ importers:
       '@snap-rail/util':
         specifier: workspace:^
         version: link:../../util/util
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -855,12 +557,36 @@ importers:
       '@snap-rail/audit':
         specifier: workspace:^
         version: link:../../audit/audit
+      '@snap-rail/client-settings':
+        specifier: workspace:^
+        version: link:../../client/settings
+      '@snap-rail/client-ui':
+        specifier: workspace:^
+        version: link:../../client/ui
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../protocol/connection
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
       '@snap-rail/gateway':
         specifier: workspace:^
         version: link:../../protocol/gateway
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../store/store
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.0
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
 
   packages/protocol/connection:
     dependencies:
@@ -900,10 +626,90 @@ importers:
         version: link:../../../vendor/cordis
 
   packages/store/store:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
     devDependencies:
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+
+  packages/suites/terminal-ops:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/client-runtime':
+        specifier: workspace:^
+        version: link:../../client/runtime
+      '@snap-rail/client-session':
+        specifier: workspace:^
+        version: link:../../client/session
+      '@snap-rail/client-settings':
+        specifier: workspace:^
+        version: link:../../client/settings
+      '@snap-rail/client-slots':
+        specifier: workspace:^
+        version: link:../../client/slots
+      '@snap-rail/client-ui':
+        specifier: workspace:^
+        version: link:../../client/ui
+      '@snap-rail/client-variables':
+        specifier: workspace:^
+        version: link:../../client/variables
+      '@snap-rail/client-workflows':
+        specifier: workspace:^
+        version: link:../../client/workflows
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../protocol/connection
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../../vendor/timer
+      '@snap-rail/field':
+        specifier: workspace:^
+        version: link:../../field/field
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../protocol/gateway
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../protocol/protocol
+      '@snap-rail/settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@snap-rail/station-rpc':
+        specifier: workspace:^
+        version: link:../../boot/station-rpc
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../store/store
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      lucide-react:
+        specifier: ^1.34.0
+        version: 1.34.0(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+
+  packages/util/plugin-kit:
+    dependencies:
+      tsdown:
+        specifier: ^0.22.2
+        version: 0.22.14(tsx@4.23.12)(typescript@6.0.3)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/util/util: {}
 
@@ -2047,6 +1853,9 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
+  '@types/node@20.19.43':
+    resolution: {integrity: sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==}
+
   '@types/node@22.20.1':
     resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
 
@@ -2526,6 +2335,98 @@ packages:
     resolution: {integrity: sha512-ZmdL2rui+eB2YwhsWzjInR8LldtZHGDoQ1ugH85ppHKwpUHL7j7rN0Ti9NCnGiQbhaZ11FpR+7ao1dNsmduNUg==}
     engines: {node: '>=12'}
 
+  drizzle-orm@0.45.2:
+    resolution: {integrity: sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==}
+    peerDependencies:
+      '@aws-sdk/client-rds-data': '>=3'
+      '@cloudflare/workers-types': '>=4'
+      '@electric-sql/pglite': '>=0.2.0'
+      '@libsql/client': '>=0.10.0'
+      '@libsql/client-wasm': '>=0.10.0'
+      '@neondatabase/serverless': '>=0.10.0'
+      '@op-engineering/op-sqlite': '>=2'
+      '@opentelemetry/api': ^1.4.1
+      '@planetscale/database': '>=1.13'
+      '@prisma/client': '*'
+      '@tidbcloud/serverless': '*'
+      '@types/better-sqlite3': '*'
+      '@types/pg': '*'
+      '@types/sql.js': '*'
+      '@upstash/redis': '>=1.34.7'
+      '@vercel/postgres': '>=0.8.0'
+      '@xata.io/client': '*'
+      better-sqlite3: '>=7'
+      bun-types: '*'
+      expo-sqlite: '>=14.0.0'
+      gel: '>=2'
+      knex: '*'
+      kysely: '*'
+      mysql2: '>=2'
+      pg: '>=8'
+      postgres: '>=3'
+      prisma: '*'
+      sql.js: '>=1'
+      sqlite3: '>=5'
+    peerDependenciesMeta:
+      '@aws-sdk/client-rds-data':
+        optional: true
+      '@cloudflare/workers-types':
+        optional: true
+      '@electric-sql/pglite':
+        optional: true
+      '@libsql/client':
+        optional: true
+      '@libsql/client-wasm':
+        optional: true
+      '@neondatabase/serverless':
+        optional: true
+      '@op-engineering/op-sqlite':
+        optional: true
+      '@opentelemetry/api':
+        optional: true
+      '@planetscale/database':
+        optional: true
+      '@prisma/client':
+        optional: true
+      '@tidbcloud/serverless':
+        optional: true
+      '@types/better-sqlite3':
+        optional: true
+      '@types/pg':
+        optional: true
+      '@types/sql.js':
+        optional: true
+      '@upstash/redis':
+        optional: true
+      '@vercel/postgres':
+        optional: true
+      '@xata.io/client':
+        optional: true
+      better-sqlite3:
+        optional: true
+      bun-types:
+        optional: true
+      expo-sqlite:
+        optional: true
+      gel:
+        optional: true
+      knex:
+        optional: true
+      kysely:
+        optional: true
+      mysql2:
+        optional: true
+      pg:
+        optional: true
+      postgres:
+        optional: true
+      prisma:
+        optional: true
+      sql.js:
+        optional: true
+      sqlite3:
+        optional: true
+
   dts-resolver@3.0.0:
     resolution: {integrity: sha512-1T1f+z+4tl9XD+m+0HBgWoL/nm0bOIffyWaUuUSBlFg/86IWvfx+wjNaO/ybU0AJzG9/Mi5hBUgGV6zCmWEN7Q==}
     engines: {node: ^22.18.0 || >=24.0.0}
@@ -2652,6 +2553,9 @@ packages:
       picomatch:
         optional: true
 
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
+
   filelist@1.0.6:
     resolution: {integrity: sha512-5giy2PkLYY1cP39p17Ech+2xlpTRL9HLspOfEgm0L6CwBXBTgsK5ou0JtzYuepxkaQ/tvhCFIJ5uXo0OrM2DxA==}
 
@@ -2731,6 +2635,10 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  happy-dom@18.0.0:
+    resolution: {integrity: sha512-o3p2Axi1EdIfMaOUulDzO/5yXzLLV0g/54eLPVrkt3u20r3yOuOenHpyp2clAJ0eHMc+HyE139ulQxl+8pEJIw==}
+    engines: {node: '>=20.0.0'}
 
   happy-dom@20.11.6:
     resolution: {integrity: sha512-Hldbg8AdAa5a5oDcZpjqnGitp7JB0hqWmfv/8qr+kft4vzSD8BHsbdRfzYvL/0QcbKcURC/yyoygbeDQarPvYg==}
@@ -4748,6 +4656,10 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
+  '@types/node@20.19.43':
+    dependencies:
+      undici-types: 6.21.0
+
   '@types/node@22.20.1':
     dependencies:
       undici-types: 6.21.0
@@ -5208,6 +5120,8 @@ snapshots:
 
   dotenv@16.4.5: {}
 
+  drizzle-orm@0.45.2: {}
+
   dts-resolver@3.0.0: {}
 
   dunder-proto@1.0.1:
@@ -5379,6 +5293,8 @@ snapshots:
     optionalDependencies:
       picomatch: 4.0.7
 
+  fflate@0.8.3: {}
+
   filelist@1.0.6:
     dependencies:
       minimatch: 5.1.9
@@ -5478,6 +5394,12 @@ snapshots:
   gopd@1.2.0: {}
 
   graceful-fs@4.2.11: {}
+
+  happy-dom@18.0.0:
+    dependencies:
+      '@types/node': 20.19.43
+      '@types/whatwg-mimetype': 3.0.2
+      whatwg-mimetype: 3.0.0
 
   happy-dom@20.11.6:
     dependencies:

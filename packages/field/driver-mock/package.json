@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/driver-mock",
-  "description": "First-party mock field driver: simulated point stream, offline mode, write echo",
+  "description": "First-party mock field driver: the reference adapter over the field base (simulated point stream, offline mode, write echo)",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -19,7 +19,6 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@snap-rail/protocol": "workspace:^",
     "zod": "^4.4.3"
   },
   "peerDependencies": {

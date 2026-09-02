@@ -10,13 +10,8 @@
  */
 
 export const RENDERER_PACKAGES: readonly string[] = [
-  '@snap-rail/layout-station',
-  '@snap-rail/chrome-titlebar',
-  '@snap-rail/process-maintenance',
-  '@snap-rail/process-production',
-  '@snap-rail/process-sampling',
-  '@snap-rail/process-fault',
-  '@snap-rail/process-downtime',
+  '@snap-rail/suite-terminal-ops',
   '@snap-rail/settings-station',
-  '@snap-rail/driver-modbus/station',
+  '@snap-rail/field/station',
+  '@snap-rail/client-fallback',
 ]

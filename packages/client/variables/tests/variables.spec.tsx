@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
 import auditPlugin from '@snap-rail/audit'
 import gatewayPlugin from '@snap-rail/gateway'
+import storePlugin from '@snap-rail/store'
 import fieldPlugin from '@snap-rail/field'
 import fieldRpcPlugin from '@snap-rail/field/rpc'
 import type { ConnectionRegistration } from '@snap-rail/field'
@@ -92,6 +93,7 @@ describe('usePoint', () => {
     host.provide('snapRailHome', home)
     await host.plugin(gatewayPlugin, { name: 'test', version: '0.0.0', bin: 'test' })
     await host.plugin(auditPlugin)
+    await host.plugin(storePlugin)
     await host.plugin(fieldPlugin)
     await host.plugin(fieldRpcPlugin)
     let registration: ConnectionRegistration | undefined

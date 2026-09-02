@@ -22,8 +22,8 @@
     "@snap-rail/field": "workspace:^"
   },
   "peerDependencies": {
-    "@snap-rail/cordis": "workspace:^",
     "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
     "react": ">=19"
   },
   "devDependencies": {
@@ -34,6 +34,7 @@
     "@types/react-dom": "^19.2.3",
     "happy-dom": "^20.0.11",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "^4.4.3"
   }
 }

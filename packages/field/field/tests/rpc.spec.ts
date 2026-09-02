@@ -3,10 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
 import auditPlugin from '@snap-rail/audit'
+import storePlugin from '@snap-rail/store'
+import { z } from 'zod'
 import { InProcessApiClient, type ServerRequest } from '@snap-rail/protocol'
 import { afterEach, describe, expect, it } from 'vitest'
 import gatewayPlugin from '@snap-rail/gateway'
-import fieldPlugin, { ConnectionId, pointKey, type ConnectionRegistration, type PointRef } from '../src/index.ts'
+import fieldPlugin, { pointKey, type DriverHandle, type PointRef } from '../src/index.ts'
 import fieldRpcPlugin from '../src/rpc.ts'
 
 const worlds: Array<{ ctx: Context, home: string }> = []
@@ -23,11 +25,11 @@ interface World {
   client: InProcessApiClient
   auditFile: string
   /** Drives samples and status on the mounted writable test connection. */
-  drive: ConnectionRegistration
+  drive: DriverHandle
 }
 
 const temp: PointRef = { device: 'conn-1', group: 'main', name: 'temp' }
-const relay: PointRef = { device: 'conn-1', group: 'main', name: 'relay' }
+const relay: PointRef = { device: 'conn-1', group: 'bools', name: 'relay' }
 const notes: PointRef = { device: 'ro-1', group: 'main', name: 'notes' }
 
 async function makeWorld(): Promise<World> {
@@ -37,41 +39,53 @@ async function makeWorld(): Promise<World> {
   ctx.provide('snapRailHome', home)
   await ctx.plugin(gatewayPlugin, { name: 'snap-rail', version: '0.1.0', bin: 'test' })
   await ctx.plugin(auditPlugin)
+  await ctx.plugin(storePlugin)
   await ctx.plugin(fieldPlugin)
   await ctx.plugin(fieldRpcPlugin)
 
-  let drive!: ConnectionRegistration
+  const handles = new Map<string, DriverHandle>()
   await ctx.plugin(Object.assign(
     function rigDriver(sub: Context): void {
       sub.field.registerDriver(sub, {
         id: 'rig',
         title: 'Rig',
-        mappings: () => ({
-          devices: [{ id: 'conn-1', driver: 'rig' }, { id: 'ro-1', driver: 'rig' }],
-          groups: [{ deviceId: 'conn-1', name: 'main', type: 'float' }],
-          points: [{ deviceId: 'conn-1', group: 'main', name: 'temp' }],
-        }),
+        schemas: {
+          device: z.object({}).strict(),
+          point: z.object({ type: z.enum(['bool', 'int', 'float', 'string']) }).strict(),
+        },
+        createConnection: (device, _points, handle) => {
+          handles.set(device.id, handle)
+          return {
+            update: () => undefined,
+            dispose: () => { handles.delete(device.id) },
+          }
+        },
       })
-      const writable = sub.connections.register(sub, { id: ConnectionId('conn-1'), driver: 'rig', title: 'Rig' })
-      writable.setPoints([
-        { ...temp, connection: ConnectionId('conn-1'), type: 'float' },
-        { ...relay, connection: ConnectionId('conn-1'), type: 'bool' },
-      ])
-      writable.setWriteHandler((point, value) => writable.sample(point, value))
-      const readOnly = sub.connections.register(sub, { id: ConnectionId('ro-1'), driver: 'rig', title: 'Read only' })
-      readOnly.setPoints([
-        { ...notes, connection: ConnectionId('ro-1'), type: 'string' },
-      ])
-      drive = writable
     },
-    { inject: ['connections', 'field'] },
+    { inject: ['field'] },
   ))
+
+  // Two devices through the base's own tables: one writable, one read-only.
+  ctx.field.upsertDevice({ name: 'conn-1', driver: 'rig', config: {} })
+  ctx.field.upsertGroup('conn-1', { name: 'main', type: 'float' })
+  ctx.field.upsertPoint('conn-1', 'main', { name: 'temp', config: {} })
+  ctx.field.upsertGroup('conn-1', { name: 'bools', type: 'bool' })
+  ctx.field.upsertPoint('conn-1', 'bools', { name: 'relay', config: {} })
+  ctx.field.upsertDevice({ name: 'ro-1', driver: 'rig', config: {} })
+  ctx.field.upsertGroup('ro-1', { name: 'main', type: 'string' })
+  ctx.field.upsertPoint('ro-1', 'main', { name: 'notes', config: {} })
+
+  const writable = handles.get('conn-1')
+  if (writable === undefined) throw new Error('rig: writable connection handle missing')
+  writable.onWrite((point, value) => {
+    writable.sample({ device: point.device, group: point.group, name: point.name }, value)
+  })
 
   return {
     ctx,
     client: new InProcessApiClient(request => ctx.rpc.handleClientRequest(request)),
     auditFile: join(home, 'audit.jsonl'),
-    drive,
+    drive: writable,
   }
 }
 
@@ -81,8 +95,9 @@ describe('field rpc bridge', () => {
     const { client } = world
 
     const list = await client.call('field.points.list', {})
+    // Insertion order: temp registered first, relay joined later via diff.
     expect(list.ok && list.value.points.map(point => pointKey(point))).toEqual([
-      'conn-1/main/temp', 'conn-1/main/relay', 'ro-1/main/notes',
+      'conn-1/main/temp', 'conn-1/bools/relay', 'ro-1/main/notes',
     ])
 
     const samples = await client.call('field.points.read', { points: [temp] })
@@ -110,7 +125,7 @@ describe('field rpc bridge', () => {
 
     const trail = readFileSync(auditFile, 'utf8')
     expect(trail).toContain('"action":"field.point.write"')
-    expect(trail).toContain('"subject":"conn-1/main/relay"')
+    expect(trail).toContain('"subject":"conn-1/bools/relay"')
     expect(trail).toContain('"value":true')
   })
 
@@ -133,13 +148,36 @@ describe('field rpc bridge', () => {
     const { client, ctx } = await makeWorld()
 
     const drivers = await client.call('field.drivers.list', {})
-    expect(drivers).toEqual({ ok: true, value: { drivers: [{ id: 'rig', title: 'Rig' }] } })
+    expect(drivers.ok && drivers.value.drivers).toEqual([
+      {
+        id: 'rig',
+        title: 'Rig',
+        canProbe: false,
+        schemas: {
+          device: { type: 'object', properties: {}, additionalProperties: false },
+          point: {
+            type: 'object',
+            properties: { type: { type: 'string', enum: ['bool', 'int', 'float', 'string'] } },
+            required: ['type'],
+            additionalProperties: false,
+          },
+        },
+      },
+    ])
 
     const mappings = await client.call('field.mappings.list', {})
     expect(mappings.ok && mappings.value.mappings).toEqual({
       devices: [{ id: 'conn-1', driver: 'rig' }, { id: 'ro-1', driver: 'rig' }],
-      groups: [{ deviceId: 'conn-1', name: 'main', type: 'float' }],
-      points: [{ deviceId: 'conn-1', group: 'main', name: 'temp' }],
+      groups: [
+        { deviceId: 'conn-1', name: 'bools', type: 'bool' },
+        { deviceId: 'conn-1', name: 'main', type: 'float' },
+        { deviceId: 'ro-1', name: 'main', type: 'string' },
+      ],
+      points: [
+        { deviceId: 'conn-1', group: 'bools', name: 'relay' },
+        { deviceId: 'conn-1', group: 'main', name: 'temp' },
+        { deviceId: 'ro-1', group: 'main', name: 'notes' },
+      ],
     })
 
     // A driver's change notice rides the internal event out as the wire frame.
@@ -167,7 +205,7 @@ describe('field rpc bridge', () => {
 
     await client.call('field.points.unsubscribe', { points: [temp] })
     world.drive.sample(temp, 22)
-    world.drive.setStatus('online')
+    world.drive.status('online')
     await new Promise(resolve => setTimeout(resolve, 0))
 
     const lateUpdates = received.filter(frame => frame.method === 'field/point-updated').length

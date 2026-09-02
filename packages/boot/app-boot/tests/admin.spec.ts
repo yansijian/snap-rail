@@ -176,9 +176,12 @@ describe('plugin layers admin', () => {
     expect(trail).toContain('"action":"plugin.config"')
   })
 
-  it('renames retired row names on load, first row winning collisions', async () => {
-    // Package merges retired several row names; rows still naming them
-    // rename to their successors in memory (the file converges on rewrite).
+  it('renames retired row names on load and drops fully retired rows', async () => {
+    // Package merges retired several row names: rows still naming them
+    // rename to their successors in memory (first row wins collisions), and
+    // rows whose successor no longer exists anywhere (the unified field
+    // settings page replaced the ModbusTCP station face) drop on load —
+    // the file converges on rewrite either way.
     const world = await makeWorld()
     writeFileSync(world.userPath, [
       'plugins:',
@@ -194,20 +197,85 @@ describe('plugin layers admin', () => {
     ].join('\n'))
     const layer = loadUserLayer(world.userPath)
     expect(layer.plugins.map(row => [row.name, row.enabled ?? null, row.config])).toEqual([
-      ['@snap-rail/driver-modbus/station', false, undefined],
       ['@snap-rail/driver-modbus', null, undefined],
-      ['@snap-rail/process-production/stats', null, { flushMs: 250 }],
+      ['@snap-rail/suite-terminal-ops/stats', null, { flushMs: 250 }],
     ])
   })
 
-  it('composes a pre-merge renderer row: the rename lands it on the new name', async () => {
-    // The retired renderer-occupant row, renamed to its successor, rides the
-    // rendererPackages skip exactly like a row written after the merge —
-    // composition succeeds instead of failing on an unknown plugin.
-    const world = await makeWorld(undefined, ['@snap-rail/driver-modbus/station'])
+  it('activating a suite deactivates the other suites in one write', async () => {
+    // Two fake suite packages in the app tree: kind = suite in the manifest,
+    // a trivial plugin entry each.
+    const base = mkdtempSync(join(tmpdir(), 'snap-rail-suite-'))
+    homes.push(base)
+    const home = join(base, 'home')
+    const appRoot = join(base, 'app')
+    const scopeDir = join(appRoot, 'node_modules', '@snap-rail')
+    mkdirSync(join(scopeDir, 'suite-a', 'lib'), { recursive: true })
+    mkdirSync(join(scopeDir, 'suite-b', 'lib'), { recursive: true })
+    const fakeSuite = (id: string): void => {
+      writeFileSync(join(scopeDir, id, 'package.json'), JSON.stringify({
+        name: `@snap-rail/${id}`,
+        version: '0.0.0',
+        type: 'module',
+        main: 'lib/index.js',
+        snapRail: { kind: 'suite' },
+      }))
+      writeFileSync(join(scopeDir, id, 'lib', 'index.js'),
+        `export default { name: '${id}', apply() {} }\n`)
+    }
+    fakeSuite('suite-a')
+    fakeSuite('suite-b')
+    symlinkSync(join(repoRoot, 'packages/protocol/gateway'), join(scopeDir, 'gateway'), 'junction')
+    symlinkSync(join(repoRoot, 'packages/audit/audit'), join(scopeDir, 'audit'), 'junction')
+    writeFileSync(join(appRoot, 'package.json'), JSON.stringify({ name: 'test-app', private: true, type: 'module' }))
+    mkdirSync(home, { recursive: true })
+    const builtinPath = join(base, 'builtin.cordis.yml')
+    writeFileSync(builtinPath, [
+      "- id: audit",
+      "  name: '@snap-rail/audit'",
+      "- id: gateway",
+      "  name: '@snap-rail/gateway'",
+      "  config:",
+      "    name: rig",
+      "    version: 1.0.0",
+      "    bin: test",
+      "- id: suite-a",
+      "  name: '@snap-rail/suite-a'",
+      "- id: suite-b",
+      "  name: '@snap-rail/suite-b'",
+    ].join('\n') + '\n')
+    const ctx = await boot({
+      binName: 'test',
+      home,
+      builtinLayerPath: builtinPath,
+      userLayerPath: join(home, 'plugins.yml'),
+      appRoot,
+    })
+    await ctx.plugin(pluginAdminRpcPlugin)
+    worlds.push({ ctx, layers: ctx.pluginLayers, client: new InProcessApiClient(request => ctx.rpc.handleClientRequest(request)), home, userPath: join(home, 'plugins.yml'), builtinPath })
+    const world = worlds[worlds.length - 1]!
+
+    // Both suites are listed with their kind.
+    const listed = await world.client.call('plugins.list', {})
+    const byName = new Map(listed.ok ? listed.value.plugins.map(plugin => [plugin.name, plugin]) : [])
+    expect(byName.get('@snap-rail/suite-a')?.kind).toBe('suite')
+    expect(byName.get('@snap-rail/suite-b')?.kind).toBe('suite')
+
+    // Activating b deactivates a in the same batched write.
+    const on = await world.client.call('plugins.set-enabled', { name: '@snap-rail/suite-b', enabled: true })
+    expect(on.ok).toBe(true)
+    const rows = loadUserLayer(world.userPath).plugins.map(row => [row.name, row.enabled])
+    expect(rows).toContainEqual(['@snap-rail/suite-b', true])
+    expect(rows).toContainEqual(['@snap-rail/suite-a', false])
+  })
+
+  it('composes a file still carrying the retired station row', async () => {
+    // The station row drops on load, so composition succeeds instead of
+    // failing on a row that resolves nowhere anymore.
+    const world = await makeWorld()
     writeFileSync(world.userPath, [
       'plugins:',
-      "  - name: '@snap-rail/modbus-station'",
+      "  - name: '@snap-rail/driver-modbus/station'",
       '    enabled: false',
       '',
     ].join('\n'))

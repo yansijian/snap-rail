@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/driver-modbus",
-  "description": "ModbusTCP in one package: host driver + field.modbus bridge + store tables, and the renderer settings page (./station) sharing the same contract",
+  "description": "The ModbusTCP field driver: a pure protocol adapter over the field base (block polling, decode/encode, probe); devices, groups, and points live in the base's configuration tables",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -14,56 +14,28 @@
       "types": "./lib/types/contract.d.ts",
       "default": "./lib/contract.js"
     },
-    "./station": {
-      "types": "./lib/types/station.d.ts",
-      "default": "./lib/station.js"
-    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/index.js",
     "lib/contract.js",
-    "lib/station.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "dependencies": {
-    "@snap-rail/protocol": "workspace:^",
     "modbus-serial": "8.0.23-no-serial-port",
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@snap-rail/audit": "workspace:^",
-    "@snap-rail/client-runtime": "workspace:^",
-    "@snap-rail/client-settings": "workspace:^",
-    "@snap-rail/client-ui": "workspace:^",
-    "@snap-rail/client-variables": "workspace:^",
-    "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-timer": "workspace:^",
-    "@snap-rail/field": "workspace:^",
-    "@snap-rail/gateway": "workspace:^",
-    "@snap-rail/settings": "workspace:^",
-    "@snap-rail/station-rpc": "workspace:^",
-    "@snap-rail/store": "workspace:^",
-    "react": ">=19"
+    "@snap-rail/field": "workspace:^"
   },
   "devDependencies": {
-    "@snap-rail/audit": "workspace:^",
-    "@snap-rail/client-runtime": "workspace:^",
-    "@snap-rail/client-settings": "workspace:^",
-    "@snap-rail/client-ui": "workspace:^",
-    "@snap-rail/client-variables": "workspace:^",
-    "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-timer": "workspace:^",
     "@snap-rail/field": "workspace:^",
-    "@snap-rail/gateway": "workspace:^",
-    "@snap-rail/settings": "workspace:^",
-    "@snap-rail/station-rpc": "workspace:^",
-    "@snap-rail/store": "workspace:^",
-    "@types/react": "^19.2.14",
-    "react": "^19.2.8"
+    "@snap-rail/store": "workspace:^"
   }
 }

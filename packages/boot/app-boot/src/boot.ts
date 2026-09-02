@@ -14,6 +14,7 @@ import { Context } from '@snap-rail/cordis'
 import Group from '@snap-rail/cordis-plugin-group'
 import Include from '@snap-rail/cordis-plugin-include'
 import Loader from '@snap-rail/cordis-plugin-loader'
+import { anchorSpineResolution } from './resolve-hooks.ts'
 import { composeEntries, loadBuiltinLayer, loadUserLayer } from './compose.ts'
 import { LayerAdmin } from './admin.ts'
 import { scanPluginPool } from './scan.ts'
@@ -104,6 +105,9 @@ export async function boot(options: BootOptions): Promise<Context> {
   // so its failure is host setup, not the plugin tree.
   let stage = 'host preparation failed'
   try {
+    // Before any tree entry loads: pool plugins must resolve the spine
+    // against the app root (see resolve-hooks).
+    anchorSpineResolution(options.appRoot, poolDirs)
     ctx.baseUrl = `${pathToFileURL(options.home).href}/`
     ctx.provide('snapRailHome', options.home)
     await ctx.plugin(Loader)

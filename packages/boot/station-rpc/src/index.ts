@@ -19,6 +19,7 @@ import type { GatewayService } from '@snap-rail/gateway'
 import type { AuditService } from '@snap-rail/audit'
 import type { SettingsService } from '@snap-rail/settings'
 import { loadUserLayer } from '@snap-rail/app-boot'
+import { scanPluginPool } from '@snap-rail/app-boot/scan'
 import {
   SESSION_OPERATOR_KEY,
   settingsChangedSchema,
@@ -104,14 +105,33 @@ const stationRpcPlugin: Plugin.Object<void> = {
 
     rpc.method(ctx, 'client-config.list', { request: stationRequestSchemas['client-config.list'] }, () => {
       const rendererPackages = new Set(layers.handles.rendererPackages)
+      // Pool-installed occupants with a renderer face: the bundle URL rides
+      // the row so the renderer's module loader knows what to fetch.
+      const pool = scanPluginPool(layers.handles.poolDirs)
+      const clientFaces = new Map<string, string>()
+      for (const [name, descriptor] of pool) {
+        if (descriptor.clientEntry === undefined) continue
+        clientFaces.set(name, `snap-plugin://pool/${descriptor.dir.split(/[\\/]/).at(-1)}/${descriptor.clientEntry}`)
+      }
+      const seen = new Set<string>()
       const rows: ClientConfigRow[] = []
       for (const row of loadUserLayer(layers.handles.userLayerPath).plugins) {
-        if (!rendererPackages.has(row.name)) continue
+        const clientUrl = clientFaces.get(row.name)
+        const isClient = rendererPackages.has(row.name) || clientUrl !== undefined
+        if (!isClient) continue
+        seen.add(row.name)
         rows.push({
           name: row.name,
           enabled: row.enabled !== false,
           ...row.config !== undefined ? { config: row.config } : {},
+          ...clientUrl !== undefined ? { clientUrl } : {},
         })
+      }
+      // Pool client faces without a user row mount by default (pool plugins
+      // default to enabled) — absent rows still reach the renderer.
+      for (const [name, clientUrl] of clientFaces) {
+        if (seen.has(name)) continue
+        rows.push({ name, enabled: true, clientUrl })
       }
       return { rows }
     })

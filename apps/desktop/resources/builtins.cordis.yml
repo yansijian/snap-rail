@@ -21,37 +21,20 @@
 - id: station-rpc
   name: '@snap-rail/station-rpc'
 # 班产统计: counts the bound output point into three 8-hour shift buckets
-# (snap-rail.db), anchored at login time. The host face of the production
-# package — the page rides the renderer tree, and the plugin-management page
-# groups both rows under one toggle.
+# (data/production_stats.db), anchored at login time. The host face of the
+# terminal-ops business suite — the pages ride the renderer tree, and the
+# plugin-management page groups both rows under one toggle.
 - id: production-stats
-  name: '@snap-rail/process-production/stats'
+  name: '@snap-rail/suite-terminal-ops/stats'
   config:
     flushMs: 1000
-# ModbusTCP: devices live in the driver's store tables and are edited from
-# the settings dialog (the package's ./station face, a renderer occupant);
-# one entry mounts the driver and its field.modbus bridge together — the
-# plugin-management page groups both rows of this package under one toggle.
+# ModbusTCP: a pure protocol adapter over the field base. Devices, groups,
+# and points live in the base's configuration tables (field.db) and are
+# edited from the settings dialog's unified 设备管理 page.
 - id: driver-modbus
   name: '@snap-rail/driver-modbus'
-# Phase-1 demo resident: the dashboard's live source until connection
-# management lands; the user layer can disable or re-point it.
-- id: mock-demo
+# 模拟设备: the reference driver (范本) — offline development and demos.
+# Its devices are configured through the same unified 设备管理 page; this
+# row only mounts the adapter.
+- id: driver-mock
   name: '@snap-rail/driver-mock'
-  config:
-    connection: demo
-    title: Demo simulator
-    periodMs: 500
-    points:
-      - name: temperature
-        group: main
-        type: float
-      - name: counter
-        group: main
-        type: int
-      - name: running
-        group: main
-        type: bool
-      - name: device
-        group: main
-        type: string

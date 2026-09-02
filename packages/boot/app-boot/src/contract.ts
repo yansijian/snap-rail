@@ -24,6 +24,10 @@ export interface PluginInfo {
   /** The npm package the row belongs to (`@scope/pkg` of `@scope/pkg/sub`) —
    * rows of one package render as one group under one master toggle. */
   packageName: string
+  /** The package's declared kind (`snapRail.kind`): `suite` rows are mutually
+   * exclusive — enabling one disables the others (terminals serve one
+   * scenario at a time). */
+  kind?: string
   /** The entry's current config when one is set. */
   config?: unknown
 }
@@ -36,6 +40,12 @@ export interface PluginsApi {
   setEnabled(payload: { name: string, enabled: boolean }): Promise<RpcResponse<{ applied: true }>>
   /** Replace one plugin's config through a user-layer row and hot-apply. */
   setConfig(payload: { name: string, config: unknown }): Promise<RpcResponse<{ applied: true }>>
+  /** Install a plugin zip into the pool (validate → extract → compose). */
+  install(payload: { zipPath: string }): Promise<RpcResponse<{ installed: { name: string, version: string } }>>
+  /** Peek at a zip's identity/kind/permissions without installing. */
+  inspect(payload: { zipPath: string }): Promise<RpcResponse<{ plugin: { name: string, version: string, kind?: string | undefined, permissions: readonly string[], hasClient: boolean } }>>
+  /** Remove a pool package, its rows, and its namespaced data. */
+  uninstall(payload: { name: string }): Promise<RpcResponse<{ removed: true }>>
 }
 
 declare module '@snap-rail/protocol' {
@@ -43,6 +53,9 @@ declare module '@snap-rail/protocol' {
     'plugins.list': PluginsApi['list']
     'plugins.set-enabled': PluginsApi['setEnabled']
     'plugins.set-config': PluginsApi['setConfig']
+    'plugins.install': PluginsApi['install']
+    'plugins.inspect': PluginsApi['inspect']
+    'plugins.uninstall': PluginsApi['uninstall']
   }
 }
 
@@ -56,5 +69,14 @@ export const pluginsRequestSchemas = {
   'plugins.set-config': z.object({
     name: z.string().min(1),
     config: z.unknown(),
+  }).strict(),
+  'plugins.install': z.object({
+    zipPath: z.string().min(1),
+  }).strict(),
+  'plugins.inspect': z.object({
+    zipPath: z.string().min(1),
+  }).strict(),
+  'plugins.uninstall': z.object({
+    name: z.string().min(1),
   }).strict(),
 } as const

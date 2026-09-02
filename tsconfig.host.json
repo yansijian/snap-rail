@@ -19,6 +19,7 @@
     { "path": "./vendor/hmr" },
     { "path": "./vendor/logger-console" },
     { "path": "./packages/util/util" },
+    { "path": "./packages/util/plugin-kit" },
     { "path": "./packages/settings/settings" },
     { "path": "./packages/store/store" },
     { "path": "./packages/audit/audit" },
@@ -38,14 +39,10 @@
     { "path": "./packages/client/session" },
     { "path": "./packages/client/workflows" },
     { "path": "./packages/client/runtime" },
+    { "path": "./packages/client/modules" },
+    { "path": "./packages/client/fallback" },
     { "path": "./packages/client/settings-station" },
-    { "path": "./packages/client/layout-station" },
-    { "path": "./packages/client/chrome-titlebar" },
-    { "path": "./packages/client/process-maintenance" },
-    { "path": "./packages/client/process-production" },
-    { "path": "./packages/client/process-sampling" },
-    { "path": "./packages/client/process-fault" },
-    { "path": "./packages/client/process-downtime" },
+    { "path": "./packages/suites/terminal-ops" },
     { "path": "./apps/desktop" }
   ]
 }

@@ -11,12 +11,14 @@
     "app:dev": "pnpm --filter @snap-rail/desktop run dev",
     "app:start": "pnpm --filter @snap-rail/desktop run start",
     "verify:spine": "tsx scripts/verify-spine.ts",
+    "pack:plugins": "tsx scripts/pack-plugins.ts",
     "app:pack": "pnpm --filter @snap-rail/desktop run pack",
     "app:dist": "pnpm --filter @snap-rail/desktop run dist"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.20.0",
+    "fflate": "^0.8.3",
     "happy-dom": "^20.0.11",
     "js-yaml": "^4.2.0",
     "tsdown": "^0.22.2",

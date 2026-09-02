@@ -7,8 +7,13 @@
  * @module @snap-rail/driver-modbus/plc
  */
 
-import type { PointValue } from '@snap-rail/field'
+import type { PointRef, PointValue } from '@snap-rail/field'
 import type { ModbusByteOrder, ModbusFc, ModbusPointConfig } from './contract.ts'
+
+/** A point as the poll plan addresses it: its dialect plus its field address. */
+export interface PlannedPoint extends ModbusPointConfig {
+  ref: PointRef
+}
 
 /** Register (or bit) width of one point's payload. */
 export function widthOf(point: ModbusPointConfig): number {
@@ -21,7 +26,7 @@ export interface PollBlock {
   start: number
   /** Bits for fc 1/2, registers for fc 3/4. */
   count: number
-  entries: Array<{ point: ModbusPointConfig, offset: number }>
+  entries: Array<{ point: PlannedPoint, offset: number }>
 }
 
 /**
@@ -30,9 +35,9 @@ export interface PollBlock {
  * units, split when a block would exceed the protocol read limit
  * (125 registers / 2000 bits).
  */
-export function planPoll(points: readonly ModbusPointConfig[], gap = 10): PollBlock[] {
+export function planPoll(points: readonly PlannedPoint[], gap = 10): PollBlock[] {
   const blocks: PollBlock[] = []
-  const byFc = new Map<ModbusFc, ModbusPointConfig[]>()
+  const byFc = new Map<ModbusFc, PlannedPoint[]>()
   for (const point of points) byFc.set(point.fc, [...byFc.get(point.fc) ?? [], point])
 
   for (const [fc, group] of byFc) {
@@ -103,12 +108,12 @@ export function encodeWrite(
   byteOrder: ModbusByteOrder,
 ): { coil?: boolean, registers?: number[] } {
   if (point.encoding === 'coil') {
-    if (typeof value !== 'boolean') throw new RangeError(`coil write to ${point.var} expects a boolean`)
+    if (typeof value !== 'boolean') throw new RangeError(`coil write to address ${point.address} expects a boolean`)
     return { coil: value }
   }
-  if (point.encoding === 'discrete') throw new RangeError(`discrete input ${point.var} is read-only`)
+  if (point.encoding === 'discrete') throw new RangeError(`discrete input at address ${point.address} is read-only`)
   const number = typeof value === 'bigint' ? Number(value) : typeof value === 'number' ? value : Number.NaN
-  if (Number.isNaN(number)) throw new RangeError(`write to ${point.var} expects a numeric value`)
+  if (Number.isNaN(number)) throw new RangeError(`write to address ${point.address} expects a numeric value`)
   const scale = point.scale ?? 1
   const raw = scale === 1 ? Math.round(number) : Math.round(number / scale)
   switch (point.encoding) {

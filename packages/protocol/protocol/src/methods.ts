@@ -62,6 +62,10 @@ export interface RpcIntrospectApi {
 export interface WindowApi {
   /** Apply a window action (`minimize`, `toggle-maximize`, `close`); `false` when no window exists to act on. */
   control(payload: { action: 'minimize' | 'toggle-maximize' | 'close' }): Promise<RpcResponse<{ applied: boolean }>>
+  /** Native zip picker for the plugin installer; `null` when cancelled. */
+  pickZip(payload: { title?: string | undefined }): Promise<RpcResponse<string | null>>
+  /** Relaunch the app (suite switches need a fresh boot to remount). */
+  relaunch(payload: Record<string, never>): Promise<RpcResponse<{ applied: true }>>
 }
 
 /** Every unary method callable by a client, keyed by its wire method name.
@@ -70,6 +74,8 @@ export interface RpcMethodMap {
   'host.describe': HostApi['describe']
   'rpc.describe': RpcIntrospectApi['describe']
   'window.control': WindowApi['control']
+  'window.pick-zip': WindowApi['pickZip']
+  'window.relaunch': WindowApi['relaunch']
 }
 
 /** Method names on the wire. */

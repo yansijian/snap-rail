@@ -40,21 +40,28 @@ Electron 主进程                        renderer（每窗口）
 | RPC 协议 | `protocol/protocol` | **信封封闭、内容开放**：四象限消息模型、RpcMethodMap/FrameMap 两个开放合并基座（只有平台行 `host.*`/`rpc.*`/`window.*` 留在这里）、zod 信封校验、AbstractApiClient 双 overload（已知方法全类型、未知方法 `(string, unknown)`） |
 | RPC 宿主侧 | `protocol/gateway` | `ctx.rpc`：域名认领（`claimDomain` 首认即得、冲突 fail-loud）、`method`（请求 schema 必须随注册）、`frame`（载荷 schema 注册）、`bridgeEvent`（宿主事件→帧的标准桥）、`rpc.describe` 能力发现、帧泵 |
 | RPC 客户端侧 | `protocol/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势（一次 zod 解析，坏帧丢弃并记录）；`rpcErrorText` 统一错误文案 |
-| 工业通讯协议域 | `field/field` | `ctx.points`/`ctx.connections`/`ctx.field`：点表运行面 + 驱动注册面（`registerDriver`：身份 + `field.<id>.*` 子命名空间 + 可选通用映射投影）；`field.mappings.list` 跨驱动聚合方言无关的点表映射文档；`./rpc` 桥认领 `field` 域，`./wire` 是方法/帧行与 schema 的家 |
-| 模拟驱动 | `field/driver-mock` | 首方 Provider：四类型点流、离线模拟、写回显；经 `ctx.field.registerDriver` 登记身份 |
-| ModbusTCP 驱动 | `field/driver-modbus` | ModbusTCP 整包：一个宿主入口同时挂驱动与 `field.modbus.*` 桥（设备/组/映射 CRUD + 连接探测），`./contract` 是方言 schema 与类型（不进 protocol），`./station` 是渲染端设置页；两行在插件管理页按包归组、一个总开关启停 |
+| 工业通讯协议域 | `field/field` | **设备连接底座**：`data/field.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面 + 统一「设备管理」设置页（`./station`，schema 驱动表单）。`ctx.field.registerDriver` 上交 `{id, title, schemas, probe?, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。`field.config.list`/`field.devices|groups|points.*` CRUD、`field.devices.test` 探测、`field/structure-changed` 帧；`field.mappings.list` 读底座表投影（消费方零改动） |
+| 模拟驱动 | `field/driver-mock` | 范本驱动（新驱动作者的活文档）：极简 schema（离线/周期）+ 模拟点流 + 写回显，点表走底座 |
+| ModbusTCP 驱动 | `field/driver-modbus` | 纯协议适配器：块轮询/编解码/探测；方言 schema（`.meta` 中文标题 → JSON Schema → 底座 SchemaForm）；无存储无渲染端，配置全在底座表 |
 | 槽位词表 | `client/slots` | `ctx.uiSlots`：well-known slot ids + 缺槽降级 |
-| UI 原语 | `client/ui` | 主题令牌（theme.css，Tailwind v4）+ shadcn 共享组件 + `useRefresh`（ctx 事件→重渲染的标准 tick）；页面组件必须组合此包原语，缺原语按 shadcn 官方实现移植，不在页面手写交互组件 |
+| UI 原语 | `client/ui` | 主题令牌（theme.css，Tailwind v4）+ shadcn 共享组件 + `SchemaForm`（JSON Schema→触屏表单：enum=TouchSelect、数字=NumberPad、布尔=Switch）+ `useRefresh`（ctx 事件→重渲染的标准 tick）；页面组件必须组合此包原语，缺原语按 shadcn 官方实现移植，不在页面手写交互组件 |
 | 操作人会话 | `client/session` | `ctx.session`：登录态镜像（宿主持久化，重启保持登录）、`session/changed` 事件；经 `settings/changed` 帧热跟随宿主侧换人 |
 | 作业流程 | `client/workflows` | `ctx.workflows`：流程注册、声明式 `requires` 门控（`operator-day`/`day` 两 scope，事件集求值）、侧栏告警、active 页状态 |
 | 渲染宿主 | `client/runtime` | 接管 React root、先挂 timer/slots/settings/variables/session/workflows 再挂住户（逐插件 config）、槽位驱动 Shell、引入唯一主题 |
 | 变量声明 | `client/variables` | `ctx.variables`：需求方声明业务变量（三元组+类型）；`watchBinding`/`useBinding`/`usePoint` 消费配方经 `field.mappings.list` + `field/mappings-changed` 解析绑定——对具体驱动零知识 |
 | 设置页 | `client/settings` | `ctx.settingsPages`：设置对话框的可扩展页注册表 |
 | 引导 | `client/kernel` | 启动页、carrier 握手、root 移交 |
-| 布局/住户 | `client/layout-station` 等 | 全部是插件：layout-station（登录门控+流程列表+内容区）、chrome-titlebar、settings-station、process-maintenance/production/sampling/fault/downtime 五个流程页（ModbusTCP 设置页是 `field/driver-modbus` 的 `./station` 面，随包归组管理） |
+| 业务套件 | `suites/terminal-ops` | **套件 = 单包多入口**（`snapRail.kind='suite'`）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）+ 一个宿主行 `./stats`（班产计数）。套件单活：启用一个套件经 `plugins.set-enabled` 自动停用其他套件包的全部行（一次批量写）——工业终端一次服务一个场景 |
+| 设置外壳 | `client/settings-station` | 设置对话框壳 + 插件管理页（三分区：套件/驱动/核心）+ 主题页；核心内置，不可外移（卸了无法自恢复） |
+| 统一设备管理页 | `field/field` 的 `./station` | 核心静态渲染面：设备 Tabs、连接灯、探测、分组健康、点位表实时值、SchemaForm 配置对话框（见 field 语义节） |
 | 设置持久化 | `settings/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
+| 持久化 | `store/store` | `ctx.store`：drizzle over node:sqlite（自写适配器，零原生模块），**按命名空间分库**（`data/<ns>.db`）——文件隔离即插件时代的信任边界；schema 用 drizzle table 对象声明，注册即建表 + append-only 加列；跨命名空间协作走服务，永不共享表 |
 | 审计 | `audit/audit` | 追加式 JSONL：启停/配置/控制写全记录；`list(filter)` 读回（工作站业务事件的真相源）；wire 类型（`AuditEntryInfo`）由它导出，单一来源 |
 | 工具 | `util/util` | Branded、assertNever、`formatClock`/`formatDuration`；`./manifest` 是脊柱/住户名单与门禁的单源 |
+| 渲染端模块系统 | `client/modules` | 已安装插件的渲染面装载器：`__ModuleLoader__`（queue→live 门面）+ 种子表（共享实例：react/cordis/client-ui…，`SEED_MODULES` 单源在 plugin-kit）+ `loadPluginBundle`（classic script）；CJS 工厂包经 `snap-plugin://pool/…` 到达 |
+| 插件作者工具 | `util/plugin-kit` | `snapRail` manifest 词汇表（zod）、种子白名单 `SEED_MODULES`、tsdown preset：`hostBundle`（ESM node）+ `clientBundle`（CJS 浏览器包，焊 `window.__ModuleLoader__.load` 工厂壳，种子 external） |
+| 兜底壳 | `client/fallback` | 核心内置的极简 layout：零套件时的空态指引 + 极简标题栏（窗口控制+设置入口）；套件 layout 注册即让位 |
+| 安装器 | `boot/app-boot` 的 `installer` | zip → 校验（manifest/名字/snapRail 形状）→ 解压进池；`inspectPluginZip` 不落盘预检；`plugins.install/inspect/uninstall` RPC（uninstall 删行+目录+分域数据）；宿主侧 zip 解析用 fflate |
 
 ## 工作站语义（station 层）
 
@@ -101,11 +108,13 @@ Electron 主进程                        renderer（每窗口）
   需要即时生效的简单配置（点位绑定之类）不走行，走 settings.json 的
   `settings.get/set` + `settings/changed` 帧（见设置行）。
 - LayerAdmin 串行化所有变更；watch 层文件与池目录（150ms 去抖）。
-- 包是管理单元：`plugins.list` 给每行带 `packageName`，插件管理页把
-  同一包的多行（如 `driver-modbus` 的宿主行与 `./station` 渲染行）
-  归为一张组卡、一个总开关一并启停；单行包保持平铺。退役行名
-  （包合并遗留）在 `loadUserLayer` 内存态改名到后继行，老文件升级
-  不炸组合，下次写回自然收敛。
+- 包是管理单元：`plugins.list` 给每行带 `packageName` 与 `kind`
+  （`snapRail.kind`，经池清单或 appRoot 解析），插件管理页把同一包的
+  多行（如套件的渲染行与 `./stats` 宿主行）归为一张组卡、一个总开关
+  一并启停；单行包保持平铺。**套件单活**：启用 kind=suite 的包时，
+  `plugins.set-enabled` 在同一次 `setUserRows` 批量写里停用其他套件包
+  的全部行。退役行名（包合并遗留）在 `loadUserLayer` 内存态改名到后
+  继行、彻底退役的行直接丢弃，老文件升级不炸组合，下次写回自然收敛。
 - 坏文件（YAML 解析失败、未知插件引用）**保持当前树运行**并报错；
   修好文件后下一次写自然恢复。扫描池回答"有什么"，清单回答"挂什么"。
 
@@ -165,29 +174,41 @@ owner 自己的 contract 模块里（`declare module '@snap-rail/protocol'`
 - 下行端口重开是替换语义：carrier 对已存在端口的 `open-stream` 关旧
   建新回包；preload 扇出对单个抛错的 listener 隔离 try/catch。
 
-## field 语义（工业通讯协议域）
+## field 语义（设备连接底座）
 
-field 缝就是工业通讯协议域本身：点表运行面（points/connections）+
-驱动注册面（`ctx.field.registerDriver`）。每个驱动是该域的 Provider，
-不是一个独立域——ModbusTCP 的配置面住在 `field.modbus.*` 子空间，
-未来的 OPC UA/MQTT 同构接入（`field.opcua.*`…）。
+field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯协议适配器**。
+三层切分——`data/field.db`（设备/组/点 + 方言 config blob）、点表运行面
+（points/connections）、驱动注册面（`registerDriver`：schema + 可选探测 +
+连接工厂）。底座编排“什么时候变”（reconcile：配置表 × 已注册驱动 → 连接
+集合，任何变更或驱动装卸都重算），驱动决策“怎么变”
+（`update(config, points)` 内部自决热调或重连；`dispose` 拆除）。
 
 - 点位寻址统一为三元组 `(device, group, name)`：缝定义、rpc 方法
   （`field.points.read/write/subscribe/unsubscribe`）与帧载荷都只讲
   三元组，没有不透明 id 过线。`pointKey`（`设备/分组/名字`）只是
   宿主侧 Map 键与审计主体的内部组合串（组名与点位名拒含 `/`）。
-- 值为 `null` 即点位异常；连接级故障看连接状态。没有质量码。
+- **点位的类型来自分组**（同组同类型是底座结构约束）；驱动 point schema
+  校验合并对象 `{type, ...config}`（底座注入 type，存储剥离之）。
+- 设备 id 从名称铸造（重名加 `-2` 后缀）；改名不改 id（绑定不漂移），
+  改名重建连接（descriptor 不可变）。删除级联：设备→组→点。
+- 值为 `null` 即点位异常；连接级故障看连接状态（`connecting/online/
+  offline` + 消息），没有质量码。
 - 总线语义四类型：`bool` / `int`（BigInt 承载 int64）/ `float`（double）/
-  `string`。协议方言（Modbus 功能码/地址/编码/字序）住在各驱动自己的
-  `./contract`，绝不进定义层。
+  `string`。协议方言（Modbus 功能码/地址/编码/字序）住在驱动自己的
+  `./contract`，经 zod `.meta({title})` 携带表单标题；JSON Schema 投影
+  （`z.toJSONSchema`，input 形态）随 `field.drivers.list` 下发，底座
+  SchemaForm（client-ui）渲染——驱动零渲染端代码。
+- 配置面 RPC：`field.config.list`（整棵配置树）、
+  `field.devices|groups|points.upsert/remove`、`field.devices.test`
+  （探测路由）；任何变更广播 `field/structure-changed`，且映射文档
+  随之重投影。
+- **通用映射面**：`field.mappings.list` 读底座表投影（设备[{id, driver}]/
+  组[{deviceId, name, type}]/点[{deviceId, group, name}]，仅含驱动在线
+  的设备）——绑定解析（client-variables）只消费这一个面，对具体驱动
+  零知识，多驱动映射自动成立。
 - 写入路由到拥有连接的驱动，按声明类型做 typeof 校验；驱动侧写路径
   await 化——`field.points.write` 在驱动 I/O 完成后才 resolve，审计
   记录的是真实结果。
-- **通用映射面**：`field.drivers.list` 列已装驱动；`field.mappings.list`
-  聚合各驱动投影出的方言无关点表映射文档（设备[{id, driver}]/
-  组[{deviceId, name, type?}]/点[{deviceId, group, name}]），任一驱动
-  配置变化广播 `field/mappings-changed`——绑定解析（client-variables）
-  只消费这一个面，对具体驱动零知识，多驱动映射自动成立。
 
 ## 业务点位与分组
 
@@ -250,14 +271,17 @@ field 缝就是工业通讯协议域本身：点表运行面（points/connection
 
 ### 三、新增一个现场驱动（工业协议实现）
 
-1. `ctx.field.registerDriver(ctx, { id, title, mappings? })` 登记
-   身份；有映射表的驱动提供投影 `mappings: () => MappingDocument`
-   （方言字段绝不进投影；modbus 的 `projectMapping` 是范本）。
-2. 连接照旧走 `ctx.connections.register`；方言 CRUD 注册在
-   `field.<id>.*`（`ctx.rpc.claimDomain(ctx, 'field.<id>')`，须在
-   field-rpc 之后挂载）；方言 schema/类型住驱动自己的 `./contract`。
-3. 设置页住户 import 驱动 `./contract` 获得类型；写路径 await 到
-   I/O 完成再返回（审计记录真实结果）。
+1. 驱动 = 纯协议适配器：`ctx.field.registerDriver(ctx, { id, title,
+   schemas, probe?, createConnection })`。schemas 是 device/point 两个
+   zod object（point 校验 `{type, ...config}`；`.meta({title})` 给统一
+   表单中文标签）；mock 是最小范本。
+2. `createConnection(device, points, handle)` 返回
+   `{ update(config, points), dispose() }`——底座决定何时调（配置/点表/
+   驱动装卸），驱动决定怎么落地（热调 vs 重连）。handle 上报
+   `status(state, message?)` / `sample(ref, value)` / `onWrite(cb)`；
+   点表注册是底座的事，驱动永不 setPoints。
+3. 设备/组/点 CRUD 与探测全部走底座（`field.devices.*` 等），驱动**没有**
+   自己的存储、RPC 子命名空间和渲染端页面。写路径 await 到 I/O 完成。
 
 ### 四、新增一个页面插件（渲染端住户）
 
@@ -273,16 +297,61 @@ field 缝就是工业通讯协议域本身：点表运行面（points/connection
    `@snap-rail/station-rpc/contract`；调 plugins 域的 import
    `@snap-rail/app-boot/contract`。
 
+### 五、打包发布一个可安装插件
+
+1. 包内两份面：宿主面用 plugin-kit 的 `hostBundle`（ESM node）；
+   渲染面用 `clientBundle`（CJS 浏览器包——焊 `__ModuleLoader__` 工厂
+   壳、种子 external），package.json 声明 `snapRail`：`kind`
+   （suite/driver/plugin）、`client: { entry }`（渲染面包路径）、
+   `permissions`（安装时展示）。
+2. `pnpm run pack:plugins` 产出 `dist-plugins/<包名>.zip`（最终格式：
+   manifest + 构建产物）；仓库自带的演示套件、mock/modbus 驱动就是
+   第一批这样的 zip——发行附件，首启空态指引进设置手动装。
+3. 安装链：设置页「安装插件」→ `window.pick-zip`（原生对话框）→
+   `plugins.inspect`（不落盘预检：包名/版本/类型/权限）→ 确认弹框 →
+   `plugins.install`（fflate 解压进 `<home>/plugins/<包名>`，manifest
+   校验 fail-loud）→ 池扫描热挂载。
+4. 运行期解析：宿主侧 `module.registerHooks` 把**池内文件**的
+   `@snap-rail/*` 与 zod 裸导入锚到应用根（共享同一批实例，零文件系统
+   副作用）；渲染端面经 `snap-plugin://pool/…` 特权协议以 classic
+   script 到达，`__ModuleLoader__` + 种子表还原（react/cordis/client-ui
+   等单实例，`SEED_MODULES` 单源）。
+5. 卸载：`plugins.uninstall` = 禁用行 + 删池目录 + 删
+   `data/<ns>.db`（分域数据随包走）。套件启停与切换见「两层组合」节
+   的单活语义。
+
+## 安装与渲染端装载（Phase C 机制总览）
+
+- **snap-plugin:// 特权协议**（desktop 主进程）：`registerSchemesAsPrivileged`
+  （standard/fetch/stream）+ `protocol.handle` 映射 `snap-plugin://pool/<…>`
+  → `<home>/plugins/<…>`；越出池根的路径 403。dev（http 页面）与
+  prod（file 页面）同一条路径——插件作者不遇 dev/prod 分裂。签名/缓存/
+  权限执行的座位都在这一层。
+- **宿主解析钩子**（`app-boot/resolve-hooks`）：仅当导入方文件位于池内
+  时，把 `@snap-rail/*`/`zod` 的裸导入重锚到 appRoot——池插件与宿主共享
+   cordis/zod 单实例；app 树与测试进程不受影响。
+- **渲染端模块系统**（`client/modules` + desktop 客户端入口）：
+  `installModuleLoader` 装 queue→live 门面，客户端入口 `create()` 后按
+  `SEED_MODULES` 播种共享实例，再对 `client-config.list` 下发的
+  `clientUrl` 逐个 `loadPluginBundle`，`system.require(name)` 取回插件
+  对象交 runtime 挂载（失败仅记日志，不拖垮页面）。
+- **管理页**（settings-station）：三分区（套件 radio 卡/驱动多活/核心与
+  其他）+ 安装流 + 待重启徽标 + 套件切换弹框（立即重启=
+  `window.relaunch` → `app.relaunch`）。
+
 ## 打包决策
 
-- asar 关闭：插件经 `file://` URL 动态 import、内置层文件需可 watch。
-  防篡改需求出现时再评估自定义协议方案。
+- asar 关闭：插件经 `file://`/`snap-plugin://` URL 动态 import、内置层
+  文件需可 watch。防篡改需求出现时再评估自定义协议方案。
 - 宿主面插件包声明在 `dependencies`（打包器只收生产依赖）；
   renderer 住户构建期打进 `dist/client`，保持 dev 依赖。
+- 发行插件 zip 由 `pnpm run pack:plugins` 产出（`dist-plugins/`），
+  作为发行附件分发；插件市场=同格式 zip 的下载源（留座位）。
 - 更新通道：electron-updater 座位已接线（无 publish 配置时静默），
   blockmap 随安装包产出。
 
 ## 一期不做、留座位的
 
-权限执行层、i18n、遥测、外部插件包规范（npm 分发的插件格式）、
-web/头部双入口 profile、as 化部署。清单的 `permissions` 字段已预留。
+权限执行层（manifest 已声明+安装展示，未拦截）、i18n、遥测、
+npm 分发源/插件市场 UI、web/头部双入口 profile、as 化部署、
+套件热激活（当前重启生效）、套件内条目级裁剪。

@@ -34,7 +34,7 @@ async function makeWorld(rendererPackages: readonly string[] = []): Promise<Test
   await host.plugin(settingsPlugin)
   await host.plugin(auditPlugin)
   host.provide('pluginLayers', {
-    handles: { userLayerPath, rendererPackages },
+    handles: { userLayerPath, rendererPackages, poolDirs: [join(home, 'plugins')] },
   } as never)
   await host.plugin(stationRpcPlugin)
   return { home, client: new InProcessApiClient(request => host.rpc.handleClientRequest(request)) }
@@ -94,10 +94,11 @@ describe('station-rpc', () => {
     homes.push(home)
     writeFileSync(join(home, 'plugins.yml'), [
       'plugins:',
-      '  - name: "@snap-rail/process-sampling"',
+      '  - name: "@snap-rail/suite-terminal-ops"',
       '    config:',
-      '      schedule: "*/20 * * * *"',
-      '  - name: "@snap-rail/process-production"',
+      '      sampling:',
+      '        schedule: "*/20 * * * *"',
+      '  - name: "@snap-rail/field/station"',
       '    enabled: false',
       '  - name: "@snap-rail/gateway"',
       '    enabled: false',
@@ -113,7 +114,8 @@ describe('station-rpc', () => {
     host.provide('pluginLayers', {
       handles: {
         userLayerPath: join(home, 'plugins.yml'),
-        rendererPackages: ['@snap-rail/process-sampling', '@snap-rail/process-production'],
+        rendererPackages: ['@snap-rail/suite-terminal-ops', '@snap-rail/field/station'],
+        poolDirs: [join(home, 'plugins')],
       },
     } as never)
     await host.plugin(stationRpcPlugin)
@@ -121,8 +123,8 @@ describe('station-rpc', () => {
     const client = new InProcessApiClient(request => host.rpc.handleClientRequest(request))
     const rows = await client.call('client-config.list', {})
     expect(rows.ok && rows.value.rows).toEqual([
-      { name: '@snap-rail/process-sampling', enabled: true, config: { schedule: '*/20 * * * *' } },
-      { name: '@snap-rail/process-production', enabled: false },
+      { name: '@snap-rail/suite-terminal-ops', enabled: true, config: { sampling: { schedule: '*/20 * * * *' } } },
+      { name: '@snap-rail/field/station', enabled: false },
     ])
   })
 })

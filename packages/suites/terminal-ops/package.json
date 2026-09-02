@@ -1,0 +1,73 @@
+{
+  "name": "@snap-rail/suite-terminal-ops",
+  "description": "The terminal-ops business suite: the whole renderer face of one industrial scenario (station layout + chrome + five process pages + counting settings) plus its host-side shift counter (./stats); one package, one toggle, snapRail.kind = suite",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./stats": {
+      "types": "./lib/types/stats.d.ts",
+      "default": "./lib/stats.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/stats.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "snapRail": {
+    "kind": "suite"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-session": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
+    "@snap-rail/client-slots": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/client-variables": "workspace:^",
+    "@snap-rail/client-workflows": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/station-rpc": "workspace:^",
+    "@snap-rail/store": "workspace:^",
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-session": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
+    "@snap-rail/client-slots": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/client-variables": "workspace:^",
+    "@snap-rail/client-workflows": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/station-rpc": "workspace:^",
+    "@snap-rail/store": "workspace:^",
+    "@types/react": "^19.2.14",
+    "lucide-react": "^1.34.0",
+    "react": "^19.2.8"
+  }
+}

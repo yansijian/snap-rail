@@ -9,7 +9,7 @@ import { defineConfig } from 'tsdown'
  */
 export default defineConfig({
   workspace: ['vendor/*', 'packages/*/*'],
-  entry: ['lib/types/{index,rpc}.js'],
+  entry: ['lib/types/{index,rpc,contract,scan}.js'],
   outDir: 'lib',
   format: ['esm'],
   platform: 'node',
@@ -17,8 +17,8 @@ export default defineConfig({
   fixedExtension: false,
   dts: false,
   clean: false,
-  // Bundler asset imports (plugin-bundled photos): the node-side lib never
-  // loads them — only the renderer bundle does, through Vite. Keep the
-  // imports untouched instead of failing resolution.
-  external: [/\.(png|jpe?g|webp|gif|svg)$/],
+  // Bundler asset imports (plugin-bundled photos, the UI seam's theme.css):
+  // the node-side lib never loads them — only the renderer bundle does,
+  // through Vite. Keep the imports untouched instead of failing resolution.
+  external: [/\.(png|jpe?g|webp|gif|svg)$/, /\.css$/],
 })

@@ -125,15 +125,28 @@ export class LayerAdmin {
    * `null`-free by the row's own types.
    */
   async setUserRow(name: string, changes: { enabled?: boolean, config?: unknown }): Promise<void> {
+    return this.setUserRows([{ name, ...changes }])
+  }
+
+  /**
+   * Upsert several user-layer rows in one write + one apply — the unit suite
+   * exclusivity needs (activating one suite disables the others atomically).
+   *
+   * @param edits - one change set per row, same semantics as
+   * {@link setUserRow}; later edits for the same row win.
+   */
+  async setUserRows(edits: ReadonlyArray<{ name: string, enabled?: boolean, config?: unknown }>): Promise<void> {
     const run = this.queue.then(async () => {
       const layer = loadUserLayer(this.handles.userLayerPath)
       const rows = [...layer.plugins]
-      const index = rows.findIndex(row => row.name === name)
-      const base: UserPluginRow = index === -1 ? { name } : { ...rows[index]! }
-      if (changes.enabled !== undefined) base.enabled = changes.enabled
-      if (changes.config !== undefined) base.config = changes.config
-      if (index === -1) rows.push(base)
-      else rows[index] = base
+      for (const edit of edits) {
+        const index = rows.findIndex(row => row.name === edit.name)
+        const base: UserPluginRow = index === -1 ? { name: edit.name } : { ...rows[index]! }
+        if (edit.enabled !== undefined) base.enabled = edit.enabled
+        if (edit.config !== undefined) base.config = edit.config
+        if (index === -1) rows.push(base)
+        else rows[index] = base
+      }
       atomicWrite(this.handles.userLayerPath, dump({ plugins: rows } satisfies UserLayer))
       await this.apply()
     })

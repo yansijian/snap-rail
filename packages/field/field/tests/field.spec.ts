@@ -1,17 +1,27 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
+import storePlugin from '@snap-rail/store'
 import { ConnectionId, pointKey, type PointDescriptor, type PointRef, type PointType } from '@snap-rail/field'
 import { afterEach, describe, expect, it } from 'vitest'
 import fieldPlugin, { FieldError } from '../src/index.ts'
 
-const contexts: Context[] = []
+const worlds: Array<{ ctx: Context, home: string }> = []
 
 afterEach(async () => {
-  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
+  for (const world of worlds.splice(0)) {
+    await world.ctx.fiber.dispose()
+    rmSync(world.home, { recursive: true, force: true })
+  }
 })
 
 async function makeField(): Promise<Context> {
+  const home = mkdtempSync(join(tmpdir(), 'snap-rail-field-'))
   const ctx = new Context()
-  contexts.push(ctx)
+  worlds.push({ ctx, home })
+  ctx.provide('snapRailHome', home)
+  await ctx.plugin(storePlugin)
   await ctx.plugin(fieldPlugin)
   return ctx
 }
@@ -149,9 +159,9 @@ describe('field seam', () => {
     ctx.connections.subscribeStatus(frame => frames.push(`${frame.id}:${frame.status}`))
 
     const registration = ctx.connections.register(ctx, { id: ConnectionId('conn-a'), driver: 'test', title: 'A' })
-    // A fresh registration starts offline before its driver announces up.
+    // A fresh registration starts connecting until its driver announces up.
     expect(ctx.connections.list()).toEqual([
-      { id: ConnectionId('conn-a'), driver: 'test', title: 'A', status: 'offline' },
+      { id: ConnectionId('conn-a'), driver: 'test', title: 'A', status: 'connecting' },
     ])
     registration.setStatus('online')
     registration.setStatus('online')

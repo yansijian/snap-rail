@@ -70,6 +70,10 @@ export interface ClientConfigRow {
   enabled: boolean
   /** The occupant's config when the row carries one. */
   config?: unknown
+  /** Pool-installed occupants: the bundle URL the renderer's module loader
+   * fetches (`snap-plugin://pool/…`); shipped occupants mount from the app
+   * bundle instead. */
+  clientUrl?: string
 }
 
 /** Renderer-occupant configuration carved out of the shared `plugins.yml`. */
