@@ -43,6 +43,7 @@
     { "path": "./packages/client/fallback" },
     { "path": "./packages/client/settings-station" },
     { "path": "./packages/suites/terminal-ops" },
+    { "path": "./packages/tools/forge" },
     { "path": "./apps/desktop" }
   ]
 }

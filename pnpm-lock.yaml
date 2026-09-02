@@ -384,6 +384,9 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/client/slots:
     devDependencies:
@@ -737,6 +740,76 @@ importers:
       lucide-react:
         specifier: ^1.34.0
         version: 1.34.0(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+
+  packages/tools/forge:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/audit':
+        specifier: workspace:^
+        version: link:../../audit/audit
+      '@snap-rail/client-kernel':
+        specifier: workspace:^
+        version: link:../../client/kernel
+      '@snap-rail/client-modules':
+        specifier: workspace:^
+        version: link:../../client/modules
+      '@snap-rail/client-runtime':
+        specifier: workspace:^
+        version: link:../../client/runtime
+      '@snap-rail/client-session':
+        specifier: workspace:^
+        version: link:../../client/session
+      '@snap-rail/client-settings':
+        specifier: workspace:^
+        version: link:../../client/settings
+      '@snap-rail/client-slots':
+        specifier: workspace:^
+        version: link:../../client/slots
+      '@snap-rail/client-ui':
+        specifier: workspace:^
+        version: link:../../client/ui
+      '@snap-rail/client-variables':
+        specifier: workspace:^
+        version: link:../../client/variables
+      '@snap-rail/client-workflows':
+        specifier: workspace:^
+        version: link:../../client/workflows
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../protocol/connection
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/field':
+        specifier: workspace:^
+        version: link:../../field/field
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../protocol/gateway
+      '@snap-rail/plugin-kit':
+        specifier: workspace:^
+        version: link:../../util/plugin-kit
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../protocol/protocol
+      '@snap-rail/settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../store/store
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
       react:
         specifier: ^19.2.8
         version: 19.2.8

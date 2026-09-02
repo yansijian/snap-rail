@@ -46,4 +46,5 @@ export const OCCUPANT_PACKAGES: readonly string[] = [
   '@snap-rail/settings-station',
   '@snap-rail/driver-mock',
   '@snap-rail/driver-modbus',
+  '@snap-rail/forge',
 ]

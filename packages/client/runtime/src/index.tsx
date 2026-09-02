@@ -22,6 +22,10 @@ import { Shell } from './Shell.tsx'
 // The single theme import: tokens and base styles ship with whoever links
 // the runtime; Tailwind scans the sources the theme.css @source list names.
 import '@snap-rail/client-ui/theme.css'
+// The kernel's client handle type, re-exported so occupants can take it
+// type-only (a value import would drag this module — theme.css included —
+// into bundles that must stay loader-external).
+export type { ClientHandle } from '@snap-rail/client-kernel'
 
 declare module '@snap-rail/cordis' {
   interface Context {

@@ -1,0 +1,73 @@
+{
+  "name": "@snap-rail/forge",
+  "description": "The AI creation studio (AI 创造): a resident installable plugin whose agent loop talks to an OpenAI-compatible endpoint and authors runtime plugins for this terminal — generated as plain-JS host/client halves, mounted live, versioned and roll-backable in data/forge.db",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./contract": {
+      "types": "./lib/types/contract.d.ts",
+      "default": "./lib/contract.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/contract.js",
+    "lib/types/index.d.ts",
+    "lib/types/contract.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "snapRail": {
+    "kind": "plugin",
+    "client": {
+      "entry": "lib-client/client.js"
+    },
+    "permissions": [
+      "network",
+      "eval-code",
+      "store"
+    ]
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@snap-rail/audit": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/store": "workspace:^"
+  },
+  "devDependencies": {
+    "@snap-rail/audit": "workspace:^",
+    "@snap-rail/client-kernel": "workspace:^",
+    "@snap-rail/client-modules": "workspace:^",
+    "@snap-rail/client-runtime": "workspace:^",
+    "@snap-rail/client-session": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
+    "@snap-rail/client-slots": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/client-variables": "workspace:^",
+    "@snap-rail/client-workflows": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/plugin-kit": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/store": "workspace:^",
+    "@types/react": "^19.2.14",
+    "react": "^19.2.8"
+  }
+}

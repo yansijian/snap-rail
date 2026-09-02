@@ -39,6 +39,13 @@ const PLUGIN_PACKAGES: readonly ReleaseSpec[] = [
     hostDir: 'lib',
     hostFace: 'lib/index.js',
   },
+  {
+    name: '@snap-rail/forge',
+    dir: join(repoRoot, 'packages/tools/forge'),
+    hostDir: 'lib',
+    hostFace: 'lib/index.js',
+    clientFace: 'lib-client',
+  },
 ]
 
 function dirname(path: string): string {

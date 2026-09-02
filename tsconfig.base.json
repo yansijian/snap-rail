@@ -73,6 +73,8 @@
       "@snap-rail/client-fallback": ["./packages/client/fallback/src"],
       "@snap-rail/suite-terminal-ops": ["./packages/suites/terminal-ops/src"],
       "@snap-rail/suite-terminal-ops/stats": ["./packages/suites/terminal-ops/src/stats.ts"],
+      "@snap-rail/forge": ["./packages/tools/forge/src"],
+      "@snap-rail/forge/contract": ["./packages/tools/forge/src/contract.ts"],
       "@snap-rail/station-rpc": ["./packages/boot/station-rpc/src"],
       "@snap-rail/station-rpc/contract": ["./packages/boot/station-rpc/src/contract.ts"]
     }

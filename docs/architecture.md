@@ -52,6 +52,7 @@ Electron 主进程                        renderer（每窗口）
 | 引导 | `client/kernel` | 启动页、carrier 握手、root 移交 |
 | 业务套件 | `suites/terminal-ops` | **套件 = 单包多入口**（`snapRail.kind='suite'`）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）+ 一个宿主行 `./stats`（班产计数：跟随计数绑定的正增量、按三班 8-16/16-24/0-8 落 `ctx.store`、登录时刻锚定班次、`production/stats-changed` 帧广播快照兼作渲染端初值心跳）。套件单活：启用一个套件经 `plugins.set-enabled` 自动停用其他套件包的全部行（一次批量写）——工业终端一次服务一个场景 |
 | 设置外壳 | `client/settings-station` | 设置对话框壳 + 插件管理页（三分区：套件/驱动/核心）+ 主题页；核心内置，不可外移（卸了无法自恢复） |
+| AI 创造工坊 | `tools/forge` | **常驻外部可装插件**（`kind:'plugin'`，zip 发行，与业务套件共存）：OpenAI 兼容流式 Agent 循环 + `rail_inspect/read/define/run/stop` 五工具造**运行时插件**（宿主/渲染两半纯 JS 函数体，require 白名单=宿主锚定表/`SEED_MODULES`，无 JSX）；版本不可变、`data/forge.db`（`forge` 命名空间）持久、boot 重挂；预检→挂载诊断→渲染端 `forge.client-report` 三段错误回喂修复环；渲染半经 `forge/gen-mounted` 帧下发，由模块系统全局 `require` 面喂种子实例后 `ctx.plugin` 挂为 forge 子 fiber；工作台=流程页+设置页（会话流式/版本卡回滚/源码复制），LLM 端点配置走 `forge.llm` 设置键热生效 |
 | 统一设备管理页 | `field/field` 的 `./station` | 核心静态渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 field 语义节） |
 | 设置持久化 | `settings/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
 | 持久化 | `store/store` | `ctx.store`：drizzle over node:sqlite（自写适配器，零原生模块），**按命名空间分库**（`data/<ns>.db`）——文件隔离即插件时代的信任边界；schema 用 drizzle table 对象声明，注册即建表 + append-only 加列；跨命名空间协作走服务，永不共享表 |

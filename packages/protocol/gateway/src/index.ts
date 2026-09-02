@@ -152,6 +152,13 @@ export interface GatewayService {
   broadcast(method: string, payload: unknown): ServerRequest
   /** Attach a frame consumer; the returned disposer detaches it. */
   attachDownlink(downlink: Downlink): () => void
+  /**
+   * The live registry view (domains, methods with JSON schemas, frames) —
+   * the same object `rpc.describe` serves on the wire. Host-side consumers
+   * (capability catalogs, agent tooling) read it directly instead of
+   * round-tripping a client request through their own dispatcher.
+   */
+  describe(): { domains: DomainInfo[], methods: MethodInfo[], frames: FrameInfo[] }
 }
 
 /** A method name: two to four lowercase kebab segments joined by dots. */
@@ -189,7 +196,7 @@ class GatewayServiceImpl extends Service {
   }
 
   /** The live registry view behind `rpc.describe`. */
-  private describe(): { domains: DomainInfo[], methods: MethodInfo[], frames: FrameInfo[] } {
+  describe(): { domains: DomainInfo[], methods: MethodInfo[], frames: FrameInfo[] } {
     const domains = [...this.claims].map(([prefix, owner]) => ({ prefix, owner: owner.name }))
     const methods: MethodInfo[] = [...this.routes].map(([name, route]) => {
       const info: MethodInfo = { name }

@@ -1,0 +1,39 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "lib": [
+      "ES2024",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "jsx": "react-jsx",
+    "types": []
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/timer" },
+    { "path": "../../util/util" },
+    { "path": "../../util/plugin-kit" },
+    { "path": "../../settings/settings" },
+    { "path": "../../store/store" },
+    { "path": "../../audit/audit" },
+    { "path": "../../protocol/protocol" },
+    { "path": "../../protocol/gateway" },
+    { "path": "../../protocol/connection" },
+    { "path": "../../field/field" },
+    { "path": "../../client/ui" },
+    { "path": "../../client/kernel" },
+    { "path": "../../client/modules" },
+    { "path": "../../client/slots" },
+    { "path": "../../client/settings" },
+    { "path": "../../client/session" },
+    { "path": "../../client/variables" },
+    { "path": "../../client/workflows" },
+    { "path": "../../client/runtime" }
+  ]
+}

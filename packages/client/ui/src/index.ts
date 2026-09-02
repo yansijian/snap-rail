@@ -16,6 +16,7 @@ export { Tooltip, TooltipRoot, type TooltipProps, type TooltipContentProps } fro
 export { ScrollArea } from './scroll-area.tsx'
 export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './dialog.tsx'
 export { Input } from './input.tsx'
+export { Textarea } from './textarea.tsx'
 export { Label } from './label.tsx'
 export { Checkbox } from './checkbox.tsx'
 export { RadioGroup, RadioGroupItem } from './radio-group.tsx'
