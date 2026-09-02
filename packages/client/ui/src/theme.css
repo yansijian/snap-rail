@@ -25,7 +25,7 @@
   --color-popover-foreground: #ced8e3;
 
   --color-primary: #4a6cff;
-  --color-primary-foreground: #07131e;
+  --color-primary-foreground: #ffffff;
 
   --color-secondary: #1c2430;
   --color-secondary-foreground: #ced8e3;
@@ -196,14 +196,17 @@
       opacity: 1;
     }
   }
+  /* Centering lives on Tailwind v4's `translate` property (not `transform`),
+   * so keyframes must only animate scale/opacity — a translate here would
+   * stack with the utility and fling the panel off-center during entry. */
   @keyframes snap-dialog-in {
     from {
       opacity: 0;
-      transform: translate(-50%, -48%) scale(0.97);
+      transform: scale(0.97);
     }
     to {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      transform: scale(1);
     }
   }
   @media (prefers-reduced-motion: reduce) {
