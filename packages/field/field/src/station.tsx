@@ -202,7 +202,7 @@ function GroupPanel(props: {
   }
 
   return (
-    <Collapsible defaultOpen className="rounded-lg border border-border" data-group={group.name}>
+    <Collapsible defaultOpen className="min-w-0 rounded-lg border border-border" data-group={group.name}>
       <div className="flex items-center gap-2 px-3 py-2">
         <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className={group.points.length > 0 ? '' : 'invisible'}><Led tone={tone} data-group-led={group.name} /></span>
@@ -335,7 +335,11 @@ function DevicePanel(props: {
   const { link, device, snapshot, driver, onDialog } = props
 
   return (
-    <div className="grid gap-4" data-device-panel={device.id}>
+    // min-w-0 on the grid items down to the table (here and on the Collapsible
+    // above): without it the table's column floors widen the panel — grid
+    // items refuse to shrink below content — and the overflow surfaces on the
+    // whole settings pane instead of panning inside the Table's DragScroll.
+    <div className="grid min-w-0 gap-4" data-device-panel={device.id}>
       <div className="flex flex-wrap items-center gap-3">
         <DeviceLinkLine snapshot={snapshot} />
         <Badge variant="outline">{driver?.title ?? device.driver}</Badge>
