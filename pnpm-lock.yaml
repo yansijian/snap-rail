@@ -70,6 +70,9 @@ importers:
       '@snap-rail/gateway':
         specifier: workspace:^
         version: link:../../packages/protocol/gateway
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../packages/protocol/protocol
       '@snap-rail/settings':
         specifier: workspace:^
         version: link:../../packages/settings/settings

@@ -15,7 +15,6 @@
     "dist": "pnpm run build:faces && electron-builder --win nsis --config electron-builder.yml"
   },
   "dependencies": {
-    "zod": "^4.4.3",
     "@snap-rail/app-boot": "workspace:^",
     "@snap-rail/audit": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
@@ -24,12 +23,14 @@
     "@snap-rail/driver-modbus": "workspace:^",
     "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
     "@snap-rail/settings": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^",
     "@snap-rail/store": "workspace:^",
     "@snap-rail/suite-terminal-ops": "workspace:^",
     "drizzle-orm": "^0.45.2",
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.6.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@snap-rail/client-fallback": "workspace:^",

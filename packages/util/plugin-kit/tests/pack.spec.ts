@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { zipSync } from 'fflate'
@@ -21,6 +21,21 @@ const suiteSpec: ReleaseSpec = {
 const driverSpec: ReleaseSpec = {
   name: '@snap-rail/driver-mock',
   dir: join(import.meta.dirname, '../../../field/driver-mock'),
+  hostDir: 'lib',
+  hostFace: 'lib/index.js',
+}
+
+const forgeSpec: ReleaseSpec = {
+  name: '@snap-rail/forge',
+  dir: join(import.meta.dirname, '../../../tools/forge'),
+  hostDir: 'lib',
+  hostFace: 'lib/index.js',
+  clientFace: 'lib-client',
+}
+
+const modbusSpec: ReleaseSpec = {
+  name: '@snap-rail/driver-modbus',
+  dir: join(import.meta.dirname, '../../../field/driver-modbus'),
   hostDir: 'lib',
   hostFace: 'lib/index.js',
 }
@@ -79,6 +94,41 @@ describe('final-format assembly (built tree)', () => {
     expect(paths).toContain('lib/index.js')
     expect(paths).toContain('package.json')
     expect(paths.every(path => path === 'package.json' || path.startsWith('lib/'))).toBe(true)
+  })
+})
+
+describe('pool-anchor discipline (shipped host faces)', () => {
+  /** The root package id of a bare specifier (`@scope/name` keeps two segments). */
+  const rootOf = (id: string): string =>
+    id.startsWith('@') ? id.split('/').slice(0, 2).join('/') : id.split('/')[0]!
+
+  /** Every static bare import/require target in a built face (relatives and
+   * node builtins excluded — the anchor list never sees them). */
+  const bareIds = (source: string): Set<string> => {
+    const ids = new Set<string>()
+    for (const pattern of [/from\s*"([^".][^"]*)"/g, /require\(\s*"([^".][^"]*)"\s*\)/g]) {
+      for (const match of source.matchAll(pattern)) {
+        const id = match[1]!
+        if (!id.startsWith('node:')) ids.add(rootOf(id))
+      }
+    }
+    return ids
+  }
+
+  it('bare-imports only ids the desktop app carries as dependencies', async () => {
+    const desktop = JSON.parse(readFileSync(
+      join(import.meta.dirname, '../../../../apps/desktop/package.json'),
+      'utf8',
+    )) as { dependencies: Record<string, string> }
+    const carried = new Set(Object.keys(desktop.dependencies))
+    for (const spec of [suiteSpec, driverSpec, modbusSpec, forgeSpec]) {
+      const source = readFileSync(join(spec.dir, spec.hostFace), 'utf8')
+      const ids = [...bareIds(source)].filter(id => id.startsWith('@snap-rail/') || id === 'zod' || id === 'drizzle-orm')
+      const missing = ids.filter(id => !carried.has(id))
+      // resolve-hooks anchors pool bare imports to the app root; an id the
+      // app does not carry dies at boot exactly there.
+      expect(missing, `${spec.name} host face anchors uncarried ids`).toEqual([])
+    }
   })
 })
 
