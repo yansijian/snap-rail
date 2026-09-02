@@ -229,7 +229,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
     }).catch(() => undefined)
   }
 
-  const runInstall = (zipPath: string): void => {
+  const runInstall = (zipPath: string, hasClient: boolean): void => {
     setInstall({ phase: 'installing' })
     void link.call('plugins.install', { zipPath }).then(result => {
       if (!result.ok) {
@@ -238,6 +238,13 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
       }
       setInstall({ phase: 'idle' })
       reload()
+      // The renderer mounts pool client faces at page boot only, so an
+      // install carrying one lands after a restart — same semantics as
+      // flipping a renderer row, with the same prompt.
+      if (hasClient) {
+        setTouched(current => new Set([...current, result.value.installed.name]))
+        setRestartPrompt(true)
+      }
     }).catch(cause => setInstall({ phase: 'error', message: String(cause) }))
   }
 
@@ -316,7 +323,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
         <Dialog open onOpenChange={next => { if (!next) setRestartPrompt(false) }}>
           <DialogContent aria-describedby={undefined} className="max-w-sm">
             <DialogTitle className="text-base font-medium">变更待重启生效</DialogTitle>
-            <p className="text-sm text-muted-foreground">业务套件与页面类插件的启用变更将在下次启动时生效。</p>
+            <p className="text-sm text-muted-foreground">业务套件与页面类插件的启用变更、以及新安装的页面类插件，将在下次启动时生效。</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setRestartPrompt(false)}>稍后</Button>
               <Button data-restart-now onClick={() => relaunch()}>立即重启</Button>
@@ -338,7 +345,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setInstall({ phase: 'idle' })}>取消</Button>
-              <Button data-confirm-install onClick={() => runInstall(install.zipPath)}>安装</Button>
+              <Button data-confirm-install onClick={() => runInstall(install.zipPath, install.plugin.hasClient)}>安装</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

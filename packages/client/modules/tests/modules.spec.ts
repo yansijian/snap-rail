@@ -82,6 +82,17 @@ describe('plugin module loader', () => {
     create()
     expect(() => create()).toThrow(/already created/)
   })
+
+  it('the global require face resolves seeds and bundles once live', () => {
+    const { global: scope, create } = loader()
+    scope.__ModuleLoader__!.load({ id: 'bundle-x', factory: () => ({ from: 'bundle' }) })
+    expect(() => scope.__ModuleLoader__!.require('bundle-x')).toThrow(/not live/)
+    const system = create()
+    system.seed('seeded', { from: 'seed' })
+    expect(scope.__ModuleLoader__!.require('seeded')).toEqual({ from: 'seed' })
+    expect(scope.__ModuleLoader__!.require('bundle-x')).toEqual({ from: 'bundle' })
+    expect(() => scope.__ModuleLoader__!.require('nowhere')).toThrow(/no module named/)
+  })
 })
 
 describe('loadPluginBundle', () => {

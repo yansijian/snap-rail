@@ -14,8 +14,14 @@
  * @module @snap-rail/client-modules
  */
 
-/** A CJS factory: receives its `require`, returns the module's exports. */
-export type ModuleFactory = (require: (id: string) => unknown) => unknown
+/** A CJS factory: receives its `require`, `module`, and `exports` (the
+ * welded wrapper's signature — the bundle body assigns `module.exports`
+ * like any CommonJS module and returns the unwrapped default). */
+export type ModuleFactory = (
+  require: (id: string) => unknown,
+  module: { exports: Record<string, unknown> },
+  exports: Record<string, unknown>,
+) => unknown
 
 /** One bundle registration as the welded wrapper posts it. */
 export interface ModuleRegistration {
@@ -27,6 +33,12 @@ export interface ModuleRegistration {
 export interface ModuleLoaderGlobal {
   /** Bundle wrapper entry point (queue-mode before create, live after). */
   load(registration: ModuleRegistration): void
+  /** Resolve one module id against the live system (seeds and registered
+   * bundles alike); throws while the system is not live. Lets plugin-provided
+   * runners — code outside any bundle wrapper — hand generated plugin code
+   * the same seeded `require` the wrappers get, restricted by construction
+   * to the ids the system itself knows. */
+  require(id: string): unknown
 }
 
 /** The live module system returned by {@link installModuleLoader}'s create. */
@@ -69,6 +81,10 @@ export function installModuleLoader(global: { __ModuleLoader__?: ModuleLoaderGlo
         return
       }
       pending.push(registration)
+    },
+    require(id: string): unknown {
+      if (tables === undefined) throw new Error('plugin module loader: not live')
+      return resolve(tables, id)
     },
   }
 
@@ -123,9 +139,18 @@ function resolve(tables: SystemTables, id: string): unknown {
   }
   tables.loading.add(id)
   try {
-    const value = factory((dependency: string) => resolve(tables, dependency))
-    tables.exports.set(id, value)
-    return value
+    // CommonJS triple-argument invocation: the wrapper's footer returns the
+    // interop-unwrapped exports, but a plain `module.exports = …` body that
+    // returns nothing still lands through the module object.
+    const moduleObject = { exports: {} as Record<string, unknown> }
+    const value = factory(
+      (dependency: string) => resolve(tables, dependency),
+      moduleObject,
+      moduleObject.exports,
+    )
+    const exported = value !== undefined ? value : moduleObject.exports
+    tables.exports.set(id, exported)
+    return exported
   } finally {
     tables.loading.delete(id)
   }

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
+import { z } from 'zod'
 import auditPlugin from '@snap-rail/audit'
 import gatewayPlugin from '@snap-rail/gateway'
 import settingsPlugin from '@snap-rail/settings'
@@ -168,6 +169,79 @@ describe('settings dialog', () => {
       '@snap-rail/driver-modbus',
       '@snap-rail/driver-modbus/station',
     ])
+
+    await runtime.dispose()
+    element.remove()
+  }, 20_000)
+
+  it('installing a plugin with a renderer face prompts for the restart that mounts it', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'snap-rail-install-ui-'))
+    tempDirs.push(home)
+    const poolDir = join(home, 'plugins')
+    // A minimal but honest zip: manifest declaring a renderer face plus the
+    // host face entry the installer validates.
+    const { zipSync } = await import('fflate')
+    const zipPath = join(home, 'mini.zip')
+    const zip = new Uint8Array(zipSync({
+      'package.json': new TextEncoder().encode(JSON.stringify({
+        name: '@snap-rail/mini-ui', version: '0.1.0', type: 'module',
+        main: 'lib/index.js',
+        snapRail: { client: { entry: 'lib-client/client.js' } },
+      })),
+      'lib/index.js': new TextEncoder().encode('export default { name: "mini", apply() {} }\n'),
+      'lib-client/client.js': new TextEncoder().encode('/* bundle */\n'),
+    }))
+    writeFileSync(zipPath, zip)
+
+    const host = new Context()
+    contexts.push(host)
+    host.provide('snapRailHome', home)
+    writeFileSync(join(home, 'builtins.cordis.yml'), "- id: timer\n  name: '@snap-rail/cordis-plugin-timer'\n")
+    await host.plugin(gatewayPlugin, { name: 'install-test', version: '0.1.0', bin: 'test' })
+    await host.plugin(settingsPlugin)
+    await host.plugin(auditPlugin)
+    host.provide('pluginLayers', {
+      handles: {
+        builtinLayerPath: join(home, 'builtins.cordis.yml'),
+        userLayerPath: join(home, 'plugins.yml'),
+        poolDirs: [poolDir],
+        rendererPackages: [],
+      },
+      apply: async (): Promise<void> => {},
+      recompose: (): unknown[] => [],
+    } as never)
+    await host.plugin(stationRpcPlugin)
+    await host.plugin(pluginsRpcPlugin)
+    // The native zip picker is an Electron window control; stand in for it.
+    host.rpc.claimDomain(host, 'window')
+    host.rpc.method(host, 'window.pick-zip', { request: z.object({ title: z.string().optional() }).strict() }, () => zipPath)
+
+    const channel: HostChannel = {
+      invoke: request => host.rpc.handleClientRequest(request),
+      openStream: listener => host.rpc.attachDownlink(frame => listener(frame)),
+    }
+    const element = document.createElement('div')
+    document.body.append(element)
+    const handle = await bootClient({ element, channel })
+    const runtime = await createClientRuntime(handle, { plugins: OCCUPANTS })
+    await flush()
+
+    document.querySelector<HTMLButtonElement>('button[aria-label="设置"]')!.click()
+    await flush()
+    document.querySelector<HTMLButtonElement>('button[data-install-plugin]')!.click()
+    await flush()
+
+    // The inspection lands on the confirm dialog naming the renderer face.
+    const confirm = document.querySelector<HTMLButtonElement>('[data-confirm-install]')
+    expect(confirm).not.toBeNull()
+    expect(document.body.textContent).toContain('含页面')
+    confirm!.click()
+    await flush(20)
+
+    // The restart prompt opens: renderer faces mount at page boot, so the
+    // install completes only after relaunch. The new row carries the badge.
+    expect(document.body.textContent).toContain('变更待重启生效')
+    expect(document.querySelector('[data-plugin-row="@snap-rail/mini-ui"]')?.textContent).toContain('待重启')
 
     await runtime.dispose()
     element.remove()
