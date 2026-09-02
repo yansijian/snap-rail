@@ -24,6 +24,10 @@ Electron 主进程                        renderer（每窗口）
   （contextIsolation 开、nodeIntegration 关、preload 只暴露两原语）。
 - renderer 内跑一棵轻量 client Cordis 树：kernel 引导（启动页 + HostLink），
   runtime 接管 React root 并挂住户插件。
+- **第二窗口（AI 创造）**：`window.open-forge` 开一个单例 frameless
+  窗口，加载同一渲染入口 + `?window=forge`——该分支只装 `@snap-rail/forge`
+  的池面、跳过内置住户清单；carrier 的帧端口按 WebContents 天然多开，
+  广播扇出到全部窗口，`window.control` 用 `target:'forge'` 定向。
 - **文件即接口**：`plugins.yml` 同时被页面按钮、手编、Agent 编辑——一条
   热重载路径服务全部三种来源。
 
@@ -42,7 +46,7 @@ Electron 主进程                        renderer（每窗口）
 | 工业通讯协议域 | `field/field` | **设备连接底座**：`data/field.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面 + 统一「设备管理」设置页（`./station`，schema 驱动表单）。`ctx.field.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。`field.config.list`/`field.devices|groups|points.*` CRUD、`field/structure-changed` 帧；`field.mappings.list` 读底座表投影（消费方零改动） |
 | 模拟驱动 | `field/driver-mock` | 范本驱动（新驱动作者的活文档）：极简 schema（离线/周期）+ 模拟点流 + 写回显，点表走底座 |
 | ModbusTCP 驱动 | `field/driver-modbus` | 纯协议适配器：块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema → 底座 SchemaForm）；无存储无渲染端，配置全在底座表 |
-| 槽位词表 | `client/slots` | `ctx.uiSlots`：well-known slot ids + 缺槽降级 |
+| 槽位词表 | `client/slots` | `ctx.uiSlots`：well-known slot ids（含 `titlebar-actions`——标题栏右侧图标按钮位，forge 的 AI 创造入口经它进驻 chrome 与兜底壳）+ 缺槽降级 |
 | UI 原语 | `client/ui` | 主题令牌（theme.css，Tailwind v4）+ shadcn 共享组件 + `SchemaForm`（JSON Schema→触屏表单：enum=TouchSelect、数字=NumberPad、布尔=Switch）+ `useRefresh`（ctx 事件→重渲染的标准 tick）；页面组件必须组合此包原语，缺原语按 shadcn 官方实现移植，不在页面手写交互组件 |
 | 操作人会话 | `client/session` | `ctx.session`：登录态镜像（宿主持久化，重启保持登录）、`session/changed` 事件；经 `settings/changed` 帧热跟随宿主侧换人 |
 | 作业流程 | `client/workflows` | `ctx.workflows`：流程注册、声明式 `requires` 门控（`operator-day`/`day` 两 scope，事件集求值）、侧栏告警、active 页状态 |
@@ -52,7 +56,7 @@ Electron 主进程                        renderer（每窗口）
 | 引导 | `client/kernel` | 启动页、carrier 握手、root 移交 |
 | 业务套件 | `suites/terminal-ops` | **套件 = 单包多入口**（`snapRail.kind='suite'`）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）+ 一个宿主行 `./stats`（班产计数：跟随计数绑定的正增量、按三班 8-16/16-24/0-8 落 `ctx.store`、登录时刻锚定班次、`production/stats-changed` 帧广播快照兼作渲染端初值心跳）。套件单活：启用一个套件经 `plugins.set-enabled` 自动停用其他套件包的全部行（一次批量写）——工业终端一次服务一个场景 |
 | 设置外壳 | `client/settings-station` | 设置对话框壳 + 插件管理页（三分区：套件/驱动/核心）+ 主题页；核心内置，不可外移（卸了无法自恢复） |
-| AI 创造工坊 | `tools/forge` | **常驻外部可装插件**（`kind:'plugin'`，zip 发行，与业务套件共存）：OpenAI 兼容流式 Agent 循环 + `rail_inspect/read/define/run/stop` 五工具造**运行时插件**（宿主/渲染两半纯 JS 函数体，require 白名单=宿主锚定表/`SEED_MODULES`，无 JSX）；版本不可变、`data/forge.db`（`forge` 命名空间）持久、boot 重挂；预检→挂载诊断→渲染端 `forge.client-report` 三段错误回喂修复环；渲染半经 `forge/gen-mounted` 帧下发，由模块系统全局 `require` 面喂种子实例后 `ctx.plugin` 挂为 forge 子 fiber；工作台=流程页+设置页（会话流式/版本卡回滚/源码复制），LLM 端点配置走 `forge.llm` 设置键热生效 |
+| AI 创造工坊 | `tools/forge` | **常驻外部可装插件**（`kind:'plugin'`，zip 发行，与业务套件共存）：OpenAI 兼容流式 Agent 循环 + `rail_inspect/read/define/run/stop` 五工具造**运行时插件**（宿主/渲染两半纯 JS 函数体，require 白名单=宿主锚定表/`SEED_MODULES`，无 JSX）；版本不可变、`data/forge.db`（`forge` 命名空间）持久、boot 重挂；预检→挂载诊断→渲染端 `forge.client-report` 三段错误回喂修复环；渲染半经 `forge/gen-mounted` 帧下发，由模块系统全局 `require` 面喂种子实例后 `ctx.plugin` 挂为 forge 子 fiber。client 面按窗口分支：主窗口只挂生成插件 runner + `titlebar-actions` AI 按钮，**独立工作室窗口**（`window.open-forge`）= layout 占用者整体铺屏（自带标题栏/左会话栏/右对话与我的插件/模型接口设置弹窗，主题经 `ui.theme` 采纳），生成插件渲染半只在主窗口挂载；`forge.plugin.export` 把任一版本合成可安装 zip（`@forge/<id>`，`window.save-zip` 落盘）；LLM 端点配置走 `forge.llm` 设置键热生效 |
 | 统一设备管理页 | `field/field` 的 `./station` | 核心静态渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 field 语义节） |
 | 设置持久化 | `settings/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
 | 持久化 | `store/store` | `ctx.store`：drizzle over node:sqlite（自写适配器，零原生模块），**按命名空间分库**（`data/<ns>.db`）——文件隔离即插件时代的信任边界；schema 用 drizzle table 对象声明，注册即建表 + append-only 加列；跨命名空间协作走服务，永不共享表 |
@@ -166,7 +170,8 @@ owner 自己的 contract 模块里（`declare module '@snap-rail/protocol'`
   计数——同一地址多个消费者各自持有一份引用，任一退订只减计数，
   最后一个退订者才停帧。`field/point-updated` 仅对计数 > 0 的地址
   广播；结构帧（增删/状态/映射变化）永远全播。渲染端整页刷新跳过
-  退订会漏计数，只浪费广播不丢帧，v1 单窗口可接受。
+  退订会漏计数，只浪费广播不丢帧——多窗口（主终端 + AI 创造）下
+  同理：各窗口多订一份广播是无害浪费。
 - 渲染端消费帧一律 `subscribeFrame(link, method, schema, listener)`
   （connection 包）：载荷一次 zod 解析、坏帧丢弃并记录，禁止手写
   `payload as {...}` 判形。`settings/changed` 帧跟随每次 settings.json
@@ -346,7 +351,9 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
   `SEED_MODULES` 播种共享实例（表驱动 + boot 期 parity fail-loud——
   播种表与白名单漂移立刻抛错），再对 `client-config.list` 下发的
   `clientUrl` 逐个 `loadPluginBundle`，`system.require(name)` 取回插件
-  对象交 runtime 挂载（失败仅记日志，不拖垮页面）。
+  对象交 runtime 挂载（失败仅记日志，不拖垮页面）。AI 创造窗口走
+  同一入口的 `?window=forge` 分支：只装 forge 一个池面、不装内置
+  住户清单——别的面的注册面向主窗口 chrome，不得双窗口双跑。
 - **装载纪律**（三条硬边界）：渲染面永不 import 双面包的宿主入口
   （跨端类型/schema 走该包 `./contract` 纯面，node 侧实现不进
   浏览器图）；渲染面运行时 require 的 id ⊆ `SEED_MODULES`
