@@ -22,6 +22,10 @@
       "types": "./lib/types/build.d.ts",
       "default": "./lib/build.js"
     },
+    "./pack": {
+      "types": "./lib/types/pack.d.ts",
+      "default": "./lib/pack.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
@@ -33,5 +37,8 @@
   "dependencies": {
     "tsdown": "^0.22.2",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "rolldown": "^1.2.5"
   }
 }

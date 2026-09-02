@@ -60,6 +60,7 @@ function snapRailSources(): Plugin {
   sourceOf.set('@snap-rail/station-rpc/contract', `${repoRoot}/packages/boot/station-rpc/src/contract.ts`)
   sourceOf.set('@snap-rail/driver-modbus/contract', `${repoRoot}/packages/field/driver-modbus/src/contract.ts`)
   sourceOf.set('@snap-rail/field/contract', `${repoRoot}/packages/field/field/src/contract.ts`)
+  sourceOf.set('@snap-rail/plugin-kit/seeds', `${repoRoot}/packages/util/plugin-kit/src/seeds.ts`)
   // The unified 设备管理 settings page is the field base's renderer face; its
   // entry must never pull the node-side base (store/drizzle) into the client
   // build — it consumes the base only through the wire.
@@ -76,7 +77,9 @@ function snapRailSources(): Plugin {
 
 /**
  * CSP rides only the production bundle: dev needs Vite's inline module
- * preludes, which a strict script-src would block.
+ * preludes, which a strict script-src would block. `snap-plugin:` carries the
+ * pool-installed plugins' client bundles (classic scripts) and their bundled
+ * assets, so it rides script-src and img-src alongside 'self'.
  */
 function productionCsp(): Plugin {
   return {
@@ -86,7 +89,7 @@ function productionCsp(): Plugin {
       return html.replace(
         '<meta charset="utf-8" />',
         '<meta charset="utf-8" />'
-          + '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:" />',
+          + '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; script-src \'self\' snap-plugin:; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: snap-plugin:" />',
       )
     },
   }

@@ -28,6 +28,7 @@
     "@snap-rail/station-rpc": "workspace:^",
     "@snap-rail/store": "workspace:^",
     "@snap-rail/suite-terminal-ops": "workspace:^",
+    "drizzle-orm": "^0.45.2",
     "electron-updater": "^6.6.2"
   },
   "devDependencies": {
@@ -40,6 +41,7 @@
     "@snap-rail/client-slots": "workspace:^",
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/plugin-kit": "workspace:^",
     "@snap-rail/settings-station": "workspace:^",
     "@snap-rail/suite-terminal-ops": "workspace:^",
     "@tailwindcss/vite": "^4.3.3",

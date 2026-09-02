@@ -34,13 +34,25 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   `snapRail.kind='suite'`），强耦合留在包内（跨页 action 常量走包内
   相对导入）；启用套件经 `plugins.set-enabled` 自动停用其他套件（终
   端一次服务一个场景）。新场景 = 新套件包，成套交付、成套丢弃。
-- **可安装插件的最终格式**：zip（manifest + 构建产物），经设置页
-  「安装插件」（pick-zip → `plugins.inspect` 预检 → 确认 →
-  `plugins.install` 解压进 `<home>/plugins/`）落地；渲染面必须是
-  plugin-kit `clientBundle` 产出的 CJS 工厂包（种子表共享实例，
-  `SEED_MODULES` 单源——跨插件值导入禁止，协作走 cordis 服务）；
-  宿主侧依赖解析靠 resolve-hooks（池内文件的 `@snap-rail/*`/zod 锚定
-  appRoot）。发布 zip：`pnpm run pack:plugins`。
+- **渲染面零宿主入口**：任何进浏览器图的代码（渲染住户、套件页面、
+  变量/连接层）禁止 import 双面包的宿主入口——node 侧实现
+  （store/drizzle/node:sqlite）永不进 client bundle；跨端消费
+  类型/schema 走该包 `./contract` 纯面。渲染面运行时 require 的模块
+  id 必须在 `SEED_MODULES`（单源三处一致：种子表 = 客户端入口播种 =
+  `clientBundle` external；客户端入口 boot 时 parity fail-loud；
+  加 id 是脊柱决策）。
+- **可安装插件是构建产物**：发行 zip = 精简 manifest（`main` 指宿主
+  面，池内包单宿主入口）+ 构建好的宿主面目录 + （声明
+  `snapRail.client` 时）client 面，永不带 src；经设置页「安装插件」
+  （pick-zip → `plugins.inspect` 预检 → 确认 → `plugins.install`
+  解压进 `<home>/plugins/`）落地；渲染面必须是 plugin-kit
+  `clientBundle` 产出的 CJS 工厂包（种子表共享实例——跨插件值导入
+  禁止，协作走 cordis 服务；位图/SVG 以 `snap-plugin://` URL 随包
+  发射）。宿主面裸导入边界：`@snap-rail/*`、`zod`、`drizzle-orm`
+  （含子路径）经 resolve-hooks 锚定 appRoot（对象跨缝传递才入名单，
+  对应包必须在 desktop `dependencies` 里），其余第三方库打进宿主面
+  bundle。发布 zip：`pnpm run build && pnpm run pack:plugins`
+  （装配规则单源 `@snap-rail/plugin-kit/pack`）。
 - **注册皆 effect**：一切贡献经 `ctx.effect()`/`ctx.on()`；`register()`
   返回处置函数。effect 体返回 disposer——把函数本身传进去等于立即执行。
 - **状态放构造期闭包，不放 Service 子类字段**：cordis 可追踪代理每次

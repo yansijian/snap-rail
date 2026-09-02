@@ -24,7 +24,10 @@
   ],
   "license": "Apache-2.0",
   "snapRail": {
-    "kind": "suite"
+    "kind": "suite",
+    "client": {
+      "entry": "lib-client/client.js"
+    }
   },
   "dependencies": {
     "@snap-rail/util": "workspace:^",
@@ -63,6 +66,7 @@
     "@snap-rail/cordis-plugin-timer": "workspace:^",
     "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/plugin-kit": "workspace:^",
     "@snap-rail/protocol": "workspace:^",
     "@snap-rail/settings": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^",

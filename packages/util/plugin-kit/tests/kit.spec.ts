@@ -30,8 +30,15 @@ describe('seed whitelist', () => {
     expect(SEED_MODULES).toContain('react')
     expect(SEED_MODULES).toContain('zod')
     expect(SEED_MODULES).toContain('@snap-rail/client-ui')
+    // Spine faces the renderer consumes at runtime: contract subpaths, the
+    // timer primitives, and the pure utilities.
+    expect(SEED_MODULES).toContain('@snap-rail/field/contract')
+    expect(SEED_MODULES).toContain('@snap-rail/util')
+    expect(SEED_MODULES).toContain('@snap-rail/cordis-plugin-timer')
     // No plugin packages: cross-plugin value imports are forbidden.
     expect(SEED_MODULES.filter(id => id.includes('suite-') || id.includes('driver-'))).toEqual([])
+    // No host entries: the node side must never enter the client graph.
+    expect(SEED_MODULES.filter(id => id === '@snap-rail/field' || id === '@snap-rail/store')).toEqual([])
   })
 })
 
@@ -52,7 +59,7 @@ describe('tsdown presets', () => {
     const banner = options && 'banner' in options ? String(options.banner) : ''
     const footer = options && 'footer' in options ? String(options.footer) : ''
     expect(banner).toContain(`window.__ModuleLoader__.load({ id: ${JSON.stringify(packageName)}, factory:`)
-    expect(footer).toContain('return module.exports; } });')
+    expect(footer).toContain('module.exports.default : module.exports; } });')
   })
 })
 

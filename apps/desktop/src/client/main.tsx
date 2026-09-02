@@ -35,6 +35,9 @@ import * as connection from '@snap-rail/connection'
 import * as protocol from '@snap-rail/protocol'
 import * as stationRpcContract from '@snap-rail/station-rpc/contract'
 import * as appBootContract from '@snap-rail/app-boot/contract'
+import * as fieldContract from '@snap-rail/field/contract'
+import * as snapRailUtil from '@snap-rail/util'
+import { SEED_MODULES } from '@snap-rail/plugin-kit/seeds'
 import * as cordis from '@snap-rail/cordis'
 import * as zod from 'zod'
 import type { Plugin } from '@snap-rail/cordis'
@@ -49,25 +52,42 @@ const createSystem = installModuleLoader(globalThis as { __ModuleLoader__?: neve
 const handle = await bootClient({ element })
 const system: ModuleSystem = createSystem()
 
-// Seed the shared-instance table — the ids match SEED_MODULES exactly.
-system.seed('react', React)
-system.seed('react/jsx-runtime', await import('react/jsx-runtime'))
-system.seed('react-dom', ReactDom)
-system.seed('react-dom/client', ReactDomClient)
-system.seed('@snap-rail/cordis', cordis)
-system.seed('@snap-rail/client-ui', clientUi)
-system.seed('@snap-rail/client-kernel', clientKernel)
-system.seed('@snap-rail/client-slots', clientSlots)
-system.seed('@snap-rail/client-settings', clientSettings)
-system.seed('@snap-rail/client-session', clientSession)
-system.seed('@snap-rail/client-workflows', clientWorkflows)
-system.seed('@snap-rail/client-variables', clientVariables)
-system.seed('@snap-rail/client-modules', await import('@snap-rail/client-modules'))
-system.seed('@snap-rail/connection', connection)
-system.seed('@snap-rail/protocol', protocol)
-system.seed('@snap-rail/station-rpc/contract', stationRpcContract)
-system.seed('@snap-rail/app-boot/contract', appBootContract)
-system.seed('zod', zod)
+// Seed the shared-instance table. The table's ids must cover SEED_MODULES
+// exactly — a drift fails loud at boot right below, so the shell's instances
+// and the plugin-kit's client-bundle externals can never fall out of step.
+const SEED_TABLE: ReadonlyArray<readonly [id: string, module: unknown]> = [
+  ['react', React],
+  ['react/jsx-runtime', await import('react/jsx-runtime')],
+  ['react-dom', ReactDom],
+  ['react-dom/client', ReactDomClient],
+  ['@snap-rail/cordis', cordis],
+  ['@snap-rail/cordis-plugin-timer', await import('@snap-rail/cordis-plugin-timer')],
+  ['@snap-rail/client-ui', clientUi],
+  ['@snap-rail/client-kernel', clientKernel],
+  ['@snap-rail/client-slots', clientSlots],
+  ['@snap-rail/client-settings', clientSettings],
+  ['@snap-rail/client-session', clientSession],
+  ['@snap-rail/client-workflows', clientWorkflows],
+  ['@snap-rail/client-variables', clientVariables],
+  ['@snap-rail/client-modules', await import('@snap-rail/client-modules')],
+  ['@snap-rail/connection', connection],
+  ['@snap-rail/protocol', protocol],
+  ['@snap-rail/station-rpc/contract', stationRpcContract],
+  ['@snap-rail/app-boot/contract', appBootContract],
+  ['@snap-rail/field/contract', fieldContract],
+  ['@snap-rail/util', snapRailUtil],
+  ['zod', zod],
+]
+for (const [id, module] of SEED_TABLE) system.seed(id, module)
+{
+  const seeded = new Set(SEED_TABLE.map(([id]) => id))
+  const whitelist = new Set(SEED_MODULES)
+  const missing = [...whitelist].filter(id => !seeded.has(id))
+  const extra = [...seeded].filter(id => !whitelist.has(id))
+  if (missing.length > 0 || extra.length > 0) {
+    throw new Error(`client: seed table mismatch (missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`)
+  }
+}
 
 // The plugins.yml rows addressed to renderer occupants carry each one's
 // config, enable flag, and — for pool-installed faces — the bundle URL.

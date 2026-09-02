@@ -5,10 +5,15 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 describe('spine resolution anchoring', () => {
-  it('anchors the spine scope and zod, nothing else', () => {
+  it('anchors the spine scope, zod, and drizzle-orm, nothing else', () => {
     expect(isAnchoredSpecifier('@snap-rail/field')).toBe(true)
     expect(isAnchoredSpecifier('@snap-rail/suite-terminal-ops/stats')).toBe(true)
     expect(isAnchoredSpecifier('zod')).toBe(true)
+    // drizzle table objects cross the store seam, so pool plugins share the
+    // host's instance just like zod schemas — subpaths anchor too.
+    expect(isAnchoredSpecifier('drizzle-orm')).toBe(true)
+    expect(isAnchoredSpecifier('drizzle-orm/sqlite-core')).toBe(true)
+    expect(isAnchoredSpecifier('zod/v4')).toBe(true)
     // Relative, absolute, and file URLs keep their own resolution; foreign
     // packages resolve from the importing file like always.
     expect(isAnchoredSpecifier('./sibling.ts')).toBe(false)

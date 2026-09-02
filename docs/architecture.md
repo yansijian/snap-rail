@@ -36,7 +36,6 @@ Electron 主进程                        renderer（每窗口）
 | --- | --- | --- |
 | 启动/组合 | `boot/app-boot` | 两层合成、boot()、LayerAdmin 热重载、`./rpc` 管理桥（认领 `plugins` 域；`./contract` 是方法行与 schema 的家）；`rendererPackages` 让渲染端住户行只作配置不进宿主树 |
 | 工作站桥 | `boot/station-rpc` | `session.*`/`settings.*`/`audit.*`/`client-config.list`（登录态落 settings + 审计；`./contract` 是方法/帧行与 schema 的家，渲染住户 import 它获得类型） |
-| 班产统计 | `client/process-production` 的 `./stats` 面 | 生产任务整包：工作流页 + 宿主侧计数器（跟随计数绑定的正增量，按三班 8-16/16-24/0-8 落 `ctx.store`，登录时刻锚定班次，`production/stats-changed` 帧广播快照兼作渲染端初值心跳）；契约是包内 `./contract`（合并进 FrameMap），两行在插件管理页按包归组 |
 | RPC 协议 | `protocol/protocol` | **信封封闭、内容开放**：四象限消息模型、RpcMethodMap/FrameMap 两个开放合并基座（只有平台行 `host.*`/`rpc.*`/`window.*` 留在这里）、zod 信封校验、AbstractApiClient 双 overload（已知方法全类型、未知方法 `(string, unknown)`） |
 | RPC 宿主侧 | `protocol/gateway` | `ctx.rpc`：域名认领（`claimDomain` 首认即得、冲突 fail-loud）、`method`（请求 schema 必须随注册）、`frame`（载荷 schema 注册）、`bridgeEvent`（宿主事件→帧的标准桥）、`rpc.describe` 能力发现、帧泵 |
 | RPC 客户端侧 | `protocol/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势（一次 zod 解析，坏帧丢弃并记录）；`rpcErrorText` 统一错误文案 |
@@ -51,7 +50,7 @@ Electron 主进程                        renderer（每窗口）
 | 变量声明 | `client/variables` | `ctx.variables`：需求方声明业务变量（三元组+类型）；`watchBinding`/`useBinding`/`usePoint` 消费配方经 `field.mappings.list` + `field/mappings-changed` 解析绑定——对具体驱动零知识 |
 | 设置页 | `client/settings` | `ctx.settingsPages`：设置对话框的可扩展页注册表 |
 | 引导 | `client/kernel` | 启动页、carrier 握手、root 移交 |
-| 业务套件 | `suites/terminal-ops` | **套件 = 单包多入口**（`snapRail.kind='suite'`）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）+ 一个宿主行 `./stats`（班产计数）。套件单活：启用一个套件经 `plugins.set-enabled` 自动停用其他套件包的全部行（一次批量写）——工业终端一次服务一个场景 |
+| 业务套件 | `suites/terminal-ops` | **套件 = 单包多入口**（`snapRail.kind='suite'`）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）+ 一个宿主行 `./stats`（班产计数：跟随计数绑定的正增量、按三班 8-16/16-24/0-8 落 `ctx.store`、登录时刻锚定班次、`production/stats-changed` 帧广播快照兼作渲染端初值心跳）。套件单活：启用一个套件经 `plugins.set-enabled` 自动停用其他套件包的全部行（一次批量写）——工业终端一次服务一个场景 |
 | 设置外壳 | `client/settings-station` | 设置对话框壳 + 插件管理页（三分区：套件/驱动/核心）+ 主题页；核心内置，不可外移（卸了无法自恢复） |
 | 统一设备管理页 | `field/field` 的 `./station` | 核心静态渲染面：设备 Tabs、连接灯、探测、分组健康、点位表实时值、SchemaForm 配置对话框（见 field 语义节） |
 | 设置持久化 | `settings/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
@@ -59,7 +58,7 @@ Electron 主进程                        renderer（每窗口）
 | 审计 | `audit/audit` | 追加式 JSONL：启停/配置/控制写全记录；`list(filter)` 读回（工作站业务事件的真相源）；wire 类型（`AuditEntryInfo`）由它导出，单一来源 |
 | 工具 | `util/util` | Branded、assertNever、`formatClock`/`formatDuration`；`./manifest` 是脊柱/住户名单与门禁的单源 |
 | 渲染端模块系统 | `client/modules` | 已安装插件的渲染面装载器：`__ModuleLoader__`（queue→live 门面）+ 种子表（共享实例：react/cordis/client-ui…，`SEED_MODULES` 单源在 plugin-kit）+ `loadPluginBundle`（classic script）；CJS 工厂包经 `snap-plugin://pool/…` 到达 |
-| 插件作者工具 | `util/plugin-kit` | `snapRail` manifest 词汇表（zod）、种子白名单 `SEED_MODULES`、tsdown preset：`hostBundle`（ESM node）+ `clientBundle`（CJS 浏览器包，焊 `window.__ModuleLoader__.load` 工厂壳，种子 external） |
+| 插件作者工具 | `util/plugin-kit` | `snapRail` manifest 词汇表（zod）、种子白名单 `SEED_MODULES`、tsdown preset：`hostBundle`（ESM node）+ `clientBundle`（CJS 浏览器包，焊 `window.__ModuleLoader__.load` 工厂壳、种子 external、位图/SVG 以 `snap-plugin://` URL 发射到包旁）、最终格式打包器 `./pack`（精简 manifest + 构建产物，装配规则单源） |
 | 兜底壳 | `client/fallback` | 核心内置的极简 layout：零套件时的空态指引 + 极简标题栏（窗口控制+设置入口）；套件 layout 注册即让位 |
 | 安装器 | `boot/app-boot` 的 `installer` | zip → 校验（manifest/名字/snapRail 形状）→ 解压进池；`inspectPluginZip` 不落盘预检；`plugins.install/inspect/uninstall` RPC（uninstall 删行+目录+分域数据）；宿主侧 zip 解析用 fflate |
 
@@ -299,26 +298,36 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
 
 ### 五、打包发布一个可安装插件
 
-1. 包内两份面：宿主面用 plugin-kit 的 `hostBundle`（ESM node）；
-   渲染面用 `clientBundle`（CJS 浏览器包——焊 `__ModuleLoader__` 工厂
-   壳、种子 external），package.json 声明 `snapRail`：`kind`
-   （suite/driver/plugin）、`client: { entry }`（渲染面包路径）、
-   `permissions`（安装时展示）。
-2. `pnpm run pack:plugins` 产出 `dist-plugins/<包名>.zip`（最终格式：
-   manifest + 构建产物）；仓库自带的演示套件、mock/modbus 驱动就是
-   第一批这样的 zip——发行附件，首启空态指引进设置手动装。
+1. 包内两份面：宿主面是 node ESM（脊柱裸导入 external，驱动内部
+   第三方库打进 bundle）；渲染面用 plugin-kit 的 `clientBundle`
+   （CJS 浏览器包——焊 `__ModuleLoader__` 工厂壳、种子 external、
+   位图/SVG 以 `snap-plugin://pool/<目录>/…` URL 发射到包旁）。
+   package.json 声明 `snapRail`：`kind`（suite/driver/plugin）、
+   `client: { entry }`（渲染面包路径）、`permissions`（安装时展示）。
+2. `pnpm run build && pnpm run pack:plugins` 产出
+   `dist-plugins/<包名>.zip`——**最终格式**：精简 manifest（`main` 指
+   宿主面）+ 构建好的宿主面目录（多入口的共享 chunk 一并随包；
+   声明/sourcemap 永不入包）+ `lib-client/`（渲染面与资产），无源码。
+   装配规则单源在 `@snap-rail/plugin-kit/pack`；多入口包（套件）的
+   zip manifest 由打包脚本把 `main` 改写为宿主面（池内包单宿主
+   入口），同一行名既驱动宿主挂载又作为 `client-config.list` 的渲染行。
 3. 安装链：设置页「安装插件」→ `window.pick-zip`（原生对话框）→
    `plugins.inspect`（不落盘预检：包名/版本/类型/权限）→ 确认弹框 →
    `plugins.install`（fflate 解压进 `<home>/plugins/<包名>`，manifest
    校验 fail-loud）→ 池扫描热挂载。
 4. 运行期解析：宿主侧 `module.registerHooks` 把**池内文件**的
-   `@snap-rail/*` 与 zod 裸导入锚到应用根（共享同一批实例，零文件系统
-   副作用）；渲染端面经 `snap-plugin://pool/…` 特权协议以 classic
-   script 到达，`__ModuleLoader__` + 种子表还原（react/cordis/client-ui
-   等单实例，`SEED_MODULES` 单源）。
-5. 卸载：`plugins.uninstall` = 禁用行 + 删池目录 + 删
-   `data/<ns>.db`（分域数据随包走）。套件启停与切换见「两层组合」节
-   的单活语义。
+   `zod`/`drizzle-orm`/`@snap-rail/*`（含子路径）裸导入锚到应用根
+   （共享同一批实例——cordis 分裂 fiber、zod 分裂 schema 身份、
+   drizzle table 跨 store 缝；对应包必须在 desktop `dependencies`
+   里才会随包发布）；其余第三方库打进宿主面 bundle，不入锚定名单。
+   渲染端面经 `snap-plugin://pool/…` 特权协议以 classic script 到达
+   （生产 CSP 的 script-src/img-src 含 `snap-plugin:`），
+   `__ModuleLoader__` + 种子表还原单实例。
+5. 渲染面依赖纪律：client bundle 运行时 require 的 id ⊆
+   `SEED_MODULES`（脊柱 contract 面、纯工具面、timer 原语可入表，
+   宿主入口永不入表；套件有 vitest 门禁扫描页面导入）。卸载：
+   `plugins.uninstall` = 删池目录 + 删 `data/<ns>.db`（分域数据随包
+   走）。套件启停与切换见「两层组合」节的单活语义。
 
 ## 安装与渲染端装载（Phase C 机制总览）
 
@@ -328,13 +337,21 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
   prod（file 页面）同一条路径——插件作者不遇 dev/prod 分裂。签名/缓存/
   权限执行的座位都在这一层。
 - **宿主解析钩子**（`app-boot/resolve-hooks`）：仅当导入方文件位于池内
-  时，把 `@snap-rail/*`/`zod` 的裸导入重锚到 appRoot——池插件与宿主共享
-   cordis/zod 单实例；app 树与测试进程不受影响。
+  时，把 `@snap-rail/*`/`zod`/`drizzle-orm`（含子路径）的裸导入重锚到
+  appRoot——池插件与宿主共享 cordis/zod/drizzle 单实例；app 树与测试
+  进程不受影响。锚定名单只收"对象跨缝传递"的共享词汇，驱动内部协议库
+  打进宿主面 bundle，不入名单。
 - **渲染端模块系统**（`client/modules` + desktop 客户端入口）：
   `installModuleLoader` 装 queue→live 门面，客户端入口 `create()` 后按
-  `SEED_MODULES` 播种共享实例，再对 `client-config.list` 下发的
+  `SEED_MODULES` 播种共享实例（表驱动 + boot 期 parity fail-loud——
+  播种表与白名单漂移立刻抛错），再对 `client-config.list` 下发的
   `clientUrl` 逐个 `loadPluginBundle`，`system.require(name)` 取回插件
   对象交 runtime 挂载（失败仅记日志，不拖垮页面）。
+- **装载纪律**（三条硬边界）：渲染面永不 import 双面包的宿主入口
+  （跨端类型/schema 走该包 `./contract` 纯面，node 侧实现不进
+  浏览器图）；渲染面运行时 require 的 id ⊆ `SEED_MODULES`
+  （种子表 = 客户端入口播种 = `clientBundle` external，三处单源；
+  加 id 是脊柱决策）；池内包单宿主入口（zip manifest 的 `main`）。
 - **管理页**（settings-station）：三分区（套件 radio 卡/驱动多活/核心与
   其他）+ 安装流 + 待重启徽标 + 套件切换弹框（立即重启=
   `window.relaunch` → `app.relaunch`）。
@@ -346,7 +363,9 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
 - 宿主面插件包声明在 `dependencies`（打包器只收生产依赖）；
   renderer 住户构建期打进 `dist/client`，保持 dev 依赖。
 - 发行插件 zip 由 `pnpm run pack:plugins` 产出（`dist-plugins/`），
-  作为发行附件分发；插件市场=同格式 zip 的下载源（留座位）。
+  **最终格式 = 精简 manifest + 构建产物，无源码**；插件市场=同格式
+  zip 的下载源（留座位）。锚定名单里的共享词汇包（drizzle-orm）
+  同样必须在 `dependencies` 里。
 - 更新通道：electron-updater 座位已接线（无 publish 配置时静默），
   blockmap 随安装包产出。
 

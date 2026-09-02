@@ -1,25 +1,44 @@
 /**
- * Pack the installable plugin zips for a release: each package becomes one
- * final-format zip (manifest + built faces) under dist-plugins/, exactly
- * what the settings page's 安装插件 consumes — the same path the future
- * marketplace serves. Dev usage: `pnpm run pack:plugins` (build first).
+ * Pack the installable plugin zips for a release: each listed package
+ * becomes one final-format zip (release manifest + built faces, never
+ * sources) under dist-plugins/ — exactly what the settings page's 安装插件
+ * consumes and the same shape the future marketplace serves. The assembly
+ * rules live in `@snap-rail/plugin-kit/pack`; this is only the repo's
+ * shipment list. Run a build first: `pnpm run build && pnpm run pack:plugins`.
  *
  * @module snap-rail/scripts/pack-plugins
  */
 
 import { createWriteStream } from 'node:fs'
-import { mkdir, readFile, readdir, stat } from 'node:fs/promises'
-import { join, relative } from 'node:path'
+import { mkdir } from 'node:fs/promises'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { zipSync, type Zippable } from 'fflate'
+import { zipSync } from 'fflate'
+import { releaseFiles, zipFileName, type ReleaseSpec } from '@snap-rail/plugin-kit/pack'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** The packages shipped as installable zips (name → relative dir). */
-const PLUGIN_PACKAGES: ReadonlyArray<{ name: string, dir: string }> = [
-  { name: '@snap-rail/suite-terminal-ops', dir: 'packages/suites/terminal-ops' },
-  { name: '@snap-rail/driver-mock', dir: 'packages/field/driver-mock' },
-  { name: '@snap-rail/driver-modbus', dir: 'packages/field/driver-modbus' },
+/** The packages shipped as installable zips. */
+const PLUGIN_PACKAGES: readonly ReleaseSpec[] = [
+  {
+    name: '@snap-rail/suite-terminal-ops',
+    dir: join(repoRoot, 'packages/suites/terminal-ops'),
+    hostDir: 'lib',
+    hostFace: 'lib/stats.js',
+    clientFace: 'lib-client',
+  },
+  {
+    name: '@snap-rail/driver-mock',
+    dir: join(repoRoot, 'packages/field/driver-mock'),
+    hostDir: 'lib',
+    hostFace: 'lib/index.js',
+  },
+  {
+    name: '@snap-rail/driver-modbus',
+    dir: join(repoRoot, 'packages/field/driver-modbus'),
+    hostDir: 'lib',
+    hostFace: 'lib/index.js',
+  },
 ]
 
 function dirname(path: string): string {
@@ -27,37 +46,20 @@ function dirname(path: string): string {
   return index < 0 ? '.' : path.slice(0, index)
 }
 
-/** Collect every file under `dir` (skipping node_modules and tsbuildinfo). */
-async function collect(dir: string, base: string): Promise<Zippable> {
-  const files: Zippable = {}
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name.endsWith('.tsbuildinfo')) continue
-    const full = join(dir, entry.name)
-    if (entry.isDirectory()) {
-      Object.assign(files, await collect(full, base))
-      continue
-    }
-    const rel = relative(base, full).replaceAll('\\', '/')
-    files[rel] = new Uint8Array(await readFile(full))
-  }
-  return files
-}
-
 async function main(): Promise<void> {
   const outDir = join(repoRoot, 'dist-plugins')
   await mkdir(outDir, { recursive: true })
-  for (const plugin of PLUGIN_PACKAGES) {
-    const base = join(repoRoot, plugin.dir)
-    await stat(base)
-    const zipName = `${plugin.name.replaceAll('/', '__')}.zip`
-    const zipped = zipSync(await collect(base, base), { level: 9 })
+  for (const spec of PLUGIN_PACKAGES) {
+    const files = await releaseFiles(spec)
+    const zipped = zipSync(files, { level: 9 })
+    const target = join(outDir, zipFileName(spec.name))
     await new Promise<void>((resolve, reject) => {
-      const stream = createWriteStream(join(outDir, zipName))
+      const stream = createWriteStream(target)
       stream.on('error', reject)
       stream.on('finish', resolve)
       stream.end(zipped)
     })
-    console.log(`packed ${zipName} (${(zipped.length / 1024).toFixed(0)} KiB)`)
+    console.log(`packed ${zipFileName(spec.name)} (${(zipped.length / 1024).toFixed(0)} KiB, ${Object.keys(files).length} files)`)
   }
 }
 

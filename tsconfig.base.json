@@ -42,6 +42,7 @@
       "@snap-rail/plugin-kit/manifest": ["./packages/util/plugin-kit/src/manifest.ts"],
       "@snap-rail/plugin-kit/seeds": ["./packages/util/plugin-kit/src/seeds.ts"],
       "@snap-rail/plugin-kit/build": ["./packages/util/plugin-kit/src/build.ts"],
+      "@snap-rail/plugin-kit/pack": ["./packages/util/plugin-kit/src/pack.ts"],
       "@snap-rail/settings": ["./packages/settings/settings/src"],
       "@snap-rail/store": ["./packages/store/store/src"],
       "@snap-rail/audit": ["./packages/audit/audit/src"],

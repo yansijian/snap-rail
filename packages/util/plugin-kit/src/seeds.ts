@@ -5,6 +5,9 @@
  * statically), and the plugin-kit's client preset externalizes exactly
  * these ids. Cross-plugin value imports are forbidden (collaboration goes
  * through cordis services and slots); adding an id here is a spine decision.
+ * Spine contract faces (`./contract` — zod + types only) and pure utility
+ * faces qualify; package host entries never do — the node side (store,
+ * drizzle, node:sqlite) must stay out of the client graph.
  *
  * @module @snap-rail/plugin-kit/seeds
  */
@@ -16,6 +19,7 @@ export const SEED_MODULES: readonly string[] = [
   'react-dom',
   'react-dom/client',
   '@snap-rail/cordis',
+  '@snap-rail/cordis-plugin-timer',
   '@snap-rail/client-ui',
   '@snap-rail/client-kernel',
   '@snap-rail/client-slots',
@@ -28,5 +32,7 @@ export const SEED_MODULES: readonly string[] = [
   '@snap-rail/protocol',
   '@snap-rail/station-rpc/contract',
   '@snap-rail/app-boot/contract',
+  '@snap-rail/field/contract',
+  '@snap-rail/util',
   'zod',
 ]
