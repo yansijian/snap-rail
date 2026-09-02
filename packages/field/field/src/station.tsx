@@ -244,10 +244,15 @@ function GroupPanel(props: {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-1/4">点位</TableHead>
-                    <TableHead>实时值</TableHead>
-                    {dialectColumns.map(field => <TableHead key={field.name}>{field.label}</TableHead>)}
-                    <TableHead className="text-right">操作</TableHead>
+                    {/* Column floors keep the table readable on small screens:
+                     * past them it overflows into the DragScroll pan (the
+                     * Table wrapper) instead of crushing the cells. */}
+                    <TableHead className="w-1/4 min-w-28">点位</TableHead>
+                    <TableHead className="min-w-24 whitespace-nowrap">实时值</TableHead>
+                    {dialectColumns.map(field => (
+                      <TableHead key={field.name} className="min-w-24 whitespace-nowrap">{field.label}</TableHead>
+                    ))}
+                    <TableHead className="whitespace-nowrap text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
