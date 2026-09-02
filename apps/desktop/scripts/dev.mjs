@@ -1,9 +1,12 @@
 /**
- * Dev orchestration: rebuild the host faces, start the Vite dev server,
- * then launch Electron with `SNAP_RAIL_DEV_URL` pointing at it. Server
- * shutdown or child exit tears the other side down with it.
+ * Dev orchestration: fall back to one root build when a built-in plugin
+ * entry has no lib output, rebuild the host faces, start the Vite dev
+ * server, then launch Electron with `SNAP_RAIL_DEV_URL` pointing at it.
+ * Server shutdown or child exit tears the other side down with it.
  */
 
+import { existsSync, readFileSync } from 'node:fs'
+import { isAbsolute, join } from 'node:path'
 import { spawn, spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -11,9 +14,40 @@ import { createServer } from 'vite'
 
 const require = createRequire(import.meta.url)
 const electronBin = require('electron')
+const yaml = require('js-yaml')
 
 const configFile = fileURLToPath(new URL('../vite.config.ts', import.meta.url))
 const appDir = fileURLToPath(new URL('..', import.meta.url))
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
+
+// Composition resolves every built-in entry from the app tree via
+// require.resolve (app-boot's resolveModuleSpecifier), so a workspace
+// package that never saw a root build — no lib/ output — only surfaces
+// after Electron is up as "cannot resolve plugin". Probe the exact same
+// names the exact same way and fall back to one root build. Stale
+// already-built output is deliberately not detected: refreshing it is
+// the documented build-before-test workflow.
+const hostRequire = createRequire(join(appDir, 'package.json'))
+const builtinNames = yaml
+  .load(readFileSync(join(appDir, 'resources', 'builtins.cordis.yml'), 'utf8'))
+  .map(entry => entry.name)
+  // names compose passes through untouched don't go through require.resolve
+  .filter(name => !name.startsWith('cordis:') && !name.startsWith('.') && !name.startsWith('file:') && !isAbsolute(name))
+const unresolved = builtinNames.filter(name => {
+  try {
+    hostRequire.resolve(name)
+    return false
+  } catch {
+    return true
+  }
+})
+if (unresolved.length > 0) {
+  const unlinked = unresolved.filter(name => !existsSync(join(appDir, 'node_modules', ...name.split('/').slice(0, 2))))
+  if (unlinked.length > 0) throw new Error(`dev: workspace packages not linked (${unlinked.join(', ')}); run \`pnpm install\` first`)
+  console.log(`[snap-rail] builtin entries without lib output: ${unresolved.join(', ')}; running root build`)
+  const root = spawnSync('pnpm run build', { cwd: repoRoot, stdio: 'inherit', shell: true })
+  if (root.status !== 0) throw new Error('dev: root build failed')
+}
 
 // dist/main and dist/preload are not in the root build graph; Electron
 // would happily launch a stale bundle still running pre-refactor host code

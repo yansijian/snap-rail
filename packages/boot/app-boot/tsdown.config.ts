@@ -1,8 +1,9 @@
 import { defineConfig } from 'tsdown'
 
 /**
- * app-boot ships three entries: the composer (index), the admin bridge
- * (rpc), and the pure renderer-facing contract (contract). The entries are
+ * app-boot ships four entries: the composer (index), the admin bridge
+ * (rpc), the pure renderer-facing contract (contract), and the plugin-pool
+ * scanner (scan) that station-rpc's loader entry imports. The entries are
  * JS emitted by tsc under lib/types and are bundled as separate
  * single-entry passes so the renderer-importable contract never carries
  * host-side code from the bridge bundles.
@@ -21,4 +22,5 @@ export default defineConfig([
   { ...shared, entry: ['lib/types/index.js'] },
   { ...shared, entry: ['lib/types/rpc.js'] },
   { ...shared, entry: ['lib/types/contract.js'] },
+  { ...shared, entry: ['lib/types/scan.js'] },
 ])
