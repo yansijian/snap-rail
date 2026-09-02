@@ -23,6 +23,9 @@ export default defineConfig([
     target: 'es2024',
     dts: false,
     clean: false,
+    // fflate rides inside the host bundle (the zip-export packer) — a
+    // forge-internal library never joins the anchored shared vocabulary.
+    noExternal: ['fflate'],
   },
   clientBundle('@snap-rail/forge', 'src/client/index.tsx'),
 ])

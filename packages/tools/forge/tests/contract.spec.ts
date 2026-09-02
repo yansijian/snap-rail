@@ -48,6 +48,16 @@ describe('forge request schemas', () => {
     }).success).toBe(false)
   })
 
+  it('validates session removal and zip export shapes', () => {
+    expect(forgeRequestSchemas['forge.session.remove'].safeParse({ sessionId: 's1' }).success).toBe(true)
+    expect(forgeRequestSchemas['forge.session.remove'].safeParse({}).success).toBe(false)
+    expect(forgeRequestSchemas['forge.plugin.export'].safeParse({ id: 'demo', path: '/tmp/demo.zip' }).success).toBe(true)
+    expect(forgeRequestSchemas['forge.plugin.export'].safeParse({ id: 'demo', versionId: 'v2', path: '/tmp/demo.zip' }).success).toBe(true)
+    expect(forgeRequestSchemas['forge.plugin.export'].safeParse({ id: 'demo', versionId: '2', path: '/tmp/demo.zip' }).success).toBe(false)
+    expect(forgeRequestSchemas['forge.plugin.export'].safeParse({ id: 'demo' }).success).toBe(false)
+    expect(forgeRequestSchemas['forge.plugin.export'].safeParse({ id: 'Bad', path: '/tmp/demo.zip' }).success).toBe(false)
+  })
+
   it('validates the llm config strictly', () => {
     expect(llmConfigSchema.safeParse({
       baseUrl: 'https://api.deepseek.com/v1', apiKey: 'sk-x', model: 'deepseek-chat',

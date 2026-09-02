@@ -9,7 +9,7 @@
       "DOM.Iterable"
     ],
     "jsx": "react-jsx",
-    "types": []
+    "types": ["node"]
   },
   "include": [
     "src"

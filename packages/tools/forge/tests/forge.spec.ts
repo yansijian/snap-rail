@@ -8,7 +8,7 @@
  * @module snap-rail/forge/tests/forge.spec
  */
 
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
@@ -16,6 +16,7 @@ import gatewayPlugin from '@snap-rail/gateway'
 import settingsPlugin from '@snap-rail/settings'
 import storePlugin from '@snap-rail/store'
 import auditPlugin from '@snap-rail/audit'
+import { unzipSync } from 'fflate'
 import { InProcessApiClient } from '@snap-rail/protocol'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createActivator } from '../src/activate.ts'
@@ -320,5 +321,53 @@ describe('the forge RPC surface', () => {
     await client.call('settings.set', { key: FORGE_LLM_KEY, value: CONFIG })
     const second = await client.call('forge.session.send', { sessionId: sent.value.sessionId, text: '再来' })
     expect(second.ok).toBe(true)
+  })
+
+  it('removes sessions and exports a plugin as an installable zip', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'snap-rail-forge-export-'))
+    homes.push(home)
+    const ctx = new Context()
+    ctx.provide('snapRailHome', home)
+    await ctx.plugin(gatewayPlugin, { name: 'forge-export-test', version: '0.1.0', bin: 'test' })
+    await ctx.plugin(settingsPlugin)
+    await ctx.plugin(storePlugin)
+    await ctx.plugin(auditPlugin)
+    await ctx.plugin(forgePlugin)
+    worlds.push({ ctx, home } as World)
+    const client = new InProcessApiClient(request => ctx.rpc.handleClientRequest(request))
+
+    // Seed one plugin through the same namespace the host face registered
+    // (store.register is idempotent per namespace — same sqlite client).
+    const db = ctx.store.register(ctx, 'forge', (await import('../src/tables.ts')).FORGE_SCHEMA)
+    createRegistry(db).definePlugin({
+      kind: 'new',
+      id: 'weekly-report',
+      title: '班产周报',
+      summary: '初版',
+      hostSrc: GOOD_HOST,
+      clientSrc: "return { name: 'weekly-report-client', apply() {} }",
+    })
+
+    // Session removal: delete an existing session, refuse an unknown id.
+    const sent = await client.call('forge.session.send', { text: '帮我做个周报页' })
+    expect(sent.ok).toBe(true)
+    expect((await client.call('forge.session.list', {})).value.sessions).toHaveLength(1)
+    const removed = await client.call('forge.session.remove', { sessionId: sent.value.sessionId })
+    expect(removed.value.removed).toBe(true)
+    expect((await client.call('forge.session.list', {})).value.sessions).toHaveLength(0)
+    expect((await client.call('forge.session.remove', { sessionId: sent.value.sessionId })).ok).toBe(false)
+    expect((await client.call('forge.session.messages', { sessionId: sent.value.sessionId })).ok).toBe(false)
+
+    // Export: the current version lands as a zip in the release format.
+    const path = join(home, 'weekly-report.zip')
+    const exported = await client.call('forge.plugin.export', { id: 'weekly-report', path })
+    expect(exported.ok).toBe(true)
+    const files = unzipSync(new Uint8Array(readFileSync(path)))
+    expect(Object.keys(files).sort()).toEqual(['client/client.js', 'host/index.js', 'package.json'])
+    const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!)) as Record<string, unknown>
+    expect(manifest['name']).toBe('@forge/weekly-report')
+    expect(manifest['snapRail']).toEqual({ kind: 'plugin', client: { entry: 'client/client.js' } })
+    // Unknown plugin and client-less versions are business failures.
+    expect((await client.call('forge.plugin.export', { id: 'ghost', path })).ok).toBe(false)
   })
 })

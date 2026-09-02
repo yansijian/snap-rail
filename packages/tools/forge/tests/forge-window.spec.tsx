@@ -1,16 +1,14 @@
 // @vitest-environment happy-dom
 /**
- * The renderer-face install chain, end to end over the real client bundle:
- * the pool-shaped flow main.tsx runs — module loader installed, seeds
- * loaded, the shipped `lib-client/client.js` executed through the loader
- * global, the plugin object required back, mounted in a client runtime
- * alongside a business suite — and the AI 创造 titlebar button shows up in
- * the chrome after sign-on, its click opening the studio window over the
- * `window.open-forge` wire row. Regression gate for "installed but no
- * entry": pool client faces only mount at page boot, so this is the chain a
- * restart actually runs.
+ * The studio window, end to end over the real client bundle: with
+ * `?window=forge` in the address (what `window.open-forge` loads), the same
+ * bundle mounts as the whole layout — its own titlebar driving
+ * `window.control` with `target: 'forge'`, the session sidebar, the chat
+ * pane (Enter sends), and the settings dialog over the shared `forge.llm`
+ * key. The main-window projection (runner + titlebar button) is covered by
+ * client-install.spec.
  *
- * @module snap-rail/forge/tests/client-install.spec
+ * @module snap-rail/forge/tests/forge-window.spec
  */
 
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
@@ -32,13 +30,6 @@ import {
   type ModuleSystem,
 } from '@snap-rail/client-modules'
 import { createClientRuntime } from '@snap-rail/client-runtime'
-import layoutPlugin from '../../../suites/terminal-ops/src/layout.tsx'
-import titlebarPlugin from '../../../suites/terminal-ops/src/chrome.tsx'
-import downtimePlugin from '../../../suites/terminal-ops/src/downtime.tsx'
-import faultPlugin from '../../../suites/terminal-ops/src/fault.tsx'
-import maintenancePlugin from '../../../suites/terminal-ops/src/maintenance.tsx'
-import productionPlugin from '../../../suites/terminal-ops/src/production.tsx'
-import samplingPlugin from '../../../suites/terminal-ops/src/sampling.tsx'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -50,6 +41,7 @@ afterEach(async () => {
   for (const ctx of contexts.splice(0)) await ctx.fiber.dispose().catch(() => {})
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
   document.body.innerHTML = ''
+  window.history.replaceState(null, '', location.pathname)
   delete (globalThis as { __ModuleLoader__?: ModuleLoaderGlobal }).__ModuleLoader__
 })
 
@@ -57,10 +49,10 @@ afterEach(async () => {
 async function makeHost(): Promise<HostChannel> {
   const host = new Context()
   contexts.push(host)
-  const home = mkdtempSync(join(tmpdir(), 'snap-rail-forge-client-'))
+  const home = mkdtempSync(join(tmpdir(), 'snap-rail-forge-window-'))
   homes.push(home)
   host.provide('snapRailHome', home)
-  await host.plugin(gatewayPlugin, { name: 'forge-client-test', version: '0.1.0', bin: 'test' })
+  await host.plugin(gatewayPlugin, { name: 'forge-window-test', version: '0.1.0', bin: 'test' })
   await host.plugin(settingsPlugin)
   await host.plugin(auditPlugin)
   await host.plugin(storePlugin)
@@ -75,8 +67,7 @@ async function makeHost(): Promise<HostChannel> {
   }
 }
 
-/** The ids the shipped client bundle requires — seeded with the real modules,
- * exactly the ids the shell's SEED_TABLE covers for it. */
+/** The seeds the shipped bundle requires (same table the shell covers). */
 async function seedTable(): Promise<Array<[string, unknown]>> {
   return [
     ['react', await import('react')],
@@ -101,30 +92,30 @@ async function flush(times = 12): Promise<void> {
   for (let i = 0; i < times; i += 1) await new Promise(resolve => setTimeout(resolve, 0))
 }
 
-/** Sign on through the login card's number pad. */
-async function loginAs(id: string): Promise<void> {
-  for (const digit of id) {
-    document.querySelector<HTMLButtonElement>(`button[data-key="${digit}"]`)?.click()
-    await flush(2)
-  }
-  document.querySelector<HTMLButtonElement>('button[data-key="confirm"]')?.click()
-  await flush(20)
+/** Set a React-controlled textarea's value the way a real keyboard would. */
+function typeInto(textarea: HTMLTextAreaElement, text: string): void {
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+  setter.call(textarea, text)
+  textarea.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-describe('the forge renderer face over the shipped bundle', () => {
-  it('mounts from the client bundle and shows the AI 创造 titlebar button after sign-on', async () => {
+describe('the studio window projection over the shipped bundle', () => {
+  it('renders the studio layout, drives its own window, sends on Enter, and manages sessions', async () => {
+    // What window.open-forge loads: the same entry with the studio branch.
+    window.history.replaceState(null, '', '?window=forge')
+
     const channel = await makeHost()
-    const opens: number[] = []
+    const controls: Array<Record<string, unknown>> = []
+    const sends: Array<Record<string, unknown>> = []
     const spying: HostChannel = {
       invoke: async request => {
-        if (request.method === 'window.open-forge') opens.push(opens.length)
+        if (request.method === 'window.control') controls.push(request.payload as Record<string, unknown>)
+        if (request.method === 'forge.session.send') sends.push(request.payload as Record<string, unknown>)
         return channel.invoke(request)
       },
       openStream: channel.openStream,
     }
 
-    // The renderer boot: loader first, then the shell, then seeds, then the
-    // pool bundle's wrapper registration — the sequence main.tsx runs.
     const createSystem = installModuleLoader(globalThis as { __ModuleLoader__?: never })
     const element = document.createElement('div')
     document.body.append(element)
@@ -132,38 +123,51 @@ describe('the forge renderer face over the shipped bundle', () => {
     const system: ModuleSystem = createSystem()
     for (const [id, module] of await seedTable()) system.seed(id, module)
 
-    // Execute the shipped bundle exactly as a classic script would: its whole
-    // body is the wrapper's `__ModuleLoader__.load({ id, factory })` call.
     const bundleSource = readFileSync(join(here, '..', 'lib-client', 'client.js'), 'utf8')
     new Function(bundleSource)()
     const forgeClient = system.require('@snap-rail/forge') as { default?: unknown }
 
+    // The studio window's seat list: only the forge face (main.tsx's branch).
     const runtime = await createClientRuntime(handle, {
-      plugins: [
-        layoutPlugin,
-        titlebarPlugin,
-        maintenancePlugin,
-        productionPlugin,
-        samplingPlugin,
-        faultPlugin,
-        downtimePlugin,
-        forgeClient.default ?? forgeClient,
-      ],
+      plugins: [forgeClient.default ?? forgeClient],
     })
     await flush()
-    await loginAs('1001')
 
-    // The studio's entry is a titlebar button beside settings, and its click
-    // rides the window.open-forge wire row.
-    const entry = document.querySelector<HTMLButtonElement>('button[aria-label="AI 创造"]')
-    expect(entry).not.toBeNull()
-    entry!.click()
+    // The whole window: titlebar + session sidebar + chat pane.
+    expect(document.querySelector('[data-forge="studio"]')).not.toBeNull()
+    expect(document.querySelector('[data-region="forge-sessions"]')).not.toBeNull()
+    expect(document.querySelector('button[aria-label="模型接口设置"]')).not.toBeNull()
+    expect(document.documentElement.dataset.mode).not.toBe(undefined)
+
+    // Window controls address this window, not the main terminal.
+    document.querySelector<HTMLButtonElement>('button[aria-label="最小化"]')!.click()
     await flush()
-    expect(opens).toHaveLength(1)
+    expect(controls).toEqual([{ action: 'minimize', target: 'forge' }])
 
-    // And the host side answers the runner's boot pull.
-    const faces = await handle.link.call('forge.gen-faces', {})
-    expect(faces.ok).toBe(true)
+    // The settings dialog opens over the shared forge.llm key.
+    document.querySelector<HTMLButtonElement>('button[aria-label="模型接口设置"]')!.click()
+    await flush()
+    expect(document.querySelector('[data-forge="config"] input[placeholder="https://api.deepseek.com/v1"]')).not.toBeNull()
+
+    // Enter sends (Shift+Enter would not); the new session lands in the sidebar.
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea')!
+    typeInto(textarea, '帮我造一个班产周报页')
+    await flush()
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    await flush(20)
+    expect(sends).toHaveLength(1)
+    expect(sends[0]!['text']).toBe('帮我造一个班产周报页')
+    const items = document.querySelectorAll('[data-session-item]')
+    expect(items.length).toBe(1)
+    expect(items[0]!.textContent).toContain('帮我造一个班产周报页')
+
+    // Deleting the session clears the sidebar back to the empty state.
+    items[0]!.querySelector<HTMLButtonElement>('button[aria-label^="删除会话"]')!.click()
+    await flush()
+    const confirm = [...document.querySelectorAll('button')].find(button => button.textContent === '删除')!
+    confirm.click()
+    await flush(20)
+    expect(document.querySelectorAll('[data-session-item]').length).toBe(0)
 
     await runtime.dispose()
     element.remove()

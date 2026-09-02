@@ -101,6 +101,12 @@ export function createRegistry(db: ForgeDb): ForgeRegistry {
     sessionExists(id: string): boolean {
       return db.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, id)).get() !== undefined
     },
+    removeSession(id: string): boolean {
+      if (!this.sessionExists(id)) return false
+      db.delete(messages).where(eq(messages.sessionId, id)).run()
+      db.delete(sessions).where(eq(sessions.id, id)).run()
+      return true
+    },
     appendMessage(sessionId: string, role: SessionMessage['role'], content: string, meta?: unknown): void {
       const last = db.select({ seq: messages.seq }).from(messages)
         .where(eq(messages.sessionId, sessionId)).orderBy(desc(messages.seq)).limit(1).get()
@@ -253,6 +259,8 @@ export interface ForgeRegistry {
   listSessions(): SessionSummary[]
   /** Whether the session id exists. */
   sessionExists(id: string): boolean
+  /** Delete a session with its messages; `false` when the id is unknown. */
+  removeSession(id: string): boolean
   /** Append one turn; assigns the next seq and touches the session. */
   appendMessage(sessionId: string, role: SessionMessage['role'], content: string, meta?: unknown): void
   /** The conversation log, oldest-first. */

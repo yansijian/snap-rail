@@ -10,6 +10,7 @@
  * @module @snap-rail/forge/host
  */
 
+import { writeFile } from 'node:fs/promises'
 import { Context, type Plugin } from '@snap-rail/cordis'
 import type { AuditService } from '@snap-rail/audit'
 import { RpcBusinessError } from '@snap-rail/protocol'
@@ -26,6 +27,7 @@ import {
 } from './contract.ts'
 import { createActivator } from './activate.ts'
 import { createDispatch } from './dispatch.ts'
+import { buildExportZip } from './export.ts'
 import { createLoop } from './loop.ts'
 import { createRegistry } from './registry.ts'
 import { createRunner } from './runner.ts'
@@ -113,6 +115,18 @@ const forgePlugin: Plugin.Object<void> = {
       stopped: loop.stop(),
     }))
 
+    rpc.method(ctx, 'forge.session.remove', { request: forgeRequestSchemas['forge.session.remove'] },
+      ({ sessionId }) => {
+        if (loop.runningSessionId() === sessionId) {
+          throw new RpcBusinessError({ code: 'conflict', details: { what: `会话 ${sessionId} 的 Agent 正在运行，请先停止` } })
+        }
+        if (!registry.removeSession(sessionId)) {
+          throw new RpcBusinessError({ code: 'not-found', details: { what: `会话 ${sessionId} 不存在` } })
+        }
+        audit.record({ actor: 'client', action: 'forge.session.remove', subject: sessionId })
+        return { removed: true as const }
+      })
+
     // ---- generated plugins ----
     rpc.method(ctx, 'forge.plugin.list', { request: forgeRequestSchemas['forge.plugin.list'] }, () => ({
       plugins: registry.listPlugins(),
@@ -198,6 +212,31 @@ const forgePlugin: Plugin.Object<void> = {
         audit.record({ actor: 'client', action: 'forge.plugin.remove', subject: id })
         dispatch.notifyPluginsChanged()
         return { removed: true as const }
+      })
+
+    rpc.method(ctx, 'forge.plugin.export', { request: forgeRequestSchemas['forge.plugin.export'] },
+      async ({ id, versionId, path }) => {
+        const record = registry.readPlugin(id)
+        if (record === undefined) {
+          throw new RpcBusinessError({ code: 'not-found', details: { what: `插件 ${id} 不存在` } })
+        }
+        const target = versionId ?? record.info.currentVersionId ?? record.versions[0]?.versionId
+        if (target === undefined) {
+          throw new RpcBusinessError({ code: 'bad-request', details: { issues: [`插件 ${id} 没有任何版本`] } })
+        }
+        const version = registry.readVersion(id, target)
+        if (version === undefined) {
+          throw new RpcBusinessError({ code: 'bad-request', details: { issues: [`版本 ${target} 不存在`] } })
+        }
+        let zipped: Uint8Array
+        try {
+          zipped = buildExportZip({ version, title: record.info.title, description: record.info.description })
+        } catch (cause) {
+          throw new RpcBusinessError({ code: 'bad-request', details: { issues: [cause instanceof Error ? cause.message : String(cause)] } })
+        }
+        await writeFile(path, zipped)
+        audit.record({ actor: 'client', action: 'forge.plugin.export', subject: id, detail: { versionId: target, path } })
+        return { path }
       })
 
     // ---- renderer runner channel ----

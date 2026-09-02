@@ -84,6 +84,8 @@ export interface ForgeSessionApi {
   send(payload: { sessionId?: string | undefined, text: string, focusPluginId?: string | undefined }): Promise<RpcResponse<{ sessionId: string, started: true }>>
   /** Abort the session's in-flight agent run (the turn stays unfinished). */
   stop(payload: { sessionId: string }): Promise<RpcResponse<{ stopped: boolean }>>
+  /** Delete a session and its messages; refuses the session whose agent run is in flight. */
+  remove(payload: { sessionId: string }): Promise<RpcResponse<{ removed: true }>>
 }
 
 /** Generated-plugin administration (the workbench's plugin cards). */
@@ -101,6 +103,9 @@ export interface ForgePluginApi {
   setVersion(payload: { id: string, versionId: string }): Promise<RpcResponse<{ applied: true }>>
   /** Permanently remove a plugin and its version history. */
   remove(payload: { id: string }): Promise<RpcResponse<{ removed: true }>>
+  /** Package one plugin version as an installable zip (the release format)
+   * at the host-side path the save dialog returned. */
+  export(payload: { id: string, versionId?: string | undefined, path: string }): Promise<RpcResponse<{ path: string }>>
 }
 
 /** The renderer runner's callback channel (load/render diagnostics, host-fed). */
@@ -119,11 +124,13 @@ declare module '@snap-rail/protocol' {
     'forge.session.messages': ForgeSessionApi['messages']
     'forge.session.send': ForgeSessionApi['send']
     'forge.session.stop': ForgeSessionApi['stop']
+    'forge.session.remove': ForgeSessionApi['remove']
     'forge.plugin.list': ForgePluginApi['list']
     'forge.plugin.read': ForgePluginApi['read']
     'forge.plugin.set-enabled': ForgePluginApi['setEnabled']
     'forge.plugin.set-version': ForgePluginApi['setVersion']
     'forge.plugin.remove': ForgePluginApi['remove']
+    'forge.plugin.export': ForgePluginApi['export']
     'forge.client-report': ForgeReportApi['clientReport']
     'forge.gen-faces': ForgeFaceApi['listFaces']
   }
@@ -160,11 +167,17 @@ export const forgeRequestSchemas = {
     focusPluginId: idSchema.optional(),
   }).strict(),
   'forge.session.stop': z.object({ sessionId: z.string().min(1) }).strict(),
+  'forge.session.remove': z.object({ sessionId: z.string().min(1) }).strict(),
   'forge.plugin.list': emptyRequest,
   'forge.plugin.read': z.object({ id: idSchema, versionId: z.string().min(1).optional() }).strict(),
   'forge.plugin.set-enabled': z.object({ id: idSchema, enabled: z.boolean() }).strict(),
   'forge.plugin.set-version': z.object({ id: idSchema, versionId: z.string().regex(/^v\d+$/) }).strict(),
   'forge.plugin.remove': z.object({ id: idSchema }).strict(),
+  'forge.plugin.export': z.object({
+    id: idSchema,
+    versionId: z.string().regex(/^v\d+$/).optional(),
+    path: z.string().min(1).max(1024),
+  }).strict(),
   'forge.client-report': z.object({
     id: idSchema,
     versionId: z.string().min(1),
