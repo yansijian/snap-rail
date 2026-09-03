@@ -5,6 +5,8 @@ packages:
   - packages/*/*
   # Product assemblies (apps/desktop owns the Electron shell).
   - apps/*
+  # Marketing website (static two-page site; never enters the app build graph).
+  - website
 
 # Vendored framework packages keep their upstream semver ranges; local builds
 # must resolve those matching names to this workspace's pinned sources.

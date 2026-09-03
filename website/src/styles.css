@@ -1,0 +1,911 @@
+/*
+ * snap-rail website theme. Token values are the dark graphite-steel +
+ * cobalt set COPIED from packages/client/ui/src/theme.css (the app is the
+ * source of truth — when its palette evolves, sync the @theme block and
+ * the glow strengths here). Website-only additions live below the app
+ * vocabulary: the rail-grid backdrop, reveal-on-scroll, media slot
+ * fallbacks and the signal animations that power the placeholders.
+ */
+@import "tailwindcss";
+
+@source "../index.html";
+@source "../plugins.html";
+@source "./*.ts";
+
+@theme {
+  --color-background: #0b0f14;
+  --color-foreground: #ced8e3;
+
+  --color-card: #11161d;
+  --color-card-foreground: #ced8e3;
+
+  --color-popover: #161b22;
+  --color-popover-foreground: #ced8e3;
+
+  --color-primary: #4a6cff;
+  --color-primary-foreground: #ffffff;
+
+  --color-secondary: #1c2430;
+  --color-secondary-foreground: #ced8e3;
+
+  --color-muted: #161b22;
+  --color-muted-foreground: #8b949e;
+
+  --color-accent: #1c2430;
+  --color-accent-foreground: #e8eef4;
+
+  --color-destructive: #f85149;
+  --color-destructive-foreground: #ffffff;
+
+  --color-success: #3fb950;
+  --color-success-foreground: #0b0f14;
+
+  --color-warning: #d29922;
+  --color-warning-foreground: #0b0f14;
+
+  --color-border: #1f2933;
+  --color-input: #1f2933;
+  --color-ring: #4a6cff;
+
+  /* Data series (docs/theme.md): never used for state semantics. */
+  --color-chart-1: #4a6cff;
+  --color-chart-2: #3147a1;
+  --color-chart-3: #667fcd;
+  --color-chart-4: #7d8fa5;
+  --color-chart-5: #55677c;
+  --color-chart-6: #33414f;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --font-sans: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    /* Glow strengths — copied from the app's dark mode. */
+    --glow-a: 55%;
+    --glow-b: 20%;
+    --bar-glow: 45%;
+    --app-gradient: radial-gradient(
+      130% 100% at 50% 0%,
+      color-mix(in srgb, var(--color-primary) 8%, var(--color-background)) 0%,
+      var(--color-background) 62%
+    );
+    /* Website-only backdrop: punched-hole array of a cabinet mounting plate. */
+    --cabinet-hole: color-mix(in srgb, var(--color-foreground) 6%, transparent);
+    --rail-lip: #667fcd;
+    --rail-groove: #0d1219;
+    --rail-lip-dim: #33414f;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Anchor targets clear the fixed top nav. */
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    background-color: var(--color-background);
+    background-image: var(--app-gradient);
+    background-repeat: no-repeat;
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-base, 1rem);
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-primary) 38%, transparent);
+  }
+
+  code,
+  pre,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Long code lines must not widen grid tracks: children may shrink below
+   * their content width so .code-block scrolls internally instead. */
+  .grid > * {
+    min-width: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * App-vocabulary utilities (copied verbatim from client-ui theme.css).
+ * ------------------------------------------------------------------------- */
+
+/** Hero readouts: large tabular numerals pick up a primary-tinted halo. */
+@utility glow-number {
+  text-shadow:
+    0 0 14px color-mix(in srgb, var(--color-primary) var(--glow-a), transparent),
+    0 0 44px color-mix(in srgb, var(--color-primary) var(--glow-b), transparent);
+}
+
+/** Chart bodies: the series-1 bars get a soft light bloom. */
+@utility glow-bar {
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-chart-1) var(--bar-glow), transparent);
+}
+
+/** The selected-channel keyline: a 3px primary rail on the inline-start edge. */
+@utility channel-keyline {
+  box-shadow: inset 3px 0 0 0 var(--color-primary);
+}
+
+/* ---------------------------------------------------------------------------
+ * Website-only vocabulary.
+ * ------------------------------------------------------------------------- */
+
+/** Cabinet mounting-plate backdrop: regular punched-hole array. */
+@utility cabinet-grid {
+  background-image: radial-gradient(circle, var(--cabinet-hole) 1.2px, transparent 1.7px);
+  background-size: 26px 26px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Hero scroll-story: three acts driven by --f1/--f2/--f3 (per-act focus,
+ * written by hero.ts each frame) and --tx (stage shift, in vw units).
+ * Focus wave: the act passing the viewport center is the largest and
+ * brightest; its in-act effects scale with the same focus value.
+ * ----------------------------------------------------------------------- */
+
+.hero-story {
+  /* 350vh minus the 100vh sticky viewport = 250vh of travel; the extra tail
+   * holds act 3 at full focus for ~0.5s more before release. */
+  height: 350vh;
+}
+
+.story-pin {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+}
+
+/* DIN rail silhouette closing the stage at the bottom edge. */
+.hero-rail-line {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 13px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--rail-lip) 3px,
+    var(--rail-groove) 3px,
+    var(--rail-groove) 9px,
+    var(--rail-lip-dim) 9px,
+    transparent 13px
+  );
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.story-stage {
+  transform: translateX(calc(var(--tx, 0) * 1px));
+  will-change: transform;
+}
+
+/* The act passing center: scale + brightness follow its focus value.
+ * Off-focus acts shrink to 1/16 of the focused area (linear 0.25). */
+.act {
+  transform: scale(calc(0.25 + 0.75 * var(--f, 1)));
+  opacity: calc(0.3 + 0.7 * var(--f, 1));
+  will-change: transform, opacity;
+}
+
+/* ---- Shared DIN rail piece (both cabinet and bus acts). ---- */
+.din-rail {
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to bottom,
+    var(--rail-lip) 0 3px,
+    var(--rail-groove) 3px 10px,
+    var(--rail-lip-dim) 10px 14px
+  );
+  box-shadow: 0 0 14px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+
+/* ---- Act 1: the cabinet — SVG enclosure with a closeable door. ---- */
+.cabinet3d {
+  position: relative;
+  height: min(56vh, 520px);
+  aspect-ratio: 3 / 4;
+  perspective: 1400px;
+}
+
+.cabinet-inner {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+}
+
+/* SVG 插件模块：未安装时聚在柜左上角外（大），.installed 由大变小飞入导轨。 */
+.cabinet-inner [data-module] {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  transform: translate(var(--from-dx, -80px), var(--from-dy, -60px)) scale(2.2);
+}
+
+.cabinet-inner [data-module].installed {
+  animation: module-snap3d 1s cubic-bezier(0.3, 1, 0.4, 1) both;
+}
+
+@keyframes module-snap3d {
+  0% {
+    transform: translate(var(--from-dx, -80px), var(--from-dy, -60px)) scale(2.2);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  58% {
+    transform: translate(0, 0) scale(1.06);
+  }
+  74% {
+    transform: translate(0, 0) scale(1.06);
+  }
+  82% {
+    transform: translate(0, 0) scale(1);
+  }
+  90% {
+    transform: translate(0, 0) scale(1.05);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+}
+
+.cabinet-inner [data-module] .led {
+  opacity: 0.15;
+  transition: opacity 0.45s ease 0.7s;
+}
+
+.cabinet-inner [data-module].installed .led {
+  opacity: 1;
+}
+
+/* 三色灯塔：SVG 直绘——方形灯段 + 浅灰隔环/底座 + 圆顶盖，贴装电柜右侧，
+ * 塔顶与柜顶对齐、不超出（不遮上方文案）。绿灯常亮带辉光，红黄熄灭暗置。 */
+.tower {
+  position: absolute;
+  top: 0;
+  right: -49px;
+  width: 45px;
+  height: 222px;
+  z-index: 5;
+  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.45));
+}
+
+/* 点亮的绿灯段：常亮 + 辉光，明显压过熄灭的红黄。 */
+.tower .lamp-lit {
+  filter: drop-shadow(0 0 7px rgb(63 185 80 / 0.9));
+}
+
+/* 电柜门：左铰链，初始斜开，关门动画转到正面盖住柜内。 */
+.cabinet-door {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #1d2633;
+  border-radius: 16px;
+  background: linear-gradient(104deg, #18202c 0%, #121823 46%, #0e131b 100%);
+  box-shadow:
+    inset 0 1px 0 #2a3a54,
+    inset -3px 0 12px rgb(0 0 0 / 0.5),
+    0 30px 70px rgb(0 0 0 / 0.5);
+  transform-origin: left center;
+  transform: rotateY(-86deg);
+  transition: transform 1.1s cubic-bezier(0.55, 0, 0.25, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  padding: 12px;
+}
+
+.cabinet-door.shut {
+  transform: rotateY(0);
+}
+
+/* 门上元件：三色灯塔 / 大旋钮 / 急停 / 红绿按钮。 */
+.tower {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px;
+  border-radius: 999px;
+  background: #0d1219;
+  border: 1px solid #2a3644;
+}
+
+.tower-lamp {
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  opacity: 0.22;
+}
+
+.tower-lamp.lit {
+  opacity: 1;
+  animation: snap-breathe 2.4s ease-in-out infinite;
+  --breathe-color: var(--color-success);
+}
+
+.knob {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 34% 30%, #2c3949, #141b25 66%);
+  border: 2px solid #3a4a60;
+  box-shadow:
+    0 6px 16px rgb(0 0 0 / 0.5),
+    inset 0 2px 3px rgb(255 255 255 / 0.08);
+}
+
+.knob::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 3px;
+  height: 16px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: #7aa2ff;
+  box-shadow: 0 0 8px #4a6cff;
+}
+
+.e-stop {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 36% 30%, #ff6b64, #c22620 62%);
+  border: 4px solid #d9a521;
+  box-shadow: 0 5px 14px rgb(0 0 0 / 0.5);
+}
+
+.push-btn {
+  width: 25px;
+  height: 25px;
+  border-radius: 999px;
+  border: 3px solid #2a3644;
+  box-shadow:
+    inset 0 2px 3px rgb(255 255 255 / 0.14),
+    0 3px 8px rgb(0 0 0 / 0.45);
+}
+
+.door-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--color-muted-foreground);
+  text-align: center;
+}
+
+.door-plate {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--color-muted-foreground);
+  border: 1px solid #2a3644;
+  border-radius: 4px;
+  padding: 3px 8px;
+  background: #0d1219;
+  white-space: nowrap;
+}
+
+/* Heat-sink fins texture on module shells. */
+.heatsink {
+  background-image: repeating-linear-gradient(
+    -60deg,
+    color-mix(in srgb, var(--color-foreground) 9%, transparent) 0 1px,
+    transparent 1px 5px
+  );
+}
+
+/* ---- Act 2: cables, light beams and the filter unit. ---- */
+
+/* 竖直缆线轨道 + 下行光条（光条表达数据流，非粒子）。 */
+.beam-line {
+  position: relative;
+  width: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 24%, transparent);
+}
+
+.beam {
+  position: absolute;
+  left: -1.5px;
+  width: 5px;
+  height: 48px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    currentColor 30%,
+    currentColor 70%,
+    transparent
+  );
+  filter: drop-shadow(0 0 6px currentColor);
+  animation: beam-fall linear infinite;
+}
+
+@keyframes beam-fall {
+  from {
+    top: -24%;
+  }
+  to {
+    top: 104%;
+  }
+}
+
+/* 滤波器：把四色混杂的现场流整编为带光晕的蓝色光条。 */
+.filter-unit {
+  position: relative;
+  border: 1px solid #2a3644;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #18202b, #10151d);
+  box-shadow:
+    inset 0 1px 0 #26334a,
+    0 12px 32px rgb(0 0 0 / 0.45);
+}
+
+.filter-grid {
+  background-image: repeating-linear-gradient(90deg, #223046 0 3px, transparent 3px 9px);
+}
+
+/* 跨岛缆线：自适应填满岛间空隙，两端贴住左右两岛，蓝色光条内流。 */
+.cable-run {
+  position: relative;
+  flex: 1;
+  min-width: 3rem;
+  height: 2px;
+  background: linear-gradient(90deg, #3d5189, #3d5189);
+}
+
+.cable-run .beam {
+  height: 5px;
+  width: 58px;
+  top: -1.5px;
+  background: linear-gradient(to right, transparent, #7aa2ff 30%, #7aa2ff 70%, transparent);
+  filter: drop-shadow(0 0 7px #4a6cff);
+  animation: beam-run linear infinite;
+}
+
+@keyframes beam-run {
+  from {
+    left: -16%;
+  }
+  to {
+    left: 104%;
+  }
+}
+
+/* ---- Act 3: the industrial terminal (4:3 panel). ---- */
+.term-frame {
+  height: min(56vh, 520px);
+  aspect-ratio: 4 / 3;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 10px solid #161d27;
+  border-radius: 18px;
+  background: var(--color-background);
+  box-shadow:
+    0 30px 70px rgb(0 0 0 / 0.5),
+    inset 0 0 0 1px #0a0e13;
+}
+
+.term-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-top: 1px solid #1d2633;
+  background: #10151d;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--color-muted-foreground);
+  padding: 0.4rem 1rem;
+}
+
+/* ---- Act 3: the terminal lights up in staggered steps. ---- */
+.screen-glow {
+  filter: brightness(0.55) saturate(0.7);
+  transition: filter 0.7s ease;
+}
+
+.is-focus .screen-glow {
+  filter: none;
+}
+
+.step-in {
+  opacity: 0.18;
+  transition: opacity 0.55s ease;
+  transition-delay: calc(var(--step-i, 0) * 0.22s);
+}
+
+.is-focus .step-in {
+  opacity: 1;
+}
+
+/* Bars rest flattened; focus grows them in a stagger. */
+.bar {
+  height: calc(var(--h) * 1%);
+  transform: scaleY(0.12);
+  transform-origin: bottom;
+  transition: transform 0.7s cubic-bezier(0.2, 1, 0.3, 1);
+  transition-delay: calc(0.3s + var(--bar-i, 0) * 0.04s);
+}
+
+.is-focus .bar {
+  transform: none;
+}
+
+/**
+ * Breathing status lamp (app convention). The element sets --breathe-color
+ * and --breathe-period; the ring pulses around a constant inner keyline.
+ */
+.breathe {
+  --breathe-color: var(--color-success);
+  --breathe-period: 2.4s;
+  animation: snap-breathe var(--breathe-period) ease-in-out infinite;
+}
+
+@keyframes snap-breathe {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--breathe-color) 60%, transparent),
+      0 0 2px 0 color-mix(in srgb, var(--breathe-color) 25%, transparent);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 2px var(--breathe-color),
+      0 0 16px 4px color-mix(in srgb, var(--breathe-color) 70%, transparent);
+  }
+}
+
+/* Reveal-on-scroll: .reveal waits below the fold, .revealed settles it in. */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+}
+
+.reveal.revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* Media slots: while the recorded asset is absent the CSS fallback stays
+ * visible; site.ts flips .is-ready when the file loads, .is-missing keeps
+ * the fallback permanently. */
+[data-video] video,
+[data-image] img {
+  display: none;
+}
+
+[data-video].is-ready video,
+[data-image].is-ready img {
+  display: block;
+}
+
+[data-video].is-ready .slot-fallback,
+[data-image].is-ready .slot-fallback {
+  display: none;
+}
+
+/* Placeholder dashboard: staggered bar pulses + typing dots. */
+.tick-bar {
+  transform-origin: bottom;
+  animation: snap-bar-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes snap-bar-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.32);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.typing-dot {
+  animation: snap-typing 1.2s ease-in-out infinite;
+}
+
+@keyframes snap-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* Placeholder forge session: the generated-plugin chip cycles in and out. */
+.forge-chip {
+  animation: snap-forge-chip 7s ease-in-out infinite;
+}
+
+@keyframes snap-forge-chip {
+  0%,
+  8% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  16%,
+  72% {
+    opacity: 1;
+    transform: none;
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/*
+ * 架构图（④ 一切皆插件）导轨光流：亮段沿凹槽流动，穿过模块时被
+ * 面板遮挡（模块后绘制）。dash 周期统一 356，位移一周期即无缝循环；
+ * 反向流用 animation-direction 翻转。辉光用 drop-shadow 跟随亮段形状。
+ */
+.arch-flow {
+  stroke-dasharray: 34 322;
+  animation: arch-flow 3.8s linear infinite;
+  filter: drop-shadow(0 0 5px rgb(74 108 255 / 0.8));
+}
+.arch-flow-rev {
+  stroke-dasharray: 26 330;
+  animation-duration: 6.2s;
+  animation-direction: reverse;
+}
+.arch-flow-late {
+  animation-duration: 5s;
+  animation-delay: -2.6s;
+}
+@keyframes arch-flow {
+  to {
+    stroke-dashoffset: -356;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .breathe,
+  .tick-bar,
+  .typing-dot,
+  .forge-chip,
+  .arch-flow {
+    animation: none;
+  }
+
+  /* The story renders as a static full picture: every act at rest state. */
+  .hero-story {
+    height: auto;
+  }
+  .story-pin {
+    position: static;
+    height: auto;
+    overflow: visible;
+    padding-bottom: 3rem;
+  }
+  .story-stage {
+    transform: none !important;
+  }
+  .act {
+    transform: none;
+    opacity: 1;
+  }
+  .pulse {
+    animation: none;
+    opacity: 0.85;
+  }
+  .screen-glow,
+  .step-in {
+    filter: none;
+    opacity: 1;
+    transition: none;
+  }
+  .bar {
+    transform: none;
+    transition: none;
+  }
+  .module .led {
+    opacity: 1;
+    transition: none;
+  }
+  .act-cabinet.is-focus .module {
+    animation: none;
+  }
+
+  /* Static full picture: modules sit installed, door shut, beams frozen. */
+  .cabinet-inner [data-module] {
+    opacity: 1;
+    transform: none;
+  }
+
+  .cabinet-inner [data-module].installed {
+    animation: none;
+  }
+
+  .cabinet-inner [data-module] .led,
+  .cabinet-inner [data-module].installed .led {
+    opacity: 1;
+    transition: none;
+  }
+
+  .cabinet-door {
+    transform: none;
+    transition: none;
+  }
+
+  .beam,
+  .cable-run .beam {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+
+/* Narrow screens: the scene band becomes a vertical strip — no panning, no
+ * focus wave; installation and beams still play. */
+@media (max-width: 639px) {
+  .hero-story {
+    height: auto;
+  }
+  .story-pin {
+    position: static;
+    height: auto;
+    overflow: visible;
+    padding-bottom: 3rem;
+  }
+  .story-stage {
+    position: static;
+    transform: none !important;
+  }
+  .story-stage > div {
+    flex-direction: column;
+    gap: 3rem;
+    padding: 0 1.5rem;
+  }
+  .act {
+    transform: none;
+    opacity: 1;
+    width: 100% !important;
+  }
+  .cable-run {
+    width: 2px;
+    height: 3rem;
+    background: linear-gradient(180deg, transparent, #3d5189 14%, #3d5189 86%, transparent);
+  }
+  .cable-run .beam {
+    animation: beam-fall 2.8s linear infinite;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Repeated component patterns (kept as classes so both pages share them).
+ * ------------------------------------------------------------------------- */
+
+@layer components {
+  .nav-link {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-md);
+    color: var(--color-muted-foreground);
+    font-size: 0.9375rem;
+    padding: 0.5rem 0.875rem;
+    transition: color 0.15s ease;
+    &:hover {
+      color: var(--color-foreground);
+    }
+    &.active {
+      color: var(--color-foreground);
+      background: var(--color-secondary);
+    }
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    padding: 0.75rem 1.5rem;
+    transition:
+      filter 0.15s ease,
+      box-shadow 0.15s ease;
+    &:hover {
+      filter: brightness(1.12);
+    }
+  }
+
+  .btn-primary {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+
+  .btn-ghost {
+    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-card) 70%, transparent);
+    color: var(--color-foreground);
+    &:hover {
+      border-color: var(--color-primary);
+    }
+  }
+
+  .kicker {
+    color: var(--color-primary);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .section-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-secondary);
+    color: var(--color-muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 0.125rem 0.625rem;
+    white-space: nowrap;
+  }
+
+  .code-block {
+    background: #0d1219;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.7;
+    margin: 0;
+    overflow-x: auto;
+    padding: 1rem 1.25rem;
+    text-align: left;
+  }
+}
