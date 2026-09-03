@@ -9,7 +9,7 @@
 export const SITE = {
   repo: 'https://github.com/yansijian/snap-rail',
   repoPush: 'https://github.com/yansijian/snap-rail.git',
-  docs: 'https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md',
+  docs: 'https://github.com/yansijian/snap-rail/blob/main/docs/architecture.md',
   readme: 'https://github.com/yansijian/snap-rail#readme',
   releases: 'https://github.com/yansijian/snap-rail/releases',
   license: 'Apache-2.0',
