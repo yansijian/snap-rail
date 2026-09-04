@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -118,6 +118,83 @@ describe('plugin layers admin', () => {
     expect(byName.get('@snap-rail/settings')?.enabled).toBe(true)
     // Every row carries its package so the management page can group.
     expect(byName.get('@snap-rail/gateway')?.packageName).toBe('@snap-rail/gateway')
+  })
+
+  it('reports pool plugins from their real mounted state', async () => {
+    const world = await makeWorld()
+    const poolDir = join(world.home, 'plugins')
+    mkdirSync(join(poolDir, '@snap-rail__mini', 'lib'), { recursive: true })
+    writeFileSync(join(poolDir, '@snap-rail__mini', 'package.json'), JSON.stringify({
+      name: '@snap-rail/mini', version: '0.1.0', type: 'module', main: 'lib/index.js',
+      snapRail: { kind: 'plugin' },
+    }))
+    writeFileSync(join(poolDir, '@snap-rail__mini', 'lib', 'index.js'), 'export default { name: "mini", apply() {} }\n')
+
+    const listed = async (): Promise<Map<string, { source: string, enabled: boolean }>> => {
+      const result = await world.client.call('plugins.list', {})
+      if (!result.ok) throw new Error('plugins.list failed')
+      return new Map(result.value.plugins.map(plugin => [plugin.name, plugin]))
+    }
+
+    // Installed but never enabled: listed as an off pool package.
+    expect((await listed()).get('@snap-rail/mini')).toMatchObject({ source: 'pool', enabled: false })
+
+    // Explicitly enabled: mounted by composition, so the flag is true.
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/mini'\n    enabled: true\n")
+    expect((await listed()).get('@snap-rail/mini')).toMatchObject({ source: 'pool', enabled: true })
+
+    // Explicitly disabled: the composition omits the entry entirely, and the
+    // listing must follow that (a disabled pool plugin is absent, not patched).
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/mini'\n    enabled: false\n")
+    expect((await listed()).get('@snap-rail/mini')).toMatchObject({ source: 'pool', enabled: false })
+  })
+
+  it('keeps renderer rows on the user source with the row flag as truth', async () => {
+    const world = await makeWorld(undefined, ['@snap-rail/renderer-demo'])
+    writeFileSync(world.userPath, [
+      'plugins:',
+      "  - name: '@snap-rail/renderer-demo'",
+      '    enabled: false',
+      '',
+    ].join('\n'))
+    const listed = await world.client.call('plugins.list', {})
+    expect(listed.ok).toBe(true)
+    if (!listed.ok) return
+    const byName = new Map(listed.value.plugins.map(plugin => [plugin.name, plugin]))
+    expect(byName.get('@snap-rail/renderer-demo')).toMatchObject({ source: 'user', enabled: false })
+  })
+
+  it('uninstalls through the wire without leaving a row behind', async () => {
+    const world = await makeWorld()
+    const poolDir = join(world.home, 'plugins')
+    mkdirSync(join(poolDir, '@snap-rail__mini', 'lib'), { recursive: true })
+    writeFileSync(join(poolDir, '@snap-rail__mini', 'package.json'), JSON.stringify({
+      name: '@snap-rail/mini', version: '0.1.0', type: 'module', main: 'lib/index.js',
+    }))
+    writeFileSync(join(poolDir, '@snap-rail__mini', 'lib', 'index.js'), 'export default { name: "mini", apply() {} }\n')
+    // Enable it first: the uninstall must remove the mounted row entirely,
+    // not park it as a disabled row naming a package that is gone.
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/mini'\n    enabled: true\n")
+    await world.layers.apply()
+
+    const off = await world.client.call('plugins.uninstall', { name: '@snap-rail/mini' })
+    expect(off).toEqual({ ok: true, value: { removed: true } })
+    expect(existsSync(join(poolDir, '@snap-rail__mini'))).toBe(false)
+    expect(readFileSync(world.userPath, 'utf8')).not.toContain('@snap-rail/mini')
+    // The on-disk layers still compose — the next boot cannot fail on a
+    // stale row.
+    expect(() => world.layers.recompose()).not.toThrow()
+  })
+
+  it('refuses a write that would not compose, leaving the file untouched', async () => {
+    const world = await makeWorld()
+    // A fresh home has no plugins.yml yet; a rejected write must not create one.
+    expect(existsSync(world.userPath)).toBe(false)
+    const off = await world.client.call('plugins.set-enabled', { name: '@snap-rail/absent', enabled: true })
+    expect(off.ok).toBe(false)
+    // A written-but-uncomposable file would brick the next boot; the write
+    // is validated before the file ever changes.
+    expect(existsSync(world.userPath)).toBe(false)
   })
 
   it('replaces a config through setConfig and hot-applies it', async () => {

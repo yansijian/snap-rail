@@ -66,7 +66,11 @@ export interface AuditApi {
 export interface ClientConfigRow {
   /** Renderer occupant package name (the row key). */
   name: string
-  /** Whether the occupant mounts (`absent` rows default to enabled). */
+  /**
+   * Whether the occupant mounts. Renderer rows: the row's flag (absent rows
+   * are enabled). Pool faces: explicit enable only — a rowless pool plugin
+   * lists as disabled until the user turns it on.
+   */
   enabled: boolean
   /** The occupant's config when the row carries one. */
   config?: unknown

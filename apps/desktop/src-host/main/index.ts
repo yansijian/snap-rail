@@ -11,7 +11,7 @@ import { app, BrowserWindow } from 'electron'
 import { boot } from '@snap-rail/app-boot'
 import type { Context } from '@snap-rail/cordis'
 import carrierPlugin from './carrier.ts'
-import windowRpcPlugin from './window-rpc.ts'
+import windowRpcPlugin, { trackMainWindow } from './window-rpc.ts'
 import { handlePluginScheme, registerPluginScheme } from './plugin-protocol.ts'
 import { RENDERER_PACKAGES } from './renderer-packages.ts'
 
@@ -66,6 +66,8 @@ async function start(): Promise<void> {
       nodeIntegration: false,
     },
   })
+  // The un-targeted window controls (the suite titlebar) drive this window.
+  trackMainWindow(win)
   win.once('ready-to-show', () => win.show())
 
   const devUrl = process.env.SNAP_RAIL_DEV_URL
