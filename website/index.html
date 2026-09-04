@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>snap-rail · 工业终端的开源底座</title>
+    <meta
+      name="description"
+      content="OT 现场数据 × IT 工具链，装进一个「一切皆插件」的 Electron 宿主。Apache-2.0 开源，基于 vendored Cordis。"
+    />
+    <meta property="og:title" content="snap-rail · 工业终端的开源底座" />
+    <meta
+      property="og:description"
+      content="一切皆插件的工业终端：底座是 DIN 导轨，套件、驱动、工具咔哒一声卡上即跑。"
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <!-- ① 导航 -->
+    <header class="fixed inset-x-0 top-0 z-50 border-b border-border/70 bg-background/75 backdrop-blur-md">
+      <nav class="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
+        <a href="./index.html" class="flex items-center gap-2.5">
+          <img src="./logo.svg" alt="" class="h-8 w-8" />
+          <span class="whitespace-nowrap text-base font-semibold tracking-wide">snap-rail</span>
+        </a>
+        <div class="ml-auto flex items-center gap-1">
+          <a data-nav="index" class="nav-link hidden sm:inline-flex" href="./index.html">主页</a>
+          <a data-nav="plugins" class="nav-link whitespace-nowrap" href="./plugins.html">插件生态</a>
+          <a
+            class="nav-link hidden sm:inline-flex"
+            href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md"
+            target="_blank"
+            rel="noopener"
+            >文档</a
+          >
+          <a class="btn btn-ghost ml-2 whitespace-nowrap px-3 py-2 text-sm sm:px-3.5" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">
+            <svg viewBox="0 0 16 16" class="h-4 w-4 fill-current" aria-hidden="true">
+              <path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+              />
+            </svg>
+            GitHub</a
+          >
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <!-- ② Hero：三幕滚动叙事（设备电柜 → DIN 导轨母线 → 终端点亮） -->
+      <section id="hero-story" class="hero-story cabinet-grid relative">
+        <div class="story-pin flex flex-col pt-16">
+          <!-- 文案层常驻顶部 -->
+          <div class="mx-auto w-full max-w-3xl shrink-0 px-6 pt-8 text-center md:pt-12">
+            <p class="kicker">开源 · Apache-2.0 · vendored Cordis</p>
+            <h1 class="glow-number mt-4 text-4xl font-bold leading-tight md:text-6xl">工业终端的开源底座</h1>
+            <p class="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground md:text-lg">
+              OT 现场数据 × IT 工具链，装进一个「一切皆插件」的宿主。
+            </p>
+            <div class="mt-6 flex flex-wrap items-center justify-center gap-4">
+              <a class="btn btn-primary" href="https://github.com/yansijian/snap-rail/releases" target="_blank" rel="noopener">
+                下载 Windows 安装包</a
+              >
+              <a class="btn btn-ghost" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">
+                ⭐ GitHub 加星</a
+              >
+            </div>
+            <p class="mt-4 font-mono text-xs text-muted-foreground/60">向下滚动，看数据从电柜走向终端 ↓</p>
+          </div>
+
+          <!-- 三幕舞台：滚动从右向左推移（overflow-x 裁剪横移穿帮，纵向放行柜顶灯塔） -->
+          <div class="relative mt-6 flex-1 overflow-x-clip">
+            <div class="story-stage absolute inset-0 flex items-center">
+              <div class="flex w-full items-center gap-[3vw] px-[10vw]">
+                <!-- 幕1 · 设备电柜（SVG）：双 DIN 轨，六模块从左上角编队装入，门后关上 -->
+                <article class="act act-cabinet shrink-0">
+                  <div class="cabinet3d">
+                    <!-- 三色灯塔（SVG 直绘）：方形灯段 + 隔环/底座，贴装柜右侧，顶与柜对齐 -->
+                    <svg class="tower" viewBox="0 0 30 148" aria-hidden="true">
+                      <!-- 圆顶盖 -->
+                      <rect x="3" y="0" width="24" height="12" rx="7" fill="#3a4a60" />
+                      <rect x="3" y="9" width="24" height="4" fill="#98a5b4" />
+                      <!-- 红段 -->
+                      <rect x="2" y="12" width="26" height="30" rx="3" fill="#f85149" opacity="0.35" />
+                      <!-- 隔环 -->
+                      <rect x="2" y="42" width="26" height="6" fill="#c3ccd7" />
+                      <!-- 黄段 -->
+                      <rect x="2" y="48" width="26" height="30" rx="3" fill="#d29922" opacity="0.35" />
+                      <!-- 隔环 -->
+                      <rect x="2" y="78" width="26" height="6" fill="#c3ccd7" />
+                      <!-- 绿段（常亮 + 辉光） -->
+                      <rect class="lamp-lit" x="2" y="84" width="26" height="30" rx="3" fill="#3fb950" />
+                      <!-- 隔环 + 底座 + 支臂 -->
+                      <rect x="2" y="114" width="26" height="6" fill="#c3ccd7" />
+                      <rect x="2" y="120" width="26" height="22" rx="3" fill="#c3ccd7" />
+                      <rect x="9" y="142" width="12" height="6" fill="#6b7889" />
+                    </svg>
+
+                    <svg class="cabinet-inner" viewBox="0 0 300 400" role="img" aria-label="snap-rail 电柜：两根 DIN 导轨横贯柜内，六枚插件模块卡装其上">
+                      <defs>
+                        <linearGradient id="cabGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stop-color="#151c27" />
+                          <stop offset="0.7" stop-color="#0e131a" />
+                        </linearGradient>
+                        <linearGradient id="modGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stop-color="#1e2734" />
+                          <stop offset="1" stop-color="#161d29" />
+                        </linearGradient>
+                      </defs>
+                      <!-- 柜壳与内壁 -->
+                      <rect x="2" y="2" width="296" height="396" rx="14" fill="url(#cabGrad)" stroke="#1d2633" stroke-width="2" />
+                      <rect x="14" y="14" width="272" height="372" rx="10" fill="#0b0f15" />
+                      <rect x="22" y="22" width="256" height="356" rx="8" fill="none" stroke="#1d2633" />
+                      <!-- 铰链（左缘） -->
+                      <rect x="0" y="104" width="7" height="26" rx="2" fill="#2a3644" />
+                      <rect x="0" y="256" width="7" height="26" rx="2" fill="#2a3644" />
+                      <!-- 上导轨：DIN 截面（卷边 / 凹槽 / 卷边）+ 端固定座 -->
+                      <rect x="26" y="90" width="10" height="26" rx="2" fill="#2a3644" />
+                      <rect x="264" y="90" width="10" height="26" rx="2" fill="#2a3644" />
+                      <rect x="34" y="94" width="232" height="4" fill="#667fcd" />
+                      <rect x="34" y="98" width="232" height="12" fill="#0d1219" />
+                      <rect x="34" y="110" width="232" height="4" fill="#33414f" />
+                      <!-- 下导轨 -->
+                      <rect x="26" y="262" width="10" height="26" rx="2" fill="#2a3644" />
+                      <rect x="264" y="262" width="10" height="26" rx="2" fill="#2a3644" />
+                      <rect x="34" y="266" width="232" height="4" fill="#667fcd" />
+                      <rect x="34" y="270" width="232" height="12" fill="#0d1219" />
+                      <rect x="34" y="282" width="232" height="4" fill="#33414f" />
+
+                      <!-- 上轨模块 ×3：起点 = 柜左上角集合点 -->
+                      <g transform="translate(44,57)">
+                        <g data-module style="--from-dx: 0px; --from-dy: -13px">
+                          <rect width="64" height="96" rx="5" fill="url(#modGrad)" stroke="#3d5189" stroke-width="1.5" />
+                          <circle class="led" cx="10" cy="11" r="3.5" fill="#3fb950" />
+                          <text x="56" y="14" text-anchor="end" font-size="6.5" fill="#8b949e" font-family="Consolas, monospace">CH1</text>
+                          <text x="32" y="36" text-anchor="middle" font-size="9" fill="#ced8e3" font-family="Consolas, monospace">modbus</text>
+                          <rect x="12" y="46" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="54" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="62" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="70" width="40" height="2.5" fill="#223046" />
+                        </g>
+                      </g>
+                      <g transform="translate(118,57)">
+                        <g data-module style="--from-dx: -74px; --from-dy: -13px">
+                          <rect width="64" height="96" rx="5" fill="url(#modGrad)" stroke="#3d5189" stroke-width="1.5" />
+                          <circle class="led" cx="10" cy="11" r="3.5" fill="#d29922" />
+                          <text x="56" y="14" text-anchor="end" font-size="6.5" fill="#8b949e" font-family="Consolas, monospace">CH2</text>
+                          <text x="32" y="36" text-anchor="middle" font-size="9" fill="#ced8e3" font-family="Consolas, monospace">mock</text>
+                          <rect x="12" y="46" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="54" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="62" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="70" width="40" height="2.5" fill="#223046" />
+                        </g>
+                      </g>
+                      <g transform="translate(192,57)">
+                        <g data-module style="--from-dx: -148px; --from-dy: -13px">
+                          <rect width="64" height="96" rx="5" fill="url(#modGrad)" stroke="#3d5189" stroke-width="1.5" />
+                          <circle class="led" cx="10" cy="11" r="3.5" fill="#3fb950" />
+                          <text x="56" y="14" text-anchor="end" font-size="6.5" fill="#8b949e" font-family="Consolas, monospace">CH3</text>
+                          <text x="32" y="36" text-anchor="middle" font-size="9" fill="#ced8e3" font-family="Consolas, monospace">gateway</text>
+                          <rect x="12" y="46" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="54" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="62" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="70" width="40" height="2.5" fill="#223046" />
+                        </g>
+                      </g>
+
+                      <!-- 下轨模块 ×3 -->
+                      <g transform="translate(44,227)">
+                        <g data-module style="--from-dx: 0px; --from-dy: -183px">
+                          <rect width="64" height="96" rx="5" fill="url(#modGrad)" stroke="#3d5189" stroke-width="1.5" />
+                          <circle class="led" cx="10" cy="11" r="3.5" fill="#3fb950" />
+                          <text x="56" y="14" text-anchor="end" font-size="6.5" fill="#8b949e" font-family="Consolas, monospace">APP</text>
+                          <text x="32" y="36" text-anchor="middle" font-size="9" fill="#ced8e3" font-family="Consolas, monospace">suite</text>
+                          <rect x="12" y="46" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="54" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="62" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="70" width="40" height="2.5" fill="#223046" />
+                        </g>
+                      </g>
+                      <g transform="translate(118,227)">
+                        <g data-module style="--from-dx: -74px; --from-dy: -183px">
+                          <rect width="64" height="96" rx="5" fill="url(#modGrad)" stroke="#3d5189" stroke-width="1.5" />
+                          <circle class="led" cx="10" cy="11" r="3.5" fill="#d29922" />
+                          <text x="56" y="14" text-anchor="end" font-size="6.5" fill="#8b949e" font-family="Consolas, monospace">AI</text>
+                          <text x="32" y="36" text-anchor="middle" font-size="9" fill="#ced8e3" font-family="Consolas, monospace">forge</text>
+                          <rect x="12" y="46" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="54" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="62" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="70" width="40" height="2.5" fill="#223046" />
+                        </g>
+                      </g>
+                      <g transform="translate(192,227)">
+                        <g data-module style="--from-dx: -148px; --from-dy: -183px">
+                          <rect width="64" height="96" rx="5" fill="url(#modGrad)" stroke="#3d5189" stroke-width="1.5" />
+                          <circle class="led" cx="10" cy="11" r="3.5" fill="#3fb950" />
+                          <text x="56" y="14" text-anchor="end" font-size="6.5" fill="#8b949e" font-family="Consolas, monospace">CFG</text>
+                          <text x="32" y="36" text-anchor="middle" font-size="9" fill="#ced8e3" font-family="Consolas, monospace">station</text>
+                          <rect x="12" y="46" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="54" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="62" width="40" height="2.5" fill="#223046" />
+                          <rect x="12" y="70" width="40" height="2.5" fill="#223046" />
+                        </g>
+                      </g>
+
+                      <text x="150" y="382" text-anchor="middle" font-size="8.5" fill="#8b949e" font-family="Consolas, monospace">35mm DIN · EN 50022</text>
+                    </svg>
+
+                    <!-- 电柜门：安装完成后关上 -->
+                    <div class="cabinet-door" data-door>
+                      <div class="flex flex-col items-center">
+                        <div class="knob"></div>
+                        <p class="door-label mt-2">电源 · 开门</p>
+                      </div>
+                      <div class="e-stop"></div>
+                      <div class="flex gap-3">
+                        <span class="push-btn bg-success"></span>
+                        <span class="push-btn bg-destructive"></span>
+                      </div>
+                      <p class="door-label">急停 / 启停</p>
+                      <p class="door-plate">SNAP-RAIL · TYPE 4X</p>
+                    </div>
+                  </div>
+                  <p class="mt-3 text-center text-xs text-muted-foreground/80">设备电柜 · OT 现场驱动与插件</p>
+                </article>
+
+                <div class="cable-run" aria-hidden="true">
+                  <i class="beam" style="animation-duration: 3.2s"></i>
+                </div>
+
+                <!-- 幕2 · 缆线与滤波器：四色现场流整编为蓝色数据总线 -->
+                <article class="act act-rail shrink-0">
+                  <div class="flex h-[min(56vh,520px)] w-[min(30vw,300px)] flex-col items-center">
+                    <p class="pb-2 font-mono text-[10px] tracking-[0.18em] text-muted-foreground/60">四缝汇流</p>
+                    <div class="flex w-full flex-1 justify-center gap-8">
+                      <div class="flex flex-col items-center gap-2">
+                        <span class="beam-line flex-1 text-destructive"><i class="beam" style="animation-duration: 2.4s"></i></span>
+                        <span class="font-mono text-[9px] text-muted-foreground">RPC</span>
+                      </div>
+                      <div class="flex flex-col items-center gap-2">
+                        <span class="beam-line flex-1 text-warning"><i class="beam" style="animation-duration: 3.1s; animation-delay: -1.4s"></i></span>
+                        <span class="font-mono text-[9px] text-muted-foreground">points</span>
+                      </div>
+                      <div class="flex flex-col items-center gap-2">
+                        <span class="beam-line flex-1 text-chart-1"><i class="beam" style="animation-duration: 2.7s; animation-delay: -0.8s"></i></span>
+                        <span class="font-mono text-[9px] text-muted-foreground">store</span>
+                      </div>
+                      <div class="flex flex-col items-center gap-2">
+                        <span class="beam-line flex-1 text-success"><i class="beam" style="animation-duration: 3.5s; animation-delay: -2s"></i></span>
+                        <span class="font-mono text-[9px] text-muted-foreground">audit</span>
+                      </div>
+                    </div>
+                    <div class="filter-unit my-3 w-full py-3 text-center">
+                      <div class="filter-grid mx-auto h-8 w-4/5 rounded"></div>
+                      <p class="mt-2 font-mono text-[10px] text-muted-foreground">底座缝 · 数据整编</p>
+                      <span
+                        class="breathe absolute right-3 top-3 h-1.5 w-1.5 rounded-full bg-chart-1"
+                        style="--breathe-color: var(--color-chart-1)"
+                      ></span>
+                    </div>
+                    <div class="flex w-full flex-1 items-stretch justify-center gap-14">
+                      <div class="flex flex-col items-center">
+                        <span class="beam-line flex-1 text-[#7aa2ff]"><i class="beam" style="animation-duration: 2s"></i></span>
+                      </div>
+                      <div class="flex flex-col items-center">
+                        <span class="beam-line flex-1 text-[#7aa2ff]"><i class="beam" style="animation-duration: 2.8s; animation-delay: -1.2s"></i></span>
+                      </div>
+                    </div>
+                    <p class="pt-2 text-center text-[11px] text-muted-foreground/70">混杂现场流 → 类型化数据总线</p>
+                  </div>
+                  <p class="mt-3 text-center text-xs text-muted-foreground/80">底座即滤波器 · 缝与审计</p>
+                </article>
+
+                <div class="cable-run" aria-hidden="true">
+                  <i class="beam" style="animation-duration: 2.6s; animation-delay: -1.1s"></i>
+                </div>
+
+                <!-- 幕3 · 工业一体机：终端作业点亮 -->
+                <article class="act act-terminal shrink-0">
+                  <div class="term-frame">
+                    <div class="flex h-9 shrink-0 items-center gap-3 border-b border-border bg-secondary/50 px-4">
+                      <span class="breathe h-2 w-2 rounded-full bg-success"></span>
+                      <span class="text-xs">工号 1024 · 早班</span>
+                      <span class="text-xs text-muted-foreground/70">snap-rail · 终端作业</span>
+                      <span class="ml-auto flex items-center gap-4 text-muted-foreground/70">
+                        <span aria-hidden="true">—</span><span aria-hidden="true">▢</span><span aria-hidden="true">✕</span>
+                      </span>
+                    </div>
+                    <div class="screen-glow grid min-h-0 flex-1 grid-cols-[108px_1fr]">
+                      <nav class="step-in space-y-1 border-r border-border p-2.5" style="--step-i: 1" aria-label="工作流导航">
+                        <p class="px-1.5 pb-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">工作流</p>
+                        <div class="rounded-md px-2 py-1 text-[11px] text-muted-foreground">维护</div>
+                        <div class="channel-keyline rounded-md bg-secondary px-2 py-1 text-[11px] font-medium">生产</div>
+                        <div class="breathe rounded-md px-2 py-1 text-[11px] text-warning" style="--breathe-color: var(--color-warning)">抽检 · 5min</div>
+                        <div class="breathe rounded-md px-2 py-1 text-[11px] text-destructive">故障</div>
+                        <div class="rounded-md px-2 py-1 text-[11px] text-muted-foreground">停机</div>
+                      </nav>
+                      <div class="flex min-w-0 flex-col gap-2.5 p-3.5">
+                        <div class="step-in flex items-center justify-between" style="--step-i: 2">
+                          <span class="text-xs text-muted-foreground">本班实产 · 实际 / 件</span>
+                          <span class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span class="breathe h-1.5 w-1.5 rounded-full bg-success"></span>
+                            设备 A-03 · 在线
+                          </span>
+                        </div>
+                        <div class="step-in flex items-end gap-4" style="--step-i: 2">
+                          <p class="glow-number font-mono text-5xl font-semibold leading-none" data-live="count">1843</p>
+                          <p class="pb-0.5 text-xs text-muted-foreground">理论 1944</p>
+                        </div>
+                        <div class="step-in flex min-h-0 flex-1 items-end justify-end gap-1.5 pt-1" style="--step-i: 3" aria-hidden="true">
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 34; --bar-i: 0"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 52; --bar-i: 1"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 41; --bar-i: 2"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 66; --bar-i: 3"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 58; --bar-i: 4"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 79; --bar-i: 5"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 71; --bar-i: 6"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 88; --bar-i: 7"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 62; --bar-i: 8"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 95; --bar-i: 9"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 74; --bar-i: 10"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 84; --bar-i: 11"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 57; --bar-i: 12"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 91; --bar-i: 13"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 68; --bar-i: 14"></i>
+                          <i class="bar block w-2.5 rounded-sm bg-chart-1 glow-bar" style="--h: 47; --bar-i: 15"></i>
+                        </div>
+                        <div class="step-in grid grid-cols-2 gap-3" style="--step-i: 4">
+                          <div class="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p class="font-mono text-[10px] text-muted-foreground">产品 · X-100</p>
+                            <p class="mt-1 text-xs">
+                              合格 <span class="font-mono text-foreground" data-live="count">1843</span>
+                              · 直通率 <span class="font-mono text-success">99.2%</span>
+                            </p>
+                          </div>
+                          <div class="rounded-lg border border-border bg-secondary/40 p-2.5">
+                            <p class="font-mono text-[10px] text-muted-foreground">工艺数据</p>
+                            <p class="mt-1 font-mono text-xs">
+                              <span data-live="temp">64.2℃</span> · <span data-live="press">0.62 MPa</span> ·
+                              <span data-live="speed">12.8 m/s</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="term-badge">
+                      <span class="breathe h-1.5 w-1.5 rounded-full bg-success"></span>
+                      <span>SNAP-TERM 1540</span>
+                      <span class="ml-auto">24 VDC · IP54</span>
+                    </div>
+                  </div>
+                  <p class="mt-3 text-center text-xs text-muted-foreground/80">工业一体机 · 终端作业</p>
+                </article>
+              </div>
+            </div>
+          </div>
+          <div class="hero-rail-line"></div>
+        </div>
+      </section>
+
+      <!-- ③ 痛点对照 -->
+      <section id="why" class="py-24">
+        <div class="mx-auto max-w-6xl px-6">
+          <p class="kicker reveal">pain points</p>
+          <h2 class="reveal mt-3 text-3xl font-bold">为什么是 snap-rail</h2>
+          <p class="reveal mt-3 max-w-2xl leading-relaxed text-muted-foreground">
+            传统工业终端软件的四个僵局，对应底座的四条解法——每一条都不靠闭源魔法。
+          </p>
+          <div class="mt-12 grid gap-6 md:grid-cols-2">
+            <article class="section-card reveal overflow-hidden">
+              <div class="grid md:grid-cols-2 md:divide-x md:divide-border">
+                <div class="p-6">
+                  <span class="badge text-destructive">僵局</span>
+                  <h3 class="mt-3 font-semibold">组态软件黑盒</h3>
+                  <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    按点位收费、定制走厂商，越用越贵，数据与界面都锁在别人家。
+                  </p>
+                </div>
+                <div class="border-t border-border bg-primary/5 p-6 md:border-t-0">
+                  <span class="badge text-primary">snap-rail</span>
+                  <h3 class="mt-3 font-semibold">开源底座</h3>
+                  <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    Apache-2.0 开源；不复现组态画布，界面创新留给社区与 Agent。
+                  </p>
+                </div>
+              </div>
+            </article>
+            <article class="section-card reveal overflow-hidden">
+              <div class="grid md:grid-cols-2 md:divide-x md:divide-border">
+                <div class="p-6">
+                  <span class="badge text-destructive">僵局</span>
+                  <h3 class="mt-3 font-semibold">场景烟囱</h3>
+                  <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    每个工位一套定制软件，烟囱林立，换个场景从头再来。
+                  </p>
+                </div>
+                <div class="border-t border-border bg-primary/5 p-6 md:border-t-0">
+                  <span class="badge text-primary">snap-rail</span>
+                  <h3 class="mt-3 font-semibold">套件即 zip</h3>
+                  <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    场景的全部界面合成一枚套件 zip，成套交付、成套丢弃，单活切换。
+                  </p>
+                </div>
+              </div>
+            </article>
+            <article class="section-card reveal overflow-hidden">
+              <div class="grid md:grid-cols-2 md:divide-x md:divide-border">
+                <div class="p-6">
+                  <span class="badge text-destructive">僵局</span>
+                  <h3 class="mt-3 font-semibold">协议碎片</h3>
+                  <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    各设备厂商私有 SDK 各写一遍，接入代码重复造轮子。
+                  </p>
+                </div>
+                <div class="border-t border-border bg-primary/5 p-6 md:border-t-0">
+                  <span class="badge text-primary">snap-rail</span>
+                  <h3 class="mt-3 font-semibold">纯适配器驱动</h3>
+                  <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    驱动只上交 schema 与连接；设备、组、点由底座统一管理。
+                  </p>
+                </div>
+              </div>
+            </article>
+            <article class="section-card reveal overflow-hidden">
+              <div class="grid md:grid-cols-2 md:divide-x md:divide-border">
+                <div class="p-6">
+                  <span class="badge text-destructive">僵局</span>
+                  <h3 class="mt-3 font-semibold">AI 缺席</h3>
+                  <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    IT 工具链与 AI 进不了车间终端，定制永远排期等发版。
+                  </p>
+                </div>
+                <div class="border-t border-border bg-primary/5 p-6 md:border-t-0">
+                  <span class="badge text-primary">snap-rail</span>
+                  <h3 class="mt-3 font-semibold">文件即接口 + AI</h3>
+                  <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    plugins.yml 可被页面、手编、Agent 编辑；forge 让 AI 当场生成插件。
+                  </p>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ④ 一切皆插件 -->
+      <section id="philosophy" class="border-y border-border/60 bg-card/30 py-24">
+        <div class="mx-auto max-w-6xl px-6">
+          <p class="kicker reveal">architecture</p>
+          <h2 class="reveal mt-3 text-3xl font-bold">一切皆插件</h2>
+          <p class="reveal mt-3 max-w-2xl leading-relaxed text-muted-foreground">
+            底座是 DIN 导轨：RPC 缝、点表缝、store、audit 是预制卡位；套件、驱动、工具是模块，咔哒一声卡上即跑。
+          </p>
+
+          <!-- DIN 导轨架构图（SVG）：平视电柜样式，导轨从模块中部背后穿过，光流沿凹槽流动 -->
+          <div class="reveal mt-12 overflow-x-auto">
+            <svg viewBox="0 0 960 372" class="mx-auto w-full min-w-[680px] max-w-4xl" role="img" aria-label="DIN 导轨架构示意：插件模块平视卡装在底座导轨上，导轨从模块中部背后穿过，光流沿导轨凹槽流动，下方是预制卡位">
+              <defs>
+                <linearGradient id="archModGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="#1e2734" />
+                  <stop offset="1" stop-color="#161d29" />
+                </linearGradient>
+              </defs>
+
+              <!-- 两端标注：与导轨平齐、留在两端空白区，不压模块 -->
+              <text x="20" y="165" class="fill-muted-foreground" font-size="13">OT 现场数据</text>
+              <text x="940" y="165" text-anchor="end" class="fill-muted-foreground" font-size="13">IT 工具链 / AI</text>
+
+              <!-- DIN 导轨：端固定座 + 电柜同款截面（上唇/凹槽/下唇） -->
+              <rect x="150" y="146" width="10" height="28" rx="2" fill="#2a3644" />
+              <rect x="800" y="146" width="10" height="28" rx="2" fill="#2a3644" />
+              <rect x="158" y="148" width="644" height="5" fill="#667fcd" />
+              <rect x="158" y="153" width="644" height="14" fill="#0d1219" />
+              <rect x="158" y="167" width="644" height="5" fill="#33414f" />
+
+              <!-- 光流：亮段沿凹槽穿行（到模块处被面板遮挡，穿轨而过） -->
+              <g>
+                <line class="arch-flow" x1="166" y1="160" x2="794" y2="160" stroke="#4a6cff" stroke-width="5" stroke-linecap="round" />
+                <line class="arch-flow arch-flow-rev" x1="166" y1="160" x2="794" y2="160" stroke="#667fcd" stroke-width="4" stroke-linecap="round" opacity="0.85" />
+                <line class="arch-flow arch-flow-late" x1="166" y1="160" x2="794" y2="160" stroke="#4a6cff" stroke-width="3.5" stroke-linecap="round" opacity="0.7" />
+              </g>
+
+              <!-- 模块 ×3：平视面板（LED + 槽位号 + 名称 + 散热栅），导轨从其中部背后穿过 -->
+              <g transform="translate(170,85)">
+                <rect width="180" height="150" rx="8" fill="url(#archModGrad)" stroke="#3d5189" stroke-width="1.5" />
+                <circle cx="16" cy="18" r="4" fill="#3fb950" />
+                <text x="164" y="22" text-anchor="end" font-size="10" fill="#8b949e" font-family="Consolas, monospace">SLOT-1</text>
+                <text x="90" y="48" text-anchor="middle" fill="#ced8e3" font-size="16" font-weight="600">业务套件</text>
+                <text x="90" y="66" text-anchor="middle" font-size="10.5" fill="#8b949e" font-family="Consolas, monospace">terminal-ops</text>
+                <g fill="#223046">
+                  <rect x="30" y="98" width="120" height="3" />
+                  <rect x="30" y="110" width="120" height="3" />
+                  <rect x="30" y="122" width="120" height="3" />
+                  <rect x="30" y="134" width="120" height="3" />
+                </g>
+              </g>
+              <g transform="translate(390,85)">
+                <rect width="180" height="150" rx="8" fill="url(#archModGrad)" stroke="#3d5189" stroke-width="1.5" />
+                <circle cx="16" cy="18" r="4" fill="#d29922" />
+                <text x="164" y="22" text-anchor="end" font-size="10" fill="#8b949e" font-family="Consolas, monospace">SLOT-2</text>
+                <text x="90" y="48" text-anchor="middle" fill="#ced8e3" font-size="16" font-weight="600">通讯驱动</text>
+                <text x="90" y="66" text-anchor="middle" font-size="10.5" fill="#8b949e" font-family="Consolas, monospace">mock · modbus</text>
+                <g fill="#223046">
+                  <rect x="30" y="98" width="120" height="3" />
+                  <rect x="30" y="110" width="120" height="3" />
+                  <rect x="30" y="122" width="120" height="3" />
+                  <rect x="30" y="134" width="120" height="3" />
+                </g>
+              </g>
+              <g transform="translate(610,85)">
+                <rect width="180" height="150" rx="8" fill="url(#archModGrad)" stroke="#3d5189" stroke-width="1.5" />
+                <circle cx="16" cy="18" r="4" fill="#3fb950" />
+                <text x="164" y="22" text-anchor="end" font-size="10" fill="#8b949e" font-family="Consolas, monospace">SLOT-3</text>
+                <text x="90" y="48" text-anchor="middle" fill="#ced8e3" font-size="16" font-weight="600">工具插件</text>
+                <text x="90" y="66" text-anchor="middle" font-size="10.5" fill="#8b949e" font-family="Consolas, monospace">forge · AI 创造</text>
+                <g fill="#223046">
+                  <rect x="30" y="98" width="120" height="3" />
+                  <rect x="30" y="110" width="120" height="3" />
+                  <rect x="30" y="122" width="120" height="3" />
+                  <rect x="30" y="134" width="120" height="3" />
+                </g>
+              </g>
+
+              <!-- 模块到卡位的接线（虚线） -->
+              <g stroke="#1f2933" stroke-width="2" stroke-dasharray="3 5">
+                <line x1="260" y1="235" x2="260" y2="285" />
+                <line x1="480" y1="235" x2="480" y2="285" />
+                <line x1="700" y1="235" x2="700" y2="285" />
+              </g>
+
+              <!-- 预制卡位（底座缝） -->
+              <g>
+                <rect x="170" y="285" width="180" height="45" rx="8" fill="none" stroke="#3d5189" stroke-width="1.5" stroke-dasharray="5 4" />
+                <text x="260" y="312" text-anchor="middle" fill="#8b949e" font-size="12">四象限 RPC 缝</text>
+                <rect x="390" y="285" width="180" height="45" rx="8" fill="none" stroke="#3d5189" stroke-width="1.5" stroke-dasharray="5 4" />
+                <text x="480" y="312" text-anchor="middle" fill="#8b949e" font-size="12">点表缝 ctx.points</text>
+                <rect x="610" y="285" width="180" height="45" rx="8" fill="none" stroke="#3d5189" stroke-width="1.5" stroke-dasharray="5 4" />
+                <text x="700" y="312" text-anchor="middle" fill="#8b949e" font-size="12">store 分库 · audit 审计</text>
+              </g>
+              <text x="480" y="360" text-anchor="middle" fill="#8b949e" font-size="12">
+                脊柱不依赖住户 · 一切贡献经 ctx.effect() 注册
+              </text>
+            </svg>
+          </div>
+
+          <div class="mt-12 grid gap-6 md:grid-cols-3">
+            <div class="section-card reveal p-6">
+              <span class="badge text-primary">双面插件</span>
+              <h3 class="mt-3 font-semibold">一个 zip，两副面孔</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                宿主面跑在 node 的 Cordis 树上；渲染面是 clientBundle 产出的 CJS 工厂包，经
+                snap-plugin:// 特权协议进浏览器图。
+              </p>
+            </div>
+            <div class="section-card reveal p-6">
+              <span class="badge text-primary">文件即接口</span>
+              <h3 class="mt-3 font-semibold">plugins.yml 一个入口</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                页面按钮、手编、Agent 编辑的是同一个文件，watch 热重载立即生效。
+              </p>
+              <pre class="code-block mt-4"><code>plugins:
+  '@snap-rail/suite-terminal-ops':
+    enabled: true</code></pre>
+            </div>
+            <div class="section-card reveal p-6">
+              <span class="badge text-primary">坏配置安全</span>
+              <h3 class="mt-3 font-semibold">车间不因 YAML 停机</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                坏文件保持旧插件树继续运行并报错——现场第一，配置错误不配当停机理由。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑤ 产品展示 -->
+      <section id="showcase" class="py-24">
+        <div class="mx-auto max-w-6xl space-y-20 px-6">
+          <div class="grid items-center gap-10 md:grid-cols-2">
+            <div class="reveal">
+              <p class="kicker">套件 · terminal-ops</p>
+              <h3 class="mt-3 text-2xl font-bold">五流程作业，一块屏跑完一个班</h3>
+              <p class="mt-4 leading-relaxed text-muted-foreground">
+                工号登录闸门按班次开启工作流；维护、生产、抽检、故障、停机五页各带声明式完成条件。产量看板以辉光大数字与
+                24 小时实际/理论对照柱状图收班；侧栏注意力灯在抽检前 5 分钟先黄后红地呼吸。
+              </p>
+            </div>
+            <div class="reveal section-card overflow-hidden" data-image="process-page" data-alt="终端作业流程页截图">
+              <div class="slot-fallback flex aspect-16/10 flex-col items-center justify-center gap-3 border-b border-dashed border-border/80">
+                <p class="font-mono text-sm text-muted-foreground">process-page.png</p>
+                <p class="text-xs text-muted-foreground/70">截图待放置 · 故障或维护流程页（状态灯上镜）</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid items-center gap-10 md:grid-cols-2">
+            <div class="reveal section-card order-last overflow-hidden md:order-first" data-image="device-manager" data-alt="设备管理设置页截图">
+              <div class="slot-fallback flex aspect-16/10 flex-col items-center justify-center gap-3">
+                <p class="font-mono text-sm text-muted-foreground">device-manager.png</p>
+                <p class="text-xs text-muted-foreground/70">截图待放置 · 设备管理页（LED / 组健康灯 / 点表）</p>
+              </div>
+            </div>
+            <div class="reveal">
+              <p class="kicker">底座 · 设备管理</p>
+              <h3 class="mt-3 text-2xl font-bold">设备、组、点，一张表管到底</h3>
+              <p class="mt-4 leading-relaxed text-muted-foreground">
+                驱动只负责协议：上交 zod schema 与 createConnection，方言表单由底座 SchemaForm
+                渲染。连接 LED 红绿即览、组健康灯分级、点表实时值滚动——驱动零渲染端代码、零自有存储。
+              </p>
+            </div>
+          </div>
+
+          <div class="grid items-center gap-10 md:grid-cols-2">
+            <div class="reveal">
+              <p class="kicker">工具 · forge</p>
+              <h3 class="mt-3 text-2xl font-bold">跟 AI 说一句话，插件当场跑起来</h3>
+              <p class="mt-4 leading-relaxed text-muted-foreground">
+                AI 创造工作室把需求直接变成运行时插件：流式对话、五件工具读写宿主、版本化存于独立分库；不满意当场改，满意一键导出可安装
+                zip。network / eval-code / store 权限安装时明示。
+              </p>
+            </div>
+            <div class="reveal section-card relative overflow-hidden" data-video="show-forge">
+              <div class="slot-fallback grid aspect-16/10 content-center grid-cols-[1.2fr_1fr] gap-4 p-5">
+                <div class="flex flex-col justify-end gap-3">
+                  <div class="ml-auto w-3/4 rounded-lg rounded-br-none bg-primary/25 px-3.5 py-2.5 text-xs leading-relaxed">
+                    给 3 号机加一个点检倒计时卡
+                  </div>
+                  <div class="w-full rounded-lg rounded-bl-none border border-border bg-secondary/50 px-3.5 py-2.5">
+                    <div class="flex gap-1.5">
+                      <span class="typing-dot h-1.5 w-1.5 rounded-full bg-primary"></span>
+                      <span class="typing-dot h-1.5 w-1.5 rounded-full bg-primary" style="animation-delay: 0.2s"></span>
+                      <span class="typing-dot h-1.5 w-1.5 rounded-full bg-primary" style="animation-delay: 0.4s"></span>
+                    </div>
+                    <div class="mt-2.5 space-y-1.5">
+                      <div class="h-1.5 w-5/6 rounded bg-muted"></div>
+                      <div class="h-1.5 w-3/4 rounded bg-muted"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex flex-col gap-2.5 border border-border/70 rounded-lg bg-background/60 p-3.5">
+                  <p class="text-xs text-muted-foreground">我的插件</p>
+                  <div class="forge-chip rounded-lg border border-primary/40 bg-primary/10 p-3">
+                    <p class="font-mono text-xs">@forge/点检倒计时</p>
+                    <p class="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span class="breathe h-1.5 w-1.5 rounded-full bg-success"></span>
+                      v2 · 已挂载
+                    </p>
+                  </div>
+                  <div class="h-8 rounded-lg border border-dashed border-border/80"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑥ 插件生态入口 -->
+      <section id="ecosystem" class="border-y border-border/60 bg-card/30 py-24">
+        <div class="mx-auto max-w-6xl px-6">
+          <p class="kicker reveal">ecosystem</p>
+          <h2 class="reveal mt-3 text-3xl font-bold">三种插件，一个生态</h2>
+          <p class="reveal mt-4 max-w-2xl leading-relaxed text-muted-foreground">
+            snap-rail 得名于 DIN 导轨上的 snap-on 卡装——模块化是工业百年的智慧，我们把它带进软件。
+          </p>
+          <div class="mt-12 grid gap-6 md:grid-cols-3">
+            <div class="section-card reveal p-6">
+              <span class="badge text-primary">套件 · 单活</span>
+              <h3 class="mt-3 font-semibold">业务套件</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                一个场景的全部界面（布局、chrome、流程页、设置页）合成一枚 zip，成套交付、成套丢弃。
+              </p>
+            </div>
+            <div class="section-card reveal p-6">
+              <span class="badge text-success">驱动 · 可并存</span>
+              <h3 class="mt-3 font-semibold">通讯驱动</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                只上交 schema 与连接适配，方言表单由底座渲染——新协议照抄 driver-mock 即可。
+              </p>
+            </div>
+            <div class="section-card reveal p-6">
+              <span class="badge text-chart-3">工具</span>
+              <h3 class="mt-3 font-semibold">工具插件</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                往宿主塞新能力的工具，AI 创造工作室 forge 就是这么一号住户。
+              </p>
+            </div>
+          </div>
+          <div class="reveal mt-10 text-center">
+            <a class="btn btn-primary" href="./plugins.html">浏览插件生态 →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑦ 开源与信任 -->
+      <section id="trust" class="py-24">
+        <div class="mx-auto max-w-6xl px-6">
+          <p class="kicker reveal">open source</p>
+          <h2 class="reveal mt-3 text-3xl font-bold">开源，且值得托付</h2>
+          <div class="reveal mt-6 flex flex-wrap items-center gap-3">
+            <span class="badge">Apache-2.0</span>
+            <span class="badge">vendored Cordis · 上游 MIT</span>
+            <a
+              class="btn btn-ghost px-3.5 py-2 text-sm"
+              href="https://github.com/yansijian/snap-rail"
+              target="_blank"
+              rel="noopener"
+              >在 GitHub 上阅读源码</a
+            >
+          </div>
+          <div class="mt-10 grid gap-6 md:grid-cols-3">
+            <div class="section-card reveal p-6">
+              <h3 class="font-semibold">权限明示</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                安装前 inspect 预检报出名称、版本、类型与权限声明——装什么、能干什么，白纸黑字。
+              </p>
+            </div>
+            <div class="section-card reveal p-6">
+              <h3 class="font-semibold">分库隔离</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                每命名空间一个独立的 SQLite 库文件，文件即隔离边界；跨命名空间协作只能走服务，永不共享表。
+              </p>
+            </div>
+            <div class="section-card reveal p-6">
+              <h3 class="font-semibold">审计追踪</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
+                append-only JSONL 审计日志，每个业务动作带 actor 记录在案，事后可查、不可篡改。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ⑧ 路线图 -->
+      <section id="roadmap" class="border-t border-border/60 bg-card/30 py-24">
+        <div class="mx-auto max-w-6xl px-6">
+          <p class="kicker reveal">roadmap</p>
+          <h2 class="reveal mt-3 text-3xl font-bold">一期已交付，座位已留好</h2>
+          <div class="mt-12 grid gap-6 md:grid-cols-2">
+            <div class="section-card reveal p-7">
+              <h3 class="flex items-center gap-2 font-semibold">
+                <span class="h-2 w-2 rounded-full bg-success"></span>一期已交付
+              </h3>
+              <ul class="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
+                <li>✓ Cordis 宿主树 + 两层清单合成（内置只读 + 用户层热重载）</li>
+                <li>✓ 四象限类型化 RPC 协议（BigInt 走结构化克隆）</li>
+                <li>✓ terminal-ops 套件 · mock + ModbusTCP 驱动</li>
+                <li>✓ forge AI 创造工作室（生成 → 挂载 → 导出 zip）</li>
+                <li>✓ store 分库持久化 + append-only 审计</li>
+              </ul>
+            </div>
+            <div class="section-card reveal p-7">
+              <h3 class="flex items-center gap-2 font-semibold">
+                <span class="h-2 w-2 rounded-full bg-chart-4"></span>预留座位
+              </h3>
+              <ul class="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
+                <li>○ 权限强制执行（现在安装时明示，将来运行时拦截）</li>
+                <li>○ 插件市场（同格式 zip 的下载源）</li>
+                <li>○ npm 分发 · 套件免重启热切换</li>
+                <li>○ i18n · 遥测</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ⑨ Footer -->
+    <footer class="border-t border-border/60 py-14">
+      <div class="mx-auto grid max-w-6xl gap-10 px-6 md:grid-cols-[1.2fr_1fr]">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <img src="./logo.svg" alt="" class="h-7 w-7" />
+            <span class="font-semibold">snap-rail</span>
+          </div>
+          <p class="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+            工业终端的开源底座。License Apache-2.0，vendored Cordis 保留上游 MIT 许可文件。
+          </p>
+          <ul class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <li>
+              <a class="text-muted-foreground hover:text-foreground" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener"
+                >GitHub</a
+              >
+            </li>
+            <li>
+              <a
+                class="text-muted-foreground hover:text-foreground"
+                href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md"
+                target="_blank"
+                rel="noopener"
+                >architecture.md</a
+              >
+            </li>
+            <li>
+              <a
+                class="text-muted-foreground hover:text-foreground"
+                href="https://github.com/yansijian/snap-rail/releases"
+                target="_blank"
+                rel="noopener"
+                >Releases</a
+              >
+            </li>
+          </ul>
+        </div>
+        <div>
+          <p class="text-sm font-semibold">快速开始</p>
+          <pre class="code-block mt-3"><code>git clone https://github.com/yansijian/snap-rail.git
+cd snap-rail
+pnpm install
+pnpm run build
+pnpm app:dev</code></pre>
+        </div>
+      </div>
+      <p class="mx-auto mt-10 max-w-6xl px-6 text-xs text-muted-foreground/70">© 2026 snap-rail contributors</p>
+    </footer>
+  </body>
+</html>

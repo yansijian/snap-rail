@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="snap-rail logo：模块卡装在 DIN 导轨上">
+  <!-- snap-rail mark: one vertical module face (LED dot, two skeleton rows)
+       with the DIN rail lips running behind it on both sides. Static mark. -->
+  <defs>
+    <linearGradient id="logoMod" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e2734" />
+      <stop offset="1" stop-color="#161d29" />
+    </linearGradient>
+  </defs>
+  <!-- 左右各两根横线：导轨上/下唇，从模块中部背后穿过 -->
+  <g stroke-width="2" stroke-linecap="round">
+    <line x1="3" y1="29" x2="22" y2="29" stroke="#667fcd" />
+    <line x1="3" y1="35" x2="22" y2="35" stroke="#3b4c60" />
+    <line x1="42" y1="29" x2="61" y2="29" stroke="#667fcd" />
+    <line x1="42" y1="35" x2="61" y2="35" stroke="#3b4c60" />
+  </g>
+  <!-- 模块面板：左上绿点 LED + 两行骨架屏短线（与导轨同一水平系统） -->
+  <rect x="22" y="12" width="20" height="40" rx="3.5" fill="url(#logoMod)" stroke="#3d5189" stroke-width="1.5" />
+  <circle cx="27" cy="18.5" r="2.2" fill="#3fb950" />
+  <rect x="27" y="27.8" width="10" height="2.4" rx="1.2" fill="#55677c" />
+  <rect x="27" y="33.8" width="10" height="2.4" rx="1.2" fill="#55677c" />
+</svg>
