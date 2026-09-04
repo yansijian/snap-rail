@@ -38,7 +38,7 @@ function haloPeriod(progress: number): string {
 }
 
 /** Sidebar events that re-render the rail and every slot consumer. */
-const RAIL_EVENTS = ['session/changed', 'workflow/changed', 'ui/slot-changed'] as const
+const RAIL_EVENTS = ['session/changed', 'session/restored', 'workflow/changed', 'ui/slot-changed'] as const
 
 // Theme tokens by name — the breathing halo colors ride CSS custom properties,
 // so retinting the theme retints the alerts.
@@ -153,6 +153,18 @@ function SlotRegion(props: { ctx: Context, slot: 'titlebar' }): ReactNode {
 
 function Station(props: { ctx: Context }): ReactNode {
   useRefresh(props.ctx, RAIL_EVENTS)
+  // The boot restore probe races the first frame: hold a blank body (the
+  // titlebar stays mounted) until it settles — a restart with a persisted
+  // operator must never flash the login card's keypad. The render reads
+  // `restored()` directly, so correctness never hangs on catching the event.
+  if (!props.ctx.session.restored()) {
+    return (
+      <div className="flex h-full flex-col">
+        <SlotRegion ctx={props.ctx} slot="titlebar" />
+        <div className="min-h-0 flex-1" data-region="session-restoring" />
+      </div>
+    )
+  }
   const operator = props.ctx.session.current()
   const body = operator === null
     ? <LoginScreen ctx={props.ctx} />

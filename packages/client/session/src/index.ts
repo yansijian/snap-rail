@@ -32,6 +32,9 @@ declare module '@snap-rail/cordis' {
      * @param operator - the new operator id, or `null` when signed off.
      */
     'session/changed'(operator: string | null): void
+    /** The boot-time restore probe settled (success or failure) — the one
+     * tick where `current()` first reflects the persisted operator. */
+    'session/restored'(): void
   }
 }
 
@@ -39,6 +42,11 @@ declare module '@snap-rail/cordis' {
 export interface SessionService {
   /** The signed-on operator id, or `null` while the login page shows. */
   current(): string | null
+  /** Whether the boot-time restore probe has settled. Until it does,
+   * `current()` is not yet the truth (a restart may still be about to
+   * restore a persisted operator) — consumers must not render the login
+   * page or gate workflows on `current()` before this holds. */
+  restored(): boolean
   /** Sign an operator on; trims the id and rejects empty input. */
   login(operator: string): Promise<void>
   /** Sign the current operator off (back to the login page). */
@@ -52,15 +60,25 @@ const sessionPlugin: Plugin.Object<void> = {
   apply(ctx: Context): void {
     const { link } = (ctx as Context & { client: ClientLink }).client
     let operator: string | null = null
+    let restored = false
     const sync = (next: string | null): void => {
       operator = next
       ctx.emit('session/changed', operator)
     }
 
-    // Restore the persisted operator; a failed probe leaves the login page up.
-    void link.call('session.current', {}).then(result => {
-      if (result.ok) sync(result.value.operator)
-    })
+    // Restore the persisted operator; a failed probe leaves the login page
+    // up. The probe races the first rendered frame, so its settlement is
+    // announced on its own event — the login surface holds off until then
+    // instead of flashing the keypad before a restart's operator lands.
+    void link.call('session.current', {})
+      .then(result => {
+        if (result.ok) sync(result.value.operator)
+      })
+      .catch(() => {})
+      .finally(() => {
+        restored = true
+        ctx.emit('session/restored')
+      })
 
     // Hot-follow host-side session changes (another surface signed in or
     // out — the titlebar's 换人, or the host restarting with a different
@@ -76,6 +94,7 @@ const sessionPlugin: Plugin.Object<void> = {
 
     ctx.provide('session', {
       current: (): string | null => operator,
+      restored: (): boolean => restored,
       async login(raw: string): Promise<void> {
         const trimmed = raw.trim()
         if (trimmed === '') throw new Error('工号不能为空')
