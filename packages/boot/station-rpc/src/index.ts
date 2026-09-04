@@ -127,11 +127,14 @@ const stationRpcPlugin: Plugin.Object<void> = {
           ...clientUrl !== undefined ? { clientUrl } : {},
         })
       }
-      // Pool client faces without a user row mount by default (pool plugins
-      // default to enabled) — absent rows still reach the renderer.
+      // Pool client faces without a user row list as disabled: installing is
+      // not enabling, and pool plugins mount (host and renderer alike) only
+      // through an explicit user row. The row still rides out so the renderer
+      // knows the face exists — boot skips disabled rows, and the settings
+      // page can prompt for a restart when the row flips.
       for (const [name, clientUrl] of clientFaces) {
         if (seen.has(name)) continue
-        rows.push({ name, enabled: true, clientUrl })
+        rows.push({ name, enabled: false, clientUrl })
       }
       return { rows }
     })

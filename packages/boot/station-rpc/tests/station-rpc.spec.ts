@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
@@ -125,6 +125,39 @@ describe('station-rpc', () => {
     expect(rows.ok && rows.value.rows).toEqual([
       { name: '@snap-rail/suite-terminal-ops', enabled: true, config: { sampling: { schedule: '*/20 * * * *' } } },
       { name: '@snap-rail/field/station', enabled: false },
+    ])
+  })
+
+  it('lists pool client faces as disabled until a user row enables them', async () => {
+    const { home, client } = await makeWorld()
+    const poolDir = join(home, 'plugins')
+    mkdirSync(join(poolDir, '@snap-rail__mini', 'lib-client'), { recursive: true })
+    writeFileSync(join(poolDir, '@snap-rail__mini', 'package.json'), JSON.stringify({
+      name: '@snap-rail/mini', version: '0.1.0', type: 'module', main: 'lib/index.js',
+      snapRail: { client: { entry: 'lib-client/client.js' } },
+    }))
+
+    const rows = async (): Promise<readonly unknown[]> => {
+      const result = await client.call('client-config.list', {})
+      if (!result.ok) throw new Error('client-config.list failed')
+      return result.value.rows
+    }
+
+    // Rowless pool face: still listed (the management page needs to know the
+    // face exists to prompt for restarts) but disabled — installing a zip is
+    // not enabling it, host and renderer agree on the explicit row.
+    expect(await rows()).toEqual([
+      { name: '@snap-rail/mini', enabled: false, clientUrl: 'snap-plugin://pool/@snap-rail__mini/lib-client/client.js' },
+    ])
+
+    writeFileSync(join(home, 'plugins.yml'), "plugins:\n  - name: '@snap-rail/mini'\n    enabled: true\n")
+    expect(await rows()).toEqual([
+      { name: '@snap-rail/mini', enabled: true, clientUrl: 'snap-plugin://pool/@snap-rail__mini/lib-client/client.js' },
+    ])
+
+    writeFileSync(join(home, 'plugins.yml'), "plugins:\n  - name: '@snap-rail/mini'\n    enabled: false\n")
+    expect(await rows()).toEqual([
+      { name: '@snap-rail/mini', enabled: false, clientUrl: 'snap-plugin://pool/@snap-rail__mini/lib-client/client.js' },
     ])
   })
 })

@@ -136,9 +136,7 @@ export class LayerAdmin {
    * {@link setUserRow}; later edits for the same row win.
    */
   async setUserRows(edits: ReadonlyArray<{ name: string, enabled?: boolean, config?: unknown }>): Promise<void> {
-    const run = this.queue.then(async () => {
-      const layer = loadUserLayer(this.handles.userLayerPath)
-      const rows = [...layer.plugins]
+    return this.commitRows(rows => {
       for (const edit of edits) {
         const index = rows.findIndex(row => row.name === edit.name)
         const base: UserPluginRow = index === -1 ? { name: edit.name } : { ...rows[index]! }
@@ -147,6 +145,42 @@ export class LayerAdmin {
         if (index === -1) rows.push(base)
         else rows[index] = base
       }
+      return rows
+    })
+  }
+
+  /**
+   * Drop one user-layer row entirely and apply — the uninstall path. The file
+   * must never keep a row naming a package that is no longer installed: a
+   * stale row fails every future composition, the next boot included. A
+   * missing row is a no-op (uninstalling a never-enabled pool plugin writes
+   * nothing).
+   *
+   * @param name - the plugin's package name (the row key).
+   */
+  async removeUserRow(name: string): Promise<void> {
+    if (!loadUserLayer(this.handles.userLayerPath).plugins.some(row => row.name === name)) return
+    return this.commitRows(rows => rows.filter(row => row.name !== name))
+  }
+
+  /**
+   * Merge-then-commit the user layer inside the write queue. The candidate
+   * rows must compose BEFORE the file changes — a written-but-uncomposable
+   * file would brick the next boot — so a validation failure leaves the file
+   * untouched and surfaces to the caller.
+   *
+   * @param merge - pure transform over the loaded rows.
+   */
+  private async commitRows(merge: (rows: UserPluginRow[]) => UserPluginRow[]): Promise<void> {
+    const run = this.queue.then(async () => {
+      const rows = merge([...loadUserLayer(this.handles.userLayerPath).plugins])
+      composeEntries({
+        builtin: loadBuiltinLayer(this.handles.builtinLayerPath),
+        userLayer: { plugins: rows },
+        pool: scanPluginPool(this.handles.poolDirs),
+        appRoot: this.handles.appRoot,
+        rendererPackages: this.handles.rendererPackages,
+      })
       atomicWrite(this.handles.userLayerPath, dump({ plugins: rows } satisfies UserLayer))
       await this.apply()
     })

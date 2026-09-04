@@ -49,11 +49,19 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       }
       for (const row of user.plugins) {
         if (seen.has(row.name)) continue
-        if (!pool.has(row.name) && !layers.handles.rendererPackages.includes(row.name)) continue
+        const inPool = pool.has(row.name)
+        if (!inPool && !layers.handles.rendererPackages.includes(row.name)) continue
         seen.add(row.name)
         const live = composed.get(row.name)
-        infos.push(toInfo(row.name, 'user', live?.disabled !== true, live?.config, kindOf(row.name)))
+        // Pool-resident packages report their physical origin ('pool') and
+        // their real mounted state: a disabled pool entry is omitted from the
+        // composition entirely, so presence in it is the truth. Renderer rows
+        // are config-only (never composed) and keep the row's flag.
+        const enabled = inPool ? composed.has(row.name) : row.enabled !== false
+        infos.push(toInfo(row.name, inPool ? 'pool' : 'user', enabled, live?.config ?? row.config, kindOf(row.name)))
       }
+      // Installed but never enabled: pool plugins mount only through an
+      // explicit user row, so a rowless package lists as off.
       for (const name of pool.keys()) {
         if (seen.has(name)) continue
         infos.push(toInfo(name, 'pool', false, undefined, kindOf(name)))
@@ -164,9 +172,11 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       if (poolDir === undefined) {
         throw new RpcBusinessError({ code: 'unavailable', details: { what: 'no plugin pool is configured' } })
       }
-      // Rows first (the package unmounts), then the files, then re-apply.
+      // The row goes first (the package unmounts), then the files, then one
+      // converging apply — the file must never keep a row naming a package
+      // that is gone, or the next boot fails to compose.
       await mutate(async () => {
-        await layers.setUserRow(name, { enabled: false })
+        await layers.removeUserRow(name)
         uninstallPlugin(name, poolDir, dirname(layers.handles.userLayerPath))
         await layers.apply()
       })

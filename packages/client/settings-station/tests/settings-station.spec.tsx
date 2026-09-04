@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
@@ -174,7 +174,7 @@ describe('settings dialog', () => {
     element.remove()
   }, 20_000)
 
-  it('installing a plugin with a renderer face prompts for the restart that mounts it', async () => {
+  it('installs into the pool disabled with an uninstall entry, and uninstalling prompts for restart', async () => {
     const home = mkdtempSync(join(tmpdir(), 'snap-rail-install-ui-'))
     tempDirs.push(home)
     const poolDir = join(home, 'plugins')
@@ -207,6 +207,8 @@ describe('settings dialog', () => {
         poolDirs: [poolDir],
         rendererPackages: [],
       },
+      setUserRow: async (): Promise<void> => {},
+      removeUserRow: async (): Promise<void> => {},
       apply: async (): Promise<void> => {},
       recompose: (): unknown[] => [],
     } as never)
@@ -238,10 +240,27 @@ describe('settings dialog', () => {
     confirm!.click()
     await flush(20)
 
-    // The restart prompt opens: renderer faces mount at page boot, so the
-    // install completes only after relaunch. The new row carries the badge.
+    // Installing is not enabling: no restart prompt, and the new row lists
+    // as a disabled pool package whose single row carries the uninstall
+    // affordance.
+    expect(document.body.textContent).not.toContain('变更待重启生效')
+    const row = document.querySelector('[data-plugin-row="@snap-rail/mini-ui"]')
+    expect(row).not.toBeNull()
+    expect(row!.textContent).toContain('插件池')
+    expect(row!.querySelector<HTMLButtonElement>('button[role="switch"]')!.getAttribute('data-state')).toBe('unchecked')
+    expect(document.querySelector('[data-uninstall-plugin="@snap-rail/mini-ui"]')).not.toBeNull()
+
+    // Uninstalling asks first, then goes through the wire, removes the pool
+    // package, drops the row, and prompts for the restart that clears the
+    // already-mounted face.
+    document.querySelector<HTMLButtonElement>('[data-uninstall-plugin="@snap-rail/mini-ui"]')!.click()
+    await flush()
+    expect(document.body.textContent).toContain('卸载插件')
+    document.querySelector<HTMLButtonElement>('[data-confirm-uninstall]')!.click()
+    await flush(20)
+    expect(existsSync(join(poolDir, '@snap-rail__mini-ui'))).toBe(false)
+    expect(document.querySelector('[data-plugin-row="@snap-rail/mini-ui"]')).toBeNull()
     expect(document.body.textContent).toContain('变更待重启生效')
-    expect(document.querySelector('[data-plugin-row="@snap-rail/mini-ui"]')?.textContent).toContain('待重启')
 
     await runtime.dispose()
     element.remove()

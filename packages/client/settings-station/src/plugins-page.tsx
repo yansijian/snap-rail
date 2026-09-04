@@ -44,8 +44,14 @@ const KIND_LABELS: Record<string, string> = {
   plugin: '插件',
 }
 
-/** One row: origin badge, name, and the enable toggle. */
-function PluginRowView(props: { row: PluginRow, onToggle: (name: string, enabled: boolean) => void, needsRestart?: boolean | undefined }): ReactNode {
+/** One row: origin badge, name, and the enable toggle (pool-installed
+ * single-entry packages also carry the uninstall affordance). */
+function PluginRowView(props: {
+  row: PluginRow
+  onToggle: (name: string, enabled: boolean) => void
+  onUninstall?: ((pkg: string) => void) | undefined
+  needsRestart?: boolean | undefined
+}): ReactNode {
   const { row } = props
   return (
     <div
@@ -57,11 +63,24 @@ function PluginRowView(props: { row: PluginRow, onToggle: (name: string, enabled
         <span className="truncate font-mono text-sm">{row.name}</span>
         {props.needsRestart === true && <Badge variant="destructive">待重启</Badge>}
       </div>
-      <Switch
-        aria-label={`启用 ${row.name}`}
-        checked={row.enabled}
-        onCheckedChange={checked => props.onToggle(row.name, checked)}
-      />
+      <div className="flex items-center gap-2">
+        {props.onUninstall !== undefined && (
+          <Button
+            data-uninstall-plugin={row.packageName}
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={() => props.onUninstall?.(row.packageName)}
+          >
+            卸载
+          </Button>
+        )}
+        <Switch
+          aria-label={`启用 ${row.name}`}
+          checked={row.enabled}
+          onCheckedChange={checked => props.onToggle(row.name, checked)}
+        />
+      </div>
     </div>
   )
 }
@@ -160,6 +179,11 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
     | { phase: 'installing' }
     | { phase: 'error', message: string }
   >({ phase: 'idle' })
+  const [uninstall, setUninstall] = useState<
+    | { phase: 'idle' }
+    | { phase: 'confirm', pkg: string }
+    | { phase: 'error', message: string }
+  >({ phase: 'idle' })
 
   const link = ctx.client.link
 
@@ -172,6 +196,11 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
         })))
       } else setFailed(true)
     }).catch(() => setFailed(true))
+    // Rides every reload: installs and uninstalls change which pool faces
+    // exist, and the restart prompt keys off this list.
+    void link.call('client-config.list', {}).then(result => {
+      if (result.ok) setRendererNames(result.value.rows.map(row => row.name))
+    }).catch(() => undefined)
   }
   useEffect(() => {
     reload()
@@ -209,8 +238,26 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
     setRestartPrompt(true)
   }
 
-  const uninstall = (pkg: string): void => {
-    void link.call('plugins.uninstall', { name: pkg }).then(() => reload())
+  /** The uninstall affordance opens a confirm first — the package and its
+   * data are deleted for real. */
+  const requestUninstall = (pkg: string): void => {
+    setUninstall({ phase: 'confirm', pkg })
+  }
+
+  const runUninstall = (pkg: string): void => {
+    void link.call('plugins.uninstall', { name: pkg }).then(result => {
+      if (!result.ok) {
+        setUninstall({ phase: 'error', message: rpcErrorText(result.error) })
+        return
+      }
+      setUninstall({ phase: 'idle' })
+      reload()
+      // The renderer may still carry the uninstalled face until it reboots.
+      if (rendererNames.includes(pkg)) {
+        setTouched(current => new Set([...current, pkg]))
+        setRestartPrompt(true)
+      }
+    }).catch(cause => setUninstall({ phase: 'error', message: String(cause) }))
   }
 
   const pickZip = (): void => {
@@ -229,22 +276,17 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
     }).catch(() => undefined)
   }
 
-  const runInstall = (zipPath: string, hasClient: boolean): void => {
+  const runInstall = (zipPath: string): void => {
     setInstall({ phase: 'installing' })
     void link.call('plugins.install', { zipPath }).then(result => {
       if (!result.ok) {
         setInstall({ phase: 'error', message: rpcErrorText(result.error) })
         return
       }
+      // Installing lands the package in the pool disabled; enabling it is a
+      // separate explicit act, so no restart prompt belongs to the install.
       setInstall({ phase: 'idle' })
       reload()
-      // The renderer mounts pool client faces at page boot only, so an
-      // install carrying one lands after a restart — same semantics as
-      // flipping a renderer row, with the same prompt.
-      if (hasClient) {
-        setTouched(current => new Set([...current, result.value.installed.name]))
-        setRestartPrompt(true)
-      }
     }).catch(cause => setInstall({ phase: 'error', message: String(cause) }))
   }
 
@@ -270,7 +312,15 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
   const renderGroups = (entries: Array<[string, PluginRow[]]>): ReactNode =>
     entries.map(([pkg, members]) =>
       members.length === 1
-        ? <PluginRowView key={members[0]!.name} row={members[0]!} onToggle={toggle} needsRestart={needsRestart(members[0]!.name)} />
+        ? (
+            <PluginRowView
+              key={members[0]!.name}
+              row={members[0]!}
+              onToggle={toggle}
+              onUninstall={isPool(pkg) ? requestUninstall : undefined}
+              needsRestart={needsRestart(members[0]!.name)}
+            />
+          )
         : (
             <PluginGroupCard
               key={pkg}
@@ -278,7 +328,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
               members={members}
               onToggle={toggle}
               needsRestart={needsRestart}
-              onUninstall={isPool(pkg) ? uninstall : undefined}
+              onUninstall={isPool(pkg) ? requestUninstall : undefined}
             />
           ))
 
@@ -286,7 +336,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
     <div data-region="plugins-table" className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          通讯驱动的启停当场生效；业务套件与页面类插件需重启生效。启用状态与配置同源（文件即接口）。
+          通讯驱动的启停当场生效；业务套件与页面类插件需重启生效。新安装的插件默认停用；仅「插件池」来源的包可卸载。
         </p>
         <Button data-install-plugin onClick={pickZip}>安装插件</Button>
       </div>
@@ -302,7 +352,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
                 active={members.some(row => row.enabled)}
                 needsRestart={members.some(row => needsRestart(row.name))}
                 onActivate={() => activateSuite(pkg)}
-                onUninstall={isPool(pkg) ? uninstall : undefined}
+                onUninstall={isPool(pkg) ? requestUninstall : undefined}
               />
             ))}
       </section>
@@ -323,7 +373,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
         <Dialog open onOpenChange={next => { if (!next) setRestartPrompt(false) }}>
           <DialogContent aria-describedby={undefined} className="max-w-sm">
             <DialogTitle className="text-base font-medium">变更待重启生效</DialogTitle>
-            <p className="text-sm text-muted-foreground">业务套件与页面类插件的启用变更、以及新安装的页面类插件，将在下次启动时生效。</p>
+            <p className="text-sm text-muted-foreground">业务套件与页面类插件的启用变更将在下次启动时生效；插件卸载后的界面残留也会随之消失。</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setRestartPrompt(false)}>稍后</Button>
               <Button data-restart-now onClick={() => relaunch()}>立即重启</Button>
@@ -345,7 +395,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setInstall({ phase: 'idle' })}>取消</Button>
-              <Button data-confirm-install onClick={() => runInstall(install.zipPath, install.plugin.hasClient)}>安装</Button>
+              <Button data-confirm-install onClick={() => runInstall(install.zipPath)}>安装</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -358,6 +408,33 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
             <p data-install-error className="text-sm text-destructive">{install.message}</p>
             <DialogFooter>
               <Button onClick={() => setInstall({ phase: 'idle' })}>知道了</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {uninstall.phase === 'confirm' && (
+        <Dialog open onOpenChange={next => { if (!next) setUninstall({ phase: 'idle' }) }}>
+          <DialogContent aria-describedby={undefined} className="max-w-sm">
+            <DialogTitle className="text-base font-medium">卸载插件</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              将从插件池移除 <span className="font-mono text-foreground">{uninstall.pkg}</span>，其数据一并删除，不可恢复。
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setUninstall({ phase: 'idle' })}>取消</Button>
+              <Button variant="destructive" data-confirm-uninstall onClick={() => runUninstall(uninstall.pkg)}>卸载</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {uninstall.phase === 'error' && (
+        <Dialog open onOpenChange={next => { if (!next) setUninstall({ phase: 'idle' }) }}>
+          <DialogContent aria-describedby={undefined} className="max-w-sm">
+            <DialogTitle className="text-base font-medium">卸载失败</DialogTitle>
+            <p data-uninstall-error className="text-sm text-destructive">{uninstall.message}</p>
+            <DialogFooter>
+              <Button onClick={() => setUninstall({ phase: 'idle' })}>知道了</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
