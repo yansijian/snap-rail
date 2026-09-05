@@ -2,7 +2,7 @@
  * 班产统计 (shift production stats): the host-side counter behind this
  * package's production page (实际产量). It follows the counting binding
  * (the same `production.countBinding` settings key the page's settings
- * dialog writes) over the field seam's `point/updated` events and
+ * dialog writes) over the field seam's `field/point-update` topic and
  * accumulates positive deltas into three eight-hour shift buckets (8–16
  * 早班, 16–24 中班, 0–8 晚班), persisted in the store — page switches,
  * logouts, and restarts never lose a count.
@@ -23,8 +23,8 @@
 
 import { Context, type Plugin } from '@snap-rail/cordis'
 import '@snap-rail/cordis-plugin-timer'
-// Consumer of the field seam: the import pulls in the `point/updated`
-// event declaration alongside the runtime service.
+// Consumer of the field seam: the import pulls in the field contracts
+// (point triples, topic payload schemas) alongside the runtime service.
 import '@snap-rail/field'
 import { z } from 'zod'
 import { desc, eq, lt, sql } from 'drizzle-orm'
@@ -87,7 +87,7 @@ interface ShiftRow {
  */
 const productionStatsPlugin: Plugin.Object<ProductionStatsConfig> = {
   name: 'production-stats',
-  inject: ['rpc', 'settings', 'store', 'timer'],
+  inject: ['rpc', 'settings', 'store', 'timer', 'topic'],
   Config: productionStatsConfigSchema,
   apply(ctx: Context, config: ProductionStatsConfig): void {
     const rpc: GatewayService = ctx.rpc
@@ -293,28 +293,35 @@ const productionStatsPlugin: Plugin.Object<ProductionStatsConfig> = {
 
     // ---- live: the counter itself. Positive deltas only; a device counter
     // reset (negative delta) is ignored; an abnormal (null) sample re-seeds
-    // the baseline; unmapped bindings never produce samples. ----
-    ctx.on('point/updated', sample => {
-      if (session === null) return
-      if (sample.device !== binding.device || sample.group !== binding.group
-        || sample.name !== binding.name) return
-      const value = sample.value
-      if (value === null) {
-        lastSample = null
-        return
-      }
-      if (typeof value !== 'number' && typeof value !== 'bigint') return
-      if (lastSample !== null) {
-        const delta = Number(value) - Number(lastSample)
-        if (delta > 0) {
-          count += delta
-          const hourStart = new Date().setMinutes(0, 0, 0)
-          hourDeltas.set(hourStart, (hourDeltas.get(hourStart) ?? 0) + delta)
-          dirty = true
+    // the baseline; unmapped bindings never produce samples. The subscription
+    // is unfiltered (the binding is settings-driven and may change under the
+    // fixed gate), so the listener narrows by the current binding itself. ----
+    ctx.topic.subscribe<{ device: string, group: string, name: string, value: number | bigint | string | boolean | null, time: number }>(
+      ctx,
+      'field/point-update',
+      undefined,
+      sample => {
+        if (session === null) return
+        if (sample.device !== binding.device || sample.group !== binding.group
+          || sample.name !== binding.name) return
+        const value = sample.value
+        if (value === null) {
+          lastSample = null
+          return
         }
-      }
-      lastSample = value
-    })
+        if (typeof value !== 'number' && typeof value !== 'bigint') return
+        if (lastSample !== null) {
+          const delta = Number(value) - Number(lastSample)
+          if (delta > 0) {
+            count += delta
+            const hourStart = new Date().setMinutes(0, 0, 0)
+            hourDeltas.set(hourStart, (hourDeltas.get(hourStart) ?? 0) + delta)
+            dirty = true
+          }
+        }
+        lastSample = value
+      },
+    )
 
     ctx.interval(tick, config.flushMs)
 

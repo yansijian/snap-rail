@@ -1,14 +1,10 @@
 /**
  * The field seam's rpc bridge: claims the `field` wire domain and registers
  * the point-table methods with their schemas, plus the driver-registry and
- * generic-mapping faces. Field events pump into `field/*` broadcast frames;
- * `field/point-updated` frames flow while at least one subscription
- * reference holds the point's address — references are counted (a renderer
- * often holds several consumers of one address; the last unsubscribe, not
- * any unsubscribe, stops the frames), so one consumer unmounting never
- * starves the rest. A renderer reload that skips its unsubscribes leaks
- * counts — wasted broadcasts only, never lost ones. Structural frames
- * (added/removed, status) always flow so lists stay current.
+ * generic-mapping faces. The domain's push face rides topics declared and
+ * published by the field base itself (`field/*` — see `wire.ts`), so this
+ * bridge carries no event forwarding: consumers subscribe through the topic
+ * primitive.
  *
  * @module @snap-rail/field/rpc
  */
@@ -19,7 +15,7 @@ import type { GatewayService } from '@snap-rail/gateway'
 import { RpcBusinessError } from '@snap-rail/protocol'
 import { FieldError, pointKey } from './index.ts'
 import type { ConnectionsService, FieldService, PointsService } from './index.ts'
-import { fieldFrameSchemas, fieldRequestSchemas } from './wire.ts'
+import { fieldRequestSchemas } from './wire.ts'
 
 /** The field-rpc bridge plugin; mount after rpc, field, and audit. */
 const fieldRpcPlugin: Plugin.Object = {
@@ -31,8 +27,6 @@ const fieldRpcPlugin: Plugin.Object = {
     const connections: ConnectionsService = ctx.connections
     const field: FieldService = ctx.field
     const audit: AuditService = ctx.audit
-    /** Reference count per composite point key; frames flow above zero. */
-    const refcounts = new Map<string, number>()
     /** Run a config mutation, translating seam failures to wire errors. */
     const attempt = <T>(what: string, fn: () => T): T => {
       try {
@@ -71,24 +65,6 @@ const fieldRpcPlugin: Plugin.Object = {
       }
       audit.record({ actor: 'client', action: 'field.point.write', subject: pointKey(point), detail: { value } })
       return { accepted: true } as const
-    })
-
-    rpc.method(ctx, 'field.points.subscribe', { request: fieldRequestSchemas['field.points.subscribe'] }, ({ points: refs }) => {
-      for (const ref of refs) {
-        const key = pointKey(ref)
-        refcounts.set(key, (refcounts.get(key) ?? 0) + 1)
-      }
-      return { subscribed: true } as const
-    })
-
-    rpc.method(ctx, 'field.points.unsubscribe', { request: fieldRequestSchemas['field.points.unsubscribe'] }, ({ points: refs }) => {
-      for (const ref of refs) {
-        const key = pointKey(ref)
-        const next = Math.max(0, (refcounts.get(key) ?? 0) - 1)
-        if (next === 0) refcounts.delete(key)
-        else refcounts.set(key, next)
-      }
-      return { unsubscribed: true } as const
     })
 
     rpc.method(ctx, 'field.connections.list', { request: fieldRequestSchemas['field.connections.list'] }, () => ({
@@ -164,24 +140,6 @@ const fieldRpcPlugin: Plugin.Object = {
     rpc.method(ctx, 'field.mappings.list', { request: fieldRequestSchemas['field.mappings.list'] }, () => ({
       mappings: attempt('mappings read', () => field.mappings()),
     }))
-
-    for (const [name, payload] of Object.entries(fieldFrameSchemas)) {
-      rpc.frame(ctx, name, { payload })
-    }
-
-    ctx.on('point/updated', sample => {
-      if ((refcounts.get(pointKey(sample)) ?? 0) > 0) {
-        const { device, group, name, value, time } = sample
-        rpc.broadcast('field/point-updated', { device, group, name, value, time })
-      }
-    })
-    rpc.bridgeEvent(ctx, 'point/added', 'field/point-added', point => ({ point }))
-    rpc.bridgeEvent(ctx, 'point/removed', 'field/point-removed', ref => ({ device: ref.device, group: ref.group, name: ref.name }))
-    rpc.bridgeEvent(ctx, 'connection/added', 'field/connection-added', connection => ({ connection }))
-    rpc.bridgeEvent(ctx, 'connection/removed', 'field/connection-removed', id => ({ id }))
-    rpc.bridgeEvent(ctx, 'connection/status', 'field/connection-status', frame => frame)
-    rpc.bridgeEvent(ctx, 'field/mappings-changed', 'field/mappings-changed', () => ({}))
-    rpc.bridgeEvent(ctx, 'field/structure-changed', 'field/structure-changed', () => ({}))
   },
 }
 

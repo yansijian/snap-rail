@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
 import timerPlugin from '@snap-rail/cordis-plugin-timer'
+import gatewayPlugin from '@snap-rail/gateway'
 import storePlugin from '@snap-rail/store'
 import { pointKey, type PointRef, type PointSample } from '@snap-rail/field'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -36,6 +37,7 @@ async function makeWorld(): Promise<World> {
   worlds.push({ ctx, home })
   ctx.provide('snapRailHome', home)
   await ctx.plugin(storePlugin)
+  await ctx.plugin(gatewayPlugin, { name: 'snap-rail', version: '0.1.0', bin: 'test' })
   await ctx.plugin(fieldPlugin)
   await ctx.plugin(timerPlugin)
   await ctx.plugin(mockDriverPlugin)
@@ -49,7 +51,7 @@ async function makeWorld(): Promise<World> {
   ctx.field.upsertPoint('sim', '计数', { name: 'count', config: {} })
   ctx.field.upsertPoint('sim', '布尔', { name: 'run', config: {} })
   ctx.field.upsertPoint('sim', '文本', { name: 'stamp', config: {} })
-  ctx.points.subscribe([refs.flow, refs.count, refs.run, refs.stamp], sample => samples.push(sample))
+  ctx.topic.subscribe<PointSample>(ctx, 'field/point-update', { points: [refs.flow, refs.count, refs.run, refs.stamp] }, sample => samples.push(sample))
   return { ctx, samples }
 }
 
@@ -120,7 +122,7 @@ describe('mock driver over the field base', () => {
     world.ctx.field.upsertPoint('sim', '计数', { name: 'count2', config: {} })
     const count2: PointRef = { device: 'sim', group: '计数', name: 'count2' }
     const seen: unknown[] = []
-    world.ctx.points.subscribe([count2], sample => seen.push(sample.value))
+    world.ctx.topic.subscribe<PointSample>(world.ctx, 'field/point-update', { points: [count2] }, sample => seen.push(sample.value))
     await sleep(60)
     expect(seen.length).toBeGreaterThan(0)
 

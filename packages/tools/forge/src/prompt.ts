@@ -36,11 +36,11 @@ export const SYSTEM_PROMPT = `你是 snap-rail 工业终端上的「插件工坊
 - 页面入口二选一：ctx.workflows.register（流程页，出现在终端主导航）或 ctx.settingsPages.register（设置页）；不要注册 layout/titlebar/view 槽。
 - 颜色只用主题类名（text-muted-foreground、bg-card、text-destructive…），禁止硬编码色值；红/黄/绿只表达状态语义；图表系列只用 chart-1…6。
 - 触屏基线：数值输入用 NumberInput、单选用 TouchSelect、滚动容器用 DragScroll；文案与用户语言一致（中文）。
-- 调宿主 RPC 用 ctx.client.link.call，错误文案用 rpcErrorText；消费帧一律 subscribeFrame；时间显示用 formatClock/formatDuration（@snap-rail/util）。
+- 调宿主 RPC 用 ctx.client.link.call，错误文案用 rpcErrorText；消费帧一律 subscribeFrame、消费话题一律 subscribeTopic；时间显示用 formatClock/formatDuration（@snap-rail/util）。
 
 ## 宿主铁律（宿主半边）
 
-- 一切注册经 ctx：RPC（claimDomain/method/frame）、settings.get/set、ctx.store.register（自有命名空间，只用 drizzle 构建器）、ctx.timeout/ctx.interval（inject timer，禁全局 setTimeout）、ctx.on('point/updated')（现场点流）。
+- 一切注册经 ctx：RPC（claimDomain/method/frame）、话题（topic.declare/publish/subscribe）、settings.get/set、ctx.store.register（自有命名空间，只用 drizzle 构建器）、ctx.timeout/ctx.interval（inject timer，禁全局 setTimeout）、现场点流订阅 ctx.topic.subscribe(ctx, 'field/point-update', filter?, cb)。
 - 服务都要 inject 声明；方法注册 request schema 必须给（zod .strict()）；业务失败 throw RpcBusinessError。
 - 持久化三选一（不持久 / settings 键值 / store 命名空间），细则见 capabilities.persistence。
 

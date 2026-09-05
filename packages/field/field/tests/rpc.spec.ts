@@ -179,37 +179,44 @@ describe('field rpc bridge', () => {
       ],
     })
 
-    // A driver's change notice rides the internal event out as the wire frame.
+    // A driver's change notice rides the topic out as the wire frame —
+    // while some gate wants it.
     const received: ServerRequest[] = []
     const detach = ctx.rpc.attachDownlink(frame => received.push(frame))
+    ctx.field.mappingsChanged()
+    expect(received.some(frame => frame.method === 'field/mappings-changed')).toBe(false)
+    const gate = await client.call('topic.subscribe', { topic: 'field/mappings-changed' })
+    expect(gate.ok).toBe(true)
     ctx.field.mappingsChanged()
     expect(received.some(frame => frame.method === 'field/mappings-changed')).toBe(true)
     detach()
   })
 
-  it('filters point frames by subscription and always streams structural frames', async () => {
+  it('gates wire topics by subscription filters', async () => {
     const world = await makeWorld()
     const { client } = world
     const received: ServerRequest[] = []
     const detach = world.ctx.rpc.attachDownlink(frame => received.push(frame))
+    const updates = (): number => received.filter(frame => frame.method === 'field/point-update').length
 
-    await client.call('field.points.subscribe', { points: [temp] })
+    const gate = await client.call('topic.subscribe', { topic: 'field/point-update', filter: { points: [temp] } })
+    if (!gate.ok) throw new Error('gate rejected')
+
+    // A sample outside the gate's filter never climbs to the wire.
     world.drive.sample(relay, false)
+    expect(updates()).toBe(0)
     world.drive.sample(temp, 21.5)
-    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(updates()).toBe(1)
+    expect((received.find(frame => frame.method === 'field/point-update')?.payload as { value: number }).value).toBe(21.5)
 
-    const updates = received.filter(frame => frame.method === 'field/point-updated')
-    expect(updates.map(frame => pointKey(frame.payload as PointRef))).toEqual(['conn-1/main/temp'])
-    expect((updates[0]?.payload as { value: number }).value).toBe(21.5)
-
-    await client.call('field.points.unsubscribe', { points: [temp] })
+    // Closing the gate stops the flow; status needs its own gate now —
+    // structural topics are no longer unconditional broadcasts.
+    await client.call('topic.unsubscribe', { subscriptionId: gate.value.subscriptionId })
     world.drive.sample(temp, 22)
+    expect(updates()).toBe(1)
+    const statusGate = await client.call('topic.subscribe', { topic: 'field/connection-status' })
+    expect(statusGate.ok).toBe(true)
     world.drive.status('online')
-    await new Promise(resolve => setTimeout(resolve, 0))
-
-    const lateUpdates = received.filter(frame => frame.method === 'field/point-updated').length
-    expect(lateUpdates).toBe(1)
-    // Status is structural: it flows regardless of point subscriptions.
     expect(received.some(frame =>
       frame.method === 'field/connection-status'
       && (frame.payload as { status: string }).status === 'online',
@@ -217,37 +224,27 @@ describe('field rpc bridge', () => {
     detach()
   })
 
-  it('counts subscription references so one unsubscribe never starves the rest', async () => {
+  it('climbs the wire once per publication while several gates match', async () => {
     const world = await makeWorld()
     const { client } = world
     const received: ServerRequest[] = []
     const detach = world.ctx.rpc.attachDownlink(frame => received.push(frame))
-    const updates = (): number => received.filter(frame => frame.method === 'field/point-updated').length
+    const updates = (): number => received.filter(frame => frame.method === 'field/point-update').length
 
-    // Two consumers (a value cell and a group LED, say) hold the address.
-    await client.call('field.points.subscribe', { points: [temp] })
-    await client.call('field.points.subscribe', { points: [temp] })
+    // Two gates want temp (a filtered one and a catch-all): one publication,
+    // one broadcast — per-consumer narrowing happens client-side.
+    const filtered = await client.call('topic.subscribe', { topic: 'field/point-update', filter: { points: [temp] } })
+    const catchAll = await client.call('topic.subscribe', { topic: 'field/point-update' })
+    if (!filtered.ok || !catchAll.ok) throw new Error('gates rejected')
     world.drive.sample(temp, 21.5)
-    await new Promise(resolve => setTimeout(resolve, 0))
     expect(updates()).toBe(1)
 
-    // One unmounts; the other's frames must keep flowing.
-    await client.call('field.points.unsubscribe', { points: [temp] })
+    // Closing one gate keeps the other's flow alive; the last one out stops it.
+    await client.call('topic.unsubscribe', { subscriptionId: filtered.value.subscriptionId })
     world.drive.sample(temp, 22)
-    await new Promise(resolve => setTimeout(resolve, 0))
     expect(updates()).toBe(2)
-
-    // The last reference out stops the frames.
-    await client.call('field.points.unsubscribe', { points: [temp] })
+    await client.call('topic.unsubscribe', { subscriptionId: catchAll.value.subscriptionId })
     world.drive.sample(temp, 23)
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(updates()).toBe(2)
-
-    // Over-unsubscribing is a harmless clamp at zero, never a negative count.
-    const excess = await client.call('field.points.unsubscribe', { points: [temp] })
-    expect(excess.ok).toBe(true)
-    world.drive.sample(temp, 24)
-    await new Promise(resolve => setTimeout(resolve, 0))
     expect(updates()).toBe(2)
     detach()
   })

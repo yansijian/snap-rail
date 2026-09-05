@@ -1,17 +1,22 @@
 /**
- * Host-side RPC dispatch, exposed as `ctx.rpc`: capability plugins claim a
- * wire domain, then register method handlers whose request schemas travel
- * with the registration; carriers deliver envelopes; the service validates
- * at the trust boundary, dispatches, and pumps broadcast frames to attached
- * downlinks.
+ * Host-side RPC dispatch and the topic layer, exposed as `ctx.rpc` and
+ * `ctx.topic`: capability plugins claim a wire domain, then register method
+ * handlers whose request schemas travel with the registration; carriers
+ * deliver envelopes; the service validates at the trust boundary, dispatches,
+ * and pumps frames to attached downlinks. Topics are the push primitive with
+ * subscription semantics: a plugin declares a topic (payload schema, optional
+ * filter schema, gate predicate), anyone publishes, and a publication only
+ * reaches the wire while some subscriber's gate matches it.
  *
- * Ownership: `method`/`frame`/`claimDomain` registrations ride the caller's
- * effect scope — unloading the owning plugin drops its methods, frames, and
- * domain claims (the same ownership rule cordis services follow). Domain
- * claims are first-wins and fail loud: a namespace collision between
- * plugins is a boot-time error, never a silent override. A same-name method
- * re-registration replaces the route (hot-reload semantics); cross-plugin
- * collisions are what claims prevent.
+ * Ownership: `method`/`frame`/`claimDomain`/`declare` registrations ride the
+ * caller's effect scope — unloading the owning plugin drops its methods,
+ * frames, topics, and domain claims (the same ownership rule cordis services
+ * follow). Domain claims are first-wins and fail loud: a namespace collision
+ * between plugins is a boot-time error, never a silent override. A same-name
+ * method re-registration replaces the route (hot-reload semantics);
+ * cross-plugin collisions are what claims prevent. Topic names are owned by
+ * their declarer outright (independent of the method-domain claims, so a
+ * plugin can publish from its core while its rpc bridge claims the domain).
  *
  * @module @snap-rail/gateway
  */
@@ -37,11 +42,13 @@ import {
   type RpcResult,
   type ServerRequest,
   type ServerResponse,
+  type TopicDescriptor,
 } from '@snap-rail/protocol'
 
 declare module '@snap-rail/cordis' {
   interface Context {
     rpc: GatewayService
+    topic: TopicService
   }
 }
 
@@ -72,12 +79,101 @@ interface FrameRegistration {
   owner: Fiber
 }
 
+/** One declared topic: payload/filter schemas, gate predicate, owning fiber. */
+interface TopicRegistration {
+  payload: z.ZodType
+  filter?: z.ZodType
+  match?: (filter: never, payload: never) => boolean
+  owner: Fiber
+}
+
+/** A declaration as the implementation stores it (schemas loose; the typed
+ * surface is the generic overload on {@link TopicService.declare}). */
+interface TopicDeclareDecl {
+  payload: z.ZodType
+  filter?: z.ZodType
+  match?: (filter: never, payload: never) => boolean
+}
+
+/** One host-side subscriber (a plugin consuming another domain's stream). */
+interface HostSubscription {
+  topic: string
+  filter: unknown
+  listener: (payload: never) => void
+}
+
+/** One wire-side subscription gate opened by a renderer via `topic.subscribe`. */
+interface WireSubscription {
+  topic: string
+  filter: unknown
+}
+
+/** Declaration payload for {@link TopicService.declare}. */
+export interface TopicDeclareDef<S extends z.ZodType = z.ZodType, F extends z.ZodType = z.ZodType> {
+  /** The payload schema — publish validates against it (the topic's trust boundary). */
+  payload: S
+  /** The subscription-filter schema; both subscribe paths validate against it. */
+  filter?: F
+  /** The gate predicate: does this filter want this payload? Without a
+   * `match`, every payload of the topic matches every subscriber. */
+  match?: (filter: z.output<F>, payload: z.output<S>) => boolean
+}
+
+/** Host-side topic service exposed as `ctx.topic`. */
+export interface TopicService {
+  /**
+   * Declare a topic: its wire name (`domain/event`), payload schema, optional
+   * subscription-filter schema, and gate predicate. First-wins per name and
+   * fail loud across plugins: a same-name declaration by a different fiber
+   * fails; the same fiber replaces (hot-reload semantics). Topic ownership is
+   * independent of the method-domain claims — the declaring plugin owns the
+   * name outright. The declaration rides the caller's effect scope; a live
+   * wire gate on the topic dies with it.
+   *
+   * @param caller - owning context; unload drops the declaration.
+   * @param name - the wire topic name (`domain/event`).
+   * @param def - payload schema (mandatory), optional filter schema and gate.
+   * @returns a disposer that drops the declaration.
+   */
+  declare<S extends z.ZodType = z.ZodType, F extends z.ZodType = z.ZodType>(
+    caller: Context,
+    name: string,
+    def: TopicDeclareDef<S, F>,
+  ): () => void
+  /**
+   * Publish one payload. Validated against the declaration (fail loud on
+   * mismatch — a host-side contract breach, not a wire error), then delivered
+   * to matching host-side subscribers directly, and broadcast on the wire
+   * only while at least one wire-side gate's filter matches: an unsubscribed
+   * topic costs no wire traffic at all.
+   *
+   * @param name - the declared topic name.
+   * @param payload - the publication; zod-parsed before anyone sees it.
+   */
+  publish(name: string, payload: unknown): void
+  /**
+   * Host-side subscription: the listener receives every published payload
+   * the gate predicate accepts — host delivery skips the wire entirely.
+   * The filter is validated against the declaration's filter schema. Rides
+   * the caller's effect scope.
+   *
+   * @param caller - subscribing context; unload drops the subscription.
+   * @param name - the declared topic name.
+   * @param filter - the subscription filter (declaration-schema-validated).
+   * @param listener - receives each matching parsed payload.
+   * @returns the unsubscribe function.
+   */
+  subscribe<P = unknown>(caller: Context, name: string, filter: unknown, listener: (payload: P) => void): () => void
+  /** The live declarations — what `topic.list` serves on the wire. */
+  list(): TopicDescriptor[]
+}
+
 /** Host-side RPC service exposed as `ctx.rpc`. */
 export interface GatewayService {
   /**
    * Claim a wire-domain prefix — one or two dot segments for methods
-   * (`field`, `field.modbus`); frame names use the single-segment form of
-   * the same vocabulary (`field/point-updated` → `field`). First claim
+   * (`field`, `field.modbus`); frame and topic names use the single-segment
+   * form of the same vocabulary (`field/point-update` → `field`). First claim
    * wins; a second claim of a live prefix fails loud. The claim rides the
    * caller's effect scope.
    *
@@ -153,12 +249,12 @@ export interface GatewayService {
   /** Attach a frame consumer; the returned disposer detaches it. */
   attachDownlink(downlink: Downlink): () => void
   /**
-   * The live registry view (domains, methods with JSON schemas, frames) —
-   * the same object `rpc.describe` serves on the wire. Host-side consumers
-   * (capability catalogs, agent tooling) read it directly instead of
-   * round-tripping a client request through their own dispatcher.
+   * The live registry view (domains, methods with JSON schemas, frames,
+   * topics) — the same object `rpc.describe` serves on the wire. Host-side
+   * consumers (capability catalogs, agent tooling) read it directly instead
+   * of round-tripping a client request through their own dispatcher.
    */
-  describe(): { domains: DomainInfo[], methods: MethodInfo[], frames: FrameInfo[] }
+  describe(): { domains: DomainInfo[], methods: MethodInfo[], frames: FrameInfo[], topics: TopicDescriptor[] }
 }
 
 /** A method name: two to four lowercase kebab segments joined by dots. */
@@ -175,7 +271,13 @@ class GatewayServiceImpl extends Service {
   private readonly frames = new Map<string, FrameRegistration>()
   private readonly claims = new Map<string, Fiber>()
   private readonly downlinks = new Set<Downlink>()
+  private readonly topics = new Map<string, TopicRegistration>()
+  private readonly hostSubs = new Set<HostSubscription>()
+  private readonly wireSubs = new Map<string, WireSubscription>()
   private frameCounter = 0
+  private subscriptionCounter = 0
+  /** The topic half of this service, provided alongside `rpc` as `ctx.topic`. */
+  readonly topic: TopicService
 
   constructor(ctx: Context, config: GatewayConfig) {
     super(ctx, 'rpc')
@@ -193,10 +295,29 @@ class GatewayServiceImpl extends Service {
       request: z.object({}).strict(),
       handler: () => this.describe(),
     })
+    this.installRoute('topic.subscribe', {
+      request: z.object({ topic: z.string().min(1), filter: z.unknown().optional() }).strict(),
+      handler: ({ topic, filter }) => this.subscribeWire(topic, filter),
+    })
+    this.installRoute('topic.unsubscribe', {
+      request: z.object({ subscriptionId: z.string().min(1) }).strict(),
+      handler: ({ subscriptionId }) => this.unsubscribeWire(subscriptionId),
+    })
+    this.installRoute('topic.list', {
+      request: z.object({}).strict(),
+      handler: () => ({ topics: this.listTopics() }),
+    })
+    this.topic = {
+      declare: (caller, name, def) => this.declareTopic(caller, name, def),
+      publish: (name, payload) => this.publishTopic(name, payload),
+      subscribe: (caller, name, filter, listener) =>
+        this.subscribeHost(caller, name, filter, listener as (payload: never) => void),
+      list: () => this.listTopics(),
+    }
   }
 
   /** The live registry view behind `rpc.describe`. */
-  describe(): { domains: DomainInfo[], methods: MethodInfo[], frames: FrameInfo[] } {
+  describe(): { domains: DomainInfo[], methods: MethodInfo[], frames: FrameInfo[], topics: TopicDescriptor[] } {
     const domains = [...this.claims].map(([prefix, owner]) => ({ prefix, owner: owner.name }))
     const methods: MethodInfo[] = [...this.routes].map(([name, route]) => {
       const info: MethodInfo = { name }
@@ -214,7 +335,7 @@ class GatewayServiceImpl extends Service {
       if (payload !== undefined) info.payloadSchema = payload
       return info
     })
-    return { domains, methods, frames }
+    return { domains, methods, frames, topics: this.listTopics() }
   }
 
   claimDomain(caller: Context, prefix: string): () => void {
@@ -288,6 +409,136 @@ class GatewayServiceImpl extends Service {
     on(event, (...args) => {
       this.broadcast(frame, map !== undefined ? map(...args) : args[0])
     })
+  }
+
+  // ---- topics ----
+
+  private declareTopic(caller: Context, name: string, def: TopicDeclareDecl): () => void {
+    if (!frameNamePattern.test(name)) {
+      throw new Error(`topic: invalid topic name "${name}" (domain/event, kebab segments joined by "/")`)
+    }
+    if (def.payload === undefined) {
+      throw new Error(`topic: "${name}" requires a payload schema`)
+    }
+    const existing = this.topics.get(name)
+    if (existing !== undefined && existing.owner !== caller.fiber) {
+      throw new Error(`topic: "${name}" is already declared by <${existing.owner.name}>`)
+    }
+    const registration: TopicRegistration = {
+      payload: def.payload,
+      ...(def.filter !== undefined ? { filter: def.filter } : {}),
+      ...(def.match !== undefined ? { match: def.match as (filter: never, payload: never) => boolean } : {}),
+      owner: caller.fiber,
+    }
+    this.topics.set(name, registration)
+    const remove = (): void => {
+      if (this.topics.get(name) !== registration) return
+      this.topics.delete(name)
+      // Gates on a dead topic are dead references: drop them with it.
+      for (const [id, sub] of [...this.wireSubs]) {
+        if (sub.topic === name) this.wireSubs.delete(id)
+      }
+    }
+    caller.effect(() => remove)
+    return remove
+  }
+
+  private publishTopic(name: string, payload: unknown): void {
+    const topic = this.topics.get(name)
+    if (topic === undefined) {
+      throw new Error(`topic: "${name}" is not declared — declare it with ctx.topic.declare first`)
+    }
+    let value: unknown
+    try {
+      value = topic.payload.parse(payload)
+    } catch (cause) {
+      throw new Error(`topic: payload for "${name}" failed its schema`, { cause })
+    }
+    for (const sub of this.hostSubs) {
+      if (sub.topic !== name || !this.gateAccepts(topic, sub.filter, value)) continue
+      sub.listener(value as never)
+    }
+    // The wire gate: a publication climbs to the wire only when some
+    // renderer's filter wants it — unsubscribed topics cost nothing.
+    let wireWants = false
+    for (const sub of this.wireSubs.values()) {
+      if (sub.topic === name && this.gateAccepts(topic, sub.filter, value)) {
+        wireWants = true
+        break
+      }
+    }
+    if (wireWants) this.broadcast(name, value)
+  }
+
+  private subscribeHost(caller: Context, name: string, filter: unknown, listener: (payload: never) => void): () => void {
+    const topic = this.topics.get(name)
+    if (topic === undefined) {
+      throw new Error(`topic: "${name}" is not declared — declare it with ctx.topic.declare first`)
+    }
+    const parsed = this.parseFilter(topic, name, filter, issues => {
+      throw new Error(`topic: filter for "${name}" rejected: ${issues.join('; ')}`)
+    })
+    const sub: HostSubscription = { topic: name, filter: parsed, listener }
+    this.hostSubs.add(sub)
+    const remove = (): void => {
+      this.hostSubs.delete(sub)
+    }
+    caller.effect(() => remove)
+    return remove
+  }
+
+  /** Wire-side subscribe (`topic.subscribe`): open a gate, return its id. */
+  private subscribeWire(name: string, filter: unknown): { subscriptionId: string } {
+    const topic = this.topics.get(name)
+    if (topic === undefined) {
+      throw new RpcBusinessError({ code: 'not-found', details: { what: `unknown topic: ${name}` } })
+    }
+    const parsed = this.parseFilter(topic, name, filter, issues => {
+      throw new RpcBusinessError({ code: 'bad-request', details: { issues } })
+    })
+    const id = `${randomUUID()}-${++this.subscriptionCounter}`
+    this.wireSubs.set(id, { topic: name, filter: parsed })
+    return { subscriptionId: id }
+  }
+
+  /** Wire-side unsubscribe (`topic.unsubscribe`). */
+  private unsubscribeWire(id: string): { unsubscribed: true } {
+    if (!this.wireSubs.delete(id)) {
+      throw new RpcBusinessError({ code: 'not-found', details: { what: `unknown subscription: ${id}` } })
+    }
+    return { unsubscribed: true } as const
+  }
+
+  private listTopics(): TopicDescriptor[] {
+    const topics: TopicDescriptor[] = []
+    for (const [name, topic] of this.topics) {
+      const info: TopicDescriptor = { name }
+      const payload = jsonSchemaOf(topic.payload)
+      if (payload !== undefined) info.payloadSchema = payload
+      if (topic.filter !== undefined) {
+        const filter = jsonSchemaOf(topic.filter)
+        if (filter !== undefined) info.filterSchema = filter
+      }
+      topics.push(info)
+    }
+    return topics
+  }
+
+  /** The declaration's gate predicate; no `match` means everyone matches. */
+  private gateAccepts(topic: TopicRegistration, filter: unknown, payload: unknown): boolean {
+    return topic.match === undefined || topic.match(filter as never, payload as never)
+  }
+
+  /** Validate a subscription filter against the declaration: a topic without
+   * a filter schema takes no filter; one with it zod-parses (missing → `{}`). */
+  private parseFilter(topic: TopicRegistration, name: string, filter: unknown, onFail: (issues: readonly string[]) => never): unknown {
+    if (topic.filter === undefined) {
+      if (filter === undefined) return {}
+      throw onFail([`topic "${name}" declares no filter`])
+    }
+    const parsed = topic.filter.safeParse(filter ?? {})
+    if (!parsed.success) throw onFail(zodIssues(parsed.error))
+    return parsed.data
   }
 
   /** Fail loud unless the method's longest claimed domain prefix (one or
@@ -411,7 +662,8 @@ const gatewayPlugin: Plugin.Object<GatewayConfig> = {
     bin: z.string(),
   }) satisfies z.ZodType<GatewayConfig>,
   apply(ctx: Context, config: GatewayConfig): void {
-    new GatewayServiceImpl(ctx, config)
+    const impl = new GatewayServiceImpl(ctx, config)
+    ctx.provide('topic', impl.topic)
   },
 }
 

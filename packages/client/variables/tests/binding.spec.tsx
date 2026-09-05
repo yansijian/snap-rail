@@ -157,7 +157,7 @@ describe('watchBinding', () => {
         host.field.removeDevice('plc1')
         seed(next)
       },
-      notifyMappingsChanged: () => { host.emit('field/mappings-changed') },
+      notifyMappingsChanged: () => { host.field.mappingsChanged() },
       sample: (group, name, value) => {
         handle?.sample({ device: 'plc1', group, name }, value)
       },

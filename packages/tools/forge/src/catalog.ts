@@ -55,7 +55,7 @@ export const CATALOG_CAPABILITIES: CatalogCapabilities = {
     "ctx.settings.get(key)/set(key, value) —— 简单持久配置（settings.json 键 '域.名'）；写后广播 settings/changed 事件，两端热应用。",
     "ctx.store.register(ctx, 'yourns', {table: sqliteTable('table', {...})}) —— 结构化持久（data/<ns>.db 独立分库）；只用 drizzle 查询构建器；表注册即建表、加列只增不改。",
     "ctx.timeout(fn, ms)/ctx.interval(fn, ms) —— 定时器（inject:['timer']；禁止全局 setTimeout）。",
-    "ctx.on('point/updated', sample => …) —— 现场点样本流（sample:{device,group,name,value,…}）；pointKey({device,group,name}) 生成地址键（require('@snap-rail/field/contract')）。",
+    "ctx.topic.subscribe(ctx, 'field/point-update', {points:[ref]}, sample => …) —— 现场点样本流（宿主半边；sample:{device,group,name,value,…}，pointKey({device,group,name}) 生成地址键，require('@snap-rail/field/contract')）。发布自己的推送：ctx.topic.declare(ctx, 'yourdomain/event', {payload: schema}) 后 ctx.topic.publish —— 有人订阅才上线路。",
     "ctx.audit.record({actor, action, subject?, detail?}) —— 业务事件（也用于流程页门控）。",
   ].join('\n'),
   uiPrimitives: [

@@ -15,7 +15,7 @@ import { Context, type Plugin } from '@snap-rail/cordis'
 // The settings-page seam's declaration merging (the inject below needs it).
 import '@snap-rail/client-settings'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { rpcErrorText, subscribeFrame, type HostLink } from '@snap-rail/connection'
+import { rpcErrorText, subscribeTopic, type HostLink } from '@snap-rail/connection'
 import {
   Badge,
   Button,
@@ -148,8 +148,9 @@ function PointValueCell(props: {
         notify.current(ref.name, first)
       }
     })
-    void link.call('field.points.subscribe', { points: [ref] }).catch(() => undefined)
-    const detach = subscribeFrame(link, 'field/point-updated', fieldFrameSchemas['field/point-updated'], frame => {
+    // The gate narrows the wire to this triple; the listener still narrows by
+    // payload (gates are process-wide, other windows watch other points).
+    const detach = subscribeTopic(link, 'field/point-update', { points: [ref] }, fieldFrameSchemas['field/point-update'], frame => {
       if (frame.device !== ref.device || frame.group !== ref.group || frame.name !== ref.name) return
       setSample(frame)
       notify.current(ref.name, frame)
@@ -157,7 +158,6 @@ function PointValueCell(props: {
     return () => {
       alive = false
       detach()
-      void link.call('field.points.unsubscribe', { points: [ref] }).catch(() => undefined)
     }
   }, [link, ref.device, ref.group, ref.name])
 
@@ -654,13 +654,13 @@ function FieldStationPage(props: { link: HostLink }): ReactNode {
     reloadDrivers()
     reloadConfig()
     reloadLinks()
-    const detachStructure = subscribeFrame(link, 'field/structure-changed', fieldFrameSchemas['field/structure-changed'], () => {
+    const detachStructure = subscribeTopic(link, 'field/structure-changed', undefined, fieldFrameSchemas['field/structure-changed'], () => {
       reloadConfig()
       reloadDrivers()
     })
-    const detachStatus = subscribeFrame(link, 'field/connection-status', fieldFrameSchemas['field/connection-status'], reloadLinks)
-    const detachAdded = subscribeFrame(link, 'field/connection-added', fieldFrameSchemas['field/connection-added'], reloadLinks)
-    const detachRemoved = subscribeFrame(link, 'field/connection-removed', fieldFrameSchemas['field/connection-removed'], reloadLinks)
+    const detachStatus = subscribeTopic(link, 'field/connection-status', undefined, fieldFrameSchemas['field/connection-status'], reloadLinks)
+    const detachAdded = subscribeTopic(link, 'field/connection-added', undefined, fieldFrameSchemas['field/connection-added'], reloadLinks)
+    const detachRemoved = subscribeTopic(link, 'field/connection-removed', undefined, fieldFrameSchemas['field/connection-removed'], reloadLinks)
     return () => {
       detachStructure()
       detachStatus()

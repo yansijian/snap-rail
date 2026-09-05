@@ -113,7 +113,7 @@ describe('usePoint', () => {
     }
   }
 
-  it('seeds from field.points.read and follows field/point-updated increments', async () => {
+  it('seeds from field.points.read and follows field/point-update publications', async () => {
     const { channel, sample } = await makeWorld()
     const calls: string[] = []
     const client = new Context()
@@ -176,9 +176,9 @@ describe('usePoint', () => {
       element.remove()
       await flush()
     })
-    expect(calls).toContain('field.points.subscribe')
+    expect(calls).toContain('topic.subscribe')
     expect(calls).toContain('field.points.read')
-    expect(calls).toContain('field.points.unsubscribe')
+    expect(calls).toContain('topic.unsubscribe')
   }, 20_000)
 })
 

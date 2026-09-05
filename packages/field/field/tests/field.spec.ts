@@ -2,8 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
+import gatewayPlugin from '@snap-rail/gateway'
 import storePlugin from '@snap-rail/store'
-import { ConnectionId, pointKey, type PointDescriptor, type PointRef, type PointType } from '@snap-rail/field'
+import { ConnectionId, pointKey, type ConnectionStatusFrame, type PointDescriptor, type PointRef, type PointSample, type PointType } from '@snap-rail/field'
 import { afterEach, describe, expect, it } from 'vitest'
 import fieldPlugin, { FieldError } from '../src/index.ts'
 
@@ -22,6 +23,7 @@ async function makeField(): Promise<Context> {
   worlds.push({ ctx, home })
   ctx.provide('snapRailHome', home)
   await ctx.plugin(storePlugin)
+  await ctx.plugin(gatewayPlugin, { name: 'snap-rail', version: '0.1.0', bin: 'test' })
   await ctx.plugin(fieldPlugin)
   return ctx
 }
@@ -35,12 +37,12 @@ function ref(device: string, name: string, group = 'main'): PointRef {
 }
 
 describe('field seam', () => {
-  it('diffs setPoints into added/removed events', async () => {
+  it('diffs setPoints into added/removed topics', async () => {
     const ctx = await makeField()
     const added: string[] = []
     const removed: string[] = []
-    ctx.on('point/added', point => added.push(pointKey(point)))
-    ctx.on('point/removed', point => removed.push(pointKey(point)))
+    ctx.topic.subscribe<{ point: PointDescriptor }>(ctx, 'field/point-added', undefined, payload => added.push(pointKey(payload.point)))
+    ctx.topic.subscribe<{ device: string, group: string, name: string }>(ctx, 'field/point-removed', undefined, payload => removed.push(pointKey(payload)))
 
     const registration = ctx.connections.register(ctx, { id: ConnectionId('conn-a'), driver: 'test', title: 'A' })
     registration.setPoints([
@@ -136,7 +138,7 @@ describe('field seam', () => {
   it('keeps BigInt values lossless through subscription filtering', async () => {
     const ctx = await makeField()
     const seen: unknown[] = []
-    const unsubscribe = ctx.points.subscribe([ref('conn-a', 'big')], sample => seen.push(sample.value))
+    const unsubscribe = ctx.topic.subscribe<PointSample>(ctx, 'field/point-update', { points: [ref('conn-a', 'big')] }, sample => seen.push(sample.value))
 
     const registration = ctx.connections.register(ctx, { id: ConnectionId('conn-a'), driver: 'test', title: 'A' })
     registration.setPoints([
@@ -156,7 +158,7 @@ describe('field seam', () => {
   it('announces status only on change and reflects live snapshots', async () => {
     const ctx = await makeField()
     const frames: string[] = []
-    ctx.connections.subscribeStatus(frame => frames.push(`${frame.id}:${frame.status}`))
+    ctx.topic.subscribe<ConnectionStatusFrame>(ctx, 'field/connection-status', undefined, frame => frames.push(`${frame.id}:${frame.status}`))
 
     const registration = ctx.connections.register(ctx, { id: ConnectionId('conn-a'), driver: 'test', title: 'A' })
     // A fresh registration starts connecting until its driver announces up.
@@ -176,8 +178,8 @@ describe('field seam', () => {
     const ctx = await makeField()
     const removed: string[] = []
     let connectionRemoved: string | undefined
-    ctx.on('point/removed', point => removed.push(pointKey(point)))
-    ctx.on('connection/removed', id => { connectionRemoved = id })
+    ctx.topic.subscribe<{ device: string, group: string, name: string }>(ctx, 'field/point-removed', undefined, payload => removed.push(pointKey(payload)))
+    ctx.topic.subscribe<{ id: ConnectionId }>(ctx, 'field/connection-removed', undefined, payload => { connectionRemoved = payload.id })
 
     const mockDriver = Object.assign(
       function mockDriver(sub: Context): void {

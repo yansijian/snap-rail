@@ -47,12 +47,38 @@ export interface FrameInfo {
   payloadSchema?: unknown
 }
 
+/** One declared topic as `topic.list` and `rpc.describe` serve it. */
+export interface TopicDescriptor {
+  /** The topic's wire name (`domain/event`). */
+  name: string
+  /** The payload schema as JSON Schema (omitted when not representable). */
+  payloadSchema?: unknown
+  /** The subscription-filter schema as JSON Schema (omitted when the topic
+   * takes no filter or the schema is not representable). */
+  filterSchema?: unknown
+}
+
+/** The topic layer's client face: gated push subscriptions and discovery.
+ * The push primitive of the wire — a topic is a frame with subscription
+ * semantics (host-side filter gates decide which publications reach it). */
+export interface TopicApi {
+  /** Open one wire-side subscription gate; publications flow while the
+   * gate's filter matches (evaluated host-side by the declaration's match).
+   * @returns the gate id `topic.unsubscribe` takes back. */
+  subscribe(payload: { topic: string, filter?: unknown }): Promise<RpcResponse<{ subscriptionId: string }>>
+  /** Close a subscription gate by id. */
+  unsubscribe(payload: { subscriptionId: string }): Promise<RpcResponse<{ unsubscribed: true }>>
+  /** Every live topic declaration — the discovery surface for binding UIs
+   * and capability catalogs. */
+  list(payload: {}): Promise<RpcResponse<{ topics: readonly TopicDescriptor[] }>>
+}
+
 /** Wire-level capability discovery. */
 export interface RpcIntrospectApi {
-  /** Every live domain claim, method route, and frame registration — the
-   * surface an external tool (settings UI, agent, future plugin installer)
-   * lists before calling. */
-  describe(payload: {}): Promise<RpcResponse<{ domains: readonly DomainInfo[], methods: readonly MethodInfo[], frames: readonly FrameInfo[] }>>
+  /** Every live domain claim, method route, frame registration, and topic
+   * declaration — the surface an external tool (settings UI, agent, future
+   * plugin installer) lists before calling. */
+  describe(payload: {}): Promise<RpcResponse<{ domains: readonly DomainInfo[], methods: readonly MethodInfo[], frames: readonly FrameInfo[], topics: readonly TopicDescriptor[] }>>
 }
 
 /**
@@ -78,6 +104,9 @@ export interface WindowApi {
 export interface RpcMethodMap {
   'host.describe': HostApi['describe']
   'rpc.describe': RpcIntrospectApi['describe']
+  'topic.subscribe': TopicApi['subscribe']
+  'topic.unsubscribe': TopicApi['unsubscribe']
+  'topic.list': TopicApi['list']
   'window.control': WindowApi['control']
   'window.pick-zip': WindowApi['pickZip']
   'window.save-zip': WindowApi['saveZip']

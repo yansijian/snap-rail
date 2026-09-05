@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
 import timerPlugin from '@snap-rail/cordis-plugin-timer'
+import gatewayPlugin from '@snap-rail/gateway'
 import storePlugin from '@snap-rail/store'
 import { pointKey, type PointRef, type PointSample } from '@snap-rail/field'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -37,13 +38,14 @@ async function makeWorld(): Promise<World> {
   worlds.push({ ctx, home })
   ctx.provide('snapRailHome', home)
   await ctx.plugin(storePlugin)
+  await ctx.plugin(gatewayPlugin, { name: 'snap-rail', version: '0.1.0', bin: 'test' })
   await ctx.plugin(fieldPlugin)
   await ctx.plugin(timerPlugin)
   await ctx.plugin(modbusDriverPlugin)
   const samples: PointSample[] = []
   const statuses: Array<{ id: string, status: string }> = []
-  ctx.points.subscribe([tempRef, countRef, switchRef], sample => samples.push(sample))
-  ctx.connections.subscribeStatus(frame => statuses.push({ id: frame.id, status: frame.status }))
+  ctx.topic.subscribe<PointSample>(ctx, 'field/point-update', { points: [tempRef, countRef, switchRef] }, sample => samples.push(sample))
+  ctx.topic.subscribe<{ id: string, status: string }>(ctx, 'field/connection-status', undefined, frame => statuses.push({ id: frame.id, status: frame.status }))
   return { ctx, samples, statuses }
 }
 
@@ -170,7 +172,7 @@ describe('driver-modbus over the field base', () => {
     })
     plc.holding.set(106, 42)
     const count2: PointRef = { device: 'plc1', group: '计数', name: '计数2' }
-    world.ctx.points.subscribe([count2], sample => world.samples.push(sample))
+    world.ctx.topic.subscribe<PointSample>(world.ctx, 'field/point-update', { points: [count2] }, sample => world.samples.push(sample))
     await waitFor(() => latestSample(world.samples, count2)?.value === 42n, 'hot-added point')
     expect(world.statuses.some(frame => frame.id === 'plc1' && frame.status === 'online')).toBe(true)
 

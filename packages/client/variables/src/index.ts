@@ -5,8 +5,8 @@
  * the registry to wire those declarations onto real register addresses.
  * Point names are unique only within their group, so a declaration is
  * itself the full address — the same (device, group, name) triple the field
- * seam speaks natively; consumers ride `field.points.subscribe` /
- * `field/point-updated` with no id munging.
+ * seam speaks natively; consumers ride the `field/point-update` topic with
+ * no id munging.
  *
  * Bindings (below the registry) generalize consumption: a page addresses
  * field data as a device-qualified point (`{device, group, name}`) or a
@@ -14,13 +14,13 @@
  * aggregated view (any member active ⇒ the group is active with the member
  * names). Group membership is mapping configuration served by the field
  * seam's generic mapping document (`field.mappings.list`, dialect-free), so
- * a `field/mappings-changed` frame re-resolves the binding in place.
+ * a `field/mappings-changed` topic re-resolves the binding in place.
  *
  * @module @snap-rail/client-variables
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
-import { subscribeFrame, type HostLink } from '@snap-rail/connection'
+import { subscribeTopic, type HostLink } from '@snap-rail/connection'
 import {
   fieldFrameSchemas,
   pointKey,
@@ -217,13 +217,12 @@ export type BindingView =
 /**
  * Watch one binding and emit a `BindingView` on every change. The watcher
  * resolves the generic mapping document itself, seeds current values with
- * one `field.points.read`, follows `field/point-updated` frames, and
- * re-resolves on a `field/mappings-changed` frame — re-mapping takes effect
- * without remounting the consumer.
+ * one `field.points.read`, follows the `field/point-update` topic, and
+ * re-resolves on a `field/mappings-changed` publication — re-mapping takes
+ * effect without remounting the consumer.
  *
- * The returned stop function drops this watcher's subscription references;
- * the host counts references per address, so overlapping watchers of one
- * address never starve each other.
+ * The returned stop function closes this watcher's topic gate; overlapping
+ * watchers each hold their own and never starve each other.
  */
 export function watchBinding(
   ctx: Context,
@@ -273,15 +272,6 @@ export function watchBinding(
         if (!live || !result.ok) return
         const next = resolveBinding(result.value.mappings, binding)
         const nextRefs = next === undefined ? [] : next.kind === 'point' ? [next.ref] : next.members.map(member => member.ref)
-        const wanted = new Set(nextRefs.map(pointKey))
-        for (const ref of refs) {
-          if (!wanted.has(pointKey(ref))) void link.call('field.points.unsubscribe', { points: [ref] }).catch(() => {})
-        }
-        for (const ref of nextRefs) {
-          if (!refs.some(current => pointKey(current) === pointKey(ref))) {
-            void link.call('field.points.subscribe', { points: [ref] }).catch(() => {})
-          }
-        }
         refs = nextRefs
         resolved = next
         samples.clear()
@@ -310,13 +300,13 @@ export function watchBinding(
       .catch(() => {})
   }
 
-  const detachUpdates = subscribeFrame(link, 'field/point-updated', fieldFrameSchemas['field/point-updated'], frame => {
+  const detachUpdates = subscribeTopic(link, 'field/point-update', undefined, fieldFrameSchemas['field/point-update'], frame => {
     const ref: PointRef = { device: frame.device, group: frame.group, name: frame.name }
     if (!refs.some(current => pointKey(current) === pointKey(ref))) return
     samples.set(pointKey(ref), { value: frame.value, time: frame.time })
     compute()
   })
-  const detachConfig = link.subscribe('field/mappings-changed', () => { resubscribe() })
+  const detachConfig = subscribeTopic(link, 'field/mappings-changed', undefined, fieldFrameSchemas['field/mappings-changed'], () => { resubscribe() })
 
   resubscribe()
 
@@ -324,7 +314,6 @@ export function watchBinding(
     live = false
     detachUpdates()
     detachConfig()
-    if (refs.length > 0) void link.call('field.points.unsubscribe', { points: [...refs] }).catch(() => {})
   }
 }
 
@@ -346,13 +335,12 @@ export function useBinding(ctx: Context, binding: FieldBinding): BindingView {
 
 /**
  * The consume recipe for demand plugins: seed the current value with a
- * `field.points.read`, then follow `field/point-updated` increments. Returns
+ * `field.points.read`, then follow `field/point-update` publications. Returns
  * `undefined` until the first observation — an unmapped declaration stays
  * undefined.
  *
- * The hook holds one subscription reference for its lifetime; the matching
- * `field.points.unsubscribe` fires on unmount, and the host's reference
- * counting keeps other watchers of the same address live.
+ * The hook holds one topic gate for its lifetime; the matching unsubscribe
+ * fires on unmount.
  */
 export function usePoint(
   ctx: Context,
@@ -364,12 +352,11 @@ export function usePoint(
 
   useEffect(() => {
     let live = true
-    const detach = subscribeFrame(link, 'field/point-updated', fieldFrameSchemas['field/point-updated'], frame => {
+    const detach = subscribeTopic(link, 'field/point-update', { points: [binding] }, fieldFrameSchemas['field/point-update'], frame => {
       const frameRef: PointRef = { device: frame.device, group: frame.group, name: frame.name }
       if (pointKey(frameRef) !== key) return
       if (live) setSample({ value: frame.value, time: frame.time })
     })
-    void link.call('field.points.subscribe', { points: [binding] }).catch(() => {})
     void link.call('field.points.read', { points: [binding] })
       .then(result => {
         if (!live || !result.ok) return
@@ -380,7 +367,6 @@ export function usePoint(
     return () => {
       live = false
       detach()
-      void link.call('field.points.unsubscribe', { points: [binding] }).catch(() => {})
     }
   }, [link, key])
 

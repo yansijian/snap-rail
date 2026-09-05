@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@snap-rail/cordis'
+import gatewayPlugin from '@snap-rail/gateway'
 import storePlugin from '@snap-rail/store'
 import { z } from 'zod'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -9,10 +10,12 @@ import fieldPlugin, {
   ConnectionId,
   FieldError,
   pointKey,
+  type ConnectionSnapshot,
   type DriverConnection,
   type DriverDevice,
   type DriverHandle,
   type DriverPoint,
+  type PointDescriptor,
   type PointRef,
 } from '../src/index.ts'
 
@@ -92,6 +95,7 @@ async function makeWorld(opts: { failCreate?: boolean } = {}): Promise<World> {
   worlds.push({ ctx, home })
   ctx.provide('snapRailHome', home)
   await ctx.plugin(storePlugin)
+  await ctx.plugin(gatewayPlugin, { name: 'snap-rail', version: '0.1.0', bin: 'test' })
   await ctx.plugin(fieldPlugin)
   const rig = makeRigDriver()
   rig.failCreate = opts.failCreate === true
@@ -106,11 +110,11 @@ async function makeWorld(opts: { failCreate?: boolean } = {}): Promise<World> {
     connectionAdded: [],
     connectionRemoved: [],
   }
-  ctx.on('field/structure-changed', () => { world.structureChanges += 1 })
-  ctx.on('point/added', point => world.pointAdded.push(pointKey(point)))
-  ctx.on('point/removed', ref => world.pointRemoved.push(pointKey(ref)))
-  ctx.on('connection/added', snapshot => world.connectionAdded.push(snapshot.id))
-  ctx.on('connection/removed', id => world.connectionRemoved.push(id))
+  ctx.topic.subscribe(ctx, 'field/structure-changed', undefined, () => { world.structureChanges += 1 })
+  ctx.topic.subscribe<{ point: PointDescriptor }>(ctx, 'field/point-added', undefined, payload => world.pointAdded.push(pointKey(payload.point)))
+  ctx.topic.subscribe<{ device: string, group: string, name: string }>(ctx, 'field/point-removed', undefined, payload => world.pointRemoved.push(pointKey(payload)))
+  ctx.topic.subscribe<{ connection: ConnectionSnapshot }>(ctx, 'field/connection-added', undefined, payload => world.connectionAdded.push(payload.connection.id))
+  ctx.topic.subscribe<{ id: ConnectionId }>(ctx, 'field/connection-removed', undefined, payload => world.connectionRemoved.push(payload.id))
   return world
 }
 
@@ -323,7 +327,7 @@ describe('field base: orchestration', () => {
   it('broadcasts structure and mappings changes on every mutation', async () => {
     const world = await makeWorld()
     const mappingsSeen: number[] = []
-    world.ctx.on('field/mappings-changed', () => mappingsSeen.push(1))
+    world.ctx.topic.subscribe(world.ctx, 'field/mappings-changed', undefined, () => mappingsSeen.push(1))
 
     const device = world.ctx.field.upsertDevice({ name: 'd', driver: 'rig', config: {} })
     world.ctx.field.upsertGroup(device.id, { name: 'g', type: 'int' })

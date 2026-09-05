@@ -41,7 +41,7 @@ import {
   type PointValue,
 } from './model.ts'
 import { FIELD_SCHEMA, fieldDevices, fieldGroups, fieldPoints } from './schema.ts'
-import type { ConfigDevice, ConfigGroup, ConfigPoint, DialectSchema, DriverInfo } from './wire.ts'
+import { fieldFrameSchemas, fieldTopicFilterSchemas, type ConfigDevice, type ConfigGroup, type ConfigPoint, type DialectSchema, type DriverInfo } from './wire.ts'
 
 export { ConnectionId, pointKey, pointRefSchema }
 export type {
@@ -182,52 +182,30 @@ declare module '@snap-rail/cordis' {
     connections: ConnectionsService
     field: FieldService
   }
-
-  interface Events {
-    /** A point entered the point table.
-     * @param point - the descriptor now visible. */
-    'point/added'(point: PointDescriptor): void
-    /** A point left the point table.
-     * @param ref - the removed point's address. */
-    'point/removed'(ref: PointRef): void
-    /** A point produced a new sample (including `null` = abnormal).
-     * @param sample - the fresh sample. */
-    'point/updated'(sample: PointSample): void
-    /** A connection was registered.
-     * @param snapshot - descriptor plus initial (connecting) status. */
-    'connection/added'(snapshot: ConnectionSnapshot): void
-    /** A connection was removed.
-     * @param id - the removed connection id. */
-    'connection/removed'(id: ConnectionId): void
-    /** A connection changed status.
-     * @param frame - the new status with its timestamp. */
-    'connection/status'(frame: ConnectionStatusFrame): void
-    /** A driver's mapping tables changed; the rpc bridge rebroadcasts the
-     * `field/mappings-changed` wire frame. */
-    'field/mappings-changed'(): void
-    /** The base's configuration tables changed (device/group/point CRUD). */
-    'field/structure-changed'(): void
-  }
 }
 
-/** Read/subscribe/write surface of the point table. */
+/** The gate predicate of the `field/point-update` topic: with a point filter,
+ * only samples of the addressed triples match. */
+function pointUpdateMatch(filter: { points?: readonly PointRef[] | undefined }, sample: PointSample): boolean {
+  return filter.points === undefined || filter.points.some(ref => pointKey(ref) === pointKey(sample))
+}
+
+/** Read/write surface of the point table; live updates flow through the
+ * `field/point-update` topic. */
 export interface PointsService {
   /** Every point currently in the table. */
   list(): readonly PointDescriptor[]
   /** The latest sample of a point, or `undefined` before its first sample. */
   read(ref: PointRef): PointSample | undefined
-  /** Observe updates for a set of points; returns the unsubscribe function. */
-  subscribe(refs: readonly PointRef[], listener: (sample: PointSample) => void): () => void
   /** Write a control value; routed to the owning driver after type validation. */
   write(ref: PointRef, value: Exclude<PointValue, null>): Promise<void>
 }
 
-/** Provider/consumer surface of connections. */
+/** Provider/consumer surface of connections; status changes flow through the
+ * `field/connection-status` topic. */
 export interface ConnectionsService {
   /** Every connection with live status. */
   list(): readonly ConnectionSnapshot[]
-  /** Observe status changes; returns the unsubscribe function. */
-  subscribeStatus(listener: (frame: ConnectionStatusFrame) => void): () => void
   /** Register a connection owned by the caller; disposal rides the caller's fiber.
    * @param caller - the driver plugin's context; unloading it removes the connection.
    * @param desc - the connection descriptor.
@@ -325,6 +303,20 @@ class FieldCore {
 
   constructor(private readonly ctx: Context) {
     this.db = ctx.store.register(ctx, 'field', FIELD_SCHEMA)
+    // The domain's topics are the live table's push face; declared before the
+    // first connection can rise, so a publish never beats its declaration.
+    ctx.topic.declare(ctx, 'field/point-update', {
+      payload: fieldFrameSchemas['field/point-update'],
+      filter: fieldTopicFilterSchemas['field/point-update'],
+      match: pointUpdateMatch,
+    })
+    ctx.topic.declare(ctx, 'field/point-added', { payload: fieldFrameSchemas['field/point-added'] })
+    ctx.topic.declare(ctx, 'field/point-removed', { payload: fieldFrameSchemas['field/point-removed'] })
+    ctx.topic.declare(ctx, 'field/connection-added', { payload: fieldFrameSchemas['field/connection-added'] })
+    ctx.topic.declare(ctx, 'field/connection-removed', { payload: fieldFrameSchemas['field/connection-removed'] })
+    ctx.topic.declare(ctx, 'field/connection-status', { payload: fieldFrameSchemas['field/connection-status'] })
+    ctx.topic.declare(ctx, 'field/mappings-changed', { payload: fieldFrameSchemas['field/mappings-changed'] })
+    ctx.topic.declare(ctx, 'field/structure-changed', { payload: fieldFrameSchemas['field/structure-changed'] })
     // Pool-loaded devices meet their drivers later; both events trigger a
     // reconcile, so one here only covers "driver loaded before field" order.
     this.reconcile()
@@ -463,8 +455,8 @@ class FieldCore {
   /** Mutations land, then the desired state is recomputed and consumers notified. */
   private afterMutation(): void {
     this.reconcile()
-    this.ctx.emit('field/structure-changed')
-    this.ctx.emit('field/mappings-changed')
+    this.ctx.topic.publish('field/structure-changed', {})
+    this.ctx.topic.publish('field/mappings-changed', {})
   }
 
   upsertDevice(input: DeviceUpsert): ConfigDevice {
@@ -720,7 +712,7 @@ class FieldCore {
     }
     const entry: ConnectionEntry = { desc, status: 'connecting', points: new Map(), values: new Map() }
     this.connections.set(desc.id, entry)
-    this.ctx.emit('connection/added', { ...desc, status: entry.status })
+    this.ctx.topic.publish('field/connection-added', { connection: { ...desc, status: entry.status } })
     const dispose = () => this.remove(desc.id)
     caller.effect(() => dispose)
     const assertOwned = (ref: PointRef): PointDescriptor | undefined => {
@@ -738,14 +730,14 @@ class FieldCore {
         }
         const sample: PointSample = { device: point.device, group: point.group, name: point.name, value, time: Date.now() }
         entry.values.set(pointKey(point), sample)
-        this.ctx.emit('point/updated', sample)
+        this.ctx.topic.publish('field/point-update', sample)
       },
       setStatus: (status, message) => {
         if (entry.status === status && entry.message === message) return
         entry.status = status
         if (message === undefined) delete entry.message
         else entry.message = message
-        this.ctx.emit('connection/status', {
+        this.ctx.topic.publish('field/connection-status', {
           id: desc.id,
           status,
           ...(message !== undefined ? { message } : {}),
@@ -772,14 +764,14 @@ class FieldCore {
         entry.points.delete(key)
         entry.values.delete(key)
         this.pointIndex.delete(key)
-        this.ctx.emit('point/removed', { device: point.device, group: point.group, name: point.name })
+        this.ctx.topic.publish('field/point-removed', { device: point.device, group: point.group, name: point.name })
       }
     }
     for (const [key, point] of next) {
       if (entry.points.has(key)) continue
       entry.points.set(key, point)
       this.pointIndex.set(key, entry.desc.id)
-      this.ctx.emit('point/added', point)
+      this.ctx.topic.publish('field/point-added', { point })
     }
   }
 
@@ -788,10 +780,10 @@ class FieldCore {
     if (entry === undefined) return
     for (const [key, point] of entry.points) {
       this.pointIndex.delete(key)
-      this.ctx.emit('point/removed', { device: point.device, group: point.group, name: point.name })
+      this.ctx.topic.publish('field/point-removed', { device: point.device, group: point.group, name: point.name })
     }
     this.connections.delete(id)
-    this.ctx.emit('connection/removed', id)
+    this.ctx.topic.publish('field/connection-removed', { id })
   }
 
   write(ref: PointRef, value: Exclude<PointValue, null>): Promise<void> {
@@ -830,13 +822,6 @@ class PointsServiceImpl extends Service {
     return this.core.connections.get(owner)?.values.get(pointKey(ref))
   }
 
-  subscribe(refs: readonly PointRef[], listener: (sample: PointSample) => void): () => void {
-    const watched = new Set(refs.map(pointKey))
-    return this.ctx.on('point/updated', sample => {
-      if (watched.has(pointKey(sample))) listener(sample)
-    })
-  }
-
   write(ref: PointRef, value: Exclude<PointValue, null>): Promise<void> {
     return this.core.write(ref, value)
   }
@@ -853,10 +838,6 @@ class ConnectionsServiceImpl extends Service {
       status: entry.status,
       ...(entry.message !== undefined ? { message: entry.message } : {}),
     }))
-  }
-
-  subscribeStatus(listener: (frame: ConnectionStatusFrame) => void): () => void {
-    return this.ctx.on('connection/status', listener)
   }
 
   register(caller: Context, desc: ConnectionDescriptor): ConnectionRegistration {
@@ -882,7 +863,7 @@ class FieldServiceImpl extends Service {
   }
 
   mappingsChanged(): void {
-    this.ctx.emit('field/mappings-changed')
+    this.ctx.topic.publish('field/mappings-changed', {})
   }
 
   registerDriver(caller: Context, desc: DriverRegistration): () => void {
@@ -918,7 +899,7 @@ class FieldServiceImpl extends Service {
 /** The field seam plugin: mounts `ctx.points`, `ctx.connections`, and `ctx.field`. */
 const fieldPlugin: Plugin.Object<Record<string, never>> = {
   name: 'field',
-  inject: ['store'],
+  inject: ['store', 'topic'],
   apply(ctx: Context): void {
     const core = new FieldCore(ctx)
     new PointsServiceImpl(ctx, core)

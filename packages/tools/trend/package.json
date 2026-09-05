@@ -1,0 +1,65 @@
+{
+  "name": "@snap-rail/trend",
+  "description": "趋势预警 (trend early warning): a resident installable plugin that records bound points as change-point history, evaluates topic bindings into an event corpus, and publishes calibrated occurrence probabilities (statistical features, k-NN calibration, Wilson CI) on the trend/warning topic — presentation is the subscribers' business",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./contract": {
+      "types": "./lib/types/contract.d.ts",
+      "default": "./lib/contract.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/contract.js",
+    "lib/types/index.d.ts",
+    "lib/types/contract.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "snapRail": {
+    "kind": "plugin",
+    "client": {
+      "entry": "lib-client/client.js"
+    },
+    "permissions": [
+      "store"
+    ]
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/store": "workspace:^"
+  },
+  "devDependencies": {
+    "@snap-rail/client-kernel": "workspace:^",
+    "@snap-rail/client-modules": "workspace:^",
+    "@snap-rail/client-settings": "workspace:^",
+    "@snap-rail/client-slots": "workspace:^",
+    "@snap-rail/client-ui": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/field": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/plugin-kit": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/store": "workspace:^",
+    "@types/react": "^19.2.14",
+    "lucide-react": "^1.34.0",
+    "react": "^19.2.8"
+  }
+}

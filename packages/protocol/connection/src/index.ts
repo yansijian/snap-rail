@@ -135,3 +135,61 @@ export function subscribeFrame<S extends z.ZodType>(
     listener(parsed.data)
   })
 }
+
+/**
+ * Subscribe to a topic with the full client recipe in one call: open the
+ * wire-side gate (`topic.subscribe`, carrying the filter the host evaluates),
+ * follow the topic's frames with the owning contract's payload schema, and
+ * close gate and stream together on dispose. The standard way to consume any
+ * topic — the schema lives in the topic's owning contract module.
+ *
+ * The wire gate is process-wide: while any window's gate matches a
+ * publication, every window following the topic sees it, so a consumer
+ * watching a slice (one point, one device) narrows by payload in its
+ * listener. A payload that fails its schema is dropped (logged), mirroring
+ * `subscribeFrame`. The gate opens asynchronously — publications before it
+ * settles are not delivered (seed current state with a read where freshness
+ * matters). The returned disposer is synchronous, so it slots straight into
+ * an effect body.
+ *
+ * @param link - the client link carrying the subscription.
+ * @param topic - the wire topic name (`domain/event`).
+ * @param filter - the subscription filter (the topic declaration's shape).
+ * @param schema - the topic's payload schema (from the owning contract).
+ * @param listener - receives each parsed payload the topic delivers.
+ * @returns the unsubscribe function.
+ */
+export function subscribeTopic<S extends z.ZodType>(
+  link: HostLink,
+  topic: string,
+  filter: Record<string, unknown> | undefined,
+  schema: S,
+  listener: (payload: z.output<S>) => void,
+): () => void {
+  let gateId: string | undefined
+  let disposed = false
+  void link.call('topic.subscribe', { topic, ...(filter !== undefined ? { filter } : {}) })
+    .then(result => {
+      if (!result.ok) {
+        console.error(`subscribeTopic: gate for ${topic} failed: ${rpcErrorText(result.error)}`)
+        return
+      }
+      gateId = result.value.subscriptionId
+      // Disposed while the gate was settling: close it right away.
+      if (disposed) void link.call('topic.unsubscribe', { subscriptionId: gateId }).catch(() => undefined)
+    })
+    .catch(() => undefined)
+  const detach = link.subscribe(topic, payload => {
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) {
+      console.error(`subscribeTopic: dropping malformed ${topic} payload`, parsed.error.message)
+      return
+    }
+    listener(parsed.data)
+  })
+  return () => {
+    disposed = true
+    detach()
+    if (gateId !== undefined) void link.call('topic.unsubscribe', { subscriptionId: gateId }).catch(() => undefined)
+  }
+}

@@ -243,6 +243,7 @@ describe('gateway capability discovery', () => {
     ctx.rpc.claimDomain(ctx, 'demo')
     ctx.rpc.method(ctx, 'demo.add', { request: z.object({ a: z.number() }).strict() }, ({ a }) => a)
     ctx.rpc.frame(ctx, 'demo/tick', { payload: z.object({ n: z.number() }).strict() })
+    ctx.topic.declare(ctx, 'demo/pulse', { payload: z.object({ n: z.number() }).strict() })
 
     const described = await clientOf(ctx).call('rpc.describe', {})
     expect(described.ok).toBe(true)
@@ -254,6 +255,142 @@ describe('gateway capability discovery', () => {
       const demo = described.value.methods.find(method => method.name === 'demo.add')
       expect(demo?.requestSchema).toMatchObject({ type: 'object' })
       expect(described.value.frames.map(frame => frame.name)).toContain('demo/tick')
+      expect(described.value.topics.map(topic => topic.name)).toContain('demo/pulse')
     }
+  })
+})
+
+describe('gateway topics', () => {
+  const payloadSchema = z.object({ device: z.string(), value: z.number() }).strict()
+  const filterSchema = z.object({ device: z.string().optional() }).strict()
+  const match = (filter: { device?: string }, payload: { device: string, value: number }): boolean =>
+    filter.device === undefined || filter.device === payload.device
+
+  it('delivers parsed payloads to host subscribers and keeps an unsubscribed topic off the wire', async () => {
+    const ctx = await makeGateway()
+    const received: unknown[] = []
+    const frames: ServerRequest[] = []
+    ctx.rpc.attachDownlink(frame => frames.push(frame))
+    const disposeDeclare = ctx.topic.declare(ctx, 'demo/tick', { payload: payloadSchema, filter: filterSchema, match })
+    const disposeSub = ctx.topic.subscribe<{ device: string, value: number }>(ctx, 'demo/tick', { device: 'a' }, payload => received.push(payload))
+
+    ctx.topic.publish('demo/tick', { device: 'a', value: 1 })
+    ctx.topic.publish('demo/tick', { device: 'b', value: 2 })
+
+    expect(received).toEqual([{ device: 'a', value: 1 }])
+    expect(frames).toEqual([])
+    disposeSub()
+    disposeDeclare()
+  })
+
+  it('climbs to the wire only while a gate matches, and stops on unsubscribe', async () => {
+    const ctx = await makeGateway()
+    const frames: ServerRequest[] = []
+    ctx.rpc.attachDownlink(frame => frames.push(frame))
+    ctx.topic.declare(ctx, 'demo/tick', { payload: payloadSchema, filter: filterSchema, match })
+    const client = clientOf(ctx)
+
+    const gate = await client.call('topic.subscribe', { topic: 'demo/tick', filter: { device: 'a' } })
+    expect(gate).toEqual({ ok: true, value: { subscriptionId: expect.any(String) } })
+    if (!gate.ok) return
+
+    ctx.topic.publish('demo/tick', { device: 'b', value: 2 })
+    expect(frames).toEqual([])
+    ctx.topic.publish('demo/tick', { device: 'a', value: 1 })
+    expect(frames.map(frame => frame.method)).toEqual(['demo/tick'])
+    expect(frames[0]!.payload).toEqual({ device: 'a', value: 1 })
+
+    const closed = await client.call('topic.unsubscribe', { subscriptionId: gate.value.subscriptionId })
+    expect(closed).toEqual({ ok: true, value: { unsubscribed: true } })
+    ctx.topic.publish('demo/tick', { device: 'a', value: 3 })
+    expect(frames).toHaveLength(1)
+  })
+
+  it('fails loud: undeclared publish, cross-plugin name collision, schema breach at publish', async () => {
+    const ctx = await makeGateway()
+    expect(() => ctx.topic.publish('ghost/tick', {})).toThrow(/not declared/)
+
+    ctx.topic.declare(ctx, 'demo/tick', { payload: payloadSchema })
+    const other: Context[] = []
+    await ctx.plugin({ name: 'demo-other', apply: c => { other.push(c) } })
+    expect(() => ctx.topic.declare(other[0]!, 'demo/tick', { payload: payloadSchema })).toThrow(/already declared/)
+    expect(() => ctx.topic.declare(other[0]!, 'demo/tick', { payload: z.object({ n: z.number() }).strict() })).toThrow(/already declared/)
+
+    expect(() => ctx.topic.publish('demo/tick', { device: 'a', value: 'nope' })).toThrow(/failed its schema/)
+    expect(() => ctx.topic.publish('demo/tick', { stray: true } as never)).toThrow(/failed its schema/)
+  })
+
+  it('replaces a same-fiber declaration (hot-reload semantics)', async () => {
+    const ctx = await makeGateway()
+    const dispose = ctx.topic.declare(ctx, 'demo/tick', { payload: payloadSchema })
+    dispose()
+    expect(() => ctx.topic.declare(ctx, 'demo/tick', { payload: z.object({ n: z.number() }).strict() })).not.toThrow()
+  })
+
+  it('validates subscription filters on both paths', async () => {
+    const ctx = await makeGateway()
+    ctx.topic.declare(ctx, 'demo/tick', { payload: payloadSchema, filter: filterSchema })
+    ctx.topic.declare(ctx, 'demo/raw', { payload: payloadSchema })
+
+    expect(() => ctx.topic.subscribe(ctx, 'demo/tick', { device: 42 }, () => undefined)).toThrow(/filter/)
+    expect(() => ctx.topic.subscribe(ctx, 'demo/tick', undefined, () => undefined)).not.toThrow()
+    // A topic that declares no filter takes none.
+    expect(() => ctx.topic.subscribe(ctx, 'demo/raw', { device: 'a' }, () => undefined)).toThrow(/declares no filter/)
+
+    const client = clientOf(ctx)
+    const badFilter = await client.call('topic.subscribe', { topic: 'demo/tick', filter: { device: 42 } })
+    expect(badFilter.ok).toBe(false)
+    if (!badFilter.ok) expect(badFilter.error.code).toBe('bad-request')
+    const unknown = await client.call('topic.subscribe', { topic: 'ghost/tick' })
+    expect(unknown).toEqual({ ok: false, error: { code: 'not-found', details: { what: 'unknown topic: ghost/tick' } } })
+    const strayFilter = await client.call('topic.subscribe', { topic: 'demo/raw', filter: { device: 'a' } })
+    expect(strayFilter.ok).toBe(false)
+    const unsubUnknown = await client.call('topic.unsubscribe', { subscriptionId: 'nope' })
+    expect(unsubUnknown.ok).toBe(false)
+  })
+
+  it('drops declarations, host subs, and wire gates with the owning plugin fiber', async () => {
+    const ctx = await makeGateway()
+    const owner: Context[] = []
+    const received: unknown[] = []
+    await ctx.plugin({
+      name: 'topic-owner',
+      inject: ['topic'],
+      apply(c) {
+        owner.push(c)
+        c.topic.declare(c, 'demo/tick', { payload: payloadSchema, filter: filterSchema, match })
+        c.topic.subscribe(c, 'demo/tick', undefined, payload => received.push(payload))
+      },
+    })
+    const client = clientOf(ctx)
+    const gate = await client.call('topic.subscribe', { topic: 'demo/tick', filter: { device: 'a' } })
+    expect(gate.ok).toBe(true)
+    ctx.topic.publish('demo/tick', { device: 'a', value: 1 })
+    expect(received).toEqual([{ device: 'a', value: 1 }])
+
+    await owner[0]!.fiber.dispose()
+    expect(() => ctx.topic.publish('demo/tick', { device: 'a', value: 2 })).toThrow(/not declared/)
+    // The wire gate died with the declaration.
+    const stale = await client.call('topic.unsubscribe', {
+      subscriptionId: gate.ok ? gate.value.subscriptionId : 'x',
+    })
+    expect(stale.ok).toBe(false)
+  })
+
+  it('serves the declaration catalog through topic.list', async () => {
+    const ctx = await makeGateway()
+    ctx.topic.declare(ctx, 'demo/tick', { payload: payloadSchema, filter: filterSchema })
+    ctx.topic.declare(ctx, 'demo/raw', { payload: payloadSchema })
+
+    const result = await clientOf(ctx).call('topic.list', {})
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        topics: [
+          { name: 'demo/tick', payloadSchema: expect.anything(), filterSchema: expect.anything() },
+          { name: 'demo/raw', payloadSchema: expect.anything() },
+        ],
+      },
+    })
   })
 })

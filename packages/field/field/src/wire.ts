@@ -1,11 +1,14 @@
 /**
  * The field domain's wire contract: method rows merged into the protocol's
- * open `RpcMethodMap`, frame rows into `FrameMap`, and the zod schemas that
- * ride with registration (host) and frame parsing (client). The field seam
- * is the industrial-communication domain on the wire — every driver is a
- * provider beneath it; the base owns the configuration tables
- * (`field.config.list` + the `field.<resource>.<verb>` CRUD) and the live
- * point table (`field.points.*`).
+ * open `RpcMethodMap`, topic payload rows into `FrameMap`, and the zod
+ * schemas that ride with registration (host) and payload parsing (client).
+ * The live-table push face rides the gateway's topic primitive — the base
+ * declares and publishes `field/*` topics; consumers subscribe through
+ * `subscribeTopic` with the schemas here. The field seam is the
+ * industrial-communication domain on the wire — every driver is a provider
+ * beneath it; the base owns the configuration tables (`field.config.list` +
+ * the `field.<resource>.<verb>` CRUD) and the live point table
+ * (`field.points.*`).
  *
  * This module is the merge point: any program that imports `@snap-rail/field`
  * sees these rows; consumers elsewhere stay untyped (open-world rule).
@@ -34,9 +37,9 @@ export type DialectConfig = Record<string, unknown>
 /** A JSON Schema document projected from a driver's zod schema (form-facing). */
 export type DialectSchema = Record<string, unknown>
 
-/** The point table: read, subscribe, and write control values. Points are
- * addressed everywhere by the (device, group, name) triple — never an
- * opaque id. */
+/** The point table: read and write control values. Points are addressed
+ * everywhere by the (device, group, name) triple — never an opaque id. Live
+ * updates flow through the `field/point-update` topic. */
 export interface PointsApi {
   /** List every point currently in the point table. */
   list(payload: {}): Promise<RpcResponse<{ points: readonly PointDescriptor[] }>>
@@ -45,11 +48,6 @@ export interface PointsApi {
   read(payload: { points: readonly PointRef[] }): Promise<RpcResponse<{ samples: readonly PointSample[] }>>
   /** Write a control value to a point (routed to the owning driver). */
   write(payload: { point: PointRef, value: Exclude<PointValue, null> }): Promise<RpcResponse<{ accepted: true }>>
-  /** Add one reference per triple to the `field/point-updated` subscription
-   * (accumulates); frames flow while any reference remains. */
-  subscribe(payload: { points: readonly PointRef[] }): Promise<RpcResponse<{ subscribed: true }>>
-  /** Drop one reference per triple; unaddressed triples keep their counts. */
-  unsubscribe(payload: { points: readonly PointRef[] }): Promise<RpcResponse<{ unsubscribed: true }>>
 }
 
 /** Connections: the device side of the field seam. */
@@ -131,8 +129,6 @@ declare module '@snap-rail/protocol' {
     'field.points.list': PointsApi['list']
     'field.points.read': PointsApi['read']
     'field.points.write': PointsApi['write']
-    'field.points.subscribe': PointsApi['subscribe']
-    'field.points.unsubscribe': PointsApi['unsubscribe']
     'field.connections.list': ConnectionsApi['list']
     'field.config.list': ConfigApi['list']
     'field.devices.upsert': DevicesApi['upsert']
@@ -150,8 +146,8 @@ declare module '@snap-rail/protocol' {
     'field/point-added': { point: PointDescriptor }
     /** One point left the point table (the departed address, flat). */
     'field/point-removed': { device: string, group: string, name: string }
-    /** One live sample; the host gates this frame by subscription refcounts. */
-    'field/point-updated': PointSample
+    /** One live sample; the host gates this topic by subscription filters. */
+    'field/point-update': PointSample
     /** One connection joined (snapshot form). */
     'field/connection-added': { connection: ConnectionSnapshot }
     /** One connection left. */
@@ -189,8 +185,6 @@ export const fieldRequestSchemas = {
     point: pointRefSchema,
     value: z.union([z.boolean(), z.number(), z.bigint(), z.string()]),
   }).strict(),
-  'field.points.subscribe': pointListRequest,
-  'field.points.unsubscribe': pointListRequest,
   'field.connections.list': emptyRequest,
   'field.config.list': emptyRequest,
   'field.devices.upsert': z.object({
@@ -223,14 +217,14 @@ export const fieldRequestSchemas = {
   'field.mappings.list': emptyRequest,
 } as const
 
-// --- frame payload schemas (for registration records and client parsing) ---
+// --- topic payload schemas (for declarations and client parsing) ---
 
 const connectionIdSchema = z.string().min(1)
 const statusSchema = z.enum(['connecting', 'online', 'offline'])
 const pointValueSchema = z.union([z.boolean(), z.number(), z.bigint(), z.string(), z.null()])
 const statusMessage = z.string().max(512).optional()
 
-/** Payload schemas for the field domain frames. */
+/** Payload schemas for the field domain topics (the push face of the live table). */
 export const fieldFrameSchemas = {
   'field/point-added': z.object({
     point: z.object({
@@ -246,7 +240,7 @@ export const fieldFrameSchemas = {
     group: z.string().min(1),
     name: z.string().min(1),
   }).strict(),
-  'field/point-updated': z.object({
+  'field/point-update': z.object({
     device: z.string().min(1),
     group: z.string().min(1),
     name: z.string().min(1),
@@ -271,4 +265,10 @@ export const fieldFrameSchemas = {
   }).strict(),
   'field/mappings-changed': z.object({}).strict(),
   'field/structure-changed': z.object({}).strict(),
+} as const
+
+/** Subscription-filter schemas for the topics that take one (a topic absent
+ * here takes no filter). */
+export const fieldTopicFilterSchemas = {
+  'field/point-update': z.object({ points: z.array(pointRefSchema).optional() }).strict(),
 } as const
