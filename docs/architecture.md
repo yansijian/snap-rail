@@ -40,10 +40,11 @@ Electron 主进程                        renderer（每窗口）
 | --- | --- | --- |
 | 启动/组合 | `boot/app-boot` | 两层合成、boot()、LayerAdmin 热重载、`./rpc` 管理桥（认领 `plugins` 域；`./contract` 是方法行与 schema 的家）；`rendererPackages` 让渲染端住户行只作配置不进宿主树 |
 | 工作站桥 | `boot/station-rpc` | `session.*`/`settings.*`/`audit.*`/`client-config.list`（登录态落 settings + 审计；`./contract` 是方法/帧行与 schema 的家，渲染住户 import 它获得类型） |
-| RPC 协议 | `protocol/protocol` | **信封封闭、内容开放**：四象限消息模型、RpcMethodMap/FrameMap 两个开放合并基座（只有平台行 `host.*`/`rpc.*`/`window.*` 留在这里）、zod 信封校验、AbstractApiClient 双 overload（已知方法全类型、未知方法 `(string, unknown)`） |
-| RPC 宿主侧 | `protocol/gateway` | `ctx.rpc`：域名认领（`claimDomain` 首认即得、冲突 fail-loud）、`method`（请求 schema 必须随注册）、`frame`（载荷 schema 注册）、`bridgeEvent`（宿主事件→帧的标准桥）、`rpc.describe` 能力发现、帧泵 |
-| RPC 客户端侧 | `protocol/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势（一次 zod 解析，坏帧丢弃并记录）；`rpcErrorText` 统一错误文案 |
-| 工业通讯协议域 | `field/field` | **设备连接底座**：`data/field.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面 + 统一「设备管理」设置页（`./station`，schema 驱动表单）。`ctx.field.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。`field.config.list`/`field.devices|groups|points.*` CRUD、`field/structure-changed` 帧；`field.mappings.list` 读底座表投影（消费方零改动） |
+| RPC 协议 | `protocol/protocol` | **信封封闭、内容开放**：四象限消息模型、RpcMethodMap/FrameMap 两个开放合并基座（只有平台行 `host.*`/`rpc.*`/`window.*`/`topic.*` 留在这里）、zod 信封校验、AbstractApiClient 双 overload（已知方法全类型、未知方法 `(string, unknown)`） |
+| RPC 宿主侧 | `protocol/gateway` | `ctx.rpc`：域名认领（`claimDomain` 首认即得、冲突 fail-loud）、`method`（请求 schema 必须随注册）、`frame`（载荷 schema 注册）、`bridgeEvent`（宿主事件→帧的标准桥）、`rpc.describe` 能力发现、帧泵。同层提供 **`ctx.topic`**（见话题层行） |
+| 话题层（推送原语） | `protocol/gateway` + `protocol/connection` | **与 rpc 同层的底层机制**：`ctx.topic.declare(ctx, '域/名', { payload, filter?, match? })`（声明者独占名字，跨插件冲突 fail-loud，同 fiber 重声明=热替换）+ `publish`（zod 校验后宿主订阅者直调；**线上侧只在有订阅 gate 命中时才广播**——无人订阅零流量）+ 宿主侧 `subscribe`（caller effect 所有权）。渲染端通用订阅 RPC：`topic.subscribe {topic, filter}` / `topic.unsubscribe {subscriptionId}` / `topic.list`（声明目录=绑定界面与能力发现的数据源）。纯管道零持久化：历史由消费方自存 |
+| RPC 客户端侧 | `protocol/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势、`subscribeTopic(link, topic, filter, schema, cb)` 是消费话题的标准姿势（一次 zod 解析，坏帧丢弃并记录；gate 异步打开、同步 disposer 可直入 effect 体）；`rpcErrorText` 统一错误文案 |
+| 工业通讯协议域 | `field/field` | **设备连接底座**：`data/field.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面 + 统一「设备管理」设置页（`./station`，schema 驱动表单）。`ctx.field.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。`field.config.list`/`field.devices|groups|points.*` CRUD；点表与连接的推送面全部走 `field/*` **话题**（`field/point-update` 带 `{points}` 过滤门控，见话题层行），field 核心自己声明并发布，field-rpc 只注册方法 |
 | 模拟驱动 | `field/driver-mock` | 范本驱动（新驱动作者的活文档）：极简 schema（离线/周期）+ 模拟点流 + 写回显，点表走底座 |
 | ModbusTCP 驱动 | `field/driver-modbus` | 纯协议适配器：块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema → 底座 SchemaForm）；无存储无渲染端，配置全在底座表 |
 | 槽位词表 | `client/slots` | `ctx.uiSlots`：well-known slot ids（含 `titlebar-actions`——标题栏右侧图标按钮位，forge 的 AI 创造入口经它进驻 chrome 与兜底壳）+ 缺槽降级 |
@@ -51,11 +52,12 @@ Electron 主进程                        renderer（每窗口）
 | 操作人会话 | `client/session` | `ctx.session`：登录态镜像（宿主持久化，重启保持登录）、`session/changed` 事件；经 `settings/changed` 帧热跟随宿主侧换人 |
 | 作业流程 | `client/workflows` | `ctx.workflows`：流程注册、声明式 `requires` 门控（`operator-day`/`day` 两 scope，事件集求值）、侧栏告警、active 页状态 |
 | 渲染宿主 | `client/runtime` | 接管 React root、先挂 timer/slots/settings/variables/session/workflows 再挂住户（逐插件 config）、槽位驱动 Shell、引入唯一主题 |
-| 变量声明 | `client/variables` | `ctx.variables`：需求方声明业务变量（三元组+类型）；`watchBinding`/`useBinding`/`usePoint` 消费配方经 `field.mappings.list` + `field/mappings-changed` 解析绑定——对具体驱动零知识 |
+| 变量声明 | `client/variables` | `ctx.variables`：需求方声明业务变量（三元组+类型）；`watchBinding`/`useBinding`/`usePoint` 消费配方经 `field.mappings.list` + `field/mappings-changed` 话题解析绑定——对具体驱动零知识 |
 | 设置页 | `client/settings` | `ctx.settingsPages`：设置对话框的可扩展页注册表 |
 | 引导 | `client/kernel` | 启动页、carrier 握手、root 移交 |
-| 业务套件 | `suites/terminal-ops` | **套件 = 单包多入口**（`snapRail.kind='suite'`）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）+ 一个宿主行 `./stats`（班产计数：跟随计数绑定的正增量、按三班 8-16/16-24/0-8 落 `ctx.store`、登录时刻锚定班次、`production/stats-changed` 帧广播快照兼作渲染端初值心跳）。套件单活：启用一个套件经 `plugins.set-enabled` 自动停用其他套件包的全部行（一次批量写）——工业终端一次服务一个场景 |
+| 业务套件 | `suites/terminal-ops` | **套件 = 单包多入口**（`snapRail.kind='suite'`）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）+ 一个宿主行 `./stats`（班产计数：订阅 `field/point-update` 话题、只累计正增量、按三班 8-16/16-24/0-8 落 `ctx.store`、登录时刻锚定班次、`production/stats-changed` 帧广播快照兼作渲染端初值心跳）。套件单活：启用一个套件经 `plugins.set-enabled` 自动停用其他套件包的全部行（一次批量写）——工业终端一次服务一个场景 |
 | 设置外壳 | `client/settings-station` | 设置对话框壳 + 插件管理页（三分区：套件/驱动/核心）+ 主题页；核心内置，不可外移（卸了无法自恢复） |
+| 趋势预警 | `tools/trend` | **常驻外部可装插件**（`kind:'plugin'`，zip 发行，无头分析引擎——预警展现与数据展示是订阅方的事）：`data/trend.db`（`trend` 命名空间）以**变点序列**无损记录全部观测点（只存值变化时刻，tagged TEXT 保 int64 精度，保留期可配）；档案（profiles）= 观察点 + **话题绑定**（`topic.list` 目录选话题 + 载荷字段 AND 条件，如「`field/point-update` 且 name==X 且 value==true」），绑定命中落 hits 表成事件语料并清除活动预警；概率引擎（纯函数：滑窗统计特征 slope/drift/variance/spikes/abnormal → k-NN 近邻参考集 → 经验命中率 Laplace 平滑 + **Wilson 95% CI** + 特征贡献度 + 相似片段证据，n<5 诚实降级）+ watch 循环按提前预警时间发布 `trend/warning` 话题（阈值+冷却+≥10pp 升档去抖）；`trend.profile.*`/`trend.series.query`/`trend.analysis.run` 供配置与展示面消费 |
 | AI 创造工坊 | `tools/forge` | **常驻外部可装插件**（`kind:'plugin'`，zip 发行，与业务套件共存）：OpenAI 兼容流式 Agent 循环 + `rail_inspect/read/define/run/stop` 五工具造**运行时插件**（宿主/渲染两半纯 JS 函数体，require 白名单=宿主锚定表/`SEED_MODULES`，无 JSX）；版本不可变、`data/forge.db`（`forge` 命名空间）持久、boot 重挂；预检→挂载诊断→渲染端 `forge.client-report` 三段错误回喂修复环；渲染半经 `forge/gen-mounted` 帧下发，由模块系统全局 `require` 面喂种子实例后 `ctx.plugin` 挂为 forge 子 fiber。client 面按窗口分支：主窗口只挂生成插件 runner + `titlebar-actions` AI 按钮，**独立工作室窗口**（`window.open-forge`）= layout 占用者整体铺屏（自带标题栏/左会话栏/右对话与我的插件/模型接口设置弹窗，主题经 `ui.theme` 采纳），生成插件渲染半只在主窗口挂载；`forge.plugin.export` 把任一版本合成可安装 zip（`@forge/<id>`，`window.save-zip` 落盘）；LLM 端点配置走 `forge.llm` 设置键热生效 |
 | 统一设备管理页 | `field/field` 的 `./station` | 核心静态渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 field 语义节） |
 | 设置持久化 | `settings/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
@@ -65,7 +67,8 @@ Electron 主进程                        renderer（每窗口）
 | 渲染端模块系统 | `client/modules` | 已安装插件的渲染面装载器：`__ModuleLoader__`（queue→live 门面）+ 种子表（共享实例：react/cordis/client-ui…，`SEED_MODULES` 单源在 plugin-kit）+ `loadPluginBundle`（classic script）；CJS 工厂包经 `snap-plugin://pool/…` 到达 |
 | 插件作者工具 | `util/plugin-kit` | `snapRail` manifest 词汇表（zod）、种子白名单 `SEED_MODULES`、tsdown preset：`hostBundle`（ESM node）+ `clientBundle`（CJS 浏览器包，焊 `window.__ModuleLoader__.load` 工厂壳、种子 external、位图/SVG 以 `snap-plugin://` URL 发射到包旁）、最终格式打包器 `./pack`（精简 manifest + 构建产物，装配规则单源） |
 | 兜底壳 | `client/fallback` | 核心内置的极简 layout：零套件时的空态指引 + 极简标题栏（窗口控制+设置入口）；套件 layout 注册即让位 |
-| 安装器 | `boot/app-boot` 的 `installer` | zip → 校验（manifest/名字/snapRail 形状）→ 解压进池；`inspectPluginZip` 不落盘预检；`plugins.install/inspect/uninstall` RPC（uninstall 删行+目录+分域数据）；宿主侧 zip 解析用 fflate |
+| 安装器 | `boot/app-boot` 的 `installer` | zip → 校验（manifest/名字/snapRail 形状）→ 解压进池（临时目录换入，失败不伤旧版）；同名包**仅严格更高版本可覆盖更新**（相同/更低 conflict，数据 db 不动，manifest 损坏按 0.0.0 可修复）；`inspectPluginZip` 不落盘预检（wire 响应带 `installed`/`action: install\|update\|blocked`）；`plugins.install/inspect/uninstall` RPC（uninstall 删行+目录+分域数据；install 的 audit 区分 `plugin.update`/`plugin.install`）；版本比较 `compareVersions`（点分数值 + 预发布，无 semver 依赖）；宿主侧 zip 解析用 fflate |
+| 插件市场 | `boot/app-boot` 的 `market` | 插件源的宿主侧拉取层：`plugins.remote-list` 拉取 `<feed>/index.json` 目录（zod 校验，未知字段剥离保前向兼容）并按本地池逐条判定 `action: install\|update\|current\|local-newer`；`plugins.remote-install { name }` 只认目录清单里的相对文件名（wire 上永无客户端自选 URL）→ 下载临时 zip → 与本地安装同一条管线（audit detail 带 `via:"market"`）；插件源地址读 `<home>/settings.json` 的 `plugins.feedUrl`（**直读文件而非注入 settings 服务**——插件管理是 settings 包自己的卸载路径，不得耦合其生命周期）；设置页「插件市场」（settings-station `market-page`） |
 
 ## 工作站语义（station 层）
 
@@ -82,11 +85,11 @@ Electron 主进程                        renderer（每窗口）
   `operator-day` 门控自动重算（换人重做当日维护）。
 - **生产理论计数**：rate × 净运行时长；故障与停机区间取并集剔除，故障与
   停机可并发。
-- **班产统计（实际计数）**：计数在宿主侧运行——生产包的 `./stats` 面
-  （`@snap-rail/process-production/stats` 挂载条目）：监听 field 的
-  `point/updated`、只累计正增量（负增量=计数器复位忽略、
-  `null`=异常重播种基线），按三班（8-16 早 / 16-24 中 / 0-8 晚）分桶落
-  `snap-rail.db`（班行 + 小时桶 + 登录锚），页面开闭/注销/重启都不丢。
+- **班产统计（实际计数）**：计数在宿主侧运行——生产包的 `./stats` 面：
+  订阅 field 的 `field/point-update` 话题、只累计正增量（负增量=计数器
+  复位忽略、`null`=异常重播种基线），按三班（8-16 早 / 16-24 中 / 0-8 晚）
+  分桶落 `snap-rail.db`（班行 + 小时桶 + 登录锚），页面开闭/注销/重启
+  都不丢。
   班次以**登录时刻**锚定：整个登录会话计入登录时所在班，只有退出重登
   才换班（同班交接延续同一班行，重启按持久化锚恢复原班次，未登录期间
   不归班）。生产页是纯投影：宿主每个 flush 周期广播
@@ -153,29 +156,36 @@ owner 自己的 contract 模块里（`declare module '@snap-rail/protocol'`
    帧域须已被认领（任意认领者：域的帧是该域缝与提供者的协作面）；
    跨插件同名帧 fail-loud。schema 服务 `rpc.describe` 与客户端解析；
    `broadcast` 热路径不重复校验（宿主输出可信）。
-4. **事件桥接**：`ctx.rpc.bridgeEvent(ctx, 'point/added',
-   'field/point-added', point => ({ point }))`——宿主 cordis 事件转发
-   为帧的标准姿势，别再手写。
+4. **事件桥接**：`ctx.rpc.bridgeEvent(ctx, 'host-event',
+   'demo/event', map?)`——宿主 cordis 事件转发为帧的标准姿势，别再手写。
 5. **能力发现**：`rpc.describe` 列出活的域认领（含认领者）、方法
-   （含 JSON Schema）、帧——设置页/Agent/未来插件安装器的内省面。
+   （含 JSON Schema）、帧与话题——设置页/Agent/未来插件安装器的内省面。
 6. **类型可见性 = 消费方 import 提供方 contract**：合并行只进入
    import 了该 contract 的程序（modbus 设置页 → 同包的
    `./contract`，渲染住户 → `@snap-rail/station-rpc/contract`，
    点表消费 → `@snap-rail/field`）。
    "谁能调什么域"显式落在 package.json。
 
-### 高频点值与帧消费
+### 高频点值与话题消费
 
-- `field.points.subscribe` 按 (device, group, name) 三元组登记，引用
-  计数——同一地址多个消费者各自持有一份引用，任一退订只减计数，
-  最后一个退订者才停帧。`field/point-updated` 仅对计数 > 0 的地址
-  广播；结构帧（增删/状态/映射变化）永远全播。渲染端整页刷新跳过
-  退订会漏计数，只浪费广播不丢帧——多窗口（主终端 + AI 创造）下
-  同理：各窗口多订一份广播是无害浪费。
-- 渲染端消费帧一律 `subscribeFrame(link, method, schema, listener)`
-  （connection 包）：载荷一次 zod 解析、坏帧丢弃并记录，禁止手写
-  `payload as {...}` 判形。`settings/changed` 帧跟随每次 settings.json
-  写入（含会话工号）；消费方按 key 过滤、zod 校验后热应用。
+- **推送面 = 话题**：field 核心声明并发布 `field/*` 话题
+  （`field/point-update` 带按点过滤、`field/connection-status`、
+  `field/structure-changed` 等结构话题）。线上侧只在有订阅 gate 命中时
+  才广播——无人订阅的话题零线上流量；宿主侧订阅者直调回调不过门控。
+  gate 是进程级的：任一窗口的 gate 命中即一次广播到所有窗口，各窗口
+  在 listener 里按载荷自行收窄。渲染端整页刷新跳过退订只会留下无效
+  gate（浪费门控不丢帧），声明随插件卸载会连 gate 一起清。
+- 渲染端消费话题一律 `subscribeTopic(link, topic, filter, schema,
+  listener)`（connection 包）：gate 打开 + 载荷一次 zod 解析、坏帧丢弃
+  并记录，禁止手写 `payload as {...}` 判形。gate 异步打开，开之前发布的
+  不补送——在乎初值的先 `read` 播种。
+- 无订阅语义的旧式帧（`production/stats-changed` 的无条件快照心跳、
+  `settings/changed`）继续走 `rpc.frame` + `broadcast`；消费一律
+  `subscribeFrame`。判据：**有人订才值得发的用话题，人人都要的无条件
+  快照用帧**。
+- 宿主侧消费点流（计数、趋势自录等）用 `ctx.topic.subscribe(ctx,
+  'field/point-update', filter?, cb)`（caller effect 所有权）；field
+  不再发 cordis 点位事件。
 - 下行端口重开是替换语义：carrier 对已存在端口的 `open-stream` 关旧
   建新回包；preload 扇出对单个抛错的 listener 隔离 try/catch。
 
@@ -189,8 +199,8 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
 （`update(config, points)` 内部自决热调或重连；`dispose` 拆除）。
 
 - 点位寻址统一为三元组 `(device, group, name)`：缝定义、rpc 方法
-  （`field.points.read/write/subscribe/unsubscribe`）与帧载荷都只讲
-  三元组，没有不透明 id 过线。`pointKey`（`设备/分组/名字`）只是
+  （`field.points.read/write`）、话题载荷与过滤参数都只讲三元组，
+  没有不透明 id 过线。`pointKey`（`设备/分组/名字`）只是
   宿主侧 Map 键与审计主体的内部组合串（组名与点位名拒含 `/`）。
 - **点位的类型来自分组**（同组同类型是底座结构约束）；驱动 point schema
   校验合并对象 `{type, ...config}`（底座注入 type，存储剥离之）。
@@ -204,8 +214,8 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
   （`z.toJSONSchema`，input 形态）随 `field.drivers.list` 下发，底座
   SchemaForm（client-ui）渲染——驱动零渲染端代码。
 - 配置面 RPC：`field.config.list`（整棵配置树）、
-  `field.devices|groups|points.upsert/remove`；任何变更广播
-  `field/structure-changed`，且映射文档随之重投影。
+  `field.devices|groups|points.upsert/remove`；任何变更发布
+  `field/structure-changed` 话题，且映射文档随之重投影。
 - **通用映射面**：`field.mappings.list` 读底座表投影（设备[{id, driver}]/
   组[{deviceId, name, type}]/点[{deviceId, group, name}]，仅含驱动在线
   的设备）——绑定解析（client-variables）只消费这一个面，对具体驱动
@@ -233,7 +243,7 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
   裸名无法寻址）；设置页新增点位对话框以本组已声明未映射的名字作
   候选。
 - 绑定解析以 `field.mappings.list` 的通用映射文档为准（设备存在 →
-  组实体存在 → 点位在该组内）；`field/mappings-changed` 帧触发重拉
+  组实体存在 → 点位在该组内）；`field/mappings-changed` 话题触发重拉
   重解析——改映射即时生效，无需重挂页面。组聚合 v1 仅"任一激活"：
   bool 真 / 数值非 0 / 非空字符串即激活，`null` 分量列入通讯异常、
   未观测（`time` 0）列入 pending；成员顺序是驱动投影定义的文档序
@@ -247,7 +257,7 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
 
 ## 开发配方（Agent/人共用 checklist）
 
-四张配方覆盖全部扩展点。共同纪律：**schema 跟着 owner 走**（contract
+五张配方覆盖全部扩展点。共同纪律：**schema 跟着 owner 走**（contract
 模块是方法/帧行与 zod 的唯一家）、**注册即 effect**（caller 首参、
 返回 disposer）、**跨包 import 用包名**、改动配 vitest 直测装配链路。
 
@@ -272,6 +282,25 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
    `ctx.rpc.bridgeEvent` 一行转发）。
 2. 渲染端消费一律 `subscribeFrame(link, 'demo/event', schema, cb)`——
    禁止 `payload as` 手写判形。
+3. 判据：人人都要的无条件快照（心跳、settings/changed）才用帧；
+   **有人订才值得发的推送用话题**（配方二 b）。
+
+### 二 b、新增一个话题（订阅式推送）
+
+1. 发布方在自己 apply 里 `ctx.topic.declare(ctx, 'demo/tick',
+   { payload: zod, filter?: zod, match?: (filter, payload) => boolean })`
+   ——载荷 schema 必须给（publish 在信任边界校验）；名字 `域/事件`
+   由声明者独占（跨插件重名 fail-loud，同 fiber 重声明=热替换）；
+   filter 是订阅过滤参数的 zod，match 是宿主侧门控谓词。
+2. 发布：`ctx.topic.publish('demo/tick', payload)`——宿主订阅者直调，
+   线上侧只在有 gate 命中时才广播。**纯管道零持久化**：要历史自己落
+   `ctx.store`（trend 的变点序列是范本）。
+3. 渲染端消费一律 `subscribeTopic(link, 'demo/tick', filter?, schema,
+   cb)`；宿主侧消费 `ctx.topic.subscribe(ctx, 'demo/tick', filter?,
+   cb)`。gate 是进程级的：任一窗口命中即全窗可达，listener 按载荷
+   自行收窄。
+4. 配方测试：跨插件重名 fail-loud、无 gate 零广播（断言 downlink 未
+   被调）、订阅过滤命中/不命中、退订即停。
 
 ### 三、新增一个现场驱动（工业协议实现）
 
@@ -373,8 +402,20 @@ field 是设备连接底座：**底座拥有配置表与统一 UI，驱动是纯
   **最终格式 = 精简 manifest + 构建产物，无源码**；插件市场=同格式
   zip 的下载源（留座位）。锚定名单里的共享词汇包（drizzle-orm）
   同样必须在 `dependencies` 里。
-- 更新通道：electron-updater 座位已接线（无 publish 配置时静默），
-  blockmap 随安装包产出。
+- 更新通道：`update` 域（宿主桥在 desktop `update-rpc`，状态机在
+  `update-machine`，Electron-free 可直测）。electron-updater 打包态驱动：
+  启动按 `update.autoCheck` 自动检查、`autoDownload` 后台下载，
+  **安装只走用户确认**（`update.install` → `quitAndInstall`，
+  `autoInstallOnAppQuit=false`）。状态全量快照经 `update/status` 帧
+  （unsupported/unconfigured/idle/checking/available/none/downloading/
+  ready/error），页面在设置「软件更新」。更新源两座位：electron-builder
+  `publish`（generic，URL 发版时改）为内置缺省，settings
+  `update.feedUrl` 现场覆盖（每次 check 前读，改完即生效）；无任何源时
+  `unconfigured`。blockmap 随安装包产出。
+- 更新源/插件源托管：静态文件服务器即可（本仓以 nginx `D:\nginx\html`
+  为基准），目录布局、发布命令与终端侧行为见
+  [docs/deploy.md](deploy.md)；插件源 = 插件 zip + `index.json` 目录
+  （`pack:plugins --out` 直接产出），插件更新与应用更新同源同规约。
 
 ## 一期不做、留座位的
 

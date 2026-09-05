@@ -13,6 +13,7 @@
     { "path": "../../packages/boot/app-boot" },
     { "path": "../../packages/protocol/gateway" },
     { "path": "../../packages/protocol/connection" },
-    { "path": "../../packages/client/kernel" }
+    { "path": "../../packages/client/kernel" },
+    { "path": "../../packages/settings/settings" }
   ]
 }

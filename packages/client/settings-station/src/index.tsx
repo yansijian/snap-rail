@@ -20,7 +20,9 @@ import {
 } from '@snap-rail/client-ui'
 import { X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { MarketPage } from './market-page.tsx'
 import { PluginsPage } from './plugins-page.tsx'
+import { UpdatePage } from './update-page.tsx'
 
 /** The 主题 settings page: one mode choice (跟随系统/白天/黑夜). The write
  * hot-applies everywhere via the `settings/changed` frame — no restart. */
@@ -149,6 +151,22 @@ const settingsStationPlugin: Plugin.Object<void> = {
       order: 1,
       render(): ReactNode {
         return <ThemePage initial={theme} onChoose={chooseTheme} />
+      },
+    })
+    ctx.settingsPages.register(ctx, {
+      id: 'update',
+      title: '软件更新',
+      order: 2,
+      render(): ReactNode {
+        return <UpdatePage ctx={ctx} />
+      },
+    })
+    ctx.settingsPages.register(ctx, {
+      id: 'market',
+      title: '插件市场',
+      order: 3,
+      render(): ReactNode {
+        return <MarketPage ctx={ctx} />
       },
     })
     ctx.uiSlots.register(ctx, 'layout', {

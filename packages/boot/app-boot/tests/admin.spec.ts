@@ -4,11 +4,15 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@snap-rail/cordis'
 import { InProcessApiClient } from '@snap-rail/protocol'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import pluginAdminRpcPlugin from '../src/rpc.ts'
 import { boot } from '../src/index.ts'
 import type { LayerAdmin } from '../src/index.ts'
 import { loadUserLayer, packageNameOf } from '../src/compose.ts'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
@@ -185,6 +189,119 @@ describe('plugin layers admin', () => {
     // stale row.
     expect(() => world.layers.recompose()).not.toThrow()
   })
+
+  it('installs a higher version over an installed package and keeps the row', async () => {
+    const world = await makeWorld()
+    const poolDir = join(world.home, 'plugins')
+    const { zipSync } = await import('fflate')
+    const writeZip = (version: string): string => {
+      const path = join(world.home, `mini-${version}.zip`)
+      writeFileSync(path, new Uint8Array(zipSync({
+        'package.json': new TextEncoder().encode(JSON.stringify({
+          name: '@snap-rail/mini', version, type: 'module', main: 'lib/index.js',
+        })),
+        'lib/index.js': new TextEncoder().encode(`export default { name: 'mini', apply() {} }\n// v${version}\n`),
+      })))
+      return path
+    }
+
+    // Fresh install lands disabled with updated: false.
+    const first = await world.client.call('plugins.install', { zipPath: writeZip('0.1.0') })
+    expect(first).toEqual({ ok: true, value: { installed: { name: '@snap-rail/mini', version: '0.1.0', updated: false } } })
+
+    // Inspecting a newer zip names the installed version and the verdict.
+    const peek = await world.client.call('plugins.inspect', { zipPath: writeZip('0.2.0') })
+    expect(peek.ok).toBe(true)
+    if (peek.ok) {
+      expect(peek.value.plugin.action).toBe('update')
+      expect(peek.value.plugin.installed).toEqual({ version: '0.1.0' })
+    }
+
+    // The update goes through the wire: the pool copy is swapped, the user
+    // row survives (same package name), and the audit trail says update.
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/mini'\n    enabled: true\n")
+    const second = await world.client.call('plugins.install', { zipPath: writeZip('0.2.0') })
+    expect(second).toEqual({ ok: true, value: { installed: { name: '@snap-rail/mini', version: '0.2.0', updated: true } } })
+    expect(readFileSync(join(poolDir, '@snap-rail__mini', 'lib', 'index.js'), 'utf8')).toContain('// v0.2.0')
+    expect(readFileSync(world.userPath, 'utf8')).toContain("'@snap-rail/mini'")
+    expect(() => world.layers.recompose()).not.toThrow()
+    const trail = readFileSync(join(world.home, 'audit.jsonl'), 'utf8')
+    expect(trail).toContain('"action":"plugin.install"')
+    expect(trail).toContain('"action":"plugin.update"')
+    expect(trail).toContain('"from":"0.1.0"')
+    expect(trail).toContain('"to":"0.2.0"')
+
+    // The list carries the pool version; the older zip is blocked on inspect
+    // and refused on install (downgrade goes through an explicit uninstall).
+    const listed = await world.client.call('plugins.list', {})
+    expect(listed.ok && listed.value.plugins.find(plugin => plugin.name === '@snap-rail/mini')?.version).toBe('0.2.0')
+    const back = await world.client.call('plugins.inspect', { zipPath: writeZip('0.1.0') })
+    expect(back.ok && back.value.plugin.action).toBe('blocked')
+    // Refusal on the wire; the conflict *code* mapping is asserted in the
+    // settings-station UI spec (this world mixes source-plane and built
+    // protocol instances, so business-error identity stops at ok:false).
+    const refused = await world.client.call('plugins.install', { zipPath: writeZip('0.1.0') })
+    expect(refused.ok).toBe(false)
+  })
+
+  it('serves the market over the wire: catalog verdicts and remote installs', async () => {
+    const world = await makeWorld()
+    const poolDir = join(world.home, 'plugins')
+    const { zipSync } = await import('fflate')
+    const zipBytes = (version: string): Uint8Array => new Uint8Array(zipSync({
+      'package.json': new TextEncoder().encode(JSON.stringify({
+        name: '@snap-rail/mini', version, type: 'module', main: 'lib/index.js',
+      })),
+      'lib/index.js': new TextEncoder().encode(`export default { name: 'mini', apply() {} }\n// v${version}\n`),
+    }))
+    const catalog: { plugins: Array<{ name: string, version: string, description: string, file: string }> } = {
+      plugins: [{ name: '@snap-rail/mini', version: '0.3.0', description: 'mini market plugin', file: 'mini.zip' }],
+    }
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL) => {
+      const key = String(url)
+      if (key === 'http://feed.test/plugins/index.json') return new Response(JSON.stringify(catalog))
+      if (key === `http://feed.test/plugins/${catalog.plugins[0]!.file}`) return new Response(zipBytes(catalog.plugins[0]!.version))
+      return new Response('not found', { status: 404 })
+    }))
+
+    // Without a configured feed the market refuses before any fetch.
+    const unconfigured = await world.client.call('plugins.remote-list', {})
+    expect(unconfigured.ok).toBe(false)
+    expect(downloadsOf()).toHaveLength(0)
+
+    world.ctx.settings.set('plugins.feedUrl', 'http://feed.test/plugins')
+    const listed = await world.client.call('plugins.remote-list', {})
+    expect(listed.ok).toBe(true)
+    if (listed.ok) {
+      expect(listed.value.feedUrl).toBe('http://feed.test/plugins')
+      expect(listed.value.plugins[0]).toMatchObject({ name: '@snap-rail/mini', version: '0.3.0', action: 'install' })
+    }
+
+    // The remote install lands the pool copy; the audit marks the market path.
+    const installed = await world.client.call('plugins.remote-install', { name: '@snap-rail/mini' })
+    expect(installed).toEqual({ ok: true, value: { installed: { name: '@snap-rail/mini', version: '0.3.0', updated: false } } })
+    expect(readFileSync(join(poolDir, '@snap-rail__mini', 'lib', 'index.js'), 'utf8')).toContain('// v0.3.0')
+    const trail = readFileSync(join(world.home, 'audit.jsonl'), 'utf8')
+    expect(trail).toContain('"via":"market"')
+
+    // A newer feed version updates in place; an unknown name is a refusal.
+    catalog.plugins[0]!.version = '0.4.0'
+    const updated = await world.client.call('plugins.remote-install', { name: '@snap-rail/mini' })
+    expect(updated).toEqual({ ok: true, value: { installed: { name: '@snap-rail/mini', version: '0.4.0', updated: true } } })
+    const absent = await world.client.call('plugins.remote-install', { name: '@snap-rail/absent' })
+    expect(absent.ok).toBe(false)
+    // The catalog badge follows the pool state: the feed (0.4.0) is now
+    // older than the installed copy.
+    catalog.plugins[0]!.version = '0.2.0'
+    const listedAgain = await world.client.call('plugins.remote-list', {})
+    expect(listedAgain.ok && listedAgain.value.plugins[0]?.action).toBe('local-newer')
+  })
+
+  /** The fetch stub records nothing itself; assert via its call log. */
+  function downloadsOf(): unknown[] {
+    const stub = vi.mocked(globalThis.fetch)
+    return stub === undefined ? [] : stub.mock.calls
+  }
 
   it('refuses a write that would not compose, leaving the file untouched', async () => {
     const world = await makeWorld()

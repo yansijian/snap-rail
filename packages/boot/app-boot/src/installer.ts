@@ -6,19 +6,21 @@
  * Zip layout: one root directory (the package) or the package at the zip
  * root. The manifest must name a legal package name; `snapRail` fields are
  * validated (kind, permissions) but unenforced beyond shape in this phase.
- * Uninstalling removes the pool directory and the package's namespaced
- * store database (its data is its own).
+ * Installing over an installed package updates it in place when the zip's
+ * version is strictly higher. Uninstalling removes the pool directory and
+ * the package's namespaced store database (its data is its own).
  *
  * @module @snap-rail/app-boot/installer
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { unzipSync } from 'fflate'
 import type { SnapRailManifest } from './scan.ts'
 
 /** Installer failures, machine-readable for the wire mapping. */
-export type InstallErrorKind = 'bad-zip' | 'bad-manifest' | 'conflict' | 'not-installed'
+export type InstallErrorKind = 'bad-zip' | 'bad-manifest' | 'conflict' | 'not-installed' | 'io'
 
 /** One installer failure carrying a machine-readable kind. */
 export class InstallError extends Error {
@@ -46,6 +48,8 @@ export interface InstallResult {
   version: string
   /** Absolute directory the package now occupies in the pool. */
   dir: string
+  /** Whether this install replaced an existing (strictly older) copy. */
+  updated: boolean
 }
 
 /** What a pre-install inspection reports: everything the install-time
@@ -136,12 +140,82 @@ function validateSnapRail(manifest: PackageJson): SnapRailManifest {
 }
 
 /**
- * Install a plugin zip into the pool directory.
+ * Compare two version strings (semver-ish, no semver dependency): core
+ * segments compare numerically (missing or non-numeric = 0), a `-suffix`
+ * prerelease orders before its release, and prerelease identifiers compare
+ * numerically when both numeric and lexicographically otherwise.
+ *
+ * @returns negative when `a < b`, positive when `a > b`, zero when equal.
+ */
+export function compareVersions(a: string, b: string): number {
+  const [coreA, ...preA] = a.split('-')
+  const [coreB, ...preB] = b.split('-')
+  const segsA = (coreA ?? '').split('.')
+  const segsB = (coreB ?? '').split('.')
+  for (let i = 0; i < Math.max(segsA.length, segsB.length); i++) {
+    const rawA = segsA[i]
+    const rawB = segsB[i]
+    const numA = rawA !== undefined && /^\d+$/.test(rawA) ? Number(rawA) : 0
+    const numB = rawB !== undefined && /^\d+$/.test(rawB) ? Number(rawB) : 0
+    if (numA !== numB) return numA < numB ? -1 : 1
+  }
+  const isPreA = preA.length > 0
+  const isPreB = preB.length > 0
+  if (isPreA !== isPreB) return isPreA ? -1 : 1
+  if (!isPreA) return 0
+  const idsA = preA.join('-').split('.')
+  const idsB = preB.join('-').split('.')
+  for (let i = 0; i < Math.max(idsA.length, idsB.length); i++) {
+    const idA = idsA[i]
+    const idB = idsB[i]
+    if (idA === idB) continue
+    if (idA === undefined) return -1
+    if (idB === undefined) return 1
+    const numA = /^\d+$/.test(idA) ? Number(idA) : null
+    const numB = /^\d+$/.test(idB) ? Number(idB) : null
+    if (numA !== null && numB !== null && numA !== numB) return numA < numB ? -1 : 1
+    if ((numA === null) !== (numB === null)) return numA !== null ? -1 : 1
+    return idA < idB ? -1 : 1
+  }
+  return 0
+}
+
+/** The pool directory one package occupies (`/` sanitized to `__`). */
+function poolDirOf(poolDir: string, name: string): string {
+  return join(poolDir, name.replaceAll('/', '__'))
+}
+
+/**
+ * Read an installed package's declared version straight from the pool.
+ *
+ * @returns the manifest version, `'0.0.0'` when the manifest lacks one or is
+ * unreadable (a broken install stays updatable — any real version repairs
+ * it), or `undefined` when the package is not installed.
+ */
+export function installedVersionOf(poolDir: string, name: string): string | undefined {
+  const manifest = join(poolDirOf(poolDir, name), 'package.json')
+  if (!existsSync(manifest)) return undefined
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(manifest, 'utf8'))
+    const version = (parsed as { version?: unknown }).version
+    return typeof version === 'string' ? version : '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
+}
+
+/**
+ * Install a plugin zip into the pool directory. Installing over an existing
+ * copy is an update: it is allowed only when the zip's version is strictly
+ * higher (equal or lower versions conflict — uninstall first to downgrade),
+ * and it never touches the package's namespaced data (that is uninstall's
+ * to delete). Extraction lands in a staging directory that is swapped into
+ * place, so a failed write leaves the installed version intact.
  *
  * @param zipPath - absolute path of the plugin zip on the host.
  * @param poolDir - the plugin pool directory (`<home>/plugins`).
  * @returns what landed; the caller re-applies the composition afterwards.
- * @throws InstallError for malformed zips/manifests and name conflicts.
+ * @throws InstallError for malformed zips/manifests and version conflicts.
  */
 export function installPluginFromZip(zipPath: string, poolDir: string): InstallResult {
   let files: Record<string, Uint8Array>
@@ -167,24 +241,42 @@ export function installPluginFromZip(zipPath: string, poolDir: string): InstallR
   }
   validateSnapRail(manifest)
 
-  const dir = join(poolDir, manifest.name.replaceAll('/', '__'))
+  const version = typeof manifest.version === 'string' ? manifest.version : '0.0.0'
+  const dir = poolDirOf(poolDir, manifest.name)
+  let updated = false
   if (existsSync(dir)) {
-    throw new InstallError('conflict', `${manifest.name} is already installed (uninstall first)`)
+    const installed = installedVersionOf(poolDir, manifest.name) ?? '0.0.0'
+    if (compareVersions(version, installed) <= 0) {
+      throw new InstallError(
+        'conflict',
+        `${manifest.name} v${installed} is already installed and the zip carries v${version} — ` +
+        'only a strictly higher version updates in place (uninstall first to downgrade)',
+      )
+    }
+    updated = true
   }
-  mkdirSync(dir, { recursive: true })
-  for (const [name, data] of Object.entries(files)) {
-    if (name.endsWith('/')) continue
-    const relative = root === '' ? name : name.slice(root.length + 1)
-    if (relative === '') continue
-    const target = join(dir, relative)
-    mkdirSync(join(target, '..'), { recursive: true })
-    writeFileSync(target, data)
+
+  const staging = `${dir}.update-${randomUUID()}`
+  try {
+    mkdirSync(staging, { recursive: true })
+    for (const [name, data] of Object.entries(files)) {
+      if (name.endsWith('/')) continue
+      const relative = root === '' ? name : name.slice(root.length + 1)
+      if (relative === '') continue
+      const target = join(staging, relative)
+      mkdirSync(join(target, '..'), { recursive: true })
+      writeFileSync(target, data)
+    }
+    if (updated) rmSync(dir, { recursive: true, force: true })
+    renameSync(staging, dir)
+  } catch (cause) {
+    rmSync(staging, { recursive: true, force: true })
+    if (cause instanceof InstallError) throw cause
+    throw new InstallError('io', `cannot write ${manifest.name} into the pool: ${
+      cause instanceof Error ? cause.message : String(cause)
+    }`)
   }
-  return {
-    name: manifest.name,
-    version: typeof manifest.version === 'string' ? manifest.version : '0.0.0',
-    dir,
-  }
+  return { name: manifest.name, version, dir, updated }
 }
 
 /** The store database file a package owns (namespace = sanitized name). */
@@ -203,7 +295,7 @@ export function pluginDataFile(home: string, name: string): string {
  * @param home - the snap-rail home (owns `data/`).
  */
 export function uninstallPlugin(name: string, poolDir: string, home: string): void {
-  const dir = join(poolDir, name.replaceAll('/', '__'))
+  const dir = poolDirOf(poolDir, name)
   if (!existsSync(dir)) {
     throw new InstallError('not-installed', `${name} is not installed`)
   }

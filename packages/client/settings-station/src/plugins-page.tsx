@@ -27,18 +27,23 @@ interface PluginRow {
   enabled: boolean
   packageName: string
   kind?: string
+  version?: string
 }
 
-/** What the pre-install inspection shows. */
+/** What the pre-install inspection shows (plus how the install would land:
+ * fresh, in-place update, or blocked by a not-higher version). */
 interface Inspected {
   name: string
   version: string
   kind?: string | undefined
   permissions: readonly string[]
   hasClient: boolean
+  installed?: { version: string } | undefined
+  action: 'install' | 'update' | 'blocked'
 }
 
-const KIND_LABELS: Record<string, string> = {
+/** Kind → display label; shared with the market page's rows. */
+export const KIND_LABELS: Record<string, string> = {
   suite: '业务套件',
   driver: '通讯驱动',
   plugin: '插件',
@@ -61,6 +66,7 @@ function PluginRowView(props: {
       <div className="flex min-w-0 items-center gap-3">
         <Badge variant="secondary">{row.source === 'builtin' ? '内置' : row.source === 'user' ? '用户层' : '插件池'}</Badge>
         <span className="truncate font-mono text-sm">{row.name}</span>
+        {row.version !== undefined && <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">v{row.version}</span>}
         {props.needsRestart === true && <Badge variant="destructive">待重启</Badge>}
       </div>
       <div className="flex items-center gap-2">
@@ -192,7 +198,9 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
       if (result.ok) {
         setRows(result.value.plugins.map(info => ({
           name: info.name, source: info.source, enabled: info.enabled,
-          packageName: info.packageName, ...info.kind !== undefined ? { kind: info.kind } : {},
+          packageName: info.packageName,
+          ...info.kind !== undefined ? { kind: info.kind } : {},
+          ...info.version !== undefined ? { version: info.version } : {},
         })))
       } else setFailed(true)
     }).catch(() => setFailed(true))
@@ -283,10 +291,15 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
         setInstall({ phase: 'error', message: rpcErrorText(result.error) })
         return
       }
-      // Installing lands the package in the pool disabled; enabling it is a
-      // separate explicit act, so no restart prompt belongs to the install.
       setInstall({ phase: 'idle' })
       reload()
+      // A fresh install lands disabled (no restart prompt). An update swaps
+      // the package under a possibly-running face, so the renderer may carry
+      // the old bundle until it reboots — same surface as the uninstall path.
+      if (result.value.installed.updated && rendererNames.includes(result.value.installed.name)) {
+        setTouched(current => new Set([...current, result.value.installed.name]))
+        setRestartPrompt(true)
+      }
     }).catch(cause => setInstall({ phase: 'error', message: String(cause) }))
   }
 
@@ -373,7 +386,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
         <Dialog open onOpenChange={next => { if (!next) setRestartPrompt(false) }}>
           <DialogContent aria-describedby={undefined} className="max-w-sm">
             <DialogTitle className="text-base font-medium">变更待重启生效</DialogTitle>
-            <p className="text-sm text-muted-foreground">业务套件与页面类插件的启用变更将在下次启动时生效；插件卸载后的界面残留也会随之消失。</p>
+            <p className="text-sm text-muted-foreground">业务套件与页面类插件的启用变更将在下次启动时生效；插件更新或卸载后的界面残留也会随之消失。</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setRestartPrompt(false)}>稍后</Button>
               <Button data-restart-now onClick={() => relaunch()}>立即重启</Button>
@@ -385,17 +398,36 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
       {install.phase === 'confirm' && (
         <Dialog open onOpenChange={next => { if (!next) setInstall({ phase: 'idle' }) }}>
           <DialogContent aria-describedby={undefined} className="max-w-sm">
-            <DialogTitle className="text-base font-medium">安装插件</DialogTitle>
+            <DialogTitle className="text-base font-medium">
+              {install.plugin.action === 'update' ? '更新插件' : '安装插件'}
+            </DialogTitle>
             <div className="grid gap-2 text-sm">
               <div className="flex justify-between gap-4"><span className="text-muted-foreground">包名</span><span className="truncate font-mono">{install.plugin.name}</span></div>
-              <div className="flex justify-between gap-4"><span className="text-muted-foreground">版本</span><span className="font-mono">{install.plugin.version}</span></div>
+              {install.plugin.action === 'update' ? (
+                <>
+                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">已安装版本</span><span className="font-mono">{install.plugin.installed?.version}</span></div>
+                  <div className="flex justify-between gap-4"><span className="text-muted-foreground">将更新至</span><span className="font-mono">{install.plugin.version}</span></div>
+                </>
+              ) : (
+                <div className="flex justify-between gap-4"><span className="text-muted-foreground">版本</span><span className="font-mono">{install.plugin.version}</span></div>
+              )}
               <div className="flex justify-between gap-4"><span className="text-muted-foreground">类型</span><span>{KIND_LABELS[install.plugin.kind ?? 'plugin'] ?? install.plugin.kind ?? '插件'}</span></div>
               {install.plugin.hasClient && <div className="flex justify-between gap-4"><span className="text-muted-foreground">界面</span><span>含页面</span></div>}
               <div className="flex justify-between gap-4"><span className="text-muted-foreground">权限</span><span>{install.plugin.permissions.length === 0 ? '无' : install.plugin.permissions.join('、')}</span></div>
+              {install.plugin.action === 'update' && (
+                <p className="text-xs text-muted-foreground">覆盖后保留该插件的配置与数据；运行中的界面需重启后生效。</p>
+              )}
+              {install.plugin.action === 'blocked' && (
+                <p data-install-blocked className="text-sm text-destructive">
+                  已安装 v{install.plugin.installed?.version}，安装包 v{install.plugin.version} 不高于已装版本，无法覆盖（卸载后可降级安装）。
+                </p>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setInstall({ phase: 'idle' })}>取消</Button>
-              <Button data-confirm-install onClick={() => runInstall(install.zipPath)}>安装</Button>
+              <Button data-confirm-install disabled={install.plugin.action === 'blocked'} onClick={() => runInstall(install.zipPath)}>
+                {install.plugin.action === 'update' ? '更新' : '安装'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
