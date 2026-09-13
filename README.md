@@ -8,28 +8,33 @@ Electron 宿主。基于 vendored Cordis 元框架；一期交付核心 + 插件
 
 ## 一分钟看懂
 
-- **主进程**跑 Cordis 宿主树：内置层清单（只读）+ 用户层
-  userData `plugins.yml`（可被页面按钮、手编、Agent 编辑——文件即接口）
-  合成出实际挂载的插件集，watch 热重载、坏配置保持旧树并报错。
+- **主进程**跑 Cordis 宿主树：内置层清单（只读，**随包只带 base**）+
+  用户层 userData `plugins.yml`（可被页面按钮、手编、Agent 编辑——文件即
+  接口）合成出实际挂载的插件集，watch 热重载、坏配置保持旧树并报错。
+- **其余一切 zip 安装**：store 后端、设备底座、驱动、UI 框架、设置页、
+  工具、业务套件都从 `dist-plugins/*.zip` 装进 `<home>/plugins/` 池
+  （设置页按钮或无框架时的拖拽引导页）；包内 `snapRail.category` 是
+  作者自定义的分类标记，管理页按标记分组；`snapRail.requires` 驱动
+  启用/卸载的依赖预检。
 - **点表缝** `ctx.points`：连接注册点位、推送样本（`null`=异常）、
-  路由写入；mock 驱动模拟 float/BigInt/bool/ISO 时间戳点流与离线。
-- **renderer** 是投影客户端：preload 只暴露 `invoke`/`openStream` 两原语，
-  四象限 RPC 协议在此之上类型化；布局/标题栏/看板/管理页全部是插件。
-- **看板**实时跳动、插件管理页禁用/启用即时生效、模拟离线值变 null。
+  路由写入；modbus 驱动是纯协议适配器的范本。
+- **renderer** 是投影客户端：preload 只暴露 `invoke`/`openStream`/
+  `zipPathOf` 三原语，四象限 RPC 协议在此之上类型化；框架、布局、
+  标题栏、看板、管理页全部是插件，没有框架时内置引导页兜底安装。
 
 ## 布局
 
 ```
 vendor/      vendored Cordis（rescope @snap-rail/*，见 vendor/README.md）
-packages/    能力组 packages/<组>/<包>：
-  boot/        app-boot（扫描/两层合成/boot/层管理热重载）
-  protocol/    protocol / gateway / connection（RPC 缝）
-  field/       field（点表缝）+ driver-mock（首方驱动）
-  client/      kernel / slots / runtime（脊柱）+ 布局/标题栏/看板/管理页（住户）
-  audit/
-  settings/
-  util/
-apps/desktop  Electron 应用（无框窗口、IPC 载体、打包配置）
+packages/    层组 packages/<层>/<包>（snapRail.layer 声明，层序 base→store→equipment→ui→tool→suite）：
+  base/        util / plugin-kit / settings / audit / protocol / gateway /
+               connection / app-boot / station-rpc / kernel / modules（出厂全集，替换经源码重建）
+  store/       store（规范：drizzle 查询构建器即规范，随应用发布）+ store-sqlite（实现，zip 安装，单活）
+  equipment/   equipment（设备连接底座缝，zip 安装）+ driver-modbus（驱动多活，范本）
+  ui/          framework-shadcn（UI 框架插件，zip、clientOnly、单活）+ equipment-station / settings-station
+  tool/        forge（AI 创造）+ trend（班产趋势）
+  suite/       terminal-ops（业务套件，clientOnly、单活）
+apps/desktop  Electron 应用（无框窗口、IPC 载体、打包配置；dev overlay 见 dev/）
 docs/         architecture.md（缝目录与决策）
 ```
 
@@ -37,10 +42,11 @@ docs/         architecture.md（缝目录与决策）
 
 ```sh
 pnpm install
-pnpm run build        # tsc -b (lib/types) + tsdown (lib)
+pnpm run build        # tsc -b (lib/types) + tailwind（框架主题预编译）+ tsdown (lib)
 pnpm run typecheck
-pnpm test             # vitest 全量（先构建）
-pnpm app:dev          # Vite dev server + Electron，热重载开发
+pnpm test             # vitest 全量（先构建）+ 层依赖门禁
+pnpm run pack:plugins # 全量可安装 zip → dist-plugins/（build 后执行）
+pnpm app:dev          # Vite dev server + Electron（全量 overlay），热重载开发
 pnpm app:pack         # win-unpacked 目录形态（release-out/）
 pnpm app:dist         # NSIS 安装包 + blockmap
 ```

@@ -13,6 +13,9 @@ importers:
 
   .:
     devDependencies:
+      '@tailwindcss/cli':
+        specifier: ^4.3.3
+        version: 4.3.3
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
@@ -28,6 +31,9 @@ importers:
       js-yaml:
         specifier: ^4.2.0
         version: 4.3.1
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
       tsdown:
         specifier: ^0.22.2
         version: 0.22.14(tsx@4.23.12)(typescript@6.0.3)
@@ -43,48 +49,51 @@ importers:
       vitest:
         specifier: ^4.1.8
         version: 4.1.11(@types/node@22.20.1)(happy-dom@20.11.6)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   apps/desktop:
     dependencies:
       '@snap-rail/app-boot':
         specifier: workspace:^
-        version: link:../../packages/boot/app-boot
+        version: link:../../packages/base/app-boot
       '@snap-rail/audit':
         specifier: workspace:^
-        version: link:../../packages/audit/audit
+        version: link:../../packages/base/audit
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../packages/base/connection
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../vendor/cordis
       '@snap-rail/cordis-plugin-timer':
         specifier: workspace:^
         version: link:../../vendor/timer
-      '@snap-rail/driver-mock':
-        specifier: workspace:^
-        version: link:../../packages/field/driver-mock
-      '@snap-rail/driver-modbus':
-        specifier: workspace:^
-        version: link:../../packages/field/driver-modbus
-      '@snap-rail/field':
-        specifier: workspace:^
-        version: link:../../packages/field/field
       '@snap-rail/gateway':
         specifier: workspace:^
-        version: link:../../packages/protocol/gateway
+        version: link:../../packages/base/gateway
+      '@snap-rail/plugin-kit':
+        specifier: workspace:^
+        version: link:../../packages/base/plugin-kit
       '@snap-rail/protocol':
         specifier: workspace:^
-        version: link:../../packages/protocol/protocol
+        version: link:../../packages/base/protocol
+      '@snap-rail/scope':
+        specifier: workspace:^
+        version: link:../../packages/base/scope
       '@snap-rail/settings':
         specifier: workspace:^
-        version: link:../../packages/settings/settings
+        version: link:../../packages/base/settings
       '@snap-rail/station-rpc':
         specifier: workspace:^
-        version: link:../../packages/boot/station-rpc
+        version: link:../../packages/base/station-rpc
       '@snap-rail/store':
         specifier: workspace:^
         version: link:../../packages/store/store
-      '@snap-rail/suite-terminal-ops':
+      '@snap-rail/util':
         specifier: workspace:^
-        version: link:../../packages/suites/terminal-ops
+        version: link:../../packages/base/util
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2
@@ -95,36 +104,39 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@snap-rail/client-fallback':
-        specifier: workspace:^
-        version: link:../../packages/client/fallback
       '@snap-rail/client-kernel':
         specifier: workspace:^
-        version: link:../../packages/client/kernel
+        version: link:../../packages/base/kernel
       '@snap-rail/client-modules':
         specifier: workspace:^
-        version: link:../../packages/client/modules
-      '@snap-rail/client-runtime':
+        version: link:../../packages/base/modules
+      '@snap-rail/driver-enip':
         specifier: workspace:^
-        version: link:../../packages/client/runtime
-      '@snap-rail/client-settings':
+        version: link:../../packages/equipment/driver-enip
+      '@snap-rail/driver-modbus':
         specifier: workspace:^
-        version: link:../../packages/client/settings
-      '@snap-rail/client-slots':
+        version: link:../../packages/equipment/driver-modbus
+      '@snap-rail/equipment':
         specifier: workspace:^
-        version: link:../../packages/client/slots
-      '@snap-rail/client-variables':
+        version: link:../../packages/equipment/equipment
+      '@snap-rail/equipment-station':
         specifier: workspace:^
-        version: link:../../packages/client/variables
-      '@snap-rail/connection':
+        version: link:../../packages/ui/equipment-station
+      '@snap-rail/framework-shadcn':
         specifier: workspace:^
-        version: link:../../packages/protocol/connection
-      '@snap-rail/plugin-kit':
-        specifier: workspace:^
-        version: link:../../packages/util/plugin-kit
+        version: link:../../packages/ui/framework-shadcn
       '@snap-rail/settings-station':
         specifier: workspace:^
-        version: link:../../packages/client/settings-station
+        version: link:../../packages/ui/settings-station
+      '@snap-rail/store-sqlite':
+        specifier: workspace:^
+        version: link:../../packages/store/store-sqlite
+      '@snap-rail/suite-terminal-ops':
+        specifier: workspace:^
+        version: link:../../packages/suite/terminal-ops
+      '@snap-rail/trend':
+        specifier: workspace:^
+        version: link:../../packages/tool/trend
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
@@ -162,13 +174,7 @@ importers:
         specifier: ^5.1.4
         version: 5.1.4(supports-color@9.4.0)(typescript@6.0.3)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
 
-  packages/audit/audit:
-    devDependencies:
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-
-  packages/boot/app-boot:
+  packages/base/app-boot:
     dependencies:
       fflate:
         specifier: ^0.8.3
@@ -179,7 +185,7 @@ importers:
     devDependencies:
       '@snap-rail/audit':
         specifier: workspace:^
-        version: link:../../audit/audit
+        version: link:../audit
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
@@ -194,193 +200,460 @@ importers:
         version: link:../../../vendor/loader
       '@snap-rail/gateway':
         specifier: workspace:^
-        version: link:../../protocol/gateway
+        version: link:../gateway
       '@snap-rail/protocol':
         specifier: workspace:^
-        version: link:../../protocol/protocol
+        version: link:../protocol
       zod:
         specifier: ^4.4.3
         version: 4.4.3
 
-  packages/boot/station-rpc:
+  packages/base/audit:
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+
+  packages/base/connection:
+    dependencies:
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../protocol
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
+  packages/base/gateway:
+    dependencies:
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../protocol
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+
+  packages/base/kernel:
+    dependencies:
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../connection
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../protocol
+      '@snap-rail/station-rpc':
+        specifier: workspace:^
+        version: link:../station-rpc
+    devDependencies:
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../gateway
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.5(@types/react@19.2.18)
+      happy-dom:
+        specifier: ^20.0.11
+        version: 20.11.6
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
+  packages/base/modules: {}
+
+  packages/base/plugin-kit:
+    dependencies:
+      '@snap-rail/util':
+        specifier: workspace:^
+        version: link:../util
+      tsdown:
+        specifier: ^0.22.2
+        version: 0.22.14(tsx@4.23.12)(typescript@6.0.3)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      rolldown:
+        specifier: ^1.2.5
+        version: 1.2.5
+
+  packages/base/protocol:
+    dependencies:
+      '@snap-rail/util':
+        specifier: workspace:^
+        version: link:../util
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+
+  packages/base/scope:
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+
+  packages/base/settings:
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+
+  packages/base/station-rpc:
     devDependencies:
       '@snap-rail/app-boot':
         specifier: workspace:^
         version: link:../app-boot
       '@snap-rail/audit':
         specifier: workspace:^
-        version: link:../../audit/audit
+        version: link:../audit
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
       '@snap-rail/gateway':
         specifier: workspace:^
-        version: link:../../protocol/gateway
+        version: link:../gateway
       '@snap-rail/protocol':
         specifier: workspace:^
-        version: link:../../protocol/protocol
+        version: link:../protocol
       '@snap-rail/settings':
         specifier: workspace:^
-        version: link:../../settings/settings
+        version: link:../settings
       zod:
         specifier: ^4.4.3
         version: 4.4.3
 
-  packages/client/fallback:
-    devDependencies:
-      '@snap-rail/client-settings':
-        specifier: workspace:^
-        version: link:../settings
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../slots
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../ui
-      '@snap-rail/connection':
-        specifier: workspace:^
-        version: link:../../protocol/connection
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
+  packages/base/util: {}
 
-  packages/client/kernel:
+  packages/equipment/driver-enip:
     dependencies:
-      '@snap-rail/connection':
-        specifier: workspace:^
-        version: link:../../protocol/connection
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../protocol/protocol
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
-      '@snap-rail/gateway':
+      '@snap-rail/audit':
         specifier: workspace:^
-        version: link:../../protocol/gateway
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.5(@types/react@19.2.18)
-      happy-dom:
-        specifier: ^20.0.11
-        version: 20.11.6
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.8
-        version: 19.2.8(react@19.2.8)
-
-  packages/client/modules: {}
-
-  packages/client/runtime:
-    dependencies:
-      '@snap-rail/client-kernel':
-        specifier: workspace:^
-        version: link:../kernel
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../session
-      '@snap-rail/client-settings':
-        specifier: workspace:^
-        version: link:../settings
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../slots
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../ui
-      '@snap-rail/client-variables':
-        specifier: workspace:^
-        version: link:../variables
-      '@snap-rail/client-workflows':
-        specifier: workspace:^
-        version: link:../workflows
-    devDependencies:
-      '@snap-rail/connection':
-        specifier: workspace:^
-        version: link:../../protocol/connection
+        version: link:../../base/audit
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
       '@snap-rail/cordis-plugin-timer':
         specifier: workspace:^
         version: link:../../../vendor/timer
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.5(@types/react@19.2.18)
+      '@snap-rail/equipment':
+        specifier: workspace:^
+        version: link:../equipment
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../base/gateway
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../store/store
+
+  packages/equipment/driver-modbus:
+    dependencies:
+      modbus-serial:
+        specifier: 8.0.23-no-serial-port
+        version: 8.0.23-no-serial-port(supports-color@9.4.0)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/audit':
+        specifier: workspace:^
+        version: link:../../base/audit
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../../vendor/timer
+      '@snap-rail/equipment':
+        specifier: workspace:^
+        version: link:../equipment
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../base/gateway
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../store/store
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       happy-dom:
-        specifier: ^20.0.11
-        version: 20.11.6
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.8
-        version: 19.2.8(react@19.2.8)
+        specifier: ^18.0.0
+        version: 18.0.0
+      rolldown:
+        specifier: ^1.2.5
+        version: 1.2.5
 
-  packages/client/session:
+  packages/equipment/equipment:
     dependencies:
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../base/protocol
+      '@snap-rail/util':
+        specifier: workspace:^
+        version: link:../../base/util
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/audit':
+        specifier: workspace:^
+        version: link:../../base/audit
       '@snap-rail/connection':
         specifier: workspace:^
-        version: link:../../protocol/connection
+        version: link:../../base/connection
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../base/gateway
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../store/store
+      '@snap-rail/store-sqlite':
+        specifier: workspace:^
+        version: link:../../store/store-sqlite
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.1
+
+  packages/store/store:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
     devDependencies:
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+
+  packages/store/store-sqlite:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../store
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.1
+
+  packages/suite/terminal-ops:
+    dependencies:
+      '@snap-rail/trend':
+        specifier: workspace:^
+        version: link:../../tool/trend
+      '@snap-rail/util':
+        specifier: workspace:^
+        version: link:../../base/util
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../base/connection
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../../vendor/timer
+      '@snap-rail/equipment':
+        specifier: workspace:^
+        version: link:../../equipment/equipment
+      '@snap-rail/framework-shadcn':
+        specifier: workspace:^
+        version: link:../../ui/framework-shadcn
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../base/gateway
+      '@snap-rail/plugin-kit':
+        specifier: workspace:^
+        version: link:../../base/plugin-kit
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../base/protocol
+      '@snap-rail/settings':
+        specifier: workspace:^
+        version: link:../../base/settings
       '@snap-rail/station-rpc':
         specifier: workspace:^
-        version: link:../../boot/station-rpc
-
-  packages/client/settings:
-    devDependencies:
-      '@snap-rail/cordis':
+        version: link:../../base/station-rpc
+      '@snap-rail/store':
         specifier: workspace:^
-        version: link:../../../vendor/cordis
+        version: link:../../store/store
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
+      lucide-react:
+        specifier: ^1.34.0
+        version: 1.34.0(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
 
-  packages/client/settings-station:
+  packages/tool/forge:
     dependencies:
-      '@snap-rail/client-runtime':
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/audit':
         specifier: workspace:^
-        version: link:../runtime
-      '@snap-rail/client-settings':
+        version: link:../../base/audit
+      '@snap-rail/client-kernel':
         specifier: workspace:^
-        version: link:../settings
-      '@snap-rail/client-ui':
+        version: link:../../base/kernel
+      '@snap-rail/client-modules':
         specifier: workspace:^
-        version: link:../ui
+        version: link:../../base/modules
       '@snap-rail/connection':
         specifier: workspace:^
-        version: link:../../protocol/connection
-      '@snap-rail/station-rpc':
-        specifier: workspace:^
-        version: link:../../boot/station-rpc
-    devDependencies:
-      '@snap-rail/app-boot':
-        specifier: workspace:^
-        version: link:../../boot/app-boot
+        version: link:../../base/connection
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@snap-rail/equipment':
+        specifier: workspace:^
+        version: link:../../equipment/equipment
+      '@snap-rail/framework-shadcn':
+        specifier: workspace:^
+        version: link:../../ui/framework-shadcn
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../base/gateway
+      '@snap-rail/plugin-kit':
+        specifier: workspace:^
+        version: link:../../base/plugin-kit
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../base/protocol
+      '@snap-rail/scope':
+        specifier: workspace:^
+        version: link:../../base/scope
+      '@snap-rail/settings':
+        specifier: workspace:^
+        version: link:../../base/settings
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../store/store
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
+      lucide-react:
+        specifier: ^1.34.0
+        version: 1.34.0(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+
+  packages/tool/trend:
+    dependencies:
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../../vendor/timer
+      '@snap-rail/equipment':
+        specifier: workspace:^
+        version: link:../../equipment/equipment
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../base/gateway
+      '@snap-rail/settings':
+        specifier: workspace:^
+        version: link:../../base/settings
+      '@snap-rail/store':
+        specifier: workspace:^
+        version: link:../../store/store
+      '@snap-rail/store-sqlite':
+        specifier: workspace:^
+        version: link:../../store/store-sqlite
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.1
+
+  packages/ui/equipment-station:
+    devDependencies:
+      '@snap-rail/audit':
+        specifier: workspace:^
+        version: link:../../base/audit
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../base/connection
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@snap-rail/driver-modbus':
+        specifier: workspace:^
+        version: link:../../equipment/driver-modbus
+      '@snap-rail/equipment':
+        specifier: workspace:^
+        version: link:../../equipment/equipment
+      '@snap-rail/framework-shadcn':
+        specifier: workspace:^
+        version: link:../framework-shadcn
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../../base/gateway
+      '@snap-rail/plugin-kit':
+        specifier: workspace:^
+        version: link:../../base/plugin-kit
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../base/protocol
+      '@snap-rail/store-sqlite':
+        specifier: workspace:^
+        version: link:../../store/store-sqlite
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      happy-dom:
+        specifier: ^18.0.0
+        version: 18.0.0
       lucide-react:
         specifier: ^1.34.0
         version: 1.34.0(react@19.2.8)
@@ -391,19 +664,7 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
-  packages/client/slots:
-    devDependencies:
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-
-  packages/client/ui:
+  packages/ui/framework-shadcn:
     dependencies:
       '@radix-ui/react-checkbox':
         specifier: ^1.1.3
@@ -448,9 +709,30 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@snap-rail/client-kernel':
+        specifier: workspace:^
+        version: link:../../base/kernel
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../../base/connection
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@snap-rail/cordis-plugin-timer':
+        specifier: workspace:^
+        version: link:../../../vendor/timer
+      '@snap-rail/equipment':
+        specifier: workspace:^
+        version: link:../../equipment/equipment
+      '@snap-rail/plugin-kit':
+        specifier: workspace:^
+        version: link:../../base/plugin-kit
+      '@snap-rail/protocol':
+        specifier: workspace:^
+        version: link:../../base/protocol
+      '@snap-rail/station-rpc':
+        specifier: workspace:^
+        version: link:../../base/station-rpc
       '@testing-library/dom':
         specifier: ^10.4.0
         version: 10.4.1
@@ -473,346 +755,27 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
 
-  packages/client/variables:
+  packages/ui/settings-station:
     dependencies:
-      '@snap-rail/field':
-        specifier: workspace:^
-        version: link:../../field/field
-    devDependencies:
       '@snap-rail/connection':
         specifier: workspace:^
-        version: link:../../protocol/connection
-      '@snap-rail/cordis':
+        version: link:../../base/connection
+      '@snap-rail/framework-shadcn':
         specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../protocol/protocol
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.5(@types/react@19.2.18)
-      happy-dom:
-        specifier: ^20.0.11
-        version: 20.11.6
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.8
-        version: 19.2.8(react@19.2.8)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  packages/client/workflows:
-    devDependencies:
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-
-  packages/field/driver-mock:
-    dependencies:
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/cordis-plugin-timer':
-        specifier: workspace:^
-        version: link:../../../vendor/timer
-      '@snap-rail/field':
-        specifier: workspace:^
-        version: link:../field
-
-  packages/field/driver-modbus:
-    dependencies:
-      modbus-serial:
-        specifier: 8.0.23-no-serial-port
-        version: 8.0.23-no-serial-port(supports-color@9.4.0)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@snap-rail/audit':
-        specifier: workspace:^
-        version: link:../../audit/audit
-      '@snap-rail/client-settings':
-        specifier: workspace:^
-        version: link:../../client/settings
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/cordis-plugin-timer':
-        specifier: workspace:^
-        version: link:../../../vendor/timer
-      '@snap-rail/field':
-        specifier: workspace:^
-        version: link:../field
-      '@snap-rail/gateway':
-        specifier: workspace:^
-        version: link:../../protocol/gateway
-      '@snap-rail/store':
-        specifier: workspace:^
-        version: link:../../store/store
-      '@testing-library/react':
-        specifier: ^16.3.3
-        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      happy-dom:
-        specifier: ^18.0.0
-        version: 18.0.0
-      rolldown:
-        specifier: ^1.2.5
-        version: 1.2.5
-
-  packages/field/field:
-    dependencies:
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../protocol/protocol
-      '@snap-rail/util':
-        specifier: workspace:^
-        version: link:../../util/util
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@snap-rail/audit':
-        specifier: workspace:^
-        version: link:../../audit/audit
-      '@snap-rail/client-settings':
-        specifier: workspace:^
-        version: link:../../client/settings
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../../client/ui
-      '@snap-rail/connection':
-        specifier: workspace:^
-        version: link:../../protocol/connection
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/gateway':
-        specifier: workspace:^
-        version: link:../../protocol/gateway
-      '@snap-rail/store':
-        specifier: workspace:^
-        version: link:../../store/store
-      '@testing-library/react':
-        specifier: ^16.3.3
-        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      happy-dom:
-        specifier: ^18.0.0
-        version: 18.0.0
-      lucide-react:
-        specifier: ^1.34.0
-        version: 1.34.0(react@19.2.8)
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-
-  packages/protocol/connection:
-    dependencies:
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../protocol
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  packages/protocol/gateway:
-    dependencies:
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../protocol
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-
-  packages/protocol/protocol:
-    dependencies:
-      '@snap-rail/util':
-        specifier: workspace:^
-        version: link:../../util/util
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  packages/settings/settings:
-    devDependencies:
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-
-  packages/store/store:
-    dependencies:
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2
-    devDependencies:
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-
-  packages/suites/terminal-ops:
-    dependencies:
-      '@snap-rail/util':
-        specifier: workspace:^
-        version: link:../../util/util
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../../client/runtime
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../../client/session
-      '@snap-rail/client-settings':
-        specifier: workspace:^
-        version: link:../../client/settings
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../../client/slots
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../../client/ui
-      '@snap-rail/client-variables':
-        specifier: workspace:^
-        version: link:../../client/variables
-      '@snap-rail/client-workflows':
-        specifier: workspace:^
-        version: link:../../client/workflows
-      '@snap-rail/connection':
-        specifier: workspace:^
-        version: link:../../protocol/connection
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/cordis-plugin-timer':
-        specifier: workspace:^
-        version: link:../../../vendor/timer
-      '@snap-rail/field':
-        specifier: workspace:^
-        version: link:../../field/field
-      '@snap-rail/gateway':
-        specifier: workspace:^
-        version: link:../../protocol/gateway
-      '@snap-rail/plugin-kit':
-        specifier: workspace:^
-        version: link:../../util/plugin-kit
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../protocol/protocol
-      '@snap-rail/settings':
-        specifier: workspace:^
-        version: link:../../settings/settings
+        version: link:../framework-shadcn
       '@snap-rail/station-rpc':
         specifier: workspace:^
-        version: link:../../boot/station-rpc
-      '@snap-rail/store':
-        specifier: workspace:^
-        version: link:../../store/store
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      lucide-react:
-        specifier: ^1.34.0
-        version: 1.34.0(react@19.2.8)
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-
-  packages/tools/forge:
-    dependencies:
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2
-      fflate:
-        specifier: ^0.8.3
-        version: 0.8.3
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
+        version: link:../../base/station-rpc
     devDependencies:
-      '@snap-rail/audit':
+      '@snap-rail/app-boot':
         specifier: workspace:^
-        version: link:../../audit/audit
-      '@snap-rail/client-kernel':
-        specifier: workspace:^
-        version: link:../../client/kernel
-      '@snap-rail/client-modules':
-        specifier: workspace:^
-        version: link:../../client/modules
-      '@snap-rail/client-runtime':
-        specifier: workspace:^
-        version: link:../../client/runtime
-      '@snap-rail/client-session':
-        specifier: workspace:^
-        version: link:../../client/session
-      '@snap-rail/client-settings':
-        specifier: workspace:^
-        version: link:../../client/settings
-      '@snap-rail/client-slots':
-        specifier: workspace:^
-        version: link:../../client/slots
-      '@snap-rail/client-ui':
-        specifier: workspace:^
-        version: link:../../client/ui
-      '@snap-rail/client-variables':
-        specifier: workspace:^
-        version: link:../../client/variables
-      '@snap-rail/client-workflows':
-        specifier: workspace:^
-        version: link:../../client/workflows
-      '@snap-rail/connection':
-        specifier: workspace:^
-        version: link:../../protocol/connection
+        version: link:../../base/app-boot
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
-      '@snap-rail/field':
-        specifier: workspace:^
-        version: link:../../field/field
-      '@snap-rail/gateway':
-        specifier: workspace:^
-        version: link:../../protocol/gateway
       '@snap-rail/plugin-kit':
         specifier: workspace:^
-        version: link:../../util/plugin-kit
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../protocol/protocol
-      '@snap-rail/settings':
-        specifier: workspace:^
-        version: link:../../settings/settings
-      '@snap-rail/store':
-        specifier: workspace:^
-        version: link:../../store/store
+        version: link:../../base/plugin-kit
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
@@ -822,21 +785,9 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
-
-  packages/util/plugin-kit:
-    dependencies:
-      tsdown:
-        specifier: ^0.22.2
-        version: 0.22.14(tsx@4.23.12)(typescript@6.0.3)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
-    devDependencies:
-      rolldown:
-        specifier: ^1.2.5
-        version: 1.2.5
-
-  packages/util/util: {}
 
   vendor/cordis:
     dependencies:
@@ -1066,11 +1017,6 @@ packages:
     resolution: {integrity: sha512-+bqFCP98pLI0Tt0XQo1TmlXtwjWchISndDOxCkEcIuUgXWpBnLyRI+2DU+mesvnMMX6L1XDqYNA0lXNDHd/yiA==}
     engines: {node: '>=22.12.0'}
 
-  '@electron/asar@3.2.1':
-    resolution: {integrity: sha512-hE2cQMZ5+4o7+6T2lUaVbxIzrOjZZfX7dB02xuapyYFJZEAiWTelq6J3mMoxzd0iONDvYLPVKecB5tyjIoVDVA==}
-    engines: {node: '>=10.12.0'}
-    hasBin: true
-
   '@electron/asar@3.4.1':
     resolution: {integrity: sha512-i4/rNPRS84t0vSRa2HorerGRXWyF4vThfHesw0dmcWHp+cspK743UanA0suA5Q5y8kzY2y6YKrvbIUn69BCAiA==}
     engines: {node: '>=10.12.0'}
@@ -1289,19 +1235,11 @@ packages:
   '@jridgewell/gen-mapping@0.3.12':
     resolution: {integrity: sha512-OuLGC46TjB5BbN1dH8JULVVZY4WTdkF7tV9Ys6wLL1rubZnCMstOhNHueU5bLCrnRuDhKPDM4g6sw4Bel5Gzqg==}
 
-  '@jridgewell/gen-mapping@0.3.5':
-    resolution: {integrity: sha512-IzL8ZoEDIBRWEzlCcRhOaCupYyN5gdIK+Q6fbFdPDg6HqX6jpkItn7DFIpW9LQzXG6Df9sA7+OKnq0qlz/GaQg==}
-    engines: {node: '>=6.0.0'}
-
   '@jridgewell/remapping@2.3.5':
     resolution: {integrity: sha512-LI9u/+laYG4Ds1TDKSJW2YPrIlcVYOwi2fUC6xB43lueCjgxV4lffOCZCtYFiH6TNOX+tQKXx97T4IKHbhyHEQ==}
 
   '@jridgewell/resolve-uri@3.1.2':
     resolution: {integrity: sha512-bRISgCIjP20/tbWSPWMEi54QVPRZExkuD9lJL+UIxUKtwVJA8wW1Trb1jMs1RFXo1CBTNZ/5hpC9QvmKWdopKw==}
-    engines: {node: '>=6.0.0'}
-
-  '@jridgewell/set-array@1.2.1':
-    resolution: {integrity: sha512-R8gLRTZeyp03ymzP/6Lil/28tGeGEzhx1q2k703KGWRAI1VdvPIXdG70VJc2pAMw3NA6JKL5hhFu1sJX0Mnn/A==}
     engines: {node: '>=6.0.0'}
 
   '@jridgewell/sourcemap-codec@1.5.5':
@@ -1328,6 +1266,94 @@ packages:
 
   '@oxc-project/types@0.146.0':
     resolution: {integrity: sha512-XC0QsnnhVe7sLIWmYmdPw7x5P0h4W8vUU3Nv1ySgWXtvCz8NizoAEpGXA0sOYoJQV2Rl13LgURAHQ5cI5ILCSA==}
+
+  '@parcel/watcher-android-arm64@2.5.1':
+    resolution: {integrity: sha512-KF8+j9nNbUN8vzOFDpRMsaKBHZ/mcjEjMToVMJOhTozkDonQFFrRcfdLWn6yWKCmJKmdVxSgHiYvTCef4/qcBA==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [arm64]
+    os: [android]
+
+  '@parcel/watcher-darwin-arm64@2.5.1':
+    resolution: {integrity: sha512-eAzPv5osDmZyBhou8PoF4i6RQXAfeKL9tjb3QzYuccXFMQU0ruIc/POh30ePnaOyD1UXdlKguHBmsTs53tVoPw==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@parcel/watcher-darwin-x64@2.5.1':
+    resolution: {integrity: sha512-1ZXDthrnNmwv10A0/3AJNZ9JGlzrF82i3gNQcWOzd7nJ8aj+ILyW1MTxVk35Db0u91oD5Nlk9MBiujMlwmeXZg==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@parcel/watcher-freebsd-x64@2.5.1':
+    resolution: {integrity: sha512-SI4eljM7Flp9yPuKi8W0ird8TI/JK6CSxju3NojVI6BjHsTyK7zxA9urjVjEKJ5MBYC+bLmMcbAWlZ+rFkLpJQ==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@parcel/watcher-linux-arm-glibc@2.5.1':
+    resolution: {integrity: sha512-RCdZlEyTs8geyBkkcnPWvtXLY44BCeZKmGYRtSgtwwnHR4dxfHRG3gR99XdMEdQ7KeiDdasJwwvNSF5jKtDwdA==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [arm]
+    os: [linux]
+    libc: [glibc]
+
+  '@parcel/watcher-linux-arm-musl@2.5.1':
+    resolution: {integrity: sha512-6E+m/Mm1t1yhB8X412stiKFG3XykmgdIOqhjWj+VL8oHkKABfu/gjFj8DvLrYVHSBNC+/u5PeNrujiSQ1zwd1Q==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [arm]
+    os: [linux]
+    libc: [musl]
+
+  '@parcel/watcher-linux-arm64-glibc@2.5.1':
+    resolution: {integrity: sha512-LrGp+f02yU3BN9A+DGuY3v3bmnFUggAITBGriZHUREfNEzZh/GO06FF5u2kx8x+GBEUYfyTGamol4j3m9ANe8w==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@parcel/watcher-linux-arm64-musl@2.5.1':
+    resolution: {integrity: sha512-cFOjABi92pMYRXS7AcQv9/M1YuKRw8SZniCDw0ssQb/noPkRzA+HBDkwmyOJYp5wXcsTrhxO0zq1U11cK9jsFg==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@parcel/watcher-linux-x64-glibc@2.5.1':
+    resolution: {integrity: sha512-GcESn8NZySmfwlTsIur+49yDqSny2IhPeZfXunQi48DMugKeZ7uy1FX83pO0X22sHntJ4Ub+9k34XQCX+oHt2A==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@parcel/watcher-linux-x64-musl@2.5.1':
+    resolution: {integrity: sha512-n0E2EQbatQ3bXhcH2D1XIAANAcTZkQICBPVaxMeaCVBtOpBZpWJuf7LwyWPSBDITb7In8mqQgJ7gH8CILCURXg==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@parcel/watcher-win32-arm64@2.5.1':
+    resolution: {integrity: sha512-RFzklRvmc3PkjKjry3hLF9wD7ppR4AKcWNzH7kXR7GUe0Igb3Nz8fyPwtZCSquGrhU5HhUNDr/mKBqj7tqA2Vw==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@parcel/watcher-win32-ia32@2.5.1':
+    resolution: {integrity: sha512-c2KkcVN+NJmuA7CGlaGD1qJh1cLfDnQsHjE89E60vUEMlqduHGCdCLJCID5geFVM0dOtA3ZiIO8BoEQmzQVfpQ==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [ia32]
+    os: [win32]
+
+  '@parcel/watcher-win32-x64@2.5.1':
+    resolution: {integrity: sha512-9lHBdJITeNR++EvSQVUcaZoWupyHfXe1jZvGZ06O/5MflPcuPLtEphScIBL+AiCWBO46tDSHzWyD0uDmmZqsgA==}
+    engines: {node: '>= 10.0.0'}
+    cpu: [x64]
+    os: [win32]
+
+  '@parcel/watcher@2.5.1':
+    resolution: {integrity: sha512-dfUnCxiN9H4ap84DvD2ubjw+3vUNpstxa0TneY/Paat8a3R4uQZDLSvWjmznAY/DoahqTHl9V46HF/Zs3F29pg==}
+    engines: {node: '>= 10.0.0'}
 
   '@peculiar/asn1-schema@2.9.4':
     resolution: {integrity: sha512-GjzePcT9Iw8NzeOPf73iNS9xM+TBhd/FilAfP+RQGkTMQJTVWtytN3JHJACCjf/ABNau5S7mS3g+DcuxmRgYEg==}
@@ -1825,6 +1851,10 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
+  '@tailwindcss/cli@4.3.3':
+    resolution: {integrity: sha512-ZvS/n1ZHOBKcVlhkt8l5NNr1EDXk1NboYO5CYDOs6NUmvT9z6bzkwsosaJftY57T/3gWNzWMJzIXLodZC8ssdw==}
+    hasBin: true
+
   '@tailwindcss/node@4.3.3':
     resolution: {integrity: sha512-/T8IKEsf9VTU6tLjgC7+sv2mOPtQxzE2jMw7u4Tt40Tx+QSZxpzh95/H6cMKoja9XuW7iMdLJYBB0o9G1CaAgg==}
 
@@ -1971,9 +2001,6 @@ packages:
   '@types/fs-extra@9.0.13':
     resolution: {integrity: sha512-nEnwB++1u5lVDM2UI4c1+5R+FYaKfaAzS4OococimjVm3nQw3TuzH5UNsocrcTBbhnerblyHj4A49qXbIiZdpA==}
 
-  '@types/glob@7.2.0':
-    resolution: {integrity: sha512-ZUxbzKl0IfJILTS6t7ip5fQQM/J3TJYubDm3nMbgubNNYS62eXeUpoLUC8/7fJNiFYHTrGPQn7hspDUzIHX3UA==}
-
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
 
@@ -1985,10 +2012,6 @@ packages:
 
   '@types/js-yaml@4.0.9':
     resolution: {integrity: sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg==}
-
-  '@types/minimatch@6.0.0':
-    resolution: {integrity: sha512-zmPitbQ8+6zNutpwgcQuLcsEpn/Cj54Kbn7L5pX0Os5kdWplB7xPgEh/g+SWOB/qmows2gpuCaPyduq8ZZRnxA==}
-    deprecated: This is a stub types definition. minimatch provides its own type definitions, so you do not need this installed.
 
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
@@ -2308,6 +2331,10 @@ packages:
     resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
     engines: {node: 20 || >=22}
 
+  braces@3.0.3:
+    resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
+    engines: {node: '>=8'}
+
   browserslist@4.28.8:
     resolution: {integrity: sha512-V2NpofLblG64mfOtSgDhOJESZEGogzDMBv/q+W6oc4LXWP/q75eOXoOaaOu1EOadB9U4Bwx/e0yzbvwKH8zalA==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
@@ -2450,6 +2477,11 @@ packages:
   dequal@2.0.3:
     resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
     engines: {node: '>=6'}
+
+  detect-libc@1.0.3:
+    resolution: {integrity: sha512-pGjwhsmsp4kL2RTz08wcOlGN83otlqHeD/Z5T8GXZB+/YcpQ/dgo+lbU8ZsGxV0HIvqqxo9l7mqYwyYMD9bKDg==}
+    engines: {node: '>=0.10'}
+    hasBin: true
 
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
@@ -2699,6 +2731,10 @@ packages:
   filelist@1.0.6:
     resolution: {integrity: sha512-5giy2PkLYY1cP39p17Ech+2xlpTRL9HLspOfEgm0L6CwBXBTgsK5ou0JtzYuepxkaQ/tvhCFIJ5uXo0OrM2DxA==}
 
+  fill-range@7.1.1:
+    resolution: {integrity: sha512-YsGpe3WHLK8ZYi4tWDg2Jy3ebRz2rXowDxnld4bkQB00cc/1Zw9AWnC0i9ztDJitivtQvaI9KaLyKrc+hBW0yg==}
+    engines: {node: '>=8'}
+
   form-data@4.0.6:
     resolution: {integrity: sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==}
     engines: {node: '>= 6'}
@@ -2826,9 +2862,21 @@ packages:
   inherits@2.0.4:
     resolution: {integrity: sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==}
 
+  is-extglob@2.1.1:
+    resolution: {integrity: sha512-SbKbANkN603Vi4jEZv49LeVJMn4yGwsbzZworEoyEiutsN3nJYdbO36zfhGJ6QEDpOZIFkDtnq5JRxmvl3jsoQ==}
+    engines: {node: '>=0.10.0'}
+
   is-fullwidth-code-point@3.0.0:
     resolution: {integrity: sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==}
     engines: {node: '>=8'}
+
+  is-glob@4.0.3:
+    resolution: {integrity: sha512-xelSayHH36ZgE7ZWhli7pW34hNbNl8Ojv5KVmkJD4hBdD3th8Tfk9vYasLM+mXWOZhFkgZfxhLSnrwRr4elSSg==}
+    engines: {node: '>=0.10.0'}
+
+  is-number@7.0.0:
+    resolution: {integrity: sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==}
+    engines: {node: '>=0.12.0'}
 
   isarray@1.0.0:
     resolution: {integrity: sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==}
@@ -3071,6 +3119,10 @@ packages:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
 
+  micromatch@4.0.8:
+    resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
+    engines: {node: '>=8.6'}
+
   mime-db@1.52.0:
     resolution: {integrity: sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==}
     engines: {node: '>= 0.6'}
@@ -3117,6 +3169,10 @@ packages:
   modbus-serial@8.0.23-no-serial-port:
     resolution: {integrity: sha512-7k9azlf6HQCUqv1LxKYgVVPPJmIOxUYNkAm8KQVuK105Ic9JHCMm8Vh/NQtlXd9YiGZF2rAHdkVHR7xvI6b6MQ==}
 
+  mri@1.2.0:
+    resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
+    engines: {node: '>=4'}
+
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
 
@@ -3128,6 +3184,9 @@ packages:
   node-abi@4.34.0:
     resolution: {integrity: sha512-4Oy5Q6/Ftna9sXyrkdnKypfvm9uWRpxUPvlw4oA192QNMN39aq8k4l36TUUUU/ONw7ivGVi402Ud+UBPVDYh6A==}
     engines: {node: '>=22.12.0'}
+
+  node-addon-api@7.1.1:
+    resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
 
   node-addon-native-custom-loader@0.1.5:
     resolution: {integrity: sha512-rL0XXRytayIChYf1xaG9/1NzGBRTyFkQTIpn+MDz/hpr0PZw1a9PZIoH9HlYfagNawhXU+jfN650EvoSIvR7Vw==}
@@ -3229,6 +3288,10 @@ packages:
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
+
+  picomatch@2.3.2:
+    resolution: {integrity: sha512-V7+vQEJ06Z+c5tSye8S+nHUfI51xoXIXjHQ99cQtKUkQqqO1kO/KCJUfZXuB47h/YBlDhah2H3hdUGXn8ie0oA==}
+    engines: {node: '>=8.6'}
 
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
@@ -3533,6 +3596,10 @@ packages:
   tmp@0.2.7:
     resolution: {integrity: sha512-e0votIpp4Uo2AJYSzVHV6xCcawuiez3DzqDAbrTc3YxBkplN6e+dM13ZeIcZnDg/QpSuU2zfZ3rzwY8ukEnaXw==}
     engines: {node: '>=14.14'}
+
+  to-regex-range@5.0.1:
+    resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
+    engines: {node: '>=8.0'}
 
   tree-kill@1.2.2:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
@@ -3964,15 +4031,6 @@ snapshots:
 
   '@electron-internal/extract-zip@1.0.5': {}
 
-  '@electron/asar@3.2.1':
-    dependencies:
-      chromium-pickle-js: 0.2.0
-      commander: 5.0.0
-      glob: 7.2.0
-      minimatch: 3.1.5
-    optionalDependencies:
-      '@types/glob': 7.2.0
-
   '@electron/asar@3.4.1':
     dependencies:
       commander: 5.0.0
@@ -4156,27 +4214,19 @@ snapshots:
       '@types/istanbul-reports': 3.0.4
       '@types/node': 22.20.1
       '@types/yargs': 16.0.11
-      chalk: 4.1.0
+      chalk: 4.1.2
 
   '@jridgewell/gen-mapping@0.3.12':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@jridgewell/trace-mapping': 0.3.31
 
-  '@jridgewell/gen-mapping@0.3.5':
-    dependencies:
-      '@jridgewell/set-array': 1.2.1
-      '@jridgewell/sourcemap-codec': 1.5.5
-      '@jridgewell/trace-mapping': 0.3.31
-
   '@jridgewell/remapping@2.3.5':
     dependencies:
-      '@jridgewell/gen-mapping': 0.3.5
+      '@jridgewell/gen-mapping': 0.3.12
       '@jridgewell/trace-mapping': 0.3.31
 
   '@jridgewell/resolve-uri@3.1.2': {}
-
-  '@jridgewell/set-array@1.2.1': {}
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
@@ -4203,6 +4253,66 @@ snapshots:
   '@noble/hashes@2.3.0': {}
 
   '@oxc-project/types@0.146.0': {}
+
+  '@parcel/watcher-android-arm64@2.5.1':
+    optional: true
+
+  '@parcel/watcher-darwin-arm64@2.5.1':
+    optional: true
+
+  '@parcel/watcher-darwin-x64@2.5.1':
+    optional: true
+
+  '@parcel/watcher-freebsd-x64@2.5.1':
+    optional: true
+
+  '@parcel/watcher-linux-arm-glibc@2.5.1':
+    optional: true
+
+  '@parcel/watcher-linux-arm-musl@2.5.1':
+    optional: true
+
+  '@parcel/watcher-linux-arm64-glibc@2.5.1':
+    optional: true
+
+  '@parcel/watcher-linux-arm64-musl@2.5.1':
+    optional: true
+
+  '@parcel/watcher-linux-x64-glibc@2.5.1':
+    optional: true
+
+  '@parcel/watcher-linux-x64-musl@2.5.1':
+    optional: true
+
+  '@parcel/watcher-win32-arm64@2.5.1':
+    optional: true
+
+  '@parcel/watcher-win32-ia32@2.5.1':
+    optional: true
+
+  '@parcel/watcher-win32-x64@2.5.1':
+    optional: true
+
+  '@parcel/watcher@2.5.1':
+    dependencies:
+      detect-libc: 1.0.3
+      is-glob: 4.0.3
+      micromatch: 4.0.8
+      node-addon-api: 7.1.1
+    optionalDependencies:
+      '@parcel/watcher-android-arm64': 2.5.1
+      '@parcel/watcher-darwin-arm64': 2.5.1
+      '@parcel/watcher-darwin-x64': 2.5.1
+      '@parcel/watcher-freebsd-x64': 2.5.1
+      '@parcel/watcher-linux-arm-glibc': 2.5.1
+      '@parcel/watcher-linux-arm-musl': 2.5.1
+      '@parcel/watcher-linux-arm64-glibc': 2.5.1
+      '@parcel/watcher-linux-arm64-musl': 2.5.1
+      '@parcel/watcher-linux-x64-glibc': 2.5.1
+      '@parcel/watcher-linux-x64-musl': 2.5.1
+      '@parcel/watcher-win32-arm64': 2.5.1
+      '@parcel/watcher-win32-ia32': 2.5.1
+      '@parcel/watcher-win32-x64': 2.5.1
 
   '@peculiar/asn1-schema@2.9.4':
     dependencies:
@@ -4640,6 +4750,16 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
+  '@tailwindcss/cli@4.3.3':
+    dependencies:
+      '@parcel/watcher': 2.5.1
+      '@tailwindcss/node': 4.3.3
+      '@tailwindcss/oxide': 4.3.3
+      enhanced-resolve: 5.24.5
+      mri: 1.2.0
+      picocolors: 1.1.1
+      tailwindcss: 4.3.3
+
   '@tailwindcss/node@4.3.3':
     dependencies:
       '@jridgewell/remapping': 2.3.5
@@ -4771,12 +4891,6 @@ snapshots:
     dependencies:
       '@types/node': 22.20.1
 
-  '@types/glob@7.2.0':
-    dependencies:
-      '@types/minimatch': 6.0.0
-      '@types/node': 22.20.1
-    optional: true
-
   '@types/istanbul-lib-coverage@2.0.6': {}
 
   '@types/istanbul-lib-report@3.0.3':
@@ -4788,11 +4902,6 @@ snapshots:
       '@types/istanbul-lib-report': 3.0.3
 
   '@types/js-yaml@4.0.9': {}
-
-  '@types/minimatch@6.0.0':
-    dependencies:
-      minimatch: 10.2.6
-    optional: true
 
   '@types/ms@2.1.0': {}
 
@@ -5095,6 +5204,10 @@ snapshots:
     dependencies:
       balanced-match: 4.0.4
 
+  braces@3.0.3:
+    dependencies:
+      fill-range: 7.1.1
+
   browserslist@4.28.8:
     dependencies:
       baseline-browser-mapping: 2.11.19
@@ -5233,6 +5346,8 @@ snapshots:
 
   dequal@2.0.3: {}
 
+  detect-libc@1.0.3: {}
+
   detect-libc@2.1.2: {}
 
   detect-node-es@1.1.0: {}
@@ -5334,7 +5449,7 @@ snapshots:
 
   electron-winstaller@5.4.0(supports-color@9.4.0):
     dependencies:
-      '@electron/asar': 3.2.1
+      '@electron/asar': 3.4.1
       debug: 4.4.3(supports-color@9.4.0)
       fs-extra: 7.0.1
       lodash: 4.18.1
@@ -5438,6 +5553,10 @@ snapshots:
   filelist@1.0.6:
     dependencies:
       minimatch: 5.1.9
+
+  fill-range@7.1.1:
+    dependencies:
+      to-regex-range: 5.0.1
 
   form-data@4.0.6:
     dependencies:
@@ -5595,7 +5714,15 @@ snapshots:
 
   inherits@2.0.4: {}
 
+  is-extglob@2.1.1: {}
+
   is-fullwidth-code-point@3.0.0: {}
+
+  is-glob@4.0.3:
+    dependencies:
+      is-extglob: 2.1.1
+
+  is-number@7.0.0: {}
 
   isarray@1.0.0: {}
 
@@ -5766,6 +5893,11 @@ snapshots:
 
   math-intrinsics@1.1.0: {}
 
+  micromatch@4.0.8:
+    dependencies:
+      braces: 3.0.3
+      picomatch: 2.3.2
+
   mime-db@1.52.0: {}
 
   mime-types@2.1.35:
@@ -5808,6 +5940,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  mri@1.2.0: {}
+
   ms@2.1.3: {}
 
   nanoid@3.3.18: {}
@@ -5816,42 +5950,37 @@ snapshots:
     dependencies:
       semver: 7.8.5
 
+  node-addon-api@7.1.1: {}
+
   node-addon-native-custom-loader@0.1.5: {}
 
   node-addon-require-builtin-darwin-arm64@0.1.5:
     dependencies:
       node-addon-native-custom-loader: 0.1.5
-    optional: true
 
   node-addon-require-builtin-darwin-x64@0.1.5:
     dependencies:
       node-addon-native-custom-loader: 0.1.5
-    optional: true
 
   node-addon-require-builtin-linux-arm64-gnu@0.1.5:
     dependencies:
       node-addon-native-custom-loader: 0.1.5
-    optional: true
 
   node-addon-require-builtin-linux-x64-gnu@0.1.5:
     dependencies:
       node-addon-native-custom-loader: 0.1.5
-    optional: true
 
   node-addon-require-builtin-win32-arm64-msvc@0.1.5:
     dependencies:
       node-addon-native-custom-loader: 0.1.5
-    optional: true
 
   node-addon-require-builtin-win32-ia32-msvc@0.1.5:
     dependencies:
       node-addon-native-custom-loader: 0.1.5
-    optional: true
 
   node-addon-require-builtin-win32-x64-msvc@0.1.5:
     dependencies:
       node-addon-native-custom-loader: 0.1.5
-    optional: true
 
   node-addon-require-builtin@0.1.5:
     dependencies:
@@ -5909,6 +6038,8 @@ snapshots:
   pe-library@0.4.1: {}
 
   picocolors@1.1.1: {}
+
+  picomatch@2.3.2: {}
 
   picomatch@4.0.7: {}
 
@@ -6202,6 +6333,10 @@ snapshots:
       tmp: 0.2.7
 
   tmp@0.2.7: {}
+
+  to-regex-range@5.0.1:
+    dependencies:
+      is-number: 7.0.0
 
   tree-kill@1.2.2: {}
 

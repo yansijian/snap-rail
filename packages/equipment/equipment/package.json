@@ -1,0 +1,59 @@
+{
+  "name": "@snap-rail/equipment",
+  "description": "The equipment seam: configuration tables (devices/groups/points), the live point table, and the driver registry — the unified 设备管理 page lives in @snap-rail/equipment-station",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./rpc": {
+      "types": "./lib/types/rpc.d.ts",
+      "default": "./lib/rpc.js"
+    },
+    "./contract": {
+      "types": "./lib/types/contract.d.ts",
+      "default": "./lib/contract.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/util": "workspace:^",
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@snap-rail/audit": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/store": "workspace:^"
+  },
+  "devDependencies": {
+    "@snap-rail/audit": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/store": "workspace:^",
+    "@snap-rail/store-sqlite": "workspace:^",
+    "@types/node": "^22.20.0"
+  },
+  "snapRail": {
+    "layer": "equipment",
+    "category": "设备",
+    "requires": [
+      "service:store"
+    ],
+    "title": "设备底座"
+  }
+}

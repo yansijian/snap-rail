@@ -11,3 +11,9 @@ tsconfig.tsbuildinfo
 apps/desktop/release*/
 .snap-rail/
 .zcode/*
+
+# tsc emissions strayed into vendored sources (main points at lib/)
+vendor/*/src/*.js
+vendor/*/src/*.js.map
+vendor/*/src/*.d.ts
+vendor/*/src/*.d.ts.map

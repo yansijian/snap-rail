@@ -17,29 +17,24 @@
   "dependencies": {
     "@snap-rail/app-boot": "workspace:^",
     "@snap-rail/audit": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-timer": "workspace:^",
-    "@snap-rail/driver-mock": "workspace:^",
-    "@snap-rail/driver-modbus": "workspace:^",
-    "@snap-rail/field": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/plugin-kit": "workspace:^",
     "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/scope": "workspace:^",
     "@snap-rail/settings": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^",
     "@snap-rail/store": "workspace:^",
-    "@snap-rail/suite-terminal-ops": "workspace:^",
+    "@snap-rail/util": "workspace:^",
     "drizzle-orm": "^0.45.2",
     "electron-updater": "^6.6.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@snap-rail/client-fallback": "workspace:^",
     "@snap-rail/client-kernel": "workspace:^",
     "@snap-rail/client-modules": "workspace:^",
-    "@snap-rail/client-runtime": "workspace:^",
-    "@snap-rail/client-settings": "workspace:^",
-    "@snap-rail/client-variables": "workspace:^",
-    "@snap-rail/client-slots": "workspace:^",
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/plugin-kit": "workspace:^",
@@ -56,6 +51,13 @@
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",
     "vite": "^8.2.2",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "@snap-rail/framework-shadcn": "workspace:^",
+    "@snap-rail/equipment-station": "workspace:^",
+    "@snap-rail/driver-modbus": "workspace:^",
+    "@snap-rail/driver-enip": "workspace:^",
+    "@snap-rail/equipment": "workspace:^",
+    "@snap-rail/store-sqlite": "workspace:^",
+    "@snap-rail/trend": "workspace:^"
   }
 }

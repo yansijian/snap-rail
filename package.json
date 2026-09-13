@@ -3,30 +3,35 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -b tsconfig.host.json && tsdown",
+    "build": "tsc -b tsconfig.host.json && tailwindcss -i packages/ui/framework-shadcn/src/ui/theme.css -o packages/ui/framework-shadcn/lib-client/theme.css && tsdown",
     "build:lib:host": "tsc -b tsconfig.host.json && tsdown",
     "typecheck": "tsc -b tsconfig.host.json",
-    "test": "pnpm run build && vitest run && pnpm run verify:spine",
+    "test": "pnpm run build && vitest run && pnpm run verify:layers && pnpm run verify:wire-catalog",
     "verify-vendor-names": "tsx scripts/verify-vendor-names.ts",
     "app:dev": "pnpm --filter @snap-rail/desktop run dev",
     "app:start": "pnpm --filter @snap-rail/desktop run start",
-    "verify:spine": "tsx scripts/verify-spine.ts",
+    "verify:layers": "tsx scripts/verify-layers.ts",
     "pack:plugins": "tsx scripts/pack-plugins.ts",
     "app:pack": "pnpm --filter @snap-rail/desktop run pack",
     "app:dist": "pnpm --filter @snap-rail/desktop run dist",
     "website:dev": "pnpm --filter @snap-rail/website run dev",
-    "website:build": "pnpm --filter @snap-rail/website run build"
+    "website:build": "pnpm --filter @snap-rail/website run build",
+    "gen:wire-catalog": "tsx scripts/gen-wire-catalog.ts",
+    "verify:wire-catalog": "tsx scripts/gen-wire-catalog.ts --check"
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.20.0",
     "fflate": "^0.8.3",
     "happy-dom": "^20.0.11",
     "js-yaml": "^4.2.0",
+    "tailwindcss": "^4.3.3",
     "tsdown": "^0.22.2",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "zod": "^4.4.3"
   }
 }

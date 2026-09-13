@@ -1,0 +1,45 @@
+/**
+ * The UI primitive seam: theme tokens (theme.css) plus the shadcn-style
+ * component set every UI plugin shares. Consumers import components by
+ * package name; the runtime imports `@snap-rail/framework-shadcn/theme.css` once.
+ *
+ * @module @snap-rail/framework-shadcn/ui
+ */
+
+export { cn } from './utils.ts'
+export { useRefresh } from './hooks.tsx'
+export { Button, type ButtonProps } from './button.tsx'
+export { Card, CardHeader, CardTitle, CardContent } from './card.tsx'
+export { Badge, type BadgeProps } from './badge.tsx'
+export { Switch } from './switch.tsx'
+export { Tooltip, TooltipRoot, type TooltipProps, type TooltipContentProps } from './tooltip.tsx'
+export { ScrollArea } from './scroll-area.tsx'
+export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './dialog.tsx'
+export { Input } from './input.tsx'
+export { Textarea } from './textarea.tsx'
+export { Label } from './label.tsx'
+export { Checkbox } from './checkbox.tsx'
+export { RadioGroup, RadioGroupItem } from './radio-group.tsx'
+export { TouchSelect, type TouchSelectOption } from './touch-select.tsx'
+export { NumberInput, NumberPad } from './number-input.tsx'
+export {
+  SchemaForm,
+  schemaDefaults,
+  planSchemaFields,
+  compactSchemaValue,
+  type SchemaFormValue,
+} from './schema-form.tsx'
+export { DragScroll } from './drag-scroll.tsx'
+export { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './table.tsx'
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs.tsx'
+export { Collapsible, CollapsibleTrigger, CollapsibleChevron, CollapsibleContent } from './collapsible.tsx'
+export { IconPlus, IconChevronsDownUp, IconChevronsUpDown } from './icons.tsx'
+export { Led, type LedTone } from './led.tsx'
+export {
+  THEME_SETTINGS_KEY,
+  DEFAULT_THEME,
+  applyTheme,
+  resolveThemeMode,
+  themeSettingsSchema,
+  type ThemeSettings,
+} from './theme.ts'

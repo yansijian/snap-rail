@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/store",
-  "description": "The persistence seam: one SQLite database under the snap-rail home, declarative table registration, thin SQL handles (ctx.store)",
+  "description": "The persistence seam (specification): ctx.store.register over drizzle query-builder schemas; namespace-per-isolation-boundary",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",
@@ -26,5 +26,8 @@
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2"
+  },
+  "snapRail": {
+    "layer": "store"
   }
 }

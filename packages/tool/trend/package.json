@@ -1,0 +1,61 @@
+{
+  "name": "@snap-rail/trend",
+  "description": "The production trend tool: counts the bound output point into 8-hour shift buckets (anchored at login), persists via the store seam, and broadcasts stats snapshots",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./contract": {
+      "types": "./lib/types/contract.d.ts",
+      "default": "./lib/contract.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    }
+  },
+  "files": [
+    "lib/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/equipment": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/store": "workspace:^",
+    "@snap-rail/store-sqlite": "workspace:^"
+  },
+  "devDependencies": {
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/equipment": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
+    "@snap-rail/store": "workspace:^",
+    "@snap-rail/store-sqlite": "workspace:^",
+    "@types/node": "^22.20.0"
+  },
+  "snapRail": {
+    "layer": "tool",
+    "category": "工具",
+    "requires": [
+      "@snap-rail/equipment",
+      "service:store"
+    ],
+    "title": "班产统计"
+  }
+}

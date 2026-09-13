@@ -1,0 +1,84 @@
+/**
+ * The plugin author's manifest vocabulary: the `snapRail` field of a plugin
+ * package's `package.json`. One source of truth for the shape — the
+ * installer validates against it, the pool scan records it, and authors
+ * import the types.
+ *
+ * @module @snap-rail/plugin-kit/manifest
+ */
+
+import { z } from 'zod'
+import { PLUGIN_LAYERS } from '@snap-rail/util/manifest'
+
+/** Plugin package kinds. `suite` and `framework` packages are single-active. */
+export const PLUGIN_KINDS = ['suite', 'driver', 'framework', 'plugin'] as const
+
+/** The layer taxonomy — single source in `@snap-rail/util/manifest`. */
+export { PLUGIN_LAYERS }
+
+/** The renderer face declaration: where the client bundle lives. */
+export const clientFaceSchema = z.object({
+  /** Path of the CJS factory bundle inside the package (from its root). */
+  entry: z.string().min(1).default('lib/client.js'),
+  /**
+   * Subpaths this client face registers as contributed seeds (e.g. framework
+   * primitives like `./ui`): each becomes a `__ModuleLoader__` id other
+   * plugins' client bundles may `require` — same instance, one execution.
+   */
+  seeds: z.array(z.string().min(1)).optional(),
+}).strict()
+
+/** The `snapRail` manifest field's schema. */
+export const snapRailManifestSchema = z.object({
+  /** Role declaration; `suite` and `framework` packages are single-active. */
+  kind: z.enum(PLUGIN_KINDS).optional(),
+  /** The layer this package belongs to; gates the import direction. */
+  layer: z.enum(PLUGIN_LAYERS).optional(),
+  /**
+   * The human-facing display name shown wherever the plugin is listed (the
+   * management page, install confirmations). The package author names it
+   * freely (Chinese included); absent → surfaces fall back to the package
+   * name.
+   */
+  title: z.string().min(1).max(64).optional(),
+  /**
+   * The classification marker shown in the management UI. Open vocabulary —
+   * the package author names it freely (Chinese included); the app groups
+   * rows by the raw marker and never validates it against an enum. Absent →
+   * the management page files the row under 其他.
+   */
+  category: z.string().min(1).max(64).optional(),
+  /**
+   * Mutex group: enabling a package of group X deactivates every other
+   * enabled package of group X in the same batched write. Suites default
+   * to `'suite'`, frameworks to `'framework'`.
+   */
+  exclusive: z.string().min(1).optional(),
+  /**
+   * The framework package this renderer face binds to (`@snap-rail/framework-shadcn`).
+   * Component plugins whose binding does not match the active framework do
+   * not mount — replacing a framework is an ecosystem switch, not a hot swap.
+   */
+  framework: z.string().min(1).optional(),
+  /**
+   * Declared dependencies, checked before an enable/disable/uninstall lands:
+   * a plain entry names a package (`@snap-rail/equipment`); a `service:`
+   * prefix names a cordis service (`service:store`). An unmet requirement
+   * refuses the write instead of leaving the next boot to fail.
+   */
+  requires: z.array(z.string().min(1)).optional(),
+  /**
+   * True for packages with no host face at all (frameworks, renderer
+   * stations): their rows are config-only — never mounted into the host
+   * tree, served to the renderer through `client-config.list`.
+   */
+  clientOnly: z.boolean().optional(),
+  /** The renderer face; omit for host-only plugins. */
+  client: clientFaceSchema.optional(),
+  /** Permission declarations — shown at install time, enforced later. */
+  permissions: z.array(z.string()).optional(),
+}).strict()
+
+/** The validated manifest field. */
+export type SnapRailManifestInput = z.input<typeof snapRailManifestSchema>
+export type SnapRailManifest = z.output<typeof snapRailManifestSchema>

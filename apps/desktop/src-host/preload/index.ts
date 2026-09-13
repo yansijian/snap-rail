@@ -1,13 +1,16 @@
 /**
- * The preload: exposes exactly two carrier primitives on `window.snapRail`.
- * One global downlink port serves every subscriber through local
- * demultiplexing; the acquisition and release signals follow the refcount so
- * the host pump detaches once the last subscription ends.
+ * The preload: exposes the carrier primitives on `window.snapRail` —
+ * invoke/openStream (one global downlink port serves every subscriber
+ * through local demultiplexing; the acquisition and release signals follow
+ * the refcount so the host pump detaches once the last subscription ends)
+ * and `zipPathOf`, the drag-and-drop bridge turning a dropped `File` back
+ * into its host-side path (`webUtils.getPathForFile` — `File.path` is gone)
+ * so the bootstrap install page can inspect and install dropped zips.
  *
  * @module @snap-rail/desktop/preload
  */
 
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 
 const listeners = new Set<(frame: unknown) => void>()
 let streamPort: MessagePort | null = null
@@ -59,6 +62,13 @@ function release(): void {
 
 contextBridge.exposeInMainWorld('snapRail', {
   invoke: async (request: unknown): Promise<unknown> => ipcRenderer.invoke('snap-rail:invoke', request),
+  zipPathOf: (file: File): string | null => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return null
+    }
+  },
   openStream: (listener: (frame: unknown) => void) => {
     listeners.add(listener)
     acquire()

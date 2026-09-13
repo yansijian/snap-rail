@@ -1,9 +1,13 @@
+# The shipped built-in layer — base only. Everything beyond the base layer
+# (store backends, the equipment base and drivers, the UI framework and its
+# stations, tools, suites) installs from zips: the settings page's 安装插件
+# or, before any framework is enabled, the kernel's drag-to-install
+# bootstrap page. The dev overlay (dev/builtins.dev.cordis.yml) is the
+# full-list variant Vite runs use; it never ships.
 - id: timer
   name: '@snap-rail/cordis-plugin-timer'
 - id: settings
   name: '@snap-rail/settings'
-- id: store
-  name: '@snap-rail/store'
 - id: audit
   name: '@snap-rail/audit'
 - id: gateway
@@ -12,29 +16,7 @@
     name: snap-rail
     version: 0.1.0
     bin: desktop
-- id: field
-  name: '@snap-rail/field'
-- id: field-rpc
-  name: '@snap-rail/field/rpc'
 - id: plugins-rpc
   name: '@snap-rail/app-boot/rpc'
 - id: station-rpc
   name: '@snap-rail/station-rpc'
-# 班产统计: counts the bound output point into three 8-hour shift buckets
-# (data/production_stats.db), anchored at login time. The host face of the
-# terminal-ops business suite — the pages ride the renderer tree, and the
-# plugin-management page groups both rows under one toggle.
-- id: production-stats
-  name: '@snap-rail/suite-terminal-ops/stats'
-  config:
-    flushMs: 1000
-# ModbusTCP: a pure protocol adapter over the field base. Devices, groups,
-# and points live in the base's configuration tables (field.db) and are
-# edited from the settings dialog's unified 设备管理 page.
-- id: driver-modbus
-  name: '@snap-rail/driver-modbus'
-# 模拟设备: the reference driver (范本) — offline development and demos.
-# Its devices are configured through the same unified 设备管理 page; this
-# row only mounts the adapter.
-- id: driver-mock
-  name: '@snap-rail/driver-mock'

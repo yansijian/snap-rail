@@ -10,9 +10,9 @@
   "references": [
     { "path": "./tsconfig.preload.json" },
     { "path": "../../vendor/cordis" },
-    { "path": "../../packages/boot/app-boot" },
-    { "path": "../../packages/protocol/gateway" },
-    { "path": "../../packages/protocol/connection" },
-    { "path": "../../packages/client/kernel" }
+    { "path": "../../packages/base/app-boot" },
+    { "path": "../../packages/base/gateway" },
+    { "path": "../../packages/base/connection" },
+    { "path": "../../packages/base/kernel" }
   ]
 }

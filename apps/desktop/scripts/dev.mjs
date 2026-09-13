@@ -23,13 +23,16 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
 // Composition resolves every built-in entry from the app tree via
 // require.resolve (app-boot's resolveModuleSpecifier), so a workspace
 // package that never saw a root build — no lib/ output — only surfaces
-// after Electron is up as "cannot resolve plugin". Probe the exact same
-// names the exact same way and fall back to one root build. Stale
-// already-built output is deliberately not detected: refreshing it is
-// the documented build-before-test workflow.
+// after Electron is up as "cannot resolve plugin". Dev runs mount the full
+// overlay (dev/builtins.dev.cordis.yml), so probe that list; fall back to
+// the shipped base-only layer when the overlay is absent. Stale
+// already-built output is deliberately not detected: refreshing it is the
+// documented build-before-test workflow.
 const hostRequire = createRequire(join(appDir, 'package.json'))
+const overlayPath = join(appDir, 'dev', 'builtins.dev.cordis.yml')
+const layerPath = existsSync(overlayPath) ? overlayPath : join(appDir, 'resources', 'builtins.cordis.yml')
 const builtinNames = yaml
-  .load(readFileSync(join(appDir, 'resources', 'builtins.cordis.yml'), 'utf8'))
+  .load(readFileSync(layerPath, 'utf8'))
   .map(entry => entry.name)
   // names compose passes through untouched don't go through require.resolve
   .filter(name => !name.startsWith('cordis:') && !name.startsWith('.') && !name.startsWith('file:') && !isAbsolute(name))

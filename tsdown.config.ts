@@ -9,7 +9,7 @@ import { defineConfig } from 'tsdown'
  */
 export default defineConfig({
   workspace: ['vendor/*', 'packages/*/*'],
-  entry: ['lib/types/{index,rpc,contract,scan}.js'],
+  entry: ['lib/types/{index,rpc,contract,scan,manifest}.js'],
   outDir: 'lib',
   format: ['esm'],
   platform: 'node',

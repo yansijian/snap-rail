@@ -1,6 +1,6 @@
 # 主题与图表色规范
 
-单源在 `packages/client/ui/src/theme.css`；本文件是使用规范。设计出处见
+单源在 `packages/ui/framework-shadcn/src/theme.css`；本文件是使用规范。设计出处见
 `docs/design/theme-samples.html`（明暗各 9 款候选，最终选钴蓝）。
 
 ## 两种模式，一套令牌
@@ -11,8 +11,8 @@ Tailwind v4 `@theme` 里的令牌就是黑夜模式（石墨钢面板 + 钴蓝�
 
 - 模式选择存 settings.json 键 `ui.theme`（`{ mode: 'system' | 'light' | 'dark' }`），
   由设置站「主题」页写入，`settings/changed` 帧当场热应用（见
-  `packages/client/settings-station`）。
-- 读写走 `@snap-rail/client-ui` 导出的 `themeSettingsSchema` / `applyTheme`，
+  `packages/ui/settings-station`）。
+- 读写走 `@snap-rail/framework-shadcn/ui` 导出的 `themeSettingsSchema` / `applyTheme`，
   不要在别处再写一套。
 
 页面代码永远只用令牌工具类（`bg-card`、`text-muted-foreground`…），**不得出现
@@ -23,10 +23,10 @@ Tailwind v4 `@theme` 里的令牌就是黑夜模式（石墨钢面板 + 钴蓝�
 全仓唯一样式表就是 `theme.css`，工具类靠 Tailwind 扫源码生成。`@source`
 按 **CSS 文件自身位置** 解析（不是 Vite cwd，自动探测只覆盖
 `apps/desktop/src/client`）：一条宽 glob `../../../**/src/**/*.{ts,tsx}`
-覆盖 `packages/` 下所有包的 src（脊柱 client 面、套件、field 站点一起），
+覆盖 `packages/` 下所有包的 src（框架渲染面、套件、equipment-station 一起），
 住户名单不在此复列；构建产物被 gitignore 天然排除。**放进 `packages/` 的
 新渲染包无需改扫描**；但把渲染源码挪出 `packages/` 的 src 会让它独有的
-类静默消失——`packages/client/ui/tests/theme-scan.spec.ts` 的门禁（每条
+类静默消失——`packages/ui/framework-shadcn/tests/theme-scan.spec.ts` 的门禁（每条
 `@source` 前缀真实存在 + 覆盖每个包）会当场红。
 
 ## 调色板

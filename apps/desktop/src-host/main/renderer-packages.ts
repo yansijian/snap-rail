@@ -12,6 +12,5 @@
 export const RENDERER_PACKAGES: readonly string[] = [
   '@snap-rail/suite-terminal-ops',
   '@snap-rail/settings-station',
-  '@snap-rail/field/station',
-  '@snap-rail/client-fallback',
+  '@snap-rail/equipment-station',
 ]

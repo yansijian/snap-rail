@@ -1,0 +1,43 @@
+# The dev overlay — the full first-party list the Vite harness runs with so
+# day-to-day work keeps every plugin mounted (the production layer ships
+# base only; see resources/builtins.cordis.yml). This file lives outside
+# resources/ on purpose: packaging can never ship it. Rows resolve through
+# the workspace's node_modules (appRoot), not the plugin pool.
+- id: timer
+  name: '@snap-rail/cordis-plugin-timer'
+- id: settings
+  name: '@snap-rail/settings'
+- id: store-sqlite
+  name: '@snap-rail/store-sqlite'
+- id: audit
+  name: '@snap-rail/audit'
+- id: gateway
+  name: '@snap-rail/gateway'
+  config:
+    name: snap-rail
+    version: 0.1.0
+    bin: desktop
+- id: equipment
+  name: '@snap-rail/equipment'
+- id: equipment-rpc
+  name: '@snap-rail/equipment/rpc'
+- id: plugins-rpc
+  name: '@snap-rail/app-boot/rpc'
+- id: station-rpc
+  name: '@snap-rail/station-rpc'
+# 班产统计: the trend tool's host face — counts the bound output point into
+# three 8-hour shift buckets (data/production_stats.db), anchored at login
+# time, and broadcasts the snapshot frames the production page renders.
+- id: trend
+  name: '@snap-rail/trend'
+  config:
+    flushMs: 1000
+# ModbusTCP: a pure protocol adapter over the equipment base. Devices, groups,
+# and points live in the base's configuration tables (equipment.db) and are
+# edited from the settings dialog's unified 设备管理 page.
+- id: driver-modbus
+  name: '@snap-rail/driver-modbus'
+# EtherNet/IP: the same adapter shape over the ENIP/CIP wire subset (first
+# target OMRON NX1P2 — published global variables by name, no route path).
+- id: driver-enip
+  name: '@snap-rail/driver-enip'

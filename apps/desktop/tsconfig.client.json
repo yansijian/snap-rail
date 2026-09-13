@@ -9,50 +9,52 @@
       "DOM.Iterable"
     ],
     "jsx": "react-jsx",
-    "types": []
+    "types": [
+      "vite/client"
+    ]
   },
   "include": [
     "src/client"
   ],
   "references": [
     {
-      "path": "../../packages/protocol/connection"
+      "path": "../../packages/base/connection"
     },
     {
       "path": "../../vendor/cordis"
     },
     {
-      "path": "../../packages/client/ui"
+      "path": "../../packages/ui/framework-shadcn"
     },
     {
-      "path": "../../packages/client/kernel"
+      "path": "../../packages/base/kernel"
     },
     {
-      "path": "../../packages/client/slots"
+      "path": "../../packages/base/modules"
     },
     {
-      "path": "../../packages/client/runtime"
+      "path": "../../packages/ui/equipment-station"
     },
     {
-      "path": "../../packages/client/layout-station"
+      "path": "../../packages/ui/settings-station"
     },
     {
-      "path": "../../packages/client/chrome-titlebar"
+      "path": "../../packages/suite/terminal-ops"
     },
     {
-      "path": "../../packages/client/process-maintenance"
+      "path": "../../packages/base/station-rpc"
     },
     {
-      "path": "../../packages/client/process-production"
+      "path": "../../packages/base/app-boot"
     },
     {
-      "path": "../../packages/client/process-sampling"
+      "path": "../../packages/equipment/equipment"
     },
     {
-      "path": "../../packages/client/process-fault"
+      "path": "../../packages/tool/trend"
     },
     {
-      "path": "../../packages/client/process-downtime"
+      "path": "../../packages/tool/forge"
     }
   ]
 }
