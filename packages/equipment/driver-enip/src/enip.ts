@@ -1,14 +1,18 @@
 /**
  * The EtherNet/IP wire subset this driver speaks, as pure codecs (I/O-free):
  * the 24-byte ENIP command header, RegisterSession, and CPF-enveloped
- * SendRRData carrying CIP message-router requests — Read Tag / Write Tag
- * addressed by an ANSI extended symbolic segment. Everything is
+ * SendRRData carrying CIP message-router requests — every Read Tag / Write
+ * Tag rides an Unconnected Send (0x52 to the connection manager) whose
+ * connection path carries the backplane route, the shape the Omron-style
+ * targets (real NX/NX1P2 alongside ab_server) require and the unconnected
+ * router's diet otherwise rejects with "service not supported". Requests
+ * are addressed by an ANSI extended symbolic segment. Everything is
  * little-endian. The CIP reply wears a 4-byte response header (reply
  * service, reserved, status at offset 2, additional-status size at offset
  * 3) — the layout observed on real NX/NX1P2 targets; request paths pad to
- * whole 16-bit words. The socket shell lives in the index runtime; the
- * fake PLC in tests reuses only the header constants, so a codec bug
- * cannot hide behind its own twin.
+ * whole 16-bit words. The socket shell lives in the index runtime; the fake
+ * PLC in tests reuses only the header constants, so a codec bug cannot hide
+ * behind its own twin.
  *
  * @module @snap-rail/driver-enip/enip
  */
@@ -20,6 +24,7 @@ export const COMMAND_SEND_RR_DATA = 0x6f
 /** CIP services this dialect touches. */
 export const SERVICE_READ_TAG = 0x4c
 export const SERVICE_WRITE_TAG = 0x4d
+export const SERVICE_UNCONNECTED_SEND = 0x52
 
 /** CIP elementary type words (the reply's type field; the dialect's diet). */
 export const CIP_BOOL = 0xc1
@@ -104,23 +109,24 @@ export function packRegisterSession(): Buffer {
   return body
 }
 
-/** Encode the message path for one variable: the ANSI extended symbolic
- * segment (0x91 + name), preceded by a backplane port segment when a slot
- * is given (0 routes straight to the port — the Omron built-in case). The
- * path always spans whole words. */
-export function packPath(tag: string, slot: number): Buffer {
+/** Encode the symbolic segment for one variable name (0x91 + name), padded
+ * to whole 16-bit words. Routing lives in the Unconnected Send's connection
+ * path, never in the tag path itself. */
+export function packPath(tag: string): Buffer {
   const name = Buffer.from(tag, 'ascii')
-  const segments = Buffer.concat([
-    slot > 0 ? Buffer.from([0x01, 0x00, slot]) : Buffer.alloc(0),
-    Buffer.from([0x91, name.length]),
-    name,
-  ])
+  const segments = Buffer.concat([Buffer.from([0x91, name.length]), name])
   return segments.length % 2 === 0 ? segments : Buffer.concat([segments, Buffer.from([0])])
 }
 
+/** The connection-path route to a backplane slot: empty targets the message
+ * port itself (the Omron built-in case); a routed slot rides port 1. */
+export function buildBackplaneRoute(slot: number): Buffer {
+  return slot > 0 ? Buffer.from([0x01, slot]) : Buffer.alloc(0)
+}
+
 /** A Read Tag request for one element (scalars are the dialect's diet). */
-export function buildReadTag(tag: string, slot: number): Buffer {
-  const path = packPath(tag, slot)
+export function buildReadTag(tag: string): Buffer {
+  const path = packPath(tag)
   const cip = Buffer.alloc(4 + path.length)
   cip.writeUInt8(SERVICE_READ_TAG, 0)
   cip.writeUInt8(path.length / 2, 1)
@@ -130,8 +136,8 @@ export function buildReadTag(tag: string, slot: number): Buffer {
 }
 
 /** A Write Tag request: the type word, one element, little-endian data. */
-export function buildWriteTag(tag: string, slot: number, type: number, data: Uint8Array): Buffer {
-  const path = packPath(tag, slot)
+export function buildWriteTag(tag: string, type: number, data: Uint8Array): Buffer {
+  const path = packPath(tag)
   const cip = Buffer.alloc(6 + path.length + data.length)
   cip.writeUInt8(SERVICE_WRITE_TAG, 0)
   cip.writeUInt8(path.length / 2, 1)
@@ -140,6 +146,38 @@ export function buildWriteTag(tag: string, slot: number, type: number, data: Uin
   cip.writeUInt16LE(1, 2 + path.length + 2)
   cip.set(data, 2 + path.length + 4)
   return cip
+}
+
+/** Wrap a CIP request in an Unconnected Send addressed to the connection
+ * manager (class 0x06 instance 0x01): the embedded request rides the UCMM
+ * unconnected data item and the connection path carries the backplane
+ * route. The reply is the embedded request's reply, verbatim. */
+export function buildUnconnectedSend(cip: Uint8Array, route: Uint8Array, ticks = 5): Buffer {
+  const pad = cip.length % 2
+  // Service + path words + CM path + ticks + embedded length = 10 bytes
+  // ahead of the embedded request.
+  const body = Buffer.alloc(10 + cip.length + pad + 2 + route.length)
+  body.writeUInt8(SERVICE_UNCONNECTED_SEND, 0)
+  body.writeUInt8(2, 1) // the CM path below spans 2 words
+  Buffer.from([0x20, 0x06, 0x24, 0x01]).copy(body, 2)
+  body.writeUInt16LE(ticks, 6)
+  body.writeUInt16LE(cip.length, 8)
+  body.set(cip, 10)
+  // The reserved byte, the route's word count, then the route itself.
+  body.writeUInt8(0, 10 + cip.length + pad)
+  body.writeUInt8(route.length / 2, 11 + cip.length + pad)
+  if (route.length > 0) body.set(route, 12 + cip.length + pad)
+  return body
+}
+
+/** One tag read as it goes on the wire: Read Tag inside an Unconnected Send. */
+export function buildTagRead(tag: string, slot: number): Buffer {
+  return buildUnconnectedSend(buildReadTag(tag), buildBackplaneRoute(slot))
+}
+
+/** One tag write as it goes on the wire: Write Tag inside an Unconnected Send. */
+export function buildTagWrite(tag: string, slot: number, type: number, data: Uint8Array): Buffer {
+  return buildUnconnectedSend(buildWriteTag(tag, type, data), buildBackplaneRoute(slot))
 }
 
 /** Wrap a CIP request in a SendRRData command frame (null address item +

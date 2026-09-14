@@ -1,12 +1,14 @@
 /**
  * The in-process fake PLC: a hand-rolled ENIP server speaking exactly the
- * subset the driver does — RegisterSession and SendRRData carrying CIP
- * Read/Write Tag requests addressed by symbolic segments (the Omron
- * NX/NX1P2 shape: no route path, published global variables). The tag
- * store is addressable from tests; `stop()` drops every connection,
- * `restart()` re-listens on the same port with the same values. Only the
- * 24-byte header size is shared with the driver — the CPF/CIP layers are
- * re-derived here so a codec bug cannot hide behind its own twin.
+ * subset the driver does — RegisterSession (with ab_server's sanity check:
+ * the sender context must be zero, else status 1) and SendRRData carrying
+ * an Unconnected Send whose embedded CIP Read/Write Tag is addressed by
+ * symbolic segments; the bare form gets the unconnected router's "service
+ * not supported". The tag store is addressable from tests; `stop()` drops
+ * every connection, `restart()` re-listens on the same port with the same
+ * values. Only the 24-byte header size is shared with the driver — the
+ * CPF/CIP layers are re-derived here so a codec bug cannot hide behind its
+ * own twin.
  *
  * @module @snap-rail/driver-enip/tests/fake-plc
  */
@@ -24,6 +26,9 @@ export interface FakePlc {
   port: number
   /** The published variable table; tests mutate values directly. */
   tags: Map<string, FakeTag>
+  /** The wire as the PLC saw it: every RegisterSession's sender context and
+   * every unconnected request's top-level CIP service, oldest first. */
+  wire: { registers: bigint[], services: number[] }
   stop(): Promise<void>
   restart(register: (server: net.Server) => void): Promise<void>
 }
@@ -40,6 +45,7 @@ export async function startFakePlc(
 
   const tags = new Map<string, FakeTag>()
   const sockets = new Set<net.Socket>()
+  const wire: FakePlc['wire'] = { registers: [], services: [] }
   let nextSession = 0x1a2b3c00
 
   const listen = (): Promise<net.Server> => new Promise(resolve => {
@@ -69,13 +75,21 @@ export async function startFakePlc(
     const sender = frame.readBigUInt64LE(12)
     const body = frame.subarray(ENIP_HEADER_BYTES)
     if (command === 0x65) {
+      wire.registers.push(sender)
+      // The register sanity check ab_server enforces: a nonzero sender
+      // context echoes back as the same command with status 1, no body.
+      if (sender !== 0n) {
+        write(socket, 0x65, session, sender, Buffer.alloc(0), 1)
+        return
+      }
       // RegisterSession: echo the body under a fresh session handle.
       write(socket, 0x65, nextSession, sender, body.subarray(0, 4))
       nextSession += 1
       return
     }
     if (command === 0x6f) {
-      write(socket, 0x6f, session, sender, wrapCpf(serveCip(unconnected(body))))
+      wire.services.push(unconnected(body).readUInt8(0))
+      write(socket, 0x6f, session, sender, wrapCpf(serveUnconnected(unconnected(body))))
       return
     }
     write(socket, command, session, sender, Buffer.alloc(0))
@@ -97,14 +111,38 @@ export async function startFakePlc(
     return body
   }
 
-  function write(socket: net.Socket, command: number, session: number, sender: bigint, body: Buffer): void {
+  function write(socket: net.Socket, command: number, session: number, sender: bigint, body: Buffer, status = 0): void {
     const frame = Buffer.alloc(ENIP_HEADER_BYTES + body.length)
     frame.writeUInt16LE(command, 0)
     frame.writeUInt16LE(body.length, 2)
     frame.writeUInt32LE(session, 4)
+    frame.writeUInt32LE(status, 8)
     frame.writeBigUInt64LE(sender, 12)
     frame.set(body, ENIP_HEADER_BYTES)
     socket.write(frame)
+  }
+
+  /** The unconnected router's diet: Forward Open/Close and Unconnected Send.
+   * Symbolic Read/Write Tag must arrive wrapped in the 0x52 envelope — the
+   * bare form is what the real unconnected routers reject. */
+  function serveUnconnected(cip: Buffer): Buffer {
+    const service = cip.readUInt8(0)
+    if (service === 0x52) {
+      const embedded = unwrapUnconnectedSend(cip)
+      if (embedded === undefined) return failure(0xd2, 0x08)
+      return serveCip(embedded)
+    }
+    return failure(service + 0x80, 0x08)
+  }
+
+  /** Strip the Unconnected Send envelope: a 2-word CM path (class 0x06
+   * instance 0x01), timeout ticks, embedded length, embedded request. */
+  function unwrapUnconnectedSend(cip: Buffer): Buffer | undefined {
+    if (cip.length < 12 || cip.readUInt8(1) !== 2) return undefined
+    if (cip.subarray(2, 6).toString('hex') !== '20062401') return undefined
+    const length = cip.readUInt16LE(8)
+    const embedded = cip.subarray(10, 10 + length)
+    return embedded.length === length ? embedded : undefined
   }
 
   /** One CIP message-router request → reply (Read/Write Tag, symbolic path). */
@@ -197,6 +235,7 @@ export async function startFakePlc(
   return {
     port,
     tags,
+    wire,
     stop: async () => {
       for (const socket of sockets) socket.destroy()
       sockets.clear()

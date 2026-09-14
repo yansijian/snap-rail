@@ -8,7 +8,7 @@ import { pointKey, type PointRef, type PointSample } from '@snap-rail/equipment'
 import { afterEach, describe, expect, it } from 'vitest'
 import equipmentPlugin from '../../equipment/src/index.ts'
 import enipDriverPlugin from '../src/index.ts'
-import { CIP_BOOL, CIP_DINT, CIP_REAL } from '../src/enip.ts'
+import { CIP_BOOL, CIP_DINT, CIP_REAL, SERVICE_UNCONNECTED_SEND } from '../src/enip.ts'
 import { startFakePlc } from './fake-plc.ts'
 
 const worlds: Array<{ ctx: Context, home: string }> = []
@@ -93,6 +93,25 @@ function latestSample(samples: PointSample[], ref: PointRef): PointSample | unde
 }
 
 describe('driver-enip over the equipment base', () => {
+  it('speaks the zero-sender register and wrapped-read dialect on the wire', async () => {
+    const plc = await startFakePlc(server => servers.push(server))
+    seedTags(plc)
+
+    const world = await makeWorld()
+    seedDevice(world.ctx, plc.port)
+    await waitFor(() => world.statuses.some(frame => frame.id === 'plc1' && frame.status === 'online'), 'online')
+    await waitFor(() => latestSample(world.samples, tempRef) !== undefined, 'first temperature')
+
+    // ab_server rejects a nonzero sender context on RegisterSession with the
+    // cryptic "ENIP command 0x65 failed with status 1"; the register rides
+    // zero and nothing else.
+    expect(plc.wire.registers).toEqual([0n])
+    // Every tag request arrives wrapped in an Unconnected Send — the bare
+    // symbolic form is what unconnected routers reject with CIP status 8.
+    expect(plc.wire.services.length).toBeGreaterThan(0)
+    expect(plc.wire.services.every(service => service === SERVICE_UNCONNECTED_SEND)).toBe(true)
+  }, 15_000)
+
   it('polls, decodes, and reports the first observation once online', async () => {
     const plc = await startFakePlc(server => servers.push(server))
     seedTags(plc)

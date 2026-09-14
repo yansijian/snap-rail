@@ -7,7 +7,11 @@ import {
   CIP_REAL,
   CIP_SINT,
   ENIP_HEADER_BYTES,
+  buildBackplaneRoute,
   buildReadTag,
+  buildTagRead,
+  buildTagWrite,
+  buildUnconnectedSend,
   buildWriteTag,
   busTypeOf,
   cipTypeName,
@@ -41,21 +45,21 @@ describe('enip header', () => {
 describe('read tag request', () => {
   it('addresses a symbolic segment (golden bytes)', () => {
     // 0x4c, 3 path words, 0x91 + "Temp", one element.
-    expect(buildReadTag('Temp', 0).toString('hex')).toBe('4c03910454656d700100')
+    expect(buildReadTag('Temp').toString('hex')).toBe('4c03910454656d700100')
   })
 
   it('pads odd-length names to whole words', () => {
     // "Count" (5 chars) pads with one zero; the path spans 4 words.
-    expect(buildReadTag('Count', 0).toString('hex')).toBe('4c049105436f756e74000100')
+    expect(buildReadTag('Count').toString('hex')).toBe('4c049105436f756e74000100')
   })
 
-  it('routes through a backplane slot when given', () => {
-    // Port segment 01 00 03 rides ahead of the symbolic segment; 5 words.
-    expect(buildReadTag('Count', 3).toString('hex')).toBe('4c050100039105436f756e740100')
+  it('routes through a backplane slot only in the connection path', () => {
+    expect(buildBackplaneRoute(0).toString('hex')).toBe('')
+    expect(buildBackplaneRoute(3).toString('hex')).toBe('0103')
   })
 
   it('wraps a SendRRData envelope (golden bytes)', () => {
-    const frame = packSendRrData(buildReadTag('Temp', 0), 1n, 0)
+    const frame = packSendRrData(buildReadTag('Temp'), 1n, 0)
     expect(frame.toString('hex')).toBe(
       '6f001a00'
       + '00000000' + '00000000' + '0100000000000000' + '00000000'
@@ -64,16 +68,42 @@ describe('read tag request', () => {
   })
 
   it('unwraps its own envelope', () => {
-    const cip = buildWriteTag('Count', 0, CIP_DINT, encodeValue(CIP_DINT, 8n))
+    const cip = buildWriteTag('Count', CIP_DINT, encodeValue(CIP_DINT, 8n))
     const frame = packSendRrData(cip, 2n, 0x1a2b3c)
     expect(parseHeader(frame).session).toBe(0x1a2b3c)
     expect(unpackSendRrData(frame).toString('hex')).toBe(cip.toString('hex'))
   })
 })
 
+describe('unconnected send wrap', () => {
+  it('addresses the connection manager and embeds the read (golden bytes)', () => {
+    // 0x52, 2 path words, CM path, 5 ticks, embedded length, the read,
+    // then the reserved byte and the empty route.
+    expect(buildTagRead('Temp', 0).toString('hex'))
+      .toBe('52022006240105000a00' + '4c03910454656d700100' + '0000')
+  })
+
+  it('pads an odd-length embedded request before the route', () => {
+    // The BOOL write is 11 bytes: one pad byte lands before reserved + route.
+    expect(buildTagWrite('Sw', 0, CIP_BOOL, encodeValue(CIP_BOOL, true)).toString('hex'))
+      .toBe('52022006240105000b00' + '4d0291025377c100010001' + '000000')
+  })
+
+  it('carries the backplane route in the connection path', () => {
+    expect(buildTagRead('Temp', 3).toString('hex'))
+      .toBe('52022006240105000a00' + '4c03910454656d700100' + '00010103')
+  })
+
+  it('keeps the embedded request recoverable', () => {
+    const cip = buildReadTag('Count')
+    expect(buildUnconnectedSend(cip, buildBackplaneRoute(2)).subarray(10, 10 + cip.length).toString('hex'))
+      .toBe(cip.toString('hex'))
+  })
+})
+
 describe('write tag request', () => {
   it('carries the type word, one element, and the data (golden bytes)', () => {
-    expect(buildWriteTag('Temp', 0, CIP_DINT, encodeValue(CIP_DINT, 7n)).toString('hex'))
+    expect(buildWriteTag('Temp', CIP_DINT, encodeValue(CIP_DINT, 7n)).toString('hex'))
       .toBe('4d03910454656d70c4000100' + '07000000')
   })
 })

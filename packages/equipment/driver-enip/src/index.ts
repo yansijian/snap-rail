@@ -3,8 +3,11 @@
  * equipment base. The base owns the device/group/point tables and calls
  * `createConnection` per configured device; this runtime keeps one ENIP
  * session per device behind a serial I/O queue, polls every published
- * variable by name, and samples only on change (first read always reports;
- * numeric deadband per point). Transport failures drop the link to offline
+ * variable by name (each read/write wrapped in an Unconnected Send, the
+ * register carrying a zero sender context — the shape ab_server and real
+ * Omron targets alike accept), and samples only on change (first read
+ * always reports; numeric deadband per point). Transport failures drop the
+ * link to offline
  * with one `null` sample per point and retry every poll tick; a single
  * variable's CIP failure (unknown or mistyped) stays per-point — one null,
  * suppressed until its config changes, the device remains online. Writes
@@ -37,8 +40,8 @@ import {
 } from '@snap-rail/equipment'
 import {
   ENIP_HEADER_BYTES,
-  buildReadTag,
-  buildWriteTag,
+  buildTagRead,
+  buildTagWrite,
   busTypeOf,
   COMMAND_REGISTER_SESSION,
   COMMAND_SEND_RR_DATA,
@@ -157,7 +160,9 @@ class EnipSession {
     }
   }
 
-  /** Send one CIP request and await its CIP reply body (CPF envelope off). */
+  /** Send one CIP request — already wrapped in its Unconnected Send — and
+   * await its CIP reply body (CPF envelope off; the reply is the embedded
+   * request's reply, verbatim). */
   async send(cip: Buffer, timeoutMs: number): Promise<Buffer> {
     const frame = await this.exchange(COMMAND_SEND_RR_DATA, cip, timeoutMs)
     return unpackSendRrData(frame)
@@ -172,7 +177,15 @@ class EnipSession {
     const sender = ++this.sequence
     const payload = command === COMMAND_SEND_RR_DATA
       ? packSendRrData(body, sender, this.handle)
-      : packHeader({ command, session: this.handle, status: 0, sender }, body)
+      : packHeader({
+          command,
+          session: this.handle,
+          status: 0,
+          // The sender context is opaque per the spec, but ab_server's
+          // register sanity check rejects nonzero values with status 1 —
+          // zero is always legal, so the register rides zero.
+          sender: command === COMMAND_REGISTER_SESSION ? 0n : sender,
+        }, body)
     return new Promise<Buffer>((resolve, reject) => {
       this.inflight = {
         resolve,
@@ -314,7 +327,7 @@ const failPoint = (runtime: DeviceRuntime, key: string): void => {
 
 /** Read one variable's type word (the write path's learning step). */
 const readType = async (runtime: DeviceRuntime, key: string, point: MappedPoint): Promise<number> => {
-  const reply = decodeReadReply(await runtime.session.send(buildReadTag(point.dialect.tag, runtime.device.slot), runtime.device.timeoutMs))
+  const reply = decodeReadReply(await runtime.session.send(buildTagRead(point.dialect.tag, runtime.device.slot), runtime.device.timeoutMs))
   const type = reply.type
   if (reply.status !== 0 || type === undefined || busTypeOf(type) !== point.dialect.type) {
     throw new EquipmentError('invalid-config', `point ${key} variable ${point.dialect.tag} does not carry the group's ${point.dialect.type} type`)
@@ -332,7 +345,7 @@ const pollDevice = async (runtime: DeviceRuntime): Promise<void> => {
     }
     for (const [key, point] of runtime.points) {
       if (runtime.failed.has(key)) continue
-      const body = await runtime.session.send(buildReadTag(point.dialect.tag, runtime.device.slot), runtime.device.timeoutMs)
+      const body = await runtime.session.send(buildTagRead(point.dialect.tag, runtime.device.slot), runtime.device.timeoutMs)
       publish(runtime, key, point, decodeReadReply(body))
     }
     runtime.nulled = false
@@ -355,7 +368,7 @@ const writePoint = async (runtime: DeviceRuntime, key: string, value: Exclude<Po
   // Writes carry the type word; learn it from a read when unlearned.
   const type = runtime.types.get(key) ?? await readType(runtime, key, point)
   runtime.types.set(key, type)
-  await runtime.session.send(buildWriteTag(point.dialect.tag, runtime.device.slot, type, encodeValue(type, value)), runtime.device.timeoutMs)
+  await runtime.session.send(buildTagWrite(point.dialect.tag, runtime.device.slot, type, encodeValue(type, value)), runtime.device.timeoutMs)
   // Echo the write as the fresh sample; the next poll compares against it.
   runtime.last.set(key, value)
   runtime.handle.sample(point.ref, value)
