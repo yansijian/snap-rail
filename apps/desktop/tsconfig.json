@@ -13,6 +13,7 @@
     { "path": "../../packages/base/app-boot" },
     { "path": "../../packages/base/gateway" },
     { "path": "../../packages/base/connection" },
-    { "path": "../../packages/base/kernel" }
+    { "path": "../../packages/base/kernel" },
+    { "path": "../../packages/base/settings" }
   ]
 }

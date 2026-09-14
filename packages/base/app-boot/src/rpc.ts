@@ -9,6 +9,7 @@
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
+import { rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { RpcBusinessError } from '@snap-rail/protocol'
 import type { GatewayService } from '@snap-rail/gateway'
@@ -18,7 +19,15 @@ import { loadBuiltinLayer, loadPresetLayers, loadUserLayer, mergeLayers, package
 import { createLayerView } from './layer-view.ts'
 import { scanPluginPool } from './scan.ts'
 import type { PluginDescriptor } from './scan.ts'
-import { InstallError, installPluginFromZip, inspectPluginZip, uninstallPlugin } from './installer.ts'
+import { annotateCatalog, downloadRemotePluginZip, fetchRemoteCatalog, MarketError, readPluginFeedUrl } from './market.ts'
+import {
+  compareVersions,
+  installedVersionOf,
+  InstallError,
+  installPluginFromZip,
+  inspectPluginZip,
+  uninstallPlugin,
+} from './installer.ts'
 
 /** The plugin-admin bridge plugin; mount after rpc, audit, and boot. */
 const pluginAdminRpcPlugin: Plugin.Object<void> = {
@@ -58,6 +67,87 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       }
     }
 
+    /** The configured market feed base URL, read straight from
+     * `<home>/settings.json` (via `readPluginFeedUrl`): the plugins domain
+     * must not couple to the settings service's lifecycle — it is the
+     * uninstall path for the settings package itself. An unset key reads as
+     * "no market feed configured". */
+    const marketFeedUrl = (): string => {
+      const value = readPluginFeedUrl(dirname(layers.handles.userLayerPath))
+      if (value === undefined) {
+        throw new RpcBusinessError({ code: 'unavailable', details: { what: '未配置插件源：请先在「插件市场」填写插件源地址' } })
+      }
+      return value
+    }
+
+    /** Map market fetch failures onto the wire's business codes. */
+    const marketCall = async <T>(run: () => Promise<T>): Promise<T> => {
+      try {
+        return await run()
+      } catch (cause) {
+        if (cause instanceof MarketError) {
+          if (cause.kind === 'bad-catalog') {
+            throw new RpcBusinessError({ code: 'bad-request', details: { issues: [cause.message] } })
+          }
+          throw new RpcBusinessError({
+            code: cause.kind === 'unreachable' ? 'unavailable' : 'not-found',
+            details: { what: cause.message },
+          })
+        }
+        throw cause
+      }
+    }
+
+    /** The shared install pipeline: local zips and market downloads land
+     * here — capture the previous version, install (strictly-higher rule,
+     * built-in names refused), hot-apply, audit. Returns the wire shape. */
+    const runInstall = async (zipPath: string, via?: string): Promise<{ installed: { name: string, version: string, updated: boolean } }> => {
+      const poolDir = layers.handles.poolDirs[0]
+      if (poolDir === undefined) {
+        throw new RpcBusinessError({ code: 'unavailable', details: { what: 'no plugin pool is configured' } })
+      }
+      // The installed version must be read before the swap replaces it; the
+      // pre-read is best-effort (the install validates and reports its own
+      // errors, and `updated` stays the authority).
+      const previous = (() => {
+        try {
+          return installedVersionOf(poolDir, inspectPluginZip(zipPath).name)
+        } catch {
+          return undefined
+        }
+      })()
+      let installed: { name: string, version: string, updated: boolean }
+      try {
+        installed = installPluginFromZip(zipPath, poolDir, { reserved: [...view.shippedNames()] })
+      } catch (cause) {
+        if (cause instanceof InstallError && cause.kind === 'conflict') {
+          throw new RpcBusinessError({ code: 'conflict', details: { what: cause.message } })
+        }
+        throw new RpcBusinessError({
+          code: 'bad-request',
+          details: { issues: [cause instanceof Error ? cause.message : String(cause)] },
+        })
+      }
+      // The pool watch may race the explicit apply; both paths converge on
+      // the same composition, and the pool scan now sees the package.
+      await mutate(async () => {
+        await layers.apply()
+      })
+      audit.record({
+        actor: 'client',
+        action: installed.updated ? 'plugin.update' : 'plugin.install',
+        subject: installed.name,
+        detail: {
+          ...(installed.updated && previous !== undefined
+            ? { from: previous, to: installed.version }
+            : { version: installed.version }),
+          ...(via !== undefined ? { via } : {}),
+        },
+      })
+      // Project to the wire shape — the host-absolute staging dir stays host-side.
+      return { installed: { name: installed.name, version: installed.version, updated: installed.updated } }
+    }
+
     rpc.serveContract(ctx, pluginsContract, {
       'plugins.list': () => {
         const builtin = loadBuiltinLayer(layers.handles.builtinLayerPath)
@@ -76,7 +166,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
 
         const infos: PluginInfo[] = []
         const seen = new Set<string>()
-        const toInfoFor = (name: string, source: PluginSource, enabled: boolean, config: unknown): PluginInfo => {
+        const toInfoFor = (name: string, source: PluginSource, enabled: boolean, config: unknown, version?: string): PluginInfo => {
           const { kind, layer, title, category, exclusive, framework, clientOnly, requires } = view.manifestOf(name, pool)
           return {
             name,
@@ -84,6 +174,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
             enabled,
             packageName: packageNameOf(name),
             ...(kind !== undefined ? { kind } : {}),
+            ...(version !== undefined ? { version } : {}),
             ...(layer !== undefined ? { layer } : {}),
             ...(title !== undefined ? { title } : {}),
             ...(category !== undefined ? { category } : {}),
@@ -110,19 +201,20 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
           // composition entirely, so presence in it is the truth. Renderer rows
           // are config-only (never composed) and keep the row's flag.
           const enabled = inPool ? composed.has(row.name) : row.enabled !== false
-          infos.push(toInfoFor(row.name, inPool ? 'pool' : 'user', enabled, live?.config ?? row.config))
+          const poolVersion = pool.get(row.name)?.version ?? pool.get(packageNameOf(row.name))?.version
+          infos.push(toInfoFor(row.name, inPool ? 'pool' : 'user', enabled, live?.config ?? row.config, poolVersion))
         }
         // Installed but never referenced: pool plugins mount only through an
         // explicit row, so a rowless package lists as off — unless a preset
         // row carries it (then the preset's flag and origin show).
-        for (const name of pool.keys()) {
+        for (const [name, entry] of pool) {
           if (seen.has(name)) continue
           const presetRow = mergedRows.get(name)
           if (presetRow !== undefined && presetOnly.has(name)) {
-            infos.push(toInfoFor(name, 'preset', composed.has(name), presetRow.config))
+            infos.push(toInfoFor(name, 'preset', composed.has(name), presetRow.config, entry.version))
             continue
           }
-          infos.push(toInfoFor(name, 'pool', false, undefined))
+          infos.push(toInfoFor(name, 'pool', false, undefined, entry.version))
         }
         // Renderer rows are config-only in the host tree but still the user's
         // plugins — list them (their enable toggle applies after a restart);
@@ -198,36 +290,8 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         return { applied: true } as const
       },
 
-      'plugins.install': async ({ zipPath }) => {
-        const poolDir = layers.handles.poolDirs[0]
-        if (poolDir === undefined) {
-          throw new RpcBusinessError({ code: 'unavailable', details: { what: 'no plugin pool is configured' } })
-        }
-        let installed: { name: string, version: string }
-        try {
-          installed = installPluginFromZip(zipPath, poolDir, { reserved: [...view.shippedNames()] })
-        } catch (cause) {
-          if (cause instanceof InstallError && cause.kind === 'conflict') {
-            throw new RpcBusinessError({ code: 'conflict', details: { what: cause.message } })
-          }
-          throw new RpcBusinessError({
-            code: 'bad-request',
-            details: { issues: [cause instanceof Error ? cause.message : String(cause)] },
-          })
-        }
-        // The pool watch may race the explicit apply; both paths converge on
-        // the same composition, and the pool scan now sees the package.
-        await mutate(async () => {
-          await layers.apply()
-        })
-        audit.record({
-          actor: 'client',
-          action: 'plugin.install',
-          subject: installed.name,
-          detail: { version: installed.version },
-        })
-        return { installed }
-      },
+      'plugins.install': ({ zipPath }) =>
+        runInstall(zipPath),
 
       'plugins.inspect': ({ zipPath }) => {
         try {
@@ -239,7 +303,17 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
           const missing = plugin.requires
             .filter(entry => !entry.startsWith('service:'))
             .filter(entry => !pool.has(entry))
-          return { plugin: { ...plugin, missing } }
+          // How the install would land over the installed version drives the
+          // confirmation dialog's update/block branches.
+          const poolDir = layers.handles.poolDirs[0]
+          const installedVersion = poolDir === undefined ? undefined : installedVersionOf(poolDir, plugin.name)
+          if (installedVersion === undefined) {
+            return { plugin: { ...plugin, missing, action: 'install' as const } }
+          }
+          const action = compareVersions(plugin.version, installedVersion) > 0
+            ? ('update' as const)
+            : ('blocked' as const)
+          return { plugin: { ...plugin, missing, action, installed: { version: installedVersion } } }
         } catch (cause) {
           throw new RpcBusinessError({
             code: 'bad-request',
@@ -284,6 +358,33 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         })
         audit.record({ actor: 'client', action: 'plugin.uninstall', subject: name })
         return { removed: true } as const
+      },
+
+      'plugins.remote-list': async () => {
+        const feedUrl = marketFeedUrl()
+        const poolDir = layers.handles.poolDirs[0]
+        if (poolDir === undefined) {
+          throw new RpcBusinessError({ code: 'unavailable', details: { what: 'no plugin pool is configured' } })
+        }
+        const catalog = await marketCall(() => fetchRemoteCatalog(feedUrl))
+        return { plugins: annotateCatalog(catalog, poolDir), feedUrl }
+      },
+
+      'plugins.remote-install': async ({ name }) => {
+        const feedUrl = marketFeedUrl()
+        // The zip URL resolves only from the freshly fetched catalog — the
+        // client names a plugin, never a download location.
+        const catalog = await marketCall(() => fetchRemoteCatalog(feedUrl))
+        const entry = catalog.plugins.find(candidate => candidate.name === name)
+        if (entry === undefined) {
+          throw new RpcBusinessError({ code: 'not-found', details: { what: `${name} 不在插件源目录中` } })
+        }
+        const zipPath = await marketCall(() => downloadRemotePluginZip(feedUrl, entry.file))
+        try {
+          return await runInstall(zipPath, 'market')
+        } finally {
+          rmSync(zipPath, { force: true })
+        }
       },
     })
   },

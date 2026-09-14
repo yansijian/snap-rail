@@ -13,6 +13,7 @@ import { boot } from '@snap-rail/app-boot'
 import type { Context } from '@snap-rail/cordis'
 import carrierPlugin from './carrier.ts'
 import windowRpcPlugin, { trackMainWindow } from './window-rpc.ts'
+import updateRpcPlugin from './update-rpc.ts'
 import { handlePluginScheme, registerPluginScheme } from './plugin-protocol.ts'
 import { RENDERER_PACKAGES } from './renderer-packages.ts'
 
@@ -36,7 +37,6 @@ function builtinLayerPath(): string {
 async function start(): Promise<void> {
   registerPluginScheme()
   await app.whenReady()
-  wireUpdateChannel()
 
   const home = app.getPath('userData')
   // Pool plugin assets reach the renderer over the privileged scheme; the
@@ -57,6 +57,7 @@ async function start(): Promise<void> {
       // Mounts immediately; activates once the gateway mounts in the tree.
       void prepared.plugin(carrierPlugin)
       void prepared.plugin(windowRpcPlugin)
+      void prepared.plugin(updateRpcPlugin)
     },
   })
 
@@ -96,24 +97,3 @@ start().catch(cause => {
   console.error(cause instanceof Error ? cause.stack ?? cause.message : cause)
   app.exit(1)
 })
-
-/**
- * The update channel seat: only a packaged build with a configured publish
- * provider checks; dev and unconfigured installs stay idle. Configure
- * `publish` in electron-builder.yml (e.g. the GitHub provider) to activate.
- */
-function wireUpdateChannel(): void {
-  if (!app.isPackaged) return
-  void (async () => {
-    try {
-      const { autoUpdater } = (await import('electron-updater')) as typeof import('electron-updater')
-      autoUpdater.autoDownload = false
-      const available = await autoUpdater.checkForUpdates()
-      if (available !== null) {
-        console.log(`[updater] ${available.updateInfo.version} available (manual download; auto-install lands with the channel)`)
-      }
-    } catch (cause) {
-      console.log('[updater] channel not configured, staying idle:', cause instanceof Error ? cause.message : cause)
-    }
-  })()
-}

@@ -15,7 +15,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { DomainContract, MethodRow } from '../packages/base/protocol/src/contract.ts'
-import { pluginsContract } from '../packages/base/app-boot/src/contract.ts'
+import { pluginsContract, updateContract } from '../packages/base/app-boot/src/contract.ts'
 import { equipmentContract } from '../packages/equipment/equipment/src/wire.ts'
 import { forgeContract } from '../packages/tool/forge/src/contract.ts'
 import { productionContract } from '../packages/tool/trend/src/contract.ts'
@@ -28,6 +28,7 @@ const catalogPath = join(root, 'docs', 'wire-catalog.md')
 const CONTRACTS: readonly DomainContract[] = [
   stationContract,
   pluginsContract,
+  updateContract,
   equipmentContract,
   forgeContract,
   productionContract,

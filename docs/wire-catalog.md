@@ -45,6 +45,25 @@ hand-written face and are documented statically here.
 | `plugins.install` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"zipPath":{"type":"string","minLength":1}},"required":["zipPath"],"additionalProperties":false} | — |
 | `plugins.inspect` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"zipPath":{"type":"string","minLength":1}},"required":["zipPath"],"additionalProperties":false} | — |
 | `plugins.uninstall` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"name":{"type":"string","minLength":1}},"required":["name"],"additionalProperties":false} | — |
+| `plugins.remote-list` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `plugins.remote-install` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"name":{"type":"string","minLength":1}},"required":["name"],"additionalProperties":false} | — |
+
+## update
+
+### Methods
+
+| method | request schema | response schema |
+|---|---|---|
+| `update.state` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `update.check` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `update.download` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `update.install` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+
+### Frames
+
+| frame | payload schema |
+|---|---|
+| `update/status` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"phase":{"type":"string","enum":["unsupported","unconfigured","idle","checking","available","none","downloading","ready","error"]},"currentVersion":{"type":"string"},"version":{"type":"string"},"percent":{"type":"number","minimum":0,"maximum":100},"message":{"type":"string"}},"required":["phase","currentVersion"],"additionalProperties":false} |
 
 ## equipment
 

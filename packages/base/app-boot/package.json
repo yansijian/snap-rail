@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/app-boot",
-  "description": "Host boot glue: plugin pool scan, two-layer composition, boot tree, layer admin; ./contract is the plugins-domain wire contract; ./invariant the layer-check sidecar",
+  "description": "Host boot glue: plugin pool scan, two-layer composition, boot tree, layer admin; ./contract is the plugins+update wire contract; ./invariant the layer-check sidecar",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",

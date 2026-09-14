@@ -21,8 +21,9 @@ nsis:
   allowToChangeInstallationDirectory: true
   artifactName: ${productName}-${version}-${arch}-setup.${ext}
 # Update channel seat: electron-updater reads the publish provider at
-# runtime; phase 1 leaves it unconfigured and the updater stays idle.
-# publish:
-#   provider: github
-#   owner: snap-rail
-#   repo: snap-rail
+# runtime (this config packs into app-update.yml as the built-in default);
+# a deployment overrides it per terminal with the `update.feedUrl` settings
+# key — no repack needed. Point the URL at the desktop release directory.
+publish:
+  - provider: generic
+    url: https://updates.example.com/snap-rail/desktop/
