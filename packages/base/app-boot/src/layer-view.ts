@@ -24,6 +24,8 @@ export interface ManifestInfo {
   framework?: string | undefined
   clientOnly?: boolean | undefined
   requires?: readonly string[] | undefined
+  /** Contributed seed ids this client face requires from other plugins. */
+  externalSeeds?: readonly string[] | undefined
   capabilities?: {
     provides?: readonly { id: string, version: string }[]
     requires?: readonly { id: string, range: string, optional?: boolean }[]
@@ -56,6 +58,10 @@ export interface LayerView {
   missingRequirements(name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[]
   /** Capability requirements that no enabled provider satisfies. */
   missingCapabilities(name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[]
+  /** Contributed seed ids the package requires that no installed provider
+   * declares: the provider package is absent, or present without declaring
+   * the id among its contributed seeds. */
+  missingSeeds(name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[]
   /** Enabled packages that require one package (declared `requires` or
    * framework binding) — the reverse check for disable/uninstall. */
   dependentsOf(name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[]
@@ -96,6 +102,12 @@ export function createLayerView(
     const engines = typeof manifest.engines === 'object' && manifest.engines !== null
       ? manifest.engines as ManifestInfo['engines']
       : undefined
+    const client = typeof manifest.client === 'object' && manifest.client !== null
+      ? manifest.client as { externalSeeds?: unknown }
+      : undefined
+    const externalSeeds = Array.isArray(client?.externalSeeds) && client.externalSeeds.every(entry => typeof entry === 'string')
+      ? client.externalSeeds as readonly string[]
+      : undefined
     return {
       kind: pick('kind'),
       layer: pick('layer'),
@@ -105,6 +117,7 @@ export function createLayerView(
       framework: pick('framework'),
       clientOnly: manifest.clientOnly === true ? true : undefined,
       requires: Array.isArray(requires) && requires.every(entry => typeof entry === 'string') ? requires : undefined,
+      ...(externalSeeds === undefined ? {} : { externalSeeds }),
       ...(parsedCapabilities === undefined ? {} : { capabilities: parsedCapabilities }),
       ...(engines === undefined ? {} : { engines }),
     }
@@ -170,6 +183,24 @@ export function createLayerView(
       .map(requirement => `${requirement.id}@${requirement.range}`)
   }
 
+  const missingSeeds = (name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[] => {
+    const target = packageNameOf(name)
+    const missing: string[] = []
+    for (const seed of manifestOf(target, pool).externalSeeds ?? []) {
+      const provider = seedProviderOf(seed)
+      if (!pool.has(provider)) {
+        missing.push(`${seed}（提供方 ${provider} 未安装）`)
+        continue
+      }
+      // Providers declare subpath keys (`seeds: ['ui']`); the required id is
+      // the full `<package>/<key>`, so compare without the package prefix.
+      const subpath = seed.slice(provider.length + 1)
+      const declared = pool.get(provider)?.clientSeeds ?? []
+      if (!declared.includes(subpath)) missing.push(`${seed}（提供方 ${provider} 未声明该贡献面）`)
+    }
+    return missing
+  }
+
   const dependentsOf = (name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[] => {
     const target = packageNameOf(name)
     const dependents = new Set<string>()
@@ -199,12 +230,25 @@ export function createLayerView(
     enabledPackages,
     missingRequirements,
     missingCapabilities,
+    missingSeeds,
     dependentsOf,
   }
 }
 
-function satisfiesRange(version: string, range: string): boolean {
-  const actual = parseVersion(version)
+/** The package that provides a contributed seed id: `@scope/pkg/sub` →
+ * `@scope/pkg`, `pkg/sub` → `pkg`. An id without a subpath names itself and
+ * can never be satisfied — seeds are subpath ids by definition. */
+function seedProviderOf(seed: string): string {
+  const firstSlash = seed.indexOf('/')
+  if (firstSlash < 0) return seed
+  if (seed.startsWith('@')) {
+    const secondSlash = seed.indexOf('/', firstSlash + 1)
+    return secondSlash < 0 ? seed : seed.slice(0, secondSlash)
+  }
+  return seed.slice(0, firstSlash)
+}
+
+function satisfiesRange(version: string, range: string): boolean {  const actual = parseVersion(version)
   const normalized = range.trim()
   const prefix = normalized.startsWith('^') || normalized.startsWith('~') || normalized.startsWith('>=') ? normalized.match(/^(\^|~|>=)/)?.[0] ?? '' : ''
   const expected = parseVersion(prefix === '>=' ? normalized.slice(2) : normalized.slice(prefix.length))

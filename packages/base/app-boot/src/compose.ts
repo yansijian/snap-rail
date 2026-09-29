@@ -377,10 +377,11 @@ export function packageManifestOf(
     if (descriptor.framework !== undefined) manifest.framework = descriptor.framework
     if (descriptor.requires !== undefined) manifest.requires = descriptor.requires
     if (descriptor.clientOnly === true) manifest.clientOnly = true
-    if (descriptor.clientEntry !== undefined || descriptor.clientSeeds !== undefined) {
+    if (descriptor.clientEntry !== undefined || descriptor.clientSeeds !== undefined || descriptor.externalSeeds !== undefined) {
       manifest.client = {
         ...descriptor.clientEntry !== undefined ? { entry: descriptor.clientEntry } : {},
         ...descriptor.clientSeeds !== undefined ? { seeds: descriptor.clientSeeds } : {},
+        ...descriptor.externalSeeds !== undefined ? { externalSeeds: descriptor.externalSeeds } : {},
       }
     }
     if (descriptor.capabilities !== undefined) manifest.capabilities = descriptor.capabilities

@@ -29,4 +29,4 @@ nsis:
 # changes this line or the per-terminal settings key.
 publish:
   - provider: generic
-    url: http://192.168.1.10/snap-rail/snap-rail/raw/branch/feed/desktop/
+    url: http://192.168.1.9:3000/snap-rail/snap-rail/raw/branch/feed/desktop/

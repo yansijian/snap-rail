@@ -26,6 +26,15 @@ export const clientFaceSchema = z.object({
    * plugins' client bundles may `require` — same instance, one execution.
    */
   seeds: z.array(z.string().min(1)).optional(),
+  /**
+   * Contributed seed ids (`<package>/<subpath>`) this client face requires
+   * from other installed plugins (a framework's primitives, an extension
+   * pack's components). clientBundle externalizes exactly these ids — they
+   * resolve from the shell's seed table at runtime instead of being inlined
+   * as private copies — and enabling the package verifies each provider is
+   * installed and declares the id.
+   */
+  externalSeeds: z.array(z.string().min(1)).optional(),
 }).strict()
 
 /** The `snapRail` manifest field's schema. */

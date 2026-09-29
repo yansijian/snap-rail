@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { clientBundle, hostBundle, CLIENT_EXTERNALS, CONTRIBUTED_SEED_MODULES, SEED_MODULES, snapRailManifestSchema } from '../src/index.ts'
@@ -70,6 +73,30 @@ describe('seed tiers', () => {
     const footer = options && 'footer' in options ? String(options.footer) : ''
     expect(banner).toContain(`window.__ModuleLoader__.load({ id: ${JSON.stringify(packageName)}, factory:`)
     expect(footer).toContain('module.exports.default : module.exports; } });')
+  })
+
+  it('client face: manifest-declared externalSeeds join the external surface', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'kit-externals-'))
+    const previous = process.cwd()
+    try {
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({
+        name: '@t/consumer',
+        snapRail: { client: { entry: 'lib/client.js', externalSeeds: ['@acme/framework-x/ui', '@b/ext/datepicker'] } },
+      }))
+      process.chdir(dir)
+      const config = clientBundle('@t/consumer', 'src/index.tsx')
+      const external = (config as { external?: readonly string[] }).external ?? []
+      expect(external).toEqual([...CLIENT_EXTERNALS, '@acme/framework-x/ui', '@b/ext/datepicker'])
+    } finally {
+      process.chdir(previous)
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('manifest schema accepts declared externalSeeds', () => {
+    const parsed = snapRailManifestSchema.parse({ client: { externalSeeds: ['@acme/framework-x/ui'] } })
+    expect(parsed.client?.externalSeeds).toEqual(['@acme/framework-x/ui'])
+    expect(snapRailManifestSchema.safeParse({ client: { externalSeeds: [''] } }).success).toBe(false)
   })
 })
 

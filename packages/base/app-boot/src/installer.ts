@@ -70,6 +70,8 @@ export interface InspectResult {
   hasClient: boolean
   /** Declared dependencies (`snapRail.requires`), unfiltered. */
   requires: readonly string[]
+  /** Contributed seed ids the client face requires from other plugins. */
+  externalSeeds: readonly string[]
   capabilities?: { provides?: readonly { id: string, version: string }[], requires?: readonly { id: string, range: string, optional?: boolean }[] }
   engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
   /** The release signature key id when the archive carries signed metadata. */
@@ -115,6 +117,7 @@ export function inspectPluginZip(zipPath: string, options?: { trustedKeys?: read
     permissions: snapRail.permissions ?? [],
     hasClient: snapRail.client !== undefined,
     requires: snapRail.requires ?? [],
+    externalSeeds: snapRail.client?.externalSeeds ?? [],
     ...(snapRail.capabilities === undefined ? {} : { capabilities: snapRail.capabilities }),
     ...(snapRail.engines === undefined ? {} : { engines: snapRail.engines }),
     ...(signatureKeyId === undefined ? {} : { signatureKeyId }),

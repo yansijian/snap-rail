@@ -18,11 +18,33 @@
  * @module @snap-rail/plugin-kit/build
  */
 
+import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { dirname, isAbsolute, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { defineConfig } from 'tsdown'
 import type { Plugin } from 'rolldown'
 import { CLIENT_EXTERNALS } from './seeds.ts'
+
+/**
+ * Contributed-seed ids this package declares it requires from other plugins
+ * (`snapRail.client.externalSeeds`), read from the package.json in the
+ * working directory (tsdown runs there). clientBundle externalizes exactly
+ * these ids on top of the seed whitelist, so a consumer's bundle resolves a
+ * third-party framework's primitives or an extension pack's components from
+ * the runtime seed table — single instances — instead of inlining private
+ * copies the loader could never resolve.
+ */
+function declaredExternalSeeds(): readonly string[] {
+  try {
+    const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as {
+      snapRail?: { client?: { externalSeeds?: string[] } }
+    }
+    const seeds = manifest.snapRail?.client?.externalSeeds
+    return Array.isArray(seeds) && seeds.every(seed => typeof seed === 'string' && seed !== '') ? seeds : []
+  } catch {
+    return []
+  }
+}
 
 /** Extensions the client preset ships as emitted assets beside the bundle. */
 const ASSET_EXTENSIONS = /\.(png|jpe?g|webp|gif|svg)$/
@@ -180,9 +202,10 @@ export function clientBundle(packageName: string, entry: string, options: Client
     // The loader's require only knows the seed table — every third-party
     // dependency (radix, cva, icons, …) inlines into the bundle; tsdown's
     // automatic externalization of package.json dependencies would leave
-    // them as unresolvable requires. The explicit `external` list wins.
+    // them as unresolvable requires. The explicit `external` list wins:
+    // the seed whitelist plus this package's declared externalSeeds.
     noExternal: [/.*/],
-    external: [...CLIENT_EXTERNALS],
+    external: [...CLIENT_EXTERNALS, ...declaredExternalSeeds()],
     plugins: [injectExtraCss, cssModules(), assetUrls(packageName, 'lib-client')],
     outputOptions: {
       // The welded wrapper: the entire bundle body becomes the factory the

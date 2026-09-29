@@ -30,7 +30,13 @@ export interface SnapRailManifest {
   /** True when the package has no host face (renderer-only). */
   clientOnly?: boolean
   /** The renderer face: the client bundle path inside the package. */
-  client?: { entry: string, seeds?: readonly string[] }
+  client?: {
+    entry: string
+    /** Contributed seed subpaths this face provides to other plugins. */
+    seeds?: readonly string[]
+    /** Contributed seed ids this face requires from other installed plugins. */
+    externalSeeds?: readonly string[]
+  }
   /** Capabilities provided by and required from the active runtime. */
   capabilities?: {
     provides?: readonly { id: string, version: string }[]
@@ -76,6 +82,8 @@ export interface PluginDescriptor {
   clientEntry?: string
   /** Contributed seed subpaths (`snapRail.client.seeds`), when declared. */
   clientSeeds?: readonly string[]
+  /** Contributed seed ids required from other plugins (`snapRail.client.externalSeeds`), when declared. */
+  externalSeeds?: readonly string[]
   /** Declared runtime capabilities. */
   capabilities?: SnapRailManifest['capabilities']
   /** Supported runtime versions. */
@@ -199,6 +207,8 @@ export function scanPluginPool(dirs: readonly string[]): Map<string, PluginDescr
       if (clientEntry !== undefined) descriptor.clientEntry = clientEntry
       const clientSeeds = stringArrayOrUndefined(snapRail?.client?.seeds)
       if (clientSeeds !== undefined) descriptor.clientSeeds = clientSeeds
+      const externalSeeds = stringArrayOrUndefined(snapRail?.client?.externalSeeds)
+      if (externalSeeds !== undefined) descriptor.externalSeeds = externalSeeds
       const capabilities = capabilitiesOrUndefined(snapRail?.capabilities)
       if (capabilities !== undefined) descriptor.capabilities = capabilities
       if (snapRail?.engines !== undefined) descriptor.engines = snapRail.engines

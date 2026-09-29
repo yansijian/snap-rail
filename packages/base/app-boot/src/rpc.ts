@@ -77,16 +77,21 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
     /**
      * Forward check before an enable lands: every declared requirement must
      * be satisfiable now — a package requirement by an enabled package, a
-     * `service:` requirement by a live service.
+     * `service:` requirement by a live service, a contributed seed by an
+     * installed provider that declares it.
      */
     const assertRequirementsMet = (name: string, pool: ReadonlyMap<string, PluginDescriptor>): void => {
       const missing = view.missingRequirements(name, pool)
       const missingCapabilities = view.missingCapabilities(name, pool)
-      if (missing.length > 0 || missingCapabilities.length > 0) {
-        throw new RpcBusinessError({
-          code: 'bad-request',
-          details: { issues: [`缺少依赖：${[...missing, ...missingCapabilities].join('、')}（请先安装并启用它们）`] },
-        })
+      const missingSeeds = view.missingSeeds(name, pool)
+      const issues = [
+        ...(missing.length > 0 || missingCapabilities.length > 0
+          ? [`缺少依赖：${[...missing, ...missingCapabilities].join('、')}（请先安装并启用它们）`]
+          : []),
+        ...(missingSeeds.length > 0 ? [`缺少贡献面：${missingSeeds.join('、')}（先安装提供它们的插件）`] : []),
+      ]
+      if (issues.length > 0) {
+        throw new RpcBusinessError({ code: 'bad-request', details: { issues } })
       }
     }
 
@@ -376,7 +381,16 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
             .filter(requirement => requirement.optional !== true)
             .filter(requirement => !providers.some(provider => provider.id === requirement.id && satisfiesCapabilityRange(provider.version, requirement.range)))
             .map(requirement => `${requirement.id}@${requirement.range}`)
-          const missing = [...missingPackages, ...missingCapabilities]
+          // Contributed seeds ride the install warning path (not a refusal):
+          // a missing provider is exactly what the market's next install
+          // fixes, and the enable precheck still refuses before mount.
+          const missingSeeds = plugin.externalSeeds
+            .filter(seed => {
+              const provider = seed.split('/').slice(0, seed.startsWith('@') ? 2 : 1).join('/')
+              return !pool.has(provider)
+            })
+            .map(seed => `${seed}（提供方未安装）`)
+          const missing = [...missingPackages, ...missingCapabilities, ...missingSeeds]
           // How the install would land over the installed version drives the
           // confirmation dialog's update/block branches.
           const poolDir = layers.handles.poolDirs[0]
