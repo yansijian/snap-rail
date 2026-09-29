@@ -10,7 +10,8 @@
 
 import { Context, type Plugin } from '@snap-rail/cordis'
 import '@snap-rail/framework-shadcn/settings-pages'
-import '@snap-rail/framework-shadcn/slots'
+import { UI_SLOT_IDS } from '@snap-rail/framework-shadcn/slots'
+import '@snap-rail/framework-shadcn/semantic'
 import '@snap-rail/framework-shadcn/runtime'
 import { subscribeFrame } from '@snap-rail/connection'
 import { settingsChangedSchema } from '@snap-rail/station-rpc/contract'
@@ -105,7 +106,7 @@ function SettingsDialog({ ctx }: { ctx: Context }): ReactNode {
 /** The settings dialog occupant. */
 const settingsStationPlugin: Plugin.Object<void> = {
   name: 'settings-station',
-  inject: ['uiSlots', 'settingsPages', 'client'],
+  inject: ['uiContract', 'settingsPages', 'client'],
   apply(ctx: Context): void {
     // Theme: apply the stored row (settings.json `ui.theme`) to <html> right
     // away, keep every surface hot-synced through the settings/changed
@@ -169,9 +170,10 @@ const settingsStationPlugin: Plugin.Object<void> = {
         return <MarketPage ctx={ctx} />
       },
     })
-    ctx.uiSlots.register(ctx, 'layout', {
+    ctx.uiContract.registerLayout(ctx, {
       id: 'settings-dialog',
       order: 100,
+      slots: [UI_SLOT_IDS.overlay],
       render(): ReactNode {
         return <SettingsDialog ctx={ctx} />
       },

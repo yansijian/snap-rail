@@ -10,6 +10,7 @@
 
 export * from './runtime.tsx'
 export * from './slots.tsx'
+export * from './semantic.tsx'
 export * from './settings-pages.ts'
 export * from './session.ts'
 export * from './variables.ts'

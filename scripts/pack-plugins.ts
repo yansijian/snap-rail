@@ -4,7 +4,8 @@
  * sources) plus an `index.json` catalog — exactly what the settings page's
  * 安装插件 consumes locally and what the 插件市场 feed serves remotely.
  * The assembly rules live in `@snap-rail/plugin-kit/pack`; this is only the
- * repo's shipment list. Run a build first: `pnpm run build && pnpm run pack:plugins`.
+ * repo's shipment list. Run a build first, then provide the publisher key:
+ * `pnpm run build && pnpm run pack:plugins -- --sign-key .keys/release.private.pem --key-id release-2026`.
  *
  * Output lands in `dist-plugins/` by default; pass `--out <dir>` to pack
  * straight into a feed directory (e.g. an nginx docroot).
@@ -12,17 +13,22 @@
  * @module snap-rail/scripts/pack-plugins
  */
 
-import { createWriteStream } from 'node:fs'
+import { createHash, createPrivateKey } from 'node:crypto'
+import { createWriteStream, readFileSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { zipSync } from 'fflate'
 import { releaseFiles, zipFileName, type ReleaseSpec } from '@snap-rail/plugin-kit/pack'
+import { signReleaseFiles, type ReleaseSignature } from '@snap-rail/plugin-kit/sign'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** The packages shipped as installable zips — the non-base catalog. */
-const PLUGIN_PACKAGES: readonly ReleaseSpec[] = [
+/** The packages shipped as installable zips — the non-base catalog. The
+ * publish pipeline reuses the list to enrich `catalog.json` from the repo
+ * sources (author, repository, readme), so it lives here: the shipment
+ * list has exactly one home. */
+export const PLUGIN_PACKAGES: readonly ReleaseSpec[] = [
   // 存储后端：drizzle 查询构建器规范的 node:sqlite 实现（全局单活）。
   {
     name: '@snap-rail/store-sqlite',
@@ -113,12 +119,48 @@ function outDirArg(): string {
   return resolve(value)
 }
 
+interface SigningOptions {
+  keyId: string
+  privateKey: ReturnType<typeof createPrivateKey>
+  publisher?: string
+}
+
+/** Release signing is mandatory for every installable feed artifact. */
+function signingOptions(): SigningOptions {
+  const keyPathIndex = process.argv.indexOf('--sign-key')
+  const keyIdIndex = process.argv.indexOf('--key-id')
+  const keyPath = keyPathIndex >= 0 ? process.argv[keyPathIndex + 1] : undefined
+  const keyId = keyIdIndex >= 0 ? process.argv[keyIdIndex + 1] : undefined
+  if (keyPath === undefined && keyId === undefined) {
+    throw new Error('pack-plugins: releases must be signed; pass --sign-key <private.pem> and --key-id <id>')
+  }
+  if (keyPath === undefined || keyId === undefined || keyPath === '' || keyId === '') {
+    throw new Error('pack-plugins: --sign-key and --key-id must be supplied together')
+  }
+  const publisherIndex = process.argv.indexOf('--publisher')
+  const publisher = publisherIndex >= 0 ? process.argv[publisherIndex + 1] : undefined
+  return {
+    keyId,
+    privateKey: createPrivateKey(readFileSync(resolve(keyPath))),
+    ...(publisher === undefined || publisher === '' ? {} : { publisher }),
+  }
+}
+
 async function main(): Promise<void> {
   const outDir = outDirArg()
+  const signing = signingOptions()
   await mkdir(outDir, { recursive: true })
   const entries: Array<Record<string, unknown>> = []
   for (const spec of PLUGIN_PACKAGES) {
-    const files = await releaseFiles(spec)
+    const unsignedFiles = await releaseFiles(spec)
+    const sourceManifest = JSON.parse(new TextDecoder().decode(unsignedFiles['package.json']!)) as { name?: string, version?: string }
+    const files = signReleaseFiles(unsignedFiles, {
+      name: sourceManifest.name ?? spec.name,
+      version: sourceManifest.version ?? '0.0.0',
+      keyId: signing.keyId,
+      privateKey: signing.privateKey,
+      ...(signing.publisher === undefined ? {} : { publisher: signing.publisher }),
+    })
     const zipped = zipSync(files, { level: 9 })
     const target = join(outDir, zipFileName(spec.name))
     await new Promise<void>((resolve, reject) => {
@@ -128,18 +170,41 @@ async function main(): Promise<void> {
       stream.end(zipped)
     })
     // The catalog entry reads back out of the shipped release manifest, so
-    // the feed can never advertise something the zip does not carry.
+    // the feed can never advertise something the zip does not carry. The
+    // digest covers the exact zip bytes — the client verifies the download
+    // against it before the installer ever sees the file.
     const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!)) as {
       version?: string
       description?: string
-      snapRail?: { kind?: string }
+      snapRail?: {
+        kind?: string
+        title?: string
+        category?: string
+        requires?: string[]
+        framework?: string
+        permissions?: string[]
+        capabilities?: { provides?: { id: string, version: string }[], requires?: { id: string, range: string, optional?: boolean }[] }
+        engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
+      }
     }
+    const signature = files['META-INF/signature.json']
+    const signatureInfo = signature === undefined ? undefined : JSON.parse(new TextDecoder().decode(signature)) as ReleaseSignature
     entries.push({
       name: spec.name,
       version: manifest.version ?? '0.0.0',
       ...(manifest.description !== undefined && manifest.description !== '' ? { description: manifest.description } : {}),
       ...(manifest.snapRail?.kind !== undefined ? { kind: manifest.snapRail.kind } : {}),
+      ...(manifest.snapRail?.title !== undefined ? { title: manifest.snapRail.title } : {}),
+      ...(manifest.snapRail?.category !== undefined ? { category: manifest.snapRail.category } : {}),
+      ...(manifest.snapRail?.requires !== undefined ? { requires: manifest.snapRail.requires } : {}),
+      ...(manifest.snapRail?.framework !== undefined ? { framework: manifest.snapRail.framework } : {}),
+      ...(manifest.snapRail?.permissions !== undefined ? { permissions: manifest.snapRail.permissions } : {}),
+      ...(manifest.snapRail?.capabilities !== undefined ? { capabilities: manifest.snapRail.capabilities } : {}),
+      ...(manifest.snapRail?.engines !== undefined ? { engines: manifest.snapRail.engines } : {}),
       file: zipFileName(spec.name),
+      sha256: createHash('sha256').update(zipped).digest('hex'),
+      size: zipped.length,
+      ...(signatureInfo === undefined ? {} : { signature: { algorithm: signatureInfo.algorithm, keyId: signatureInfo.keyId } }),
     })
     console.log(`packed ${zipFileName(spec.name)} (${(zipped.length / 1024).toFixed(0)} KiB, ${Object.keys(files).length} files)`)
   }
@@ -148,7 +213,11 @@ async function main(): Promise<void> {
   console.log(`packed index.json (${entries.length} plugins)`)
 }
 
-main().catch(cause => {
-  console.error(cause)
-  process.exitCode = 1
-})
+// Run only when invoked directly — the publish pipeline imports the
+// shipment list and must not trigger a pack as a side effect.
+if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch(cause => {
+    console.error(cause)
+    process.exitCode = 1
+  })
+}

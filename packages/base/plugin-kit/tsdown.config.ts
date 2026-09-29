@@ -8,7 +8,7 @@ import { defineConfig } from 'tsdown'
  * tsc emits under lib/types.
  */
 export default defineConfig({
-  entry: ['lib/types/{index,manifest,seeds,build,pack}.js'],
+  entry: ['lib/types/{index,manifest,seeds,build,pack,sign}.js'],
   outDir: 'lib',
   format: ['esm'],
   platform: 'node',

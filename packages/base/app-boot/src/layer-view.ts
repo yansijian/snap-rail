@@ -24,6 +24,11 @@ export interface ManifestInfo {
   framework?: string | undefined
   clientOnly?: boolean | undefined
   requires?: readonly string[] | undefined
+  capabilities?: {
+    provides?: readonly { id: string, version: string }[]
+    requires?: readonly { id: string, range: string, optional?: boolean }[]
+  }
+  engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
 }
 
 /** Everything the administration and diagnostic surfaces read from the layers. */
@@ -49,6 +54,8 @@ export interface LayerView {
    * package requirement nobody enabled, or a `service:` requirement with no
    * live service. Empty means safe. */
   missingRequirements(name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[]
+  /** Capability requirements that no enabled provider satisfies. */
+  missingCapabilities(name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[]
   /** Enabled packages that require one package (declared `requires` or
    * framework binding) — the reverse check for disable/uninstall. */
   dependentsOf(name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[]
@@ -82,6 +89,13 @@ export function createLayerView(
       return typeof value === 'string' ? value : undefined
     }
     const requires = manifest.requires
+    const capabilities = manifest.capabilities
+    const parsedCapabilities = typeof capabilities === 'object' && capabilities !== null
+      ? capabilities as ManifestInfo['capabilities']
+      : undefined
+    const engines = typeof manifest.engines === 'object' && manifest.engines !== null
+      ? manifest.engines as ManifestInfo['engines']
+      : undefined
     return {
       kind: pick('kind'),
       layer: pick('layer'),
@@ -91,6 +105,8 @@ export function createLayerView(
       framework: pick('framework'),
       clientOnly: manifest.clientOnly === true ? true : undefined,
       requires: Array.isArray(requires) && requires.every(entry => typeof entry === 'string') ? requires : undefined,
+      ...(parsedCapabilities === undefined ? {} : { capabilities: parsedCapabilities }),
+      ...(engines === undefined ? {} : { engines }),
     }
   }
 
@@ -142,15 +158,33 @@ export function createLayerView(
     return missing
   }
 
+  const missingCapabilities = (name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[] => {
+    const requirements = manifestOf(name, pool).capabilities?.requires ?? []
+    if (requirements.length === 0) return []
+    const providers: Array<{ id: string, version: string }> = []
+    for (const enabled of enabledPackages(pool)) {
+      providers.push(...(manifestOf(enabled, pool).capabilities?.provides ?? []))
+    }
+    return requirements
+      .filter(requirement => requirement.optional !== true && !providers.some(provider => provider.id === requirement.id && satisfiesRange(provider.version, requirement.range)))
+      .map(requirement => `${requirement.id}@${requirement.range}`)
+  }
+
   const dependentsOf = (name: string, pool: ReadonlyMap<string, PluginDescriptor>): readonly string[] => {
     const target = packageNameOf(name)
     const dependents = new Set<string>()
+    const provided = manifestOf(target, pool).capabilities?.provides ?? []
     for (const enabled of enabledPackages(pool)) {
       if (enabled === target) continue
       const requirements = [...requiresOf(enabled, pool)]
       const framework = manifestOf(enabled, pool).framework
       if (framework !== undefined) requirements.push(framework)
       if (requirements.some(requirement => !requirement.startsWith('service:') && packageNameOf(requirement) === target)) {
+        dependents.add(enabled)
+      }
+      const capabilityRequirements = manifestOf(enabled, pool).capabilities?.requires ?? []
+      if (capabilityRequirements.some(requirement => requirement.optional !== true
+        && provided.some(capability => capability.id === requirement.id && satisfiesRange(capability.version, requirement.range)))) {
         dependents.add(enabled)
       }
     }
@@ -164,8 +198,32 @@ export function createLayerView(
     groupOf,
     enabledPackages,
     missingRequirements,
+    missingCapabilities,
     dependentsOf,
   }
+}
+
+function satisfiesRange(version: string, range: string): boolean {
+  const actual = parseVersion(version)
+  const normalized = range.trim()
+  const prefix = normalized.startsWith('^') || normalized.startsWith('~') || normalized.startsWith('>=') ? normalized.match(/^(\^|~|>=)/)?.[0] ?? '' : ''
+  const expected = parseVersion(prefix === '>=' ? normalized.slice(2) : normalized.slice(prefix.length))
+  if (prefix === '>=') return compareVersion(actual, expected) >= 0
+  if (prefix === '^') return actual[0] === expected[0] && compareVersion(actual, expected) >= 0
+  if (prefix === '~') return actual[0] === expected[0] && actual[1] === expected[1] && compareVersion(actual, expected) >= 0
+  return compareVersion(actual, expected) === 0
+}
+
+function parseVersion(value: string): [number, number, number] {
+  const parts = value.split(/[.-]/).slice(0, 3).map(item => /^\d+$/.test(item) ? Number(item) : 0)
+  return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0]
+}
+
+function compareVersion(a: [number, number, number], b: [number, number, number]): number {
+  for (let index = 0; index < 3; index++) {
+    if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1
+  }
+  return 0
 }
 
 /** Convenience the invariant sidecar re-exports so callers need no Context

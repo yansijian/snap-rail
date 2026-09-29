@@ -78,7 +78,7 @@ export const sectionOf = (row: PluginRow): string =>
  * top, the package (or entry) name beneath in small muted mono — an
  * undeclared title shows the name alone. A pool version rides the secondary
  * line when known. */
-function PluginIdentity(props: { title?: string | undefined, name: string, version?: string | undefined, badge?: ReactNode }): ReactNode {
+export function PluginIdentity(props: { title?: string | undefined, name: string, version?: string | undefined, badge?: ReactNode }): ReactNode {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-3">

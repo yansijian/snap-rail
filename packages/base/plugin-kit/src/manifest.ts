@@ -77,6 +77,21 @@ export const snapRailManifestSchema = z.object({
   client: clientFaceSchema.optional(),
   /** Permission declarations — shown at install time, enforced later. */
   permissions: z.array(z.string()).optional(),
+  /** Capabilities this plugin provides and requires at runtime. */
+  capabilities: z.object({
+    provides: z.array(z.object({ id: z.string().min(1), version: z.string().min(1) }).strict()).optional(),
+    requires: z.array(z.object({
+      id: z.string().min(1),
+      range: z.string().min(1),
+      optional: z.boolean().optional(),
+    }).strict()).optional(),
+  }).strict().optional(),
+  /** Host and renderer versions the built faces support. */
+  engines: z.object({
+    snapRail: z.string().min(1).optional(),
+    hostProtocol: z.string().min(1).optional(),
+    renderer: z.string().min(1).optional(),
+  }).strict().optional(),
 }).strict()
 
 /** The validated manifest field. */

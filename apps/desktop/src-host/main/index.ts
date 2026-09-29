@@ -9,13 +9,13 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
-import { boot } from '@snap-rail/app-boot'
 import type { Context } from '@snap-rail/cordis'
 import carrierPlugin from './carrier.ts'
 import windowRpcPlugin, { trackMainWindow } from './window-rpc.ts'
 import updateRpcPlugin from './update-rpc.ts'
 import { handlePluginScheme, registerPluginScheme } from './plugin-protocol.ts'
 import { RENDERER_PACKAGES } from './renderer-packages.ts'
+import { startDesktopHost } from './host.ts'
 
 /**
  * The built-in layer ships inside the app directory (packed with the app in
@@ -46,7 +46,7 @@ async function start(): Promise<void> {
   // ships base only, and every renderer resident arrives through the pool
   // (clientOnly packages never join the host tree by their own manifest).
   const dev = process.env.SNAP_RAIL_DEV_URL !== undefined
-  const ctx: Context = await boot({
+  const host = await startDesktopHost({
     binName: 'desktop',
     home,
     builtinLayerPath: builtinLayerPath(),
@@ -61,9 +61,7 @@ async function start(): Promise<void> {
     },
   })
 
-  // Hot layer reload: hand-edited or Agent-written plugins.yml (and pool or
-  // built-in list changes) re-compose and apply transactionally.
-  ctx.effect(() => ctx.pluginLayers.startWatch())
+  const ctx: Context = host.ctx
 
   const win = new BrowserWindow({
     width: 1280,
@@ -89,7 +87,7 @@ async function start(): Promise<void> {
   else await win.loadFile(join(app.getAppPath(), 'dist/client/index.html'))
 
   app.on('window-all-closed', () => {
-    void ctx.fiber.dispose().finally(() => app.quit())
+    void host.dispose().finally(() => app.quit())
   })
 }
 

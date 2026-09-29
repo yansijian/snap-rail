@@ -26,6 +26,7 @@ import * as clientRuntime from '@snap-rail/framework-shadcn/runtime'
 import * as clientSession from '@snap-rail/framework-shadcn/session'
 import * as clientSettings from '@snap-rail/framework-shadcn/settings-pages'
 import * as clientSlots from '@snap-rail/framework-shadcn/slots'
+import * as clientSemantic from '@snap-rail/framework-shadcn/semantic'
 import * as clientUi from '@snap-rail/framework-shadcn/ui'
 import * as clientVariables from '@snap-rail/framework-shadcn/variables'
 import * as clientWorkflows from '@snap-rail/framework-shadcn/workflows'
@@ -53,6 +54,7 @@ export async function runDevRenderer(options: DevHarnessOptions): Promise<void> 
   const CONTRIBUTED_TABLE: ReadonlyArray<readonly [id: string, module: unknown]> = [
     ['@snap-rail/framework-shadcn/ui', clientUi],
     ['@snap-rail/framework-shadcn/slots', clientSlots],
+    ['@snap-rail/framework-shadcn/semantic', clientSemantic],
     ['@snap-rail/framework-shadcn/settings-pages', clientSettings],
     ['@snap-rail/framework-shadcn/session', clientSession],
     ['@snap-rail/framework-shadcn/workflows', clientWorkflows],

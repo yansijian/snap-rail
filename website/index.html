@@ -28,21 +28,17 @@
         </a>
         <div class="ml-auto flex items-center gap-1">
           <a data-nav="index" class="nav-link hidden sm:inline-flex" href="./index.html">主页</a>
-          <a data-nav="plugins" class="nav-link whitespace-nowrap" href="./plugins.html">插件生态</a>
+          <a data-nav="plugins" class="nav-link hidden whitespace-nowrap sm:inline-flex" href="./plugins.html">插件生态</a>
+          <a data-nav="recipes" class="nav-link whitespace-nowrap" href="./recipes.html">组合示例</a>
           <a
             class="nav-link hidden sm:inline-flex"
-            href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md"
+            href="https://gitee.com/yansijian/snap-rail/blob/master/docs/architecture.md"
             target="_blank"
             rel="noopener"
             >文档</a
           >
-          <a class="btn btn-ghost ml-2 whitespace-nowrap px-3 py-2 text-sm sm:px-3.5" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">
-            <svg viewBox="0 0 16 16" class="h-4 w-4 fill-current" aria-hidden="true">
-              <path
-                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
-              />
-            </svg>
-            GitHub</a
+          <a class="btn btn-ghost ml-2 whitespace-nowrap px-3 py-2 text-sm sm:px-3.5" href="https://gitee.com/yansijian/snap-rail" target="_blank" rel="noopener">
+            ⭐ Gitee</a
           >
         </div>
       </nav>
@@ -60,12 +56,8 @@
               OT 现场数据 × IT 工具链，装进一个「一切皆插件」的宿主。
             </p>
             <div class="mt-6 flex flex-wrap items-center justify-center gap-4">
-              <a class="btn btn-primary" href="https://github.com/yansijian/snap-rail/releases" target="_blank" rel="noopener">
-                下载 Windows 安装包</a
-              >
-              <a class="btn btn-ghost" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">
-                ⭐ GitHub 加星</a
-              >
+              <a class="btn btn-primary" href="./plugins.html#download"> 下载 Windows 安装包</a>
+              <a class="btn btn-ghost" href="./recipes.html"> 看组合示例 →</a>
             </div>
             <p class="mt-4 font-mono text-xs text-muted-foreground/60">向下滚动，看数据从电柜走向终端 ↓</p>
           </div>
@@ -703,10 +695,10 @@
             <span class="badge">vendored Cordis · 上游 MIT</span>
             <a
               class="btn btn-ghost px-3.5 py-2 text-sm"
-              href="https://github.com/yansijian/snap-rail"
+              href="https://gitee.com/yansijian/snap-rail"
               target="_blank"
               rel="noopener"
-              >在 GitHub 上阅读源码</a
+              >在 Gitee 上阅读源码</a
             >
           </div>
           <div class="mt-10 grid gap-6 md:grid-cols-3">
@@ -745,9 +737,10 @@
               <ul class="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
                 <li>✓ Cordis 宿主树 + 两层清单合成（内置只读 + 用户层热重载）</li>
                 <li>✓ 四象限类型化 RPC 协议（BigInt 走结构化克隆）</li>
-                <li>✓ terminal-ops 套件 · mock + ModbusTCP 驱动</li>
+                <li>✓ terminal-ops 套件 · ModbusTCP/EtherNet/IP 驱动</li>
                 <li>✓ forge AI 创造工作室（生成 → 挂载 → 导出 zip）</li>
                 <li>✓ store 分库持久化 + append-only 审计</li>
+                <li>✓ 插件市场 + 组合一键安装 · 应用自更新通道</li>
               </ul>
             </div>
             <div class="section-card reveal p-7">
@@ -756,7 +749,8 @@
               </h3>
               <ul class="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
                 <li>○ 权限强制执行（现在安装时明示，将来运行时拦截）</li>
-                <li>○ 插件市场（同格式 zip 的下载源）</li>
+                <li>○ snap-rail-market 社区仓（三方插件 PR 上架）</li>
+                <li>○ 发布签名 · deep link 唤起安装</li>
                 <li>○ npm 分发 · 套件免重启热切换</li>
                 <li>○ i18n · 遥测</li>
               </ul>
@@ -779,33 +773,27 @@
           </p>
           <ul class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
             <li>
-              <a class="text-muted-foreground hover:text-foreground" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener"
-                >GitHub</a
+              <a class="text-muted-foreground hover:text-foreground" href="https://gitee.com/yansijian/snap-rail" target="_blank" rel="noopener"
+                >Gitee</a
               >
             </li>
             <li>
               <a
                 class="text-muted-foreground hover:text-foreground"
-                href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md"
+                href="https://gitee.com/yansijian/snap-rail/blob/master/docs/architecture.md"
                 target="_blank"
                 rel="noopener"
                 >architecture.md</a
               >
             </li>
             <li>
-              <a
-                class="text-muted-foreground hover:text-foreground"
-                href="https://github.com/yansijian/snap-rail/releases"
-                target="_blank"
-                rel="noopener"
-                >Releases</a
-              >
+              <a class="text-muted-foreground hover:text-foreground" href="./plugins.html">插件生态</a>
             </li>
           </ul>
         </div>
         <div>
           <p class="text-sm font-semibold">快速开始</p>
-          <pre class="code-block mt-3"><code>git clone https://github.com/yansijian/snap-rail.git
+          <pre class="code-block mt-3"><code>git clone https://gitee.com/yansijian/snap-rail.git
 cd snap-rail
 pnpm install
 pnpm run build

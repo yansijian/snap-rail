@@ -176,6 +176,9 @@ importers:
 
   packages/base/app-boot:
     dependencies:
+      '@snap-rail/plugin-kit':
+        specifier: workspace:^
+        version: link:../plugin-kit
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
@@ -287,6 +290,22 @@ importers:
       rolldown:
         specifier: ^1.2.5
         version: 1.2.5
+
+  packages/base/plugin-sdk:
+    dependencies:
+      '@snap-rail/plugin-kit':
+        specifier: workspace:^
+        version: link:../plugin-kit
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@snap-rail/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
 
   packages/base/protocol:
     dependencies:

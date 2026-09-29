@@ -9,25 +9,47 @@
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
-import { rmSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { dump } from 'js-yaml'
 import { RpcBusinessError } from '@snap-rail/protocol'
 import type { GatewayService } from '@snap-rail/gateway'
 import type { AuditService } from '@snap-rail/audit'
 import { pluginsContract, type PluginInfo, type PluginSource } from './contract.ts'
-import { loadBuiltinLayer, loadPresetLayers, loadUserLayer, mergeLayers, packageNameOf } from './compose.ts'
+import {
+  appliedRecipeIds,
+  loadBuiltinLayer,
+  loadPresetLayers,
+  loadUserLayer,
+  mergeLayers,
+  packageNameOf,
+  recipePresetFileName,
+} from './compose.ts'
+import type { UserLayer } from './compose.ts'
+import { atomicWrite } from './admin.ts'
 import { createLayerView } from './layer-view.ts'
 import { scanPluginPool } from './scan.ts'
 import type { PluginDescriptor } from './scan.ts'
-import { annotateCatalog, downloadRemotePluginZip, fetchRemoteCatalog, MarketError, readPluginFeedUrl } from './market.ts'
+import {
+  annotateCatalog,
+  downloadRemotePluginZip,
+  fetchRecipeDocument,
+  fetchRemoteCatalog,
+  fetchRemoteRecipes,
+  MarketError,
+  readPluginFeedUrl,
+} from './market.ts'
 import {
   compareVersions,
+  HOST_ENGINE_VERSIONS,
   installedVersionOf,
   InstallError,
   installPluginFromZip,
   inspectPluginZip,
   uninstallPlugin,
+  withPluginPoolTransaction,
 } from './installer.ts'
+import { loadTrustedReleaseKeys } from './trust.ts'
 
 /** The plugin-admin bridge plugin; mount after rpc, audit, and boot. */
 const pluginAdminRpcPlugin: Plugin.Object<void> = {
@@ -59,10 +81,11 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
      */
     const assertRequirementsMet = (name: string, pool: ReadonlyMap<string, PluginDescriptor>): void => {
       const missing = view.missingRequirements(name, pool)
-      if (missing.length > 0) {
+      const missingCapabilities = view.missingCapabilities(name, pool)
+      if (missing.length > 0 || missingCapabilities.length > 0) {
         throw new RpcBusinessError({
           code: 'bad-request',
-          details: { issues: [`缺少依赖：${missing.join('、')}（请先安装并启用它们）`] },
+          details: { issues: [`缺少依赖：${[...missing, ...missingCapabilities].join('、')}（请先安装并启用它们）`] },
         })
       }
     }
@@ -80,6 +103,18 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       return value
     }
 
+    /** The first pool directory; every install path lands there. */
+    const poolDirOf = (): string => {
+      const poolDir = layers.handles.poolDirs[0]
+      if (poolDir === undefined) {
+        throw new RpcBusinessError({ code: 'unavailable', details: { what: 'no plugin pool is configured' } })
+      }
+      return poolDir
+    }
+
+    const trustedKeys = (): readonly import('@snap-rail/plugin-kit/sign').TrustedReleaseKey[] =>
+      loadTrustedReleaseKeys(dirname(layers.handles.userLayerPath))
+
     /** Map market fetch failures onto the wire's business codes. */
     const marketCall = async <T>(run: () => Promise<T>): Promise<T> => {
       try {
@@ -90,7 +125,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
             throw new RpcBusinessError({ code: 'bad-request', details: { issues: [cause.message] } })
           }
           throw new RpcBusinessError({
-            code: cause.kind === 'unreachable' ? 'unavailable' : 'not-found',
+            code: cause.kind === 'not-found' ? 'not-found' : 'unavailable',
             details: { what: cause.message },
           })
         }
@@ -111,14 +146,17 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       // errors, and `updated` stays the authority).
       const previous = (() => {
         try {
-          return installedVersionOf(poolDir, inspectPluginZip(zipPath).name)
+          return installedVersionOf(poolDir, inspectPluginZip(zipPath, { trustedKeys: trustedKeys() }).name)
         } catch {
           return undefined
         }
       })()
       let installed: { name: string, version: string, updated: boolean }
       try {
-        installed = installPluginFromZip(zipPath, poolDir, { reserved: [...view.shippedNames()] })
+        installed = installPluginFromZip(zipPath, poolDir, {
+          reserved: [...view.shippedNames()],
+          trustedKeys: trustedKeys(),
+        })
       } catch (cause) {
         if (cause instanceof InstallError && cause.kind === 'conflict') {
           throw new RpcBusinessError({ code: 'conflict', details: { what: cause.message } })
@@ -167,7 +205,8 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         const infos: PluginInfo[] = []
         const seen = new Set<string>()
         const toInfoFor = (name: string, source: PluginSource, enabled: boolean, config: unknown, version?: string): PluginInfo => {
-          const { kind, layer, title, category, exclusive, framework, clientOnly, requires } = view.manifestOf(name, pool)
+          const { kind, layer, title, category, exclusive, framework, clientOnly, requires, capabilities, engines } = view.manifestOf(name, pool)
+          const signatureKeyId = pool.get(packageNameOf(name))?.signatureKeyId
           return {
             name,
             source,
@@ -182,6 +221,9 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
             ...(framework !== undefined ? { framework } : {}),
             ...(clientOnly ? { clientOnly: true } : {}),
             ...(requires !== undefined && requires.length > 0 ? { requires } : {}),
+            ...(capabilities === undefined ? {} : { capabilities }),
+            ...(engines === undefined ? {} : { engines }),
+            ...(signatureKeyId === undefined ? {} : { signatureKeyId }),
             ...config !== undefined ? { config } : {},
           }
         }
@@ -225,6 +267,31 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
           infos.push(toInfoFor(name, presetOnly.has(name) ? 'preset' : 'builtin', row === undefined || row.enabled !== false, row?.config))
         }
         return { plugins: infos }
+      },
+
+      'plugins.diagnostics': () => {
+        const pool = scanPluginPool(layers.handles.poolDirs)
+        const enabled = [...view.enabledPackages(pool)].sort()
+        const missing = enabled.map(name => ({
+          name,
+          requirements: view.missingRequirements(name, pool),
+          capabilities: view.missingCapabilities(name, pool),
+        })).filter(row => row.requirements.length > 0 || row.capabilities.length > 0)
+        const signatures = [...pool.values()]
+          .map(descriptor => descriptor.signatureKeyId === undefined
+            ? undefined
+            : { name: descriptor.name, keyId: descriptor.signatureKeyId })
+          .filter((entry): entry is { name: string, keyId: string } => entry !== undefined)
+          .sort((a, b) => a.name.localeCompare(b.name))
+        return {
+          snapshot: {
+            host: { ...HOST_ENGINE_VERSIONS },
+            enabled,
+            missing,
+            signatures,
+            lastFailure: layers.lastFailure(),
+          },
+        }
       },
 
       'plugins.set-enabled': async ({ name, enabled }) => {
@@ -295,14 +362,21 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
 
       'plugins.inspect': ({ zipPath }) => {
         try {
-          const plugin = inspectPluginZip(zipPath)
+          const plugin = inspectPluginZip(zipPath, { trustedKeys: trustedKeys() })
           // Package requirements the home cannot satisfy yet surface as install
           // warnings: not installed (neither pool nor app tree). Service
           // requirements are runtime facts, not install-time ones.
           const pool = scanPluginPool(layers.handles.poolDirs)
-          const missing = plugin.requires
+          const missingPackages = plugin.requires
             .filter(entry => !entry.startsWith('service:'))
             .filter(entry => !pool.has(entry))
+          const providers = [...new Set([...pool.keys(), ...view.shippedNames()])]
+            .flatMap(name => view.manifestOf(name, pool).capabilities?.provides ?? [])
+          const missingCapabilities = (plugin.capabilities?.requires ?? [])
+            .filter(requirement => requirement.optional !== true)
+            .filter(requirement => !providers.some(provider => provider.id === requirement.id && satisfiesCapabilityRange(provider.version, requirement.range)))
+            .map(requirement => `${requirement.id}@${requirement.range}`)
+          const missing = [...missingPackages, ...missingCapabilities]
           // How the install would land over the installed version drives the
           // confirmation dialog's update/block branches.
           const poolDir = layers.handles.poolDirs[0]
@@ -362,10 +436,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
 
       'plugins.remote-list': async () => {
         const feedUrl = marketFeedUrl()
-        const poolDir = layers.handles.poolDirs[0]
-        if (poolDir === undefined) {
-          throw new RpcBusinessError({ code: 'unavailable', details: { what: 'no plugin pool is configured' } })
-        }
+        const poolDir = poolDirOf()
         const catalog = await marketCall(() => fetchRemoteCatalog(feedUrl))
         return { plugins: annotateCatalog(catalog, poolDir), feedUrl }
       },
@@ -379,15 +450,168 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         if (entry === undefined) {
           throw new RpcBusinessError({ code: 'not-found', details: { what: `${name} 不在插件源目录中` } })
         }
-        const zipPath = await marketCall(() => downloadRemotePluginZip(feedUrl, entry.file))
+        const zipPath = await marketCall(() => downloadRemotePluginZip(feedUrl, entry.file, entry.sha256))
         try {
           return await runInstall(zipPath, 'market')
         } finally {
           rmSync(zipPath, { force: true })
         }
       },
+
+      'plugins.remote-recipes': async () => {
+        const feedUrl = marketFeedUrl()
+        const poolDir = poolDirOf()
+        const [recipes, catalog] = await Promise.all([
+          marketCall(() => fetchRemoteRecipes(feedUrl)),
+          marketCall(() => fetchRemoteCatalog(feedUrl)),
+        ])
+        const pool = scanPluginPool([poolDir])
+        const feedNames = new Set(catalog.plugins.map(entry => entry.name))
+        const applied = appliedRecipeIds(layers.handles.presetDirs)
+        const infos = await Promise.all(recipes.recipes.map(async recipe => {
+          const payload = await marketCall(() => fetchRecipeDocument(feedUrl, recipe.file))
+          const referenced = [...new Set(payload.plugins.map(row => packageNameOf(row.name)))]
+          const pending = referenced.filter(name => !pool.has(name))
+          return {
+            id: recipe.id,
+            version: recipe.version,
+            title: recipe.title,
+            ...(recipe.description !== undefined ? { description: recipe.description } : {}),
+            kind: recipe.kind,
+            plugins: referenced,
+            pending,
+            unavailable: pending.filter(name => !feedNames.has(name)),
+            applied: applied.has(recipe.id),
+          }
+        }))
+        return { recipes: infos, feedUrl }
+      },
+
+      'plugins.remote-install-recipe': async ({ id }) => {
+        const feedUrl = marketFeedUrl()
+        const poolDir = poolDirOf()
+        // Everything resolves from freshly fetched feed documents — the
+        // client names a recipe id, never a download location.
+        const recipes = await marketCall(() => fetchRemoteRecipes(feedUrl))
+        const recipe = recipes.recipes.find(candidate => candidate.id === id)
+        if (recipe === undefined) {
+          throw new RpcBusinessError({ code: 'not-found', details: { what: `组合 ${id} 不在组合目录中` } })
+        }
+        const payload = await marketCall(() => fetchRecipeDocument(feedUrl, recipe.file))
+        const catalog = await marketCall(() => fetchRemoteCatalog(feedUrl))
+        const feedByName = new Map(catalog.plugins.map(entry => [entry.name, entry]))
+        // Unique referenced packages in document order; one lands only when
+        // the pool lacks it or the feed upgrades it — a current pool package
+        // is left exactly as the user has it.
+        const targets: Array<{ name: string, file: string, sha256: string | undefined }> = []
+        for (const row of payload.plugins) {
+          const name = packageNameOf(row.name)
+          if (targets.some(target => target.name === name)) continue
+          const feedEntry = feedByName.get(name)
+          const installedVersion = installedVersionOf(poolDir, name)
+          if (feedEntry === undefined) {
+            if (installedVersion === undefined) {
+              throw new RpcBusinessError({
+                code: 'bad-request',
+                details: { issues: [`组合引用的 ${name} 既未安装也不在插件源目录中：请先更新插件源或调整组合`] },
+              })
+            }
+            continue
+          }
+          if (installedVersion !== undefined && compareVersions(feedEntry.version, installedVersion) <= 0) continue
+          targets.push({ name, file: feedEntry.file, sha256: feedEntry.sha256 })
+        }
+        const installed: Array<{ name: string, version: string, updated: boolean }> = []
+        const presetDir = layers.handles.presetDirs[0]
+        if (presetDir === undefined) {
+          throw new RpcBusinessError({ code: 'unavailable', details: { what: 'no preset directory is configured' } })
+        }
+        const presetPath = join(presetDir, recipePresetFileName(id))
+        const previousPreset = existsSync(presetPath) ? readFileSync(presetPath, 'utf8') : undefined
+        const rows = payload.plugins.map(row => ({
+          name: row.name,
+          ...(row.enabled !== undefined ? { enabled: row.enabled } : {}),
+          ...(row.config !== undefined ? { config: row.config } : {}),
+        }))
+        try {
+          await withPluginPoolTransaction(poolDir, targets.map(target => target.name), async () => {
+            for (const target of targets) {
+              const zipPath = await marketCall(() => downloadRemotePluginZip(feedUrl, target.file, target.sha256))
+              try {
+                const result = await runInstall(zipPath, 'recipe')
+                installed.push(result.installed)
+              } finally {
+                rmSync(zipPath, { force: true })
+              }
+            }
+            // The preset is part of the same recipe transaction: a failed
+            // write or compose must restore both the pool and the previous
+            // combination, otherwise the next boot sees a half-installed
+            // recipe.
+            mkdirSync(presetDir, { recursive: true })
+            atomicWrite(presetPath, dump({ plugins: rows } satisfies UserLayer))
+            await mutate(async () => {
+              await layers.apply()
+            })
+          })
+        } catch (cause) {
+          // The filesystem transaction restored the prior pool. Restore the
+          // prior preset too, then recompose the old tree before surfacing the
+          // failed recipe operation.
+          if (previousPreset === undefined) rmSync(presetPath, { force: true })
+          else atomicWrite(presetPath, previousPreset)
+          try { await layers.apply() } catch { /* preserve the original failure */ }
+          throw cause
+        }
+        audit.record({
+          actor: 'client',
+          action: 'recipe.install',
+          subject: id,
+          detail: {
+            version: recipe.version,
+            ...(installed.length > 0 ? { installed: installed.map(entry => `${entry.name}@${entry.version}`) } : {}),
+          },
+        })
+        return { installed, applied: true } as const
+      },
+
+      'plugins.remove-recipe': async ({ id }) => {
+        const presetDir = layers.handles.presetDirs[0]
+        if (presetDir === undefined) {
+          throw new RpcBusinessError({ code: 'unavailable', details: { what: 'no preset directory is configured' } })
+        }
+        const file = join(presetDir, recipePresetFileName(id))
+        if (!existsSync(file)) {
+          throw new RpcBusinessError({ code: 'not-found', details: { what: `组合 ${id} 尚未安装` } })
+        }
+        rmSync(file, { force: true })
+        await mutate(async () => {
+          await layers.apply()
+        })
+        audit.record({ actor: 'client', action: 'recipe.remove', subject: id })
+        return { removed: true } as const
+      },
     })
   },
+}
+
+function satisfiesCapabilityRange(version: string, range: string): boolean {
+  const parse = (value: string): [number, number, number] => {
+    const parts = value.replace(/^[^0-9]*/, '').split(/[.-]/).slice(0, 3).map(part => /^\d+$/.test(part) ? Number(part) : 0)
+    return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0]
+  }
+  const actual = parse(version)
+  const trimmed = range.trim()
+  const prefix = trimmed.startsWith('>=') ? '>=' : trimmed.startsWith('^') ? '^' : trimmed.startsWith('~') ? '~' : ''
+  const expected = parse(trimmed.slice(prefix.length))
+  const compare = (): number => {
+    for (let index = 0; index < 3; index += 1) if (actual[index] !== expected[index]) return actual[index]! < expected[index]! ? -1 : 1
+    return 0
+  }
+  if (prefix === '>=') return compare() >= 0
+  if (prefix === '^') return actual[0] === expected[0] && compare() >= 0
+  if (prefix === '~') return actual[0] === expected[0] && actual[1] === expected[1] && compare() >= 0
+  return compare() === 0
 }
 
 async function mutate(run: () => Promise<void>): Promise<void> {

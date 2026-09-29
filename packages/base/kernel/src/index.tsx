@@ -10,6 +10,7 @@
 
 import { HostLink, subscribeFrame, type HostChannel } from '@snap-rail/connection'
 import { RENDERER_AUTO_RELOAD_KEY, clientConfigChangedSchema, settingsChangedSchema } from '@snap-rail/station-rpc/contract'
+import { pluginDiagnosticsSchema, type PluginDiagnostics } from '@snap-rail/app-boot/contract'
 import { createRoot, type Root } from 'react-dom/client'
 import { BootstrapPage } from './BootstrapPage.tsx'
 import { StartupPage } from './StartupPage.tsx'
@@ -32,6 +33,12 @@ export interface ClientHandle {
   root: Root
   /** The element the startup page mounted into (runtime re-roots here). */
   element: HTMLElement
+}
+
+async function describeDiagnostics(link: HostLink): Promise<PluginDiagnostics> {
+  const result = await link.call('plugins.diagnostics', {})
+  if (!result.ok) throw new Error(`plugin diagnostics failed: ${result.error.code}`)
+  return pluginDiagnosticsSchema.parse(result.value.snapshot)
 }
 
 /** Narrow the preload-global to the carrier contract; missing shapes fail loud. */
@@ -62,7 +69,7 @@ export function droppedZipPath(file: File): string | null {
 
 /** Render the startup (connect) page onto the boot root. */
 export function showStartup(handle: ClientHandle, options: { onInstall?: () => void } = {}): void {
-  handle.root.render(<StartupPage describe={() => handle.link.describeHost()} {...options.onInstall !== undefined ? { onInstall: options.onInstall } : {}} />)
+  handle.root.render(<StartupPage describe={() => handle.link.describeHost()} diagnose={() => describeDiagnostics(handle.link)} {...options.onInstall !== undefined ? { onInstall: options.onInstall } : {}} />)
 }
 
 /** Render the bootstrap install page (the no-framework recovery console). */

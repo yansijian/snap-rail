@@ -8,6 +8,7 @@
     "src"
   ],
   "references": [
+    { "path": "../plugin-kit" },
     { "path": "../../../vendor/cordis" },
     { "path": "../../../vendor/group" },
     { "path": "../../../vendor/include" },

@@ -60,6 +60,7 @@ export const SEED_MODULES: readonly string[] = [
 export const CONTRIBUTED_SEED_MODULES: readonly string[] = [
   '@snap-rail/framework-shadcn/ui',
   '@snap-rail/framework-shadcn/slots',
+  '@snap-rail/framework-shadcn/semantic',
   '@snap-rail/framework-shadcn/settings-pages',
   '@snap-rail/framework-shadcn/session',
   '@snap-rail/framework-shadcn/workflows',

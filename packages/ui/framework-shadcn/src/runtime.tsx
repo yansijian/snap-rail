@@ -16,6 +16,7 @@ import fallbackPlugin from './fallback.tsx'
 import settingsPlugin from './settings-pages.ts'
 import sessionPlugin from './session.ts'
 import slotsPlugin from './slots.tsx'
+import semanticPlugin from './semantic.tsx'
 import variablesPlugin from './variables.ts'
 import workflowsPlugin from './workflows.ts'
 import { createRoot } from 'react-dom/client'
@@ -81,6 +82,7 @@ export async function createClientRuntime(handle: ClientHandle, options: Runtime
   // plugins consume.
   await ctx.plugin(timerPlugin)
   await ctx.plugin(slotsPlugin)
+  await ctx.plugin(semanticPlugin)
   await ctx.plugin(settingsPlugin)
   await ctx.plugin(variablesPlugin)
   await ctx.plugin(sessionPlugin)

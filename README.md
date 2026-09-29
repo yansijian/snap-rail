@@ -5,6 +5,7 @@ Electron 宿主。基于 vendored Cordis 元框架；一期交付核心 + 插件
 
 不复现组态画布与传统 HMI——底座提供进程模型、数据缝与最小 UI 骨架，
 界面创新留给社区与 Agent（见 [docs/architecture.md](docs/architecture.md)）。
+完整插件平台实施顺序见 [docs/plugin-platform-plan.md](docs/plugin-platform-plan.md)。
 
 ## 一分钟看懂
 
@@ -21,14 +22,19 @@ Electron 宿主。基于 vendored Cordis 元框架；一期交付核心 + 插件
 - **renderer** 是投影客户端：preload 只暴露 `invoke`/`openStream`/
   `zipPathOf` 三原语，四象限 RPC 协议在此之上类型化；框架、布局、
   标题栏、看板、管理页全部是插件，没有框架时内置引导页兜底安装。
+- **独立插件开发**：插件仓库使用 `@snap-rail/plugin-sdk` 和
+  `snap-rail-plugin` CLI，不需要放进本仓库；manifest 能力、Host/Renderer
+  面、语义 UI 槽位和 Ed25519 发布签名见
+  [docs/plugin-development.md](docs/plugin-development.md)。
 
 ## 布局
 
 ```
 vendor/      vendored Cordis（rescope @snap-rail/*，见 vendor/README.md）
 packages/    层组 packages/<层>/<包>（snapRail.layer 声明，层序 base→store→equipment→ui→tool→suite）：
-  base/        util / plugin-kit / settings / audit / protocol / gateway /
-               connection / app-boot / station-rpc / kernel / modules（出厂全集，替换经源码重建）
+  base/        util / plugin-kit / plugin-sdk / settings / audit / protocol /
+               gateway / connection / app-boot / station-rpc / kernel / modules
+               （出厂全集，替换经源码重建）
   store/       store（规范：drizzle 查询构建器即规范，随应用发布）+ store-sqlite（实现，zip 安装，单活）
   equipment/   equipment（设备连接底座缝，zip 安装）+ driver-modbus（驱动多活，范本）
   ui/          framework-shadcn（UI 框架插件，zip、clientOnly、单活）+ equipment-station / settings-station
@@ -45,7 +51,10 @@ pnpm install
 pnpm run build        # tsc -b (lib/types) + tailwind（框架主题预编译）+ tsdown (lib)
 pnpm run typecheck
 pnpm test             # vitest 全量（先构建）+ 层依赖门禁
-pnpm run pack:plugins # 全量可安装 zip → dist-plugins/（build 后执行）
+pnpm run pack:plugins -- --sign-key .keys/release.private.pem --key-id release-2026
+pnpm run plugin:generate-key -- .keys gitea-main-2026 --publisher snap-rail
+pnpm run publish:local -- --sign-key .keys/gitea-main-2026.private.pem --key-id gitea-main-2026 --publisher snap-rail
+pnpm run verify:market -- --feed dist-publish/plugins --trust .keys/gitea-main-2026.trust.json
 pnpm app:dev          # Vite dev server + Electron（全量 overlay），热重载开发
 pnpm app:pack         # win-unpacked 目录形态（release-out/）
 pnpm app:dist         # NSIS 安装包 + blockmap

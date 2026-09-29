@@ -1,7 +1,9 @@
+import { createHash, generateKeyPairSync, type KeyObject } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { zipSync } from 'fflate'
 import type { Context } from '@snap-rail/cordis'
 import { InProcessApiClient } from '@snap-rail/protocol'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +11,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 // shares the gateway's protocol identity — the source face would throw a
 // duplicate class the gateway maps to a bare `internal`.
 import pluginAdminRpcPlugin from '@snap-rail/app-boot/rpc'
+import { signReleaseFiles } from '@snap-rail/plugin-kit/sign'
 import { boot } from '../src/index.ts'
 import type { LayerAdmin } from '../src/index.ts'
 import { loadUserLayer, packageNameOf } from '../src/compose.ts'
@@ -26,6 +29,7 @@ interface World {
   home: string
   userPath: string
   builtinPath: string
+  signingKey: KeyObject
 }
 
 const worlds: World[] = []
@@ -41,6 +45,14 @@ async function makeWorld(builtinRows?: string[], rendererPackages?: readonly str
   homes.push(base)
   const home = join(base, 'home')
   mkdirSync(home, { recursive: true })
+  const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+  writeFileSync(join(home, 'trusted-release-keys.json'), JSON.stringify({
+    keys: [{
+      keyId: 'test-key',
+      publisher: 'snap-rail-tests',
+      publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+    }],
+  }))
   const appRoot = join(base, 'app')
   const scopeDir = join(appRoot, 'node_modules', '@snap-rail')
   mkdirSync(scopeDir, { recursive: true })
@@ -85,9 +97,21 @@ async function makeWorld(builtinRows?: string[], rendererPackages?: readonly str
     home,
     userPath: join(home, 'plugins.yml'),
     builtinPath,
+    signingKey: privateKey,
   }
   worlds.push(world)
   return world
+}
+
+/** Build a signed release zip for the production RPC installer path. */
+function signedZip(world: World, files: Record<string, Uint8Array>, name: string, version: string): Uint8Array {
+  return new Uint8Array(zipSync(signReleaseFiles(files, {
+    name,
+    version,
+    keyId: 'test-key',
+    publisher: 'snap-rail-tests',
+    privateKey: world.signingKey,
+  })))
 }
 
 async function sleepUntil(predicate: () => boolean, ms = 3000): Promise<void> {
@@ -230,15 +254,14 @@ describe('plugin layers admin', () => {
   it('installs a higher version over an installed package and keeps the row', async () => {
     const world = await makeWorld()
     const poolDir = join(world.home, 'plugins')
-    const { zipSync } = await import('fflate')
     const writeZip = (version: string): string => {
       const path = join(world.home, `mini-${version}.zip`)
-      writeFileSync(path, new Uint8Array(zipSync({
+      writeFileSync(path, signedZip(world, {
         'package.json': new TextEncoder().encode(JSON.stringify({
           name: '@snap-rail/mini', version, type: 'module', main: 'lib/index.js',
         })),
         'lib/index.js': new TextEncoder().encode(`export default { name: 'mini', apply() {} }\n// v${version}\n`),
-      })))
+      }, '@snap-rail/mini', version))
       return path
     }
 
@@ -284,20 +307,28 @@ describe('plugin layers admin', () => {
   it('serves the market over the wire: catalog verdicts and remote installs', async () => {
     const world = await makeWorld()
     const poolDir = join(world.home, 'plugins')
-    const { zipSync } = await import('fflate')
-    const zipBytes = (version: string): Uint8Array => new Uint8Array(zipSync({
+    const zipBytes = (version: string): Uint8Array => signedZip(world, {
       'package.json': new TextEncoder().encode(JSON.stringify({
         name: '@snap-rail/mini', version, type: 'module', main: 'lib/index.js',
       })),
       'lib/index.js': new TextEncoder().encode(`export default { name: 'mini', apply() {} }\n// v${version}\n`),
-    }))
-    const catalog: { plugins: Array<{ name: string, version: string, description: string, file: string }> } = {
-      plugins: [{ name: '@snap-rail/mini', version: '0.3.0', description: 'mini market plugin', file: 'mini.zip' }],
+    }, '@snap-rail/mini', version)
+    let currentVersion = '0.3.0'
+    let currentZip = zipBytes(currentVersion)
+    const catalog: { plugins: Array<{
+      name: string, version: string, description: string, file: string,
+      sha256: string, size: number, signature: { algorithm: 'Ed25519', keyId: string }
+    }> } = {
+      plugins: [{
+        name: '@snap-rail/mini', version: currentVersion, description: 'mini market plugin', file: 'mini.zip',
+        sha256: createHash('sha256').update(currentZip).digest('hex'), size: currentZip.length,
+        signature: { algorithm: 'Ed25519', keyId: 'test-key' },
+      }],
     }
     vi.stubGlobal('fetch', vi.fn(async (url: string | URL) => {
       const key = String(url)
       if (key === 'http://feed.test/plugins/index.json') return new Response(JSON.stringify(catalog))
-      if (key === `http://feed.test/plugins/${catalog.plugins[0]!.file}`) return new Response(zipBytes(catalog.plugins[0]!.version))
+      if (key === `http://feed.test/plugins/${catalog.plugins[0]!.file}`) return new Response(currentZip)
       return new Response('not found', { status: 404 })
     }))
 
@@ -322,7 +353,11 @@ describe('plugin layers admin', () => {
     expect(trail).toContain('"via":"market"')
 
     // A newer feed version updates in place; an unknown name is a refusal.
-    catalog.plugins[0]!.version = '0.4.0'
+    currentVersion = '0.4.0'
+    currentZip = zipBytes(currentVersion)
+    catalog.plugins[0]!.version = currentVersion
+    catalog.plugins[0]!.sha256 = createHash('sha256').update(currentZip).digest('hex')
+    catalog.plugins[0]!.size = currentZip.length
     const updated = await world.client.call('plugins.remote-install', { name: '@snap-rail/mini' })
     expect(updated).toEqual({ ok: true, value: { installed: { name: '@snap-rail/mini', version: '0.4.0', updated: true } } })
     const absent = await world.client.call('plugins.remote-install', { name: '@snap-rail/absent' })
@@ -339,6 +374,141 @@ describe('plugin layers admin', () => {
     const stub = vi.mocked(globalThis.fetch)
     return stub === undefined ? [] : stub.mock.calls
   }
+
+  it('installs a recipe over the wire: plugins first, then the preset file', async () => {
+    const world = await makeWorld()
+    const poolDir = join(world.home, 'plugins')
+    const presetPath = join(world.home, 'presets', 'recipe-demo-base.yml')
+    const zipBytes = (name: string, version: string, rpc?: boolean): Uint8Array => {
+      const id = name.slice('@snap-rail/'.length)
+      const files: Record<string, Uint8Array> = {
+        'package.json': new TextEncoder().encode(JSON.stringify({
+          name, version, type: 'module', main: 'lib/index.js',
+          ...(rpc === true ? { exports: { '.': './lib/index.js', './rpc': './lib/rpc.js' } } : {}),
+        })),
+        'lib/index.js': new TextEncoder().encode(
+          `export default { name: ${JSON.stringify(id)}, apply(c) { c.provide(${JSON.stringify(id)}, true) } }\n// v${version}\n`),
+      }
+      if (rpc === true) {
+        files['lib/rpc.js'] = new TextEncoder().encode(
+          `export default { name: ${JSON.stringify(`${id}-rpc`)}, apply(c) { c.provide(${JSON.stringify(`${id}-rpc`)}, true) } }\n`)
+      }
+      return signedZip(world, files, name, version)
+    }
+    const digestOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex')
+    const bytes = {
+      'mini.zip': zipBytes('@snap-rail/mini', '0.3.0'),
+      'sub.zip': zipBytes('@snap-rail/sub', '1.0.0', true),
+    }
+    const catalog = {
+      plugins: [
+        {
+          name: '@snap-rail/mini', version: '0.3.0', file: 'mini.zip',
+          sha256: digestOf(bytes['mini.zip']!), size: bytes['mini.zip']!.length,
+          signature: { algorithm: 'Ed25519', keyId: 'test-key' },
+        },
+        {
+          name: '@snap-rail/sub', version: '1.0.0', file: 'sub.zip',
+          sha256: digestOf(bytes['sub.zip']!), size: bytes['sub.zip']!.length,
+          signature: { algorithm: 'Ed25519', keyId: 'test-key' },
+        },
+      ],
+    }
+    const recipes = {
+      recipes: [
+        { id: 'demo-base', version: '1.0.0', title: '演示基座', description: 'demo base', kind: 'base', file: 'demo-base.yml' },
+        { id: 'broken', version: '1.0.0', title: '坏组合', kind: 'scenario', file: 'broken.yml' },
+      ],
+    }
+    const recipeDoc = [
+      'plugins:',
+      "  - name: '@snap-rail/mini'",
+      "  - name: '@snap-rail/sub'",
+      "  - name: '@snap-rail/sub/rpc'",
+      '',
+    ].join('\n')
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL) => {
+      const key = String(url)
+      const prefix = 'http://feed.test/plugins/'
+      if (key === `${prefix}index.json`) return new Response(JSON.stringify(catalog))
+      if (key === `${prefix}recipes.json`) return new Response(JSON.stringify(recipes))
+      if (key === `${prefix}demo-base.yml`) return new Response(recipeDoc)
+      if (key === `${prefix}broken.yml`) return new Response("plugins:\n  - name: '@snap-rail/absent'\n")
+      const file = key.slice(prefix.length)
+      const hit = bytes[file as keyof typeof bytes]
+      if (hit !== undefined) return new Response(hit)
+      return new Response('not found', { status: 404 })
+    }))
+
+    // Without a configured feed every recipe method refuses before any fetch.
+    const unconfigured = await world.client.call('plugins.remote-recipes', {})
+    expect(unconfigured.ok).toBe(false)
+
+    world.ctx.settings.set('plugins.feedUrl', 'http://feed.test/plugins')
+
+    // The annotated view: both referenced packages are still pending, nothing
+    // is unavailable, and the recipe has not landed as a preset file.
+    const listed = await world.client.call('plugins.remote-recipes', {})
+    expect(listed.ok).toBe(true)
+    if (listed.ok) {
+      const info = listed.value.recipes.find(recipe => recipe.id === 'demo-base')
+      expect(info).toMatchObject({
+        title: '演示基座', kind: 'base',
+        plugins: ['@snap-rail/mini', '@snap-rail/sub'],
+        pending: ['@snap-rail/mini', '@snap-rail/sub'],
+        unavailable: [], applied: false,
+      })
+    }
+
+    // An unknown id is a refusal; a recipe the feed cannot satisfy refuses
+    // and writes no preset file.
+    const absent = await world.client.call('plugins.remote-install-recipe', { id: 'no-such-recipe' })
+    expect(absent.ok).toBe(false)
+    const broken = await world.client.call('plugins.remote-install-recipe', { id: 'broken' })
+    expect(broken.ok).toBe(false)
+    expect(existsSync(join(world.home, 'presets', 'recipe-broken.yml'))).toBe(false)
+
+    // The real install lands both pool packages (fresh installs), then the
+    // preset file — and the composition mounts everything.
+    const installed = await world.client.call('plugins.remote-install-recipe', { id: 'demo-base' })
+    expect(installed).toEqual({
+      ok: true,
+      value: {
+        installed: [
+          { name: '@snap-rail/mini', version: '0.3.0', updated: false },
+          { name: '@snap-rail/sub', version: '1.0.0', updated: false },
+        ],
+        applied: true,
+      },
+    })
+    expect(existsSync(join(poolDir, '@snap-rail__mini'))).toBe(true)
+    expect(existsSync(join(poolDir, '@snap-rail__sub'))).toBe(true)
+    expect(readFileSync(presetPath, 'utf8')).toContain("'@snap-rail/sub/rpc'")
+    await sleepUntil(() =>
+      world.ctx.get('mini') !== undefined && world.ctx.get('sub') !== undefined && world.ctx.get('sub-rpc') !== undefined)
+
+    // Re-running is a no-op on the pool (everything current) and the view
+    // flips to applied.
+    const again = await world.client.call('plugins.remote-install-recipe', { id: 'demo-base' })
+    expect(again).toEqual({ ok: true, value: { installed: [], applied: true } })
+    const listedAgain = await world.client.call('plugins.remote-recipes', {})
+    expect(listedAgain.ok && listedAgain.value.recipes.find(recipe => recipe.id === 'demo-base')?.applied).toBe(true)
+
+    // The recipe's preset references the packages, so uninstall is refused —
+    // remove the recipe first, then the pool packages are ordinary again.
+    const blocked = await world.client.call('plugins.uninstall', { name: '@snap-rail/mini' })
+    expect(blocked.ok).toBe(false)
+    const removed = await world.client.call('plugins.remove-recipe', { id: 'demo-base' })
+    expect(removed).toEqual({ ok: true, value: { removed: true } })
+    expect(existsSync(presetPath)).toBe(false)
+    const uninstalled = await world.client.call('plugins.uninstall', { name: '@snap-rail/mini' })
+    expect(uninstalled.ok).toBe(true)
+    expect(existsSync(join(poolDir, '@snap-rail__mini'))).toBe(false)
+
+    const trail = readFileSync(join(world.home, 'audit.jsonl'), 'utf8')
+    expect(trail).toContain('"action":"recipe.install"')
+    expect(trail).toContain('"action":"recipe.remove"')
+  })
 
   it('refuses a write that would not compose, leaving the file untouched', async () => {
     const world = await makeWorld()
@@ -379,14 +549,13 @@ describe('plugin layers admin', () => {
     // package's name is a conflict, and nothing may land — no pool
     // directory, no user layer write.
     const world = await makeWorld()
-    const { zipSync } = await import('fflate')
     const zipPath = join(world.home, 'impostor.zip')
-    writeFileSync(zipPath, new Uint8Array(zipSync({
+    writeFileSync(zipPath, signedZip(world, {
       'package.json': new TextEncoder().encode(JSON.stringify({
         name: '@snap-rail/settings', version: '9.9.9', type: 'module', main: 'lib/index.js',
       })),
       'lib/index.js': new TextEncoder().encode('export default { name: "impostor", apply() {} }\n'),
-    })))
+    }, '@snap-rail/settings', '9.9.9'))
     const result = await world.client.call('plugins.install', { zipPath })
     expect(result.ok).toBe(false)
     expect(existsSync(join(world.home, 'plugins', '@snap-rail__settings'))).toBe(false)
@@ -453,12 +622,7 @@ describe('plugin layers admin', () => {
     expect(trail).toContain('"action":"plugin.config"')
   })
 
-  it('renames retired row names on load and drops fully retired rows', async () => {
-    // Package merges retired several row names: rows still naming them
-    // rename to their successors in memory (first row wins collisions), and
-    // rows whose successor no longer exists anywhere (the unified field
-    // settings page replaced the ModbusTCP station face) drop on load —
-    // the file converges on rewrite either way.
+  it('rejects retired row names instead of applying a compatibility bridge', async () => {
     const world = await makeWorld()
     writeFileSync(world.userPath, [
       'plugins:',
@@ -472,11 +636,7 @@ describe('plugin layers admin', () => {
       '      flushMs: 250',
       '',
     ].join('\n'))
-    const layer = loadUserLayer(world.userPath)
-    expect(layer.plugins.map(row => [row.name, row.enabled ?? null, row.config])).toEqual([
-      ['@snap-rail/driver-modbus', null, undefined],
-      ['@snap-rail/trend', null, { flushMs: 250 }],
-    ])
+    await expect(world.layers.apply()).rejects.toThrow(/neither built-in nor in the plugin pool/)
   })
 
   it('activating a suite deactivates the other suites in one write', async () => {
@@ -525,7 +685,15 @@ describe('plugin layers admin', () => {
       appRoot,
     })
     await ctx.plugin(pluginAdminRpcPlugin)
-    worlds.push({ ctx, layers: ctx.pluginLayers, client: new InProcessApiClient(request => ctx.rpc.handleClientRequest(request)), home, userPath: join(home, 'plugins.yml'), builtinPath })
+    worlds.push({
+      ctx,
+      layers: ctx.pluginLayers,
+      client: new InProcessApiClient(request => ctx.rpc.handleClientRequest(request)),
+      home,
+      userPath: join(home, 'plugins.yml'),
+      builtinPath,
+      signingKey: generateKeyPairSync('ed25519').privateKey,
+    })
     const world = worlds[worlds.length - 1]!
 
     // Both suites start enabled: the pool provides them, the rows mount them.
@@ -551,9 +719,7 @@ describe('plugin layers admin', () => {
     expect(rows).toContainEqual(['@snap-rail/suite-a', false])
   })
 
-  it('composes a file still carrying the retired station row', async () => {
-    // The station row drops on load, so composition succeeds instead of
-    // failing on a row that resolves nowhere anymore.
+  it('fails on a retired station row instead of silently dropping it', async () => {
     const world = await makeWorld()
     writeFileSync(world.userPath, [
       'plugins:',
@@ -561,13 +727,10 @@ describe('plugin layers admin', () => {
       '    enabled: false',
       '',
     ].join('\n'))
-    await expect(world.layers.apply()).resolves.toBeDefined()
+    await expect(world.layers.apply()).rejects.toThrow(/neither built-in nor in the plugin pool/)
   })
 
-  it('retires user rows naming first-party packages that left the shipped layer', async () => {
-    // The app ships base only now; an upgraded plugins.yml from the
-    // all-builtins era keeps composing — the rows drop until the package
-    // is installed into the pool.
+  it('requires pool installation before a non-base package can be referenced', async () => {
     const world = await makeWorld()
     writeFileSync(world.userPath, [
       'plugins:',
@@ -576,8 +739,8 @@ describe('plugin layers admin', () => {
       '    enabled: false',
       '',
     ].join('\n'))
-    await expect(world.layers.apply()).resolves.toBeDefined()
-    // Installing the package revives the row's meaning.
+    await expect(world.layers.apply()).rejects.toThrow(/neither built-in nor in the plugin pool/)
+    // Installing the package makes the row resolvable.
     seedPoolPackage(world.home, '@snap-rail/equipment')
     writeFileSync(world.userPath, [
       'plugins:',

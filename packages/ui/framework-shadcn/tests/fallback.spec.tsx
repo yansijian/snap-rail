@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /**
  * The fallback shell's titlebar seam: occupant-contributed
- * `titlebar-actions` buttons (the forge studio's AI 创造 entry) render even
+ * `shell.titlebar.actions` buttons (the forge studio's AI 创造 entry) render even
  * with no suite active, beside the built-in settings and window controls —
  * a fresh install keeps its way into the pool-installed tools.
  *
@@ -22,6 +22,7 @@ import { bootClient } from '../../../base/kernel/src/index.tsx'
 import type { HostChannel } from '../../connection/src/index.tsx'
 import { createClientRuntime } from '../src/runtime.tsx'
 import fallbackShellPlugin from '../src/fallback.tsx'
+import { UI_SLOT_IDS } from '../src/slots.tsx'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const contexts: Context[] = []
@@ -58,7 +59,7 @@ const stubActionPlugin: Plugin.Object<void> = {
   name: 'stub-titlebar-action',
   inject: ['uiSlots'],
   apply(ctx: Context): void {
-    ctx.uiSlots.register(ctx, 'titlebar-actions', {
+    ctx.uiSlots.register(ctx, UI_SLOT_IDS.titlebarActions, {
       id: 'stub-ai',
       order: 10,
       render(): ReactNode {
@@ -73,7 +74,7 @@ async function flush(times = 12): Promise<void> {
 }
 
 describe('the fallback shell titlebar', () => {
-  it('renders titlebar-actions occupants beside the built-in controls', async () => {
+  it('renders shell.titlebar.actions occupants beside the built-in controls', async () => {
     const channel = await makeWorld()
     const sent: Array<{ method?: unknown, payload?: unknown }> = []
     const spying: HostChannel = {

@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react'
+import type { PluginDiagnostics } from '@snap-rail/app-boot/contract'
 
 /** Identity served by the host's `host.describe`. */
 export interface HostIdentity {
@@ -17,7 +18,7 @@ export interface HostIdentity {
 
 type ConnectPhase =
   | { kind: 'connecting' }
-  | { kind: 'ready'; host: HostIdentity }
+  | { kind: 'ready'; host: HostIdentity, diagnostics?: PluginDiagnostics }
   | { kind: 'failed'; message: string }
 
 /**
@@ -26,14 +27,21 @@ type ConnectPhase =
  * UI framework face, the caller passes `onInstall` to surface the corner
  * affordance back into the bootstrap install console.
  */
-export function StartupPage(props: { describe: () => Promise<HostIdentity>, onInstall?: () => void }): ReactNode {
+export function StartupPage(props: { describe: () => Promise<HostIdentity>, diagnose?: () => Promise<PluginDiagnostics>, onInstall?: () => void }): ReactNode {
   const [phase, setPhase] = useState<ConnectPhase>({ kind: 'connecting' })
 
   useEffect(() => {
     let alive = true
     props.describe().then(
       host => {
-        if (alive) setPhase({ kind: 'ready', host })
+        if (!alive) return
+        setPhase({ kind: 'ready', host })
+        const diagnose = props.diagnose
+        if (diagnose !== undefined) {
+          void diagnose().then(diagnostics => {
+            if (alive) setPhase(current => current.kind === 'ready' ? { ...current, diagnostics } : current)
+          }).catch(() => undefined)
+        }
       },
       cause => {
         if (alive) setPhase({ kind: 'failed', message: String(cause) })
@@ -50,9 +58,18 @@ export function StartupPage(props: { describe: () => Promise<HostIdentity>, onIn
       ? `${phase.host.name} ${phase.host.version}`
       : `连接失败：${phase.message}`
 
+  const diagnostics = phase.kind === 'ready' ? phase.diagnostics : undefined
+
   return (
     <div className="relative flex h-screen items-center justify-center bg-background font-sans text-lg text-muted-foreground">
       {line}
+      {diagnostics !== undefined && (diagnostics.missing.length > 0 || diagnostics.lastFailure !== null)
+        ? (
+            <div style={{ position: 'absolute', bottom: 18, maxWidth: '80%', fontSize: 12, color: '#d99b45' }}>
+              {diagnostics.lastFailure?.message ?? `缺少依赖：${diagnostics.missing.map(row => row.name).join('、')}`}
+            </div>
+          )
+        : undefined}
       {props.onInstall !== undefined
         ? (
             <button

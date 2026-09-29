@@ -15,6 +15,7 @@ import * as runtime from './runtime.tsx'
 import * as session from './session.ts'
 import * as settingsPages from './settings-pages.ts'
 import * as slots from './slots.tsx'
+import * as semantic from './semantic.tsx'
 import * as ui from './ui/index.ts'
 import * as variables from './variables.ts'
 import * as workflows from './workflows.ts'
@@ -23,6 +24,7 @@ import * as workflows from './workflows.ts'
 export interface FrameworkSeedFaces {
   ui: typeof ui
   slots: typeof slots
+  semantic: typeof semantic
   'settings-pages': typeof settingsPages
   session: typeof session
   variables: typeof variables
@@ -40,6 +42,7 @@ const frameworkClientFace: { seeds: FrameworkSeedFaces } = {
   seeds: {
     ui,
     slots,
+    semantic,
     'settings-pages': settingsPages,
     session,
     variables,

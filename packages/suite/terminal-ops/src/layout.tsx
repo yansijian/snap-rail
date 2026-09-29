@@ -18,6 +18,8 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { Card, CardContent, DragScroll, NumberPad, cn, useRefresh } from '@snap-rail/framework-shadcn/ui'
 import type { WorkflowEntry } from '@snap-rail/framework-shadcn/workflows'
 import '@snap-rail/framework-shadcn/slots'
+import { UI_SLOT_IDS } from '@snap-rail/framework-shadcn/slots'
+import '@snap-rail/framework-shadcn/semantic'
 import '@snap-rail/framework-shadcn/runtime'
 import '@snap-rail/framework-shadcn/session'
 import '@snap-rail/framework-shadcn/workflows'
@@ -144,7 +146,7 @@ function WorkflowSidebar(props: { ctx: Context }): ReactNode {
   )
 }
 
-function SlotRegion(props: { ctx: Context, slot: 'titlebar' }): ReactNode {
+function SlotRegion(props: { ctx: Context, slot: typeof UI_SLOT_IDS.titlebar }): ReactNode {
   useRefresh(props.ctx, RAIL_EVENTS)
   const occupants = props.ctx.uiSlots.list(props.slot)
   if (occupants.length === 0) return null
@@ -160,7 +162,7 @@ function Station(props: { ctx: Context }): ReactNode {
   if (!props.ctx.session.restored()) {
     return (
       <div className="flex h-full flex-col">
-        <SlotRegion ctx={props.ctx} slot="titlebar" />
+        <SlotRegion ctx={props.ctx} slot={UI_SLOT_IDS.titlebar} />
         <div className="min-h-0 flex-1" data-region="session-restoring" />
       </div>
     )
@@ -181,7 +183,7 @@ function Station(props: { ctx: Context }): ReactNode {
       )
   return (
     <div className="flex h-full flex-col">
-      <SlotRegion ctx={props.ctx} slot="titlebar" />
+      <SlotRegion ctx={props.ctx} slot={UI_SLOT_IDS.titlebar} />
       {body}
     </div>
   )
@@ -190,7 +192,7 @@ function Station(props: { ctx: Context }): ReactNode {
 /** The station layout occupant. */
 const layoutPlugin: Plugin.Object<void> = {
   name: 'layout-station',
-  inject: ['uiSlots', 'client', 'session', 'workflows'],
+  inject: ['uiContract', 'client', 'session', 'workflows'],
   apply(ctx: Context): void {
     // The gating feed: on every session transition, anchor the operator and
     // rebuild today's event set from the audit log (the durable truth).
@@ -217,9 +219,10 @@ const layoutPlugin: Plugin.Object<void> = {
     // The session may have restored before this plugin mounted; sync once.
     syncGating()
 
-    ctx.uiSlots.register(ctx, 'layout', {
+    ctx.uiContract.registerLayout(ctx, {
       id: 'station',
       order: 0,
+      slots: [UI_SLOT_IDS.titlebar, UI_SLOT_IDS.sidebar, UI_SLOT_IDS.view],
       render(): ReactNode {
         return <Station ctx={ctx} />
       },

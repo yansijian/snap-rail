@@ -1,5 +1,5 @@
 /**
- * Vite config for the marketing website (two-page MPA, no framework).
+ * Vite config for the marketing website (MPA, no framework).
  *
  * `base: './'` keeps the built dist deployable under any static path —
  * GitHub Pages project sites, OSS buckets and intranet nginx alike —
@@ -16,6 +16,7 @@ export default defineConfig({
       input: {
         main: 'index.html',
         plugins: 'plugins.html',
+        recipes: 'recipes.html',
       },
     },
   },

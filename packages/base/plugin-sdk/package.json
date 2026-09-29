@@ -1,0 +1,41 @@
+{
+  "name": "@snap-rail/plugin-sdk",
+  "description": "Public SDK for developing, validating, building, signing, and packaging snap-rail plugins outside the monorepo",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "bin": {
+    "snap-rail-plugin": "lib/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./tsconfig.plugin.json": "./tsconfig.plugin.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/*.js",
+    "lib/types/**/*.d.ts",
+    "tsconfig.plugin.json"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@snap-rail/plugin-kit": "workspace:^",
+    "fflate": "^0.8.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@snap-rail/plugin-kit": "workspace:^",
+    "@snap-rail/cordis": "workspace:^"
+  },
+  "peerDependencies": {
+    "@snap-rail/cordis": "^4.0.1"
+  },
+  "snapRail": {
+    "layer": "base",
+    "title": "插件开发 SDK"
+  }
+}

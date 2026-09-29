@@ -39,6 +39,12 @@
   "snapRail": {
     "layer": "ui",
     "category": "界面",
+    "capabilities": {
+      "requires": [
+        { "id": "ui.renderer.react", "range": "^1.0.0" },
+        { "id": "ui.contract", "range": "^1.0.0" }
+      ]
+    },
     "framework": "@snap-rail/framework-shadcn",
     "clientOnly": true,
     "requires": [

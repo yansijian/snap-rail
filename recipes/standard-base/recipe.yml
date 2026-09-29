@@ -1,0 +1,15 @@
+# 标准基座组合：一键装成可用的空终端，也是三方插件的公共靶台。
+# 组合序 = 出厂内置 → 预设（本组合落地为 recipe-standard-base.yml）→ 用户层；
+# 发布时仅 `plugins` 块进入 feed 的组合文档（客户端 strict 校验该形状），
+# version/title/kind/description 由发布脚本装配进 recipes.json。
+version: 1.0.0
+title: 标准基座
+kind: base
+description: 存储后端、设备底座、界面框架与统一设置/设备管理页——一键装成可用的空终端。
+plugins:
+  - name: '@snap-rail/store-sqlite'
+  - name: '@snap-rail/equipment'
+  - name: '@snap-rail/equipment/rpc'
+  - name: '@snap-rail/framework-shadcn'
+  - name: '@snap-rail/settings-station'
+  - name: '@snap-rail/equipment-station'

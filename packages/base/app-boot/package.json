@@ -27,6 +27,10 @@
     "./invariant": {
       "types": "./lib/types/invariant.d.ts",
       "default": "./lib/invariant.js"
+    },
+    "./trust": {
+      "types": "./lib/types/trust.d.ts",
+      "default": "./lib/trust.js"
     }
   },
   "files": [
@@ -35,10 +39,12 @@
     "lib/contract.js",
     "lib/scan.js",
     "lib/invariant.js",
+    "lib/trust.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",
   "dependencies": {
+    "@snap-rail/plugin-kit": "workspace:^",
     "fflate": "^0.8.3",
     "js-yaml": "^4.2.0"
   },
@@ -59,6 +65,7 @@
     "@snap-rail/cordis-plugin-include": "workspace:^",
     "@snap-rail/cordis-plugin-loader": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
+    "@snap-rail/plugin-kit": "workspace:^",
     "@snap-rail/protocol": "workspace:^",
     "zod": "^4.4.3"
   },

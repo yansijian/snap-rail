@@ -15,6 +15,7 @@ import { LogOut, Minus, Settings, Square, X } from 'lucide-react'
 import { Fragment, useState, type ReactNode } from 'react'
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, useRefresh } from '@snap-rail/framework-shadcn/ui'
 import '@snap-rail/framework-shadcn/slots'
+import { UI_SLOT_IDS } from '@snap-rail/framework-shadcn/slots'
 import '@snap-rail/framework-shadcn/runtime'
 import '@snap-rail/framework-shadcn/session'
 import '@snap-rail/framework-shadcn/settings-pages'
@@ -46,7 +47,7 @@ function Titlebar(props: {
   control: (action: Action) => void
 }): ReactNode {
   const [confirming, setConfirming] = useState(false)
-  // Slot-changed keeps the titlebar-actions region (forge's AI button) live.
+  // Slot-changed keeps the shell.titlebar.actions region (forge's AI button) live.
   useRefresh(props.ctx, ['session/changed', 'ui/slot-changed'])
 
   const operator = props.ctx.session.current()
@@ -82,7 +83,7 @@ function Titlebar(props: {
         <div className="flex items-stretch">
           {/* Occupant-contributed icon buttons (flush styling is the
            * occupant's contract) — the forge studio's AI 创造 entry. */}
-          {props.ctx.uiSlots.list('titlebar-actions').map(occupant => (
+          {props.ctx.uiSlots.list(UI_SLOT_IDS.titlebarActions).map(occupant => (
             <Fragment key={occupant.id}>{occupant.render()}</Fragment>
           ))}
           <Button
@@ -148,7 +149,7 @@ const titlebarPlugin: Plugin.Object<void> = {
     const control = (action: Action): void => {
       void ctx.client.link.call('window.control', { action }).catch(() => {})
     }
-    ctx.uiSlots.register(ctx, 'titlebar', {
+    ctx.uiSlots.register(ctx, UI_SLOT_IDS.titlebar, {
       id: 'chrome',
       order: 0,
       render(): ReactNode {

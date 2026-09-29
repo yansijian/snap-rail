@@ -18,6 +18,10 @@
       "types": "./lib/types/slots.d.ts",
       "default": "./lib/slots.js"
     },
+    "./semantic": {
+      "types": "./lib/types/semantic.d.ts",
+      "default": "./lib/semantic.js"
+    },
     "./ui": {
       "types": "./lib/types/ui/index.d.ts",
       "default": "./lib/ui/index.js"
@@ -101,12 +105,19 @@
     "layer": "ui",
     "exclusive": "framework",
     "category": "界面",
+    "capabilities": {
+      "provides": [
+        { "id": "ui.renderer.react", "version": "1.0.0" },
+        { "id": "ui.contract", "version": "1.0.0" }
+      ]
+    },
     "clientOnly": true,
     "client": {
       "entry": "lib-client/client.js",
       "seeds": [
         "ui",
         "slots",
+        "semantic",
         "settings-pages",
         "session",
         "variables",

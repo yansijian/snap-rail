@@ -1,0 +1,9 @@
+{
+  "keys": [
+    {
+      "keyId": "replace-with-your-key-id",
+      "publisher": "replace-with-your-publisher",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nREPLACE_WITH_ED25519_PUBLIC_KEY\n-----END PUBLIC KEY-----"
+    }
+  ]
+}

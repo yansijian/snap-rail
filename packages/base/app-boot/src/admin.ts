@@ -41,6 +41,12 @@ export interface LayerHandles {
   rendererPackages: readonly string[]
 }
 
+/** The latest failed composition attempt, retained for recovery diagnostics. */
+export interface LayerFailure {
+  time: number
+  message: string
+}
+
 /** Minimal structural face of the vendored include entry (`refresh`). */
 interface Refreshable {
   refresh(): Promise<void>
@@ -54,7 +60,13 @@ function retryableWriteError(error: unknown): boolean {
   return code === 'EACCES' || code === 'EBUSY' || code === 'EPERM'
 }
 
-function atomicWrite(path: string, content: string): void {
+/**
+ * Write a file atomically: land the bytes in a sibling temp file, then
+ * rename over the target, retrying the Windows-busy errors a watching
+ * process (an editor, an antivirus scan) can raise. The preset-file writer
+ * for feed-served recipes shares this with the user-layer commits.
+ */
+export function atomicWrite(path: string, content: string): void {
   const tmp = `${path}.tmp`
   writeFileSync(tmp, content)
   for (let retry = 0; ; retry++) {
@@ -77,8 +89,14 @@ export class LayerAdmin {
   private queue: Promise<unknown> = Promise.resolve()
   private watchers: Array<{ close(): void }> = []
   private watchTimer: NodeJS.Timeout | undefined
+  private lastFailureValue: LayerFailure | null = null
 
   constructor(private readonly ctx: Context, readonly handles: LayerHandles) {}
+
+  /** Last failed compose/refresh attempt, or null after a clean apply. */
+  lastFailure(): LayerFailure | null {
+    return this.lastFailureValue
+  }
 
   /** Recompute the composition from the layer files (fail loud, no writes). */
   recompose(): EntryOptions[] {
@@ -103,21 +121,33 @@ export class LayerAdmin {
    * cases the previously mounted tree keeps running.
    */
   async apply(): Promise<boolean> {
-    const composed = this.recompose()
-    const serialized = dump(composed)
-    const current = existsSync(this.handles.composedPath)
-      ? readFileSync(this.handles.composedPath, 'utf8')
-      : undefined
-    if (serialized === current) return false
+    try {
+      const composed = this.recompose()
+      const serialized = dump(composed)
+      const current = existsSync(this.handles.composedPath)
+        ? readFileSync(this.handles.composedPath, 'utf8')
+        : undefined
+      if (serialized === current) {
+        this.lastFailureValue = null
+        return false
+      }
 
-    const include = this.ctx.loader.store[this.handles.includeId]?.subtree as Refreshable | undefined
-    if (include === undefined) {
-      throw new Error('pluginLayers: the root include entry is no longer mounted')
+      const include = this.ctx.loader.store[this.handles.includeId]?.subtree as Refreshable | undefined
+      if (include === undefined) {
+        throw new Error('pluginLayers: the root include entry is no longer mounted')
+      }
+      atomicWrite(this.handles.composedPath, serialized)
+      await include.refresh()
+      this.lastFailureValue = null
+      this.ctx.emit('plugin-layers/applied', composed)
+      return true
+    } catch (cause) {
+      this.lastFailureValue = {
+        time: Date.now(),
+        message: cause instanceof Error ? cause.message : String(cause),
+      }
+      throw cause
     }
-    atomicWrite(this.handles.composedPath, serialized)
-    await include.refresh()
-    this.ctx.emit('plugin-layers/applied', composed)
-    return true
   }
 
   /**

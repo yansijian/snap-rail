@@ -31,6 +31,15 @@ export interface SnapRailManifest {
   clientOnly?: boolean
   /** The renderer face: the client bundle path inside the package. */
   client?: { entry: string, seeds?: readonly string[] }
+  /** Capabilities provided by and required from the active runtime. */
+  capabilities?: {
+    provides?: readonly { id: string, version: string }[]
+    requires?: readonly { id: string, range: string, optional?: boolean }[]
+  }
+  /** Supported snap-rail, Host protocol, and renderer versions. */
+  engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
+  /** Key id recorded in the signed release envelope, when present. */
+  signatureKeyId?: string
 }
 
 /**
@@ -67,6 +76,12 @@ export interface PluginDescriptor {
   clientEntry?: string
   /** Contributed seed subpaths (`snapRail.client.seeds`), when declared. */
   clientSeeds?: readonly string[]
+  /** Declared runtime capabilities. */
+  capabilities?: SnapRailManifest['capabilities']
+  /** Supported runtime versions. */
+  engines?: SnapRailManifest['engines']
+  /** Key id recorded in the signed release envelope, when present. */
+  signatureKeyId?: string
 }
 
 interface PluginPackageJson {
@@ -83,6 +98,13 @@ const stringArrayOrUndefined = (value: unknown): readonly string[] | undefined =
   Array.isArray(value) && value.every(item => typeof item === 'string' && item !== '')
     ? value as readonly string[]
     : undefined
+
+const capabilitiesOrUndefined = (value: SnapRailManifest['capabilities']): SnapRailManifest['capabilities'] | undefined => {
+  if (value === undefined) return undefined
+  if (value.provides !== undefined && !value.provides.every(item => item.id !== '' && item.version !== '')) return undefined
+  if (value.requires !== undefined && !value.requires.every(item => item.id !== '' && item.range !== '')) return undefined
+  return value
+}
 
 /**
  * Resolve one subpath (`'./rpc'`) inside a pool package directory: the
@@ -177,6 +199,16 @@ export function scanPluginPool(dirs: readonly string[]): Map<string, PluginDescr
       if (clientEntry !== undefined) descriptor.clientEntry = clientEntry
       const clientSeeds = stringArrayOrUndefined(snapRail?.client?.seeds)
       if (clientSeeds !== undefined) descriptor.clientSeeds = clientSeeds
+      const capabilities = capabilitiesOrUndefined(snapRail?.capabilities)
+      if (capabilities !== undefined) descriptor.capabilities = capabilities
+      if (snapRail?.engines !== undefined) descriptor.engines = snapRail.engines
+      try {
+        const signature = JSON.parse(readFileSync(join(pluginDir, 'META-INF', 'signature.json'), 'utf8')) as { keyId?: unknown }
+        if (typeof signature.keyId === 'string' && signature.keyId !== '') descriptor.signatureKeyId = signature.keyId
+      } catch {
+        // Unsigned development fixtures remain discoverable; the RPC installer
+        // still rejects them whenever a production trust store is supplied.
+      }
       pool.set(manifest.name, descriptor)
     }
   }

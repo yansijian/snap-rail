@@ -51,6 +51,11 @@
   },
   "snapRail": {
     "layer": "tool",
+    "capabilities": {
+      "requires": [
+        { "id": "equipment.runtime", "range": "^1.0.0" }
+      ]
+    },
     "category": "工具",
     "requires": [
       "@snap-rail/equipment",

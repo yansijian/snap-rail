@@ -8,6 +8,7 @@
 
 import type { Context } from '@snap-rail/cordis'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { UI_SLOT_IDS } from './slots.tsx'
 
 /** Shell root; mounted once by {@link ../index.tsx | createClientRuntime}. */
 export function Shell(props: { ctx: Context }): ReactNode {
@@ -17,7 +18,7 @@ export function Shell(props: { ctx: Context }): ReactNode {
     return () => { detach() }
   }, [props.ctx])
 
-  const layouts = props.ctx.uiSlots.list('layout')
+  const layouts = props.ctx.uiSlots.list(UI_SLOT_IDS.layout)
   const content = layouts.length > 0
     ? layouts.map(occupant => <Fragment key={occupant.id}>{occupant.render()}</Fragment>)
     : <div className="m-auto text-muted-foreground">没有已加载的布局插件。</div>

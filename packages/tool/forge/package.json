@@ -35,6 +35,13 @@
       "store"
     ],
     "layer": "tool",
+    "capabilities": {
+      "requires": [
+        { "id": "ui.contract", "range": "^1.0.0" },
+        { "id": "equipment.runtime", "range": "^1.0.0" }
+      ]
+    },
+    "framework": "@snap-rail/framework-shadcn",
     "requires": [
       "@snap-rail/equipment",
       "service:store"

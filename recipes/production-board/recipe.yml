@@ -1,0 +1,16 @@
+# 产线看板组合：标准基座 + 采集/统计/作业套件，装完按 readme 建一组演示
+# 设备即可看到完整效果。发布时仅 `plugins` 块进入 feed 的组合文档。
+version: 1.0.0
+title: 产线看板
+kind: scenario
+description: 标准基座之上加装 ModbusTCP 采集、班产统计与终端作业套件——设备管理、点采集、班产看板一条链。
+plugins:
+  - name: '@snap-rail/store-sqlite'
+  - name: '@snap-rail/equipment'
+  - name: '@snap-rail/equipment/rpc'
+  - name: '@snap-rail/framework-shadcn'
+  - name: '@snap-rail/settings-station'
+  - name: '@snap-rail/equipment-station'
+  - name: '@snap-rail/driver-modbus'
+  - name: '@snap-rail/trend'
+  - name: '@snap-rail/suite-terminal-ops'

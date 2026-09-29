@@ -17,3 +17,7 @@ vendor/*/src/*.js
 vendor/*/src/*.js.map
 vendor/*/src/*.d.ts
 vendor/*/src/*.d.ts.map
+dist-publish/
+deploy.config.json
+.keys/
+.pnpm-store/

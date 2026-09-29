@@ -4,8 +4,8 @@
  * marketplace of the future is just another source of the same zips.
  *
  * Zip layout: one root directory (the package) or the package at the zip
- * root. The manifest must name a legal package name; `snapRail` fields are
- * validated (kind, permissions) but unenforced beyond shape in this phase.
+ * root. The manifest must name a legal package name; `snapRail` fields,
+ * capabilities and runtime engine ranges are validated before extraction.
  * Installing over an installed package updates it in place when the zip's
  * version is strictly higher. Uninstalling removes the pool directory and
  * the package's namespaced store database (its data is its own).
@@ -14,13 +14,22 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { unzipSync } from 'fflate'
+import { verifyReleaseFiles, type TrustedReleaseKey } from '@snap-rail/plugin-kit/sign'
+import { snapRailManifestSchema } from '@snap-rail/plugin-kit/manifest'
 import type { SnapRailManifest } from './scan.ts'
 
 /** Installer failures, machine-readable for the wire mapping. */
-export type InstallErrorKind = 'bad-zip' | 'bad-manifest' | 'conflict' | 'not-installed' | 'io'
+export type InstallErrorKind = 'bad-zip' | 'bad-manifest' | 'bad-signature' | 'conflict' | 'not-installed' | 'io'
+
+/** Engine versions implemented by this Host/Renderer release. */
+export const HOST_ENGINE_VERSIONS = {
+  snapRail: '0.1.0',
+  hostProtocol: '1.0.0',
+  renderer: '1.0.0',
+} as const
 
 /** One installer failure carrying a machine-readable kind. */
 export class InstallError extends Error {
@@ -35,14 +44,7 @@ interface PackageJson {
   name?: unknown
   version?: unknown
   main?: unknown
-  snapRail?: {
-    kind?: unknown
-    title?: unknown
-    category?: unknown
-    permissions?: unknown
-    requires?: unknown
-    client?: { entry?: unknown } | undefined
-  }
+  snapRail?: unknown
 }
 
 /** What a successful install reports back. */
@@ -68,6 +70,10 @@ export interface InspectResult {
   hasClient: boolean
   /** Declared dependencies (`snapRail.requires`), unfiltered. */
   requires: readonly string[]
+  capabilities?: { provides?: readonly { id: string, version: string }[], requires?: readonly { id: string, range: string, optional?: boolean }[] }
+  engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
+  /** The release signature key id when the archive carries signed metadata. */
+  signatureKeyId?: string
 }
 
 /**
@@ -78,7 +84,7 @@ export interface InspectResult {
  * @param zipPath - absolute path of the plugin zip on the host.
  * @throws InstallError for the same malformed inputs {@link installPluginFromZip} rejects.
  */
-export function inspectPluginZip(zipPath: string): InspectResult {
+export function inspectPluginZip(zipPath: string, options?: { trustedKeys?: readonly TrustedReleaseKey[] }): InspectResult {
   let files: Record<string, Uint8Array>
   try {
     files = unzipSync(new Uint8Array(readFileSync(zipPath)))
@@ -89,15 +95,17 @@ export function inspectPluginZip(zipPath: string): InspectResult {
   if (entries.length === 0) throw new InstallError('bad-zip', 'the archive is empty')
   const roots = new Set(entries.map(name => name.includes('/') ? name.split('/')[0]! : ''))
   const root = roots.size === 1 && !roots.has('') ? [...roots][0]! : ''
+  validateArchivePaths(entries, root)
   const manifestFile = files[`${root ? `${root}/` : ''}package.json`]
   if (manifestFile === undefined) {
     throw new InstallError('bad-manifest', 'package.json not found at the archive root')
   }
   const manifest = readManifest(manifestFile)
-  if (typeof manifest.name !== 'string' || !/^@[a-z0-9-]+\/[a-z0-9-]+$|^[a-z0-9-]+$/.test(manifest.name)) {
+  if (typeof manifest.name !== 'string' || !/^(?:@[a-z0-9][a-z0-9-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(manifest.name)) {
     throw new InstallError('bad-manifest', `package name "${String(manifest.name)}" is not a legal package name`)
   }
   const snapRail = validateSnapRail(manifest)
+  const signatureKeyId = verifyArchiveSignature(files, root, options?.trustedKeys, manifest.name, typeof manifest.version === 'string' ? manifest.version : '0.0.0')
   return {
     name: manifest.name,
     version: typeof manifest.version === 'string' ? manifest.version : '0.0.0',
@@ -107,6 +115,48 @@ export function inspectPluginZip(zipPath: string): InspectResult {
     permissions: snapRail.permissions ?? [],
     hasClient: snapRail.client !== undefined,
     requires: snapRail.requires ?? [],
+    ...(snapRail.capabilities === undefined ? {} : { capabilities: snapRail.capabilities }),
+    ...(snapRail.engines === undefined ? {} : { engines: snapRail.engines }),
+    ...(signatureKeyId === undefined ? {} : { signatureKeyId }),
+  }
+}
+
+/** Verify a release envelope when the caller supplies a trust store. */
+function verifyArchiveSignature(
+  files: Record<string, Uint8Array>,
+  root: string,
+  trustedKeys: readonly TrustedReleaseKey[] | undefined,
+  expectedName?: string,
+  expectedVersion?: string,
+): string | undefined {
+  const prefix = root === '' ? '' : `${root}/`
+  const metadata = files[`${prefix}META-INF/release.json`]
+  const signature = files[`${prefix}META-INF/signature.json`]
+  if (trustedKeys === undefined) return signature === undefined ? undefined : readSignatureKeyId(signature)
+  if (metadata === undefined || signature === undefined) throw new InstallError('bad-signature', 'signed release metadata is missing')
+  const normalized: Record<string, Uint8Array> = {}
+  for (const [path, data] of Object.entries(files)) {
+    const relative = root === '' ? path : path.startsWith(prefix) ? path.slice(prefix.length) : path
+    normalized[relative] = data
+  }
+  try {
+    const verified = verifyReleaseFiles(normalized, trustedKeys)
+    if ((expectedName !== undefined && verified.name !== expectedName) || (expectedVersion !== undefined && verified.version !== expectedVersion)) {
+      throw new Error('release metadata identity does not match package.json')
+    }
+    const parsed = JSON.parse(new TextDecoder().decode(signature)) as { keyId?: unknown }
+    return typeof parsed.keyId === 'string' ? parsed.keyId : verified.name
+  } catch (cause) {
+    throw new InstallError('bad-signature', cause instanceof Error ? cause.message : String(cause))
+  }
+}
+
+function readSignatureKeyId(file: Uint8Array): string | undefined {
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(file)) as { keyId?: unknown }
+    return typeof parsed.keyId === 'string' ? parsed.keyId : undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -120,51 +170,62 @@ function readManifest(file: Uint8Array): PackageJson {
   return parsed as PackageJson
 }
 
-/** Validate the `snapRail` manifest block's shape (present fields only). */
+/** Reject zip entries that could escape the staging directory on extraction. */
+function validateArchivePaths(entries: readonly string[], root: string): void {
+  const prefix = root === '' ? '' : `${root}/`
+  for (const entry of entries) {
+    const relative = root === '' ? entry : entry.startsWith(prefix) ? entry.slice(prefix.length) : entry
+    const normalized = relative.replaceAll('\\', '/')
+    if (normalized === '' || normalized.includes('\0') || normalized.startsWith('/')
+      || /^[A-Za-z]:\//.test(normalized) || normalized.split('/').includes('..')) {
+      throw new InstallError('bad-zip', `archive entry escapes its package root: ${entry}`)
+    }
+  }
+}
+
+/** Validate the `snapRail` manifest with the public SDK schema and check the
+ * installed Host/Renderer engine ranges. The installer and authors therefore
+ * share one strict manifest contract. */
 function validateSnapRail(manifest: PackageJson): SnapRailManifest {
-  const snap = manifest.snapRail
-  if (snap === undefined) return {}
-  if (typeof snap !== 'object' || snap === null) {
-    throw new InstallError('bad-manifest', 'snapRail must be an object')
+  let parsed: SnapRailManifest
+  try {
+    parsed = snapRailManifestSchema.parse(manifest.snapRail ?? {}) as SnapRailManifest
+  } catch (cause) {
+    throw new InstallError('bad-manifest', `snapRail manifest 无效：${cause instanceof Error ? cause.message : String(cause)}`)
   }
-  const out: SnapRailManifest = {}
-  if (snap.kind !== undefined) {
-    if (typeof snap.kind !== 'string' || !/^[a-z][a-z0-9-]*$/.test(snap.kind)) {
-      throw new InstallError('bad-manifest', `snapRail.kind "${String(snap.kind)}" is not a kebab-case kind`)
+  for (const [key, range] of Object.entries(parsed.engines ?? {})) {
+    const actual = HOST_ENGINE_VERSIONS[key as keyof typeof HOST_ENGINE_VERSIONS]
+    if (actual !== undefined && !satisfiesRuntimeRange(actual, range)) {
+      throw new InstallError('bad-manifest', `插件要求 ${key} ${range}，当前版本为 ${actual}`)
     }
-    out.kind = snap.kind
   }
-  if (snap.title !== undefined) {
-    if (typeof snap.title !== 'string' || snap.title === '' || snap.title.length > 64) {
-      throw new InstallError('bad-manifest', 'snapRail.title must be a string of 1 to 64 characters')
-    }
-    out.title = snap.title
+  return parsed
+}
+
+function satisfiesRuntimeRange(version: string, range: string): boolean {
+  const actual = parseRuntimeVersion(version)
+  const trimmed = range.trim()
+  const target = parseRuntimeVersion(trimmed.replace(/^(\^|~|>=|>|<=|<|=)\s*/, ''))
+  if (target === undefined || actual === undefined) return false
+  if (trimmed.startsWith('^')) return actual[0] === target[0] && compareRuntimeTuple(actual, target) >= 0
+  if (trimmed.startsWith('~')) return actual[0] === target[0] && actual[1] === target[1] && compareRuntimeTuple(actual, target) >= 0
+  if (trimmed.startsWith('>=')) return compareRuntimeTuple(actual, target) >= 0
+  if (trimmed.startsWith('>')) return compareRuntimeTuple(actual, target) > 0
+  if (trimmed.startsWith('<=')) return compareRuntimeTuple(actual, target) <= 0
+  if (trimmed.startsWith('<')) return compareRuntimeTuple(actual, target) < 0
+  return compareRuntimeTuple(actual, target) === 0
+}
+
+function parseRuntimeVersion(value: string): [number, number, number] | undefined {
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(value)
+  return match === null ? undefined : [Number(match[1]), Number(match[2]), Number(match[3])]
+}
+
+function compareRuntimeTuple(a: readonly [number, number, number], b: readonly [number, number, number]): number {
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return a[index]! - b[index]!
   }
-  if (snap.category !== undefined) {
-    if (typeof snap.category !== 'string' || snap.category.length > 64) {
-      throw new InstallError('bad-manifest', 'snapRail.category must be a string of at most 64 characters')
-    }
-    out.category = snap.category
-  }
-  if (snap.permissions !== undefined) {
-    if (!Array.isArray(snap.permissions) || snap.permissions.some(entry => typeof entry !== 'string')) {
-      throw new InstallError('bad-manifest', 'snapRail.permissions must be a string array')
-    }
-    out.permissions = snap.permissions
-  }
-  if (snap.requires !== undefined) {
-    if (!Array.isArray(snap.requires) || snap.requires.some(entry => typeof entry !== 'string' || entry === '')) {
-      throw new InstallError('bad-manifest', 'snapRail.requires must be a non-empty string array')
-    }
-    out.requires = snap.requires
-  }
-  if (snap.client !== undefined) {
-    if (typeof snap.client !== 'object' || snap.client === null || typeof snap.client.entry !== 'string' || snap.client.entry === '') {
-      throw new InstallError('bad-manifest', 'snapRail.client must be { entry: string }')
-    }
-    out.client = { entry: snap.client.entry }
-  }
-  return out
+  return 0
 }
 
 /**
@@ -251,6 +312,7 @@ export function installedVersionOf(poolDir: string, name: string): string | unde
  */
 export function installPluginFromZip(zipPath: string, poolDir: string, options?: {
   reserved?: readonly string[]
+  trustedKeys?: readonly TrustedReleaseKey[]
 }): InstallResult {
   let files: Record<string, Uint8Array>
   try {
@@ -264,16 +326,18 @@ export function installPluginFromZip(zipPath: string, poolDir: string, options?:
   if (entries.length === 0) throw new InstallError('bad-zip', 'the archive is empty')
   const roots = new Set(entries.map(name => name.includes('/') ? name.split('/')[0]! : ''))
   const root = roots.size === 1 && !roots.has('') ? [...roots][0]! : ''
+  validateArchivePaths(entries, root)
   const manifestEntry = `${root ? `${root}/` : ''}package.json`
   const manifestFile = files[manifestEntry]
   if (manifestFile === undefined) {
     throw new InstallError('bad-manifest', 'package.json not found at the archive root')
   }
   const manifest = readManifest(manifestFile)
-  if (typeof manifest.name !== 'string' || !/^@[a-z0-9-]+\/[a-z0-9-]+$|^[a-z0-9-]+$/.test(manifest.name)) {
+  if (typeof manifest.name !== 'string' || !/^(?:@[a-z0-9][a-z0-9-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(manifest.name)) {
     throw new InstallError('bad-manifest', `package name "${String(manifest.name)}" is not a legal package name`)
   }
   validateSnapRail(manifest)
+  verifyArchiveSignature(files, root, options?.trustedKeys, manifest.name, typeof manifest.version === 'string' ? manifest.version : '0.0.0')
   if (options?.reserved?.includes(manifest.name) === true) {
     throw new InstallError('conflict', `${manifest.name} is a built-in package name (an install cannot replace built-ins)`)
   }
@@ -294,6 +358,7 @@ export function installPluginFromZip(zipPath: string, poolDir: string, options?:
   }
 
   const staging = `${dir}.update-${randomUUID()}`
+  const backup = updated ? `${dir}.backup-${randomUUID()}` : undefined
   try {
     mkdirSync(staging, { recursive: true })
     for (const [name, data] of Object.entries(files)) {
@@ -304,16 +369,71 @@ export function installPluginFromZip(zipPath: string, poolDir: string, options?:
       mkdirSync(join(target, '..'), { recursive: true })
       writeFileSync(target, data)
     }
-    if (updated) rmSync(dir, { recursive: true, force: true })
+    if (backup !== undefined) renameSync(dir, backup)
     renameSync(staging, dir)
+    if (backup !== undefined) rmSync(backup, { recursive: true, force: true })
   } catch (cause) {
     rmSync(staging, { recursive: true, force: true })
+    if (backup !== undefined && existsSync(backup)) {
+      rmSync(dir, { recursive: true, force: true })
+      renameSync(backup, dir)
+    }
     if (cause instanceof InstallError) throw cause
     throw new InstallError('io', `cannot write ${manifest.name} into the pool: ${
       cause instanceof Error ? cause.message : String(cause)
     }`)
   }
   return { name: manifest.name, version, dir, updated }
+}
+
+/**
+ * Run several pool installs as one filesystem transaction. Existing package
+ * directories are copied to a private sibling backup before the callback runs;
+ * the live copy stays visible so each normal install still enforces its
+ * strictly-higher version rule. Any callback failure removes newly landed
+ * directories and restores every backup. The caller owns the composition
+ * refresh after rollback.
+ */
+export async function withPluginPoolTransaction<T>(
+  poolDir: string,
+  names: readonly string[],
+  run: () => Promise<T>,
+): Promise<T> {
+  mkdirSync(poolDir, { recursive: true })
+  const transaction = join(poolDir, `.transaction-${randomUUID()}`)
+  mkdirSync(transaction, { recursive: true })
+  const uniqueNames = [...new Set(names)]
+  const backups: Array<{ name: string, dir: string }> = []
+  let runStarted = false
+  try {
+    for (const name of uniqueNames) {
+      const dir = poolDirOf(poolDir, name)
+      if (!existsSync(dir)) continue
+      const backup = join(transaction, name.replaceAll('/', '__'))
+      cpSync(dir, backup, { recursive: true })
+      backups.push({ name, dir: backup })
+    }
+    runStarted = true
+    const result = await run()
+    rmSync(transaction, { recursive: true, force: true })
+    return result
+  } catch (cause) {
+    // A backup failure happened before the callback could mutate the live
+    // pool. Leave every original directory untouched; deleting it here would
+    // turn a failed copy into data loss.
+    if (!runStarted) {
+      rmSync(transaction, { recursive: true, force: true })
+      throw cause
+    }
+    for (const name of uniqueNames) {
+      rmSync(poolDirOf(poolDir, name), { recursive: true, force: true })
+    }
+    for (const backup of backups.reverse()) {
+      cpSync(backup.dir, poolDirOf(poolDir, backup.name), { recursive: true })
+    }
+    rmSync(transaction, { recursive: true, force: true })
+    throw cause
+  }
 }
 
 /** The store database file a package owns (namespace = sanitized name). */

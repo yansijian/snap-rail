@@ -54,6 +54,10 @@ export interface PluginInfo {
   /** Declared dependencies (`snapRail.requires`): package names and
    * `service:` ids checked before enable/disable/uninstall land. */
   requires?: readonly string[]
+  capabilities?: { provides?: readonly { id: string, version: string }[], requires?: readonly { id: string, range: string, optional?: boolean }[] }
+  engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
+  /** The publisher key id after archive verification. */
+  signatureKeyId?: string | undefined
   /** The entry's current config when one is set. */
   config?: unknown
 }
@@ -88,10 +92,30 @@ export interface RemotePluginInfo {
   description?: string | undefined
   /** The package's declared kind (`snapRail.kind`), when declared. */
   kind?: string | undefined
+  /** The author-named display name (`snapRail.title`), when declared. */
+  title?: string | undefined
+  /** The author-named classification marker (`snapRail.category`), when
+   * declared — the market page groups rows by the raw string. */
+  category?: string | undefined
+  /** Declared dependencies (`snapRail.requires`), when declared — also the
+   * machine-readable trace of which base the plugin builds on. */
+  requires?: readonly string[] | undefined
+  /** The renderer framework binding (`snapRail.framework`), when declared. */
+  framework?: string | undefined
   /** The zip's file name relative to the feed — never a URL. The host
    * resolves it against the configured feed and nothing else, so the wire
    * never carries a client-chosen download location. */
   file: string
+  /** The zip's mandatory sha256 hex digest; a differing download is refused
+   * before it reaches the installer. */
+  sha256?: string | undefined
+  /** The zip's mandatory byte size. */
+  size?: number | undefined
+  /** Mandatory signature metadata published with the release. */
+  signature?: { algorithm: 'Ed25519', keyId: string } | undefined
+  /** Capabilities and engine ranges published with the release. */
+  capabilities?: { provides?: readonly { id: string, version: string }[], requires?: readonly { id: string, range: string, optional?: boolean }[] } | undefined
+  engines?: { snapRail?: string, hostProtocol?: string, renderer?: string } | undefined
   /** The installed version when the package is already in the pool. */
   installed?: { version: string } | undefined
   action: RemoteAction
@@ -110,6 +134,10 @@ export interface InspectedPlugin {
   hasClient: boolean
   /** Declared dependencies from the manifest, unfiltered. */
   requires: readonly string[]
+  capabilities?: { provides?: readonly { id: string, version: string }[], requires?: readonly { id: string, range: string, optional?: boolean }[] }
+  engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
+  /** The publisher key id after archive verification. */
+  signatureKeyId?: string | undefined
   /** Package requirements the home cannot satisfy (not installed) — the
    * confirmation dialog shows these as warnings. */
   missing: readonly string[]
@@ -119,6 +147,28 @@ export interface InspectedPlugin {
   action: InstallAction
 }
 
+/** Host snapshot used by the kernel recovery surface and support bundles. */
+export interface PluginDiagnostics {
+  host: { snapRail: string, hostProtocol: string, renderer: string }
+  enabled: readonly string[]
+  missing: readonly { name: string, requirements: readonly string[], capabilities: readonly string[] }[]
+  signatures: readonly { name: string, keyId: string }[]
+  lastFailure: { time: number, message: string } | null
+}
+
+/** Runtime validator shared by the kernel recovery surface and Host RPC. */
+export const pluginDiagnosticsSchema = z.object({
+  host: z.object({ snapRail: z.string(), hostProtocol: z.string(), renderer: z.string() }).strict(),
+  enabled: z.array(z.string()),
+  missing: z.array(z.object({
+    name: z.string(),
+    requirements: z.array(z.string()),
+    capabilities: z.array(z.string()),
+  }).strict()),
+  signatures: z.array(z.object({ name: z.string(), keyId: z.string() }).strict()),
+  lastFailure: z.object({ time: z.number(), message: z.string() }).strict().nullable(),
+}).strict()
+
 /** One wire method of the plugins domain, from its declaration to its
  * handler: the merged `RpcMethodMap` rows, the trust-boundary request
  * schemas, and the handler table all derive from this one declaration. */
@@ -126,6 +176,8 @@ export const pluginsContract = defineContract('plugins', {
   methods: {
     /** Merged view: mounted entries with status plus pool plugins not referenced. */
     'plugins.list': method(z.object({}).strict()).ret<{ plugins: readonly PluginInfo[] }>(),
+    /** Read the current Host/Renderer/plugin health snapshot without mutating layers. */
+    'plugins.diagnostics': method(z.object({}).strict()).ret<{ snapshot: PluginDiagnostics }>(),
     /** Enable or disable one plugin by writing a user-layer row and hot-applying. */
     'plugins.set-enabled': method(z.object({
       name: z.string().min(1),
@@ -156,19 +208,33 @@ export const pluginsContract = defineContract('plugins', {
      * same strictly-higher update rule as a local install). */
     'plugins.remote-install': method(z.object({ name: z.string().min(1) }).strict())
       .ret<{ installed: { name: string, version: string, updated: boolean } }>(),
+    /** Fetch the feed's recipe catalog and annotate every combination with
+     * what it would still install locally and whether it already landed. */
+    'plugins.remote-recipes': method(z.object({}).strict())
+      .ret<{ recipes: readonly RemoteRecipeInfo[], feedUrl: string }>(),
+    /** Install one combination: every missing or outdated referenced plugin
+     * downloads from the feed first; only after all of them land does the
+     * recipe's preset file get written (which is what makes it live). */
+    'plugins.remote-install-recipe': method(z.object({ id: z.string().regex(/^[a-z0-9-]+$/) }).strict())
+      .ret<{ installed: readonly { name: string, version: string, updated: boolean }[], applied: true }>(),
+    /** Remove one installed combination's preset file — the pool packages it
+     * installed stay; uninstall them individually if desired. */
+    'plugins.remove-recipe': method(z.object({ id: z.string().regex(/^[a-z0-9-]+$/) }).strict())
+      .ret<{ removed: true }>(),
   },
   frames: {},
 })
 
 /** The legal package-name shape the installer enforces (shared with the catalog). */
-const packageNamePattern = /^@[a-z0-9-]+\/[a-z0-9-]+$|^[a-z0-9-]+$/
+const packageNamePattern = /^(?:@[a-z0-9][a-z0-9-]*\/)?[a-z0-9][a-z0-9._-]*$/
 
 /**
  * The `index.json` catalog a plugin feed serves: the packer emits it, the
  * host validates it before anything downstream sees an entry. Deliberately
- * non-strict — unknown fields strip so older hosts keep reading newer
- * catalogs — with the load-bearing fields enforced (the file name pattern
- * keeps downloads under the feed base, no traversal, no absolute URLs).
+ * non-strict for enrichment fields — unknown fields strip — while the
+ * load-bearing release fields are mandatory (the file name pattern keeps
+ * downloads under the feed base, and the digest, size, and signature identify
+ * the exact zip the installer is allowed to consume).
  */
 export const remoteCatalogSchema = z.object({
   plugins: z.array(z.object({
@@ -176,12 +242,98 @@ export const remoteCatalogSchema = z.object({
     version: z.string().min(1),
     description: z.string().optional(),
     kind: z.string().optional(),
-    file: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$/),
+    title: z.string().optional(),
+    category: z.string().optional(),
+    requires: z.array(z.string()).optional(),
+    framework: z.string().optional(),
+    // Scoped package archives are named `@scope__package.zip`; `@` is legal
+    // only as the first character and no slash/path segment is accepted.
+    file: z.string().regex(/^@?[A-Za-z0-9][A-Za-z0-9._-]*(?:__[A-Za-z0-9][A-Za-z0-9._-]*)?\.zip$/),
+    // A market catalog is a signed release index, not a convenience list:
+    // every entry carries the exact zip digest, byte size, and release key id.
+    sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    size: z.number().int().positive(),
+    signature: z.object({ algorithm: z.literal('Ed25519'), keyId: z.string().min(1) }),
+    capabilities: z.object({
+      provides: z.array(z.object({ id: z.string().min(1), version: z.string().min(1) }).strict()).optional(),
+      requires: z.array(z.object({ id: z.string().min(1), range: z.string().min(1), optional: z.boolean().optional() }).strict()).optional(),
+    }).strict().optional(),
+    engines: z.object({ snapRail: z.string().min(1).optional(), hostProtocol: z.string().min(1).optional(), renderer: z.string().min(1).optional() }).strict().optional(),
   })),
 })
 
 /** One validated feed catalog. */
 export type RemoteCatalog = z.output<typeof remoteCatalogSchema>
+
+/** A recipe's kind: `base` combinations are the standard install units (the
+ * shared target bench third-party plugins build against); `scenario`
+ * combinations stack scenario plugins on a base to demonstrate an effect. */
+export type RecipeKind = 'base' | 'scenario'
+
+/** One combination (recipe) as the feed's recipe catalog annotates it for
+ * the local home: which packages it would still install, which it can not
+ * satisfy at all, and whether its preset file already landed. */
+export interface RemoteRecipeInfo {
+  /** The recipe's stable id — also the preset file name's key. */
+  id: string
+  /** The recipe document's version (bumped when its rows change). */
+  version: string
+  /** Human title (`标准基座`, `产线看板`, …). */
+  title: string
+  /** One-line description of the combination's effect. */
+  description?: string | undefined
+  kind: RecipeKind
+  /** The package names the recipe's rows address, deduplicated, document order. */
+  plugins: readonly string[]
+  /** Referenced packages not installed in the local pool — installing the
+   * recipe downloads these from the feed first. */
+  pending: readonly string[]
+  /** Referenced packages that are neither installed nor in the feed's
+   * plugin catalog — the recipe cannot land until the feed carries them. */
+  unavailable: readonly string[]
+  /** Whether the recipe's preset file already sits in the home's presets. */
+  applied: boolean
+}
+
+/**
+ * The `recipes.json` catalog a plugin feed serves beside `index.json`:
+ * same non-strict discipline, same file-name safety rule — a recipe
+ * document is fetched by pure file name under the configured base and
+ * nothing else.
+ */
+export const remoteRecipesSchema = z.object({
+  recipes: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9-]+$/),
+    version: z.string().min(1),
+    title: z.string().min(1),
+    description: z.string().optional(),
+    kind: z.enum(['base', 'scenario']),
+    file: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*\.yml$/),
+  })),
+})
+
+/** One validated feed recipe catalog. */
+export type RemoteRecipes = z.output<typeof remoteRecipesSchema>
+
+/** Row names a recipe may address: package names and their subpath entries. */
+const recipeNamePattern = /^(@[a-z0-9-]+\/[a-z0-9-]+|[a-z0-9-]+)(\/[a-z0-9-]+)*$/
+
+/** Strict validation of a fetched recipe document: a recipe becomes a preset
+ * file in the home, so anything beyond the user-layer row shape is refused. */
+export const recipePayloadSchema = z.object({
+  plugins: z.array(z.object({
+    name: z.string().regex(recipeNamePattern),
+    enabled: z.boolean().optional(),
+    config: z.unknown().optional(),
+  }).strict()).min(1),
+}).strict()
+
+/** One row of a recipe document — the exact user-layer row shape. */
+export type RecipeRow = z.output<typeof recipePayloadSchema>['plugins'][number]
+
+/** The recipe document payload: byte-for-byte the `plugins.yml` shape, so a
+ * downloaded recipe lands as a preset file the compositor already speaks. */
+export type RecipePayload = z.output<typeof recipePayloadSchema>
 
 /** The `settings.json` key holding the plugin market feed's base URL. */
 export const PLUGINS_FEED_URL_KEY = 'plugins.feedUrl'

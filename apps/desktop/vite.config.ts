@@ -33,6 +33,7 @@ function snapRailSources(): Plugin {
     '@snap-rail/framework-shadcn/ui': 'packages/ui/framework-shadcn/src/ui/index.ts',
     '@snap-rail/client-kernel': 'packages/base/kernel/src/index.tsx',
     '@snap-rail/framework-shadcn/slots': 'packages/ui/framework-shadcn/src/slots.tsx',
+    '@snap-rail/framework-shadcn/semantic': 'packages/ui/framework-shadcn/src/semantic.tsx',
     '@snap-rail/framework-shadcn/session': 'packages/ui/framework-shadcn/src/session.ts',
     '@snap-rail/framework-shadcn/workflows': 'packages/ui/framework-shadcn/src/workflows.ts',
     '@snap-rail/framework-shadcn/settings-pages': 'packages/ui/framework-shadcn/src/settings-pages.ts',

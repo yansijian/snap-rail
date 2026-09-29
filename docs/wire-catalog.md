@@ -40,6 +40,7 @@ hand-written face and are documented statically here.
 | method | request schema | response schema |
 |---|---|---|
 | `plugins.list` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `plugins.diagnostics` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
 | `plugins.set-enabled` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"name":{"type":"string","minLength":1},"enabled":{"type":"boolean"}},"required":["name","enabled"],"additionalProperties":false} | — |
 | `plugins.set-config` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"name":{"type":"string","minLength":1},"config":{}},"required":["name","config"],"additionalProperties":false} | — |
 | `plugins.install` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"zipPath":{"type":"string","minLength":1}},"required":["zipPath"],"additionalProperties":false} | — |
@@ -47,6 +48,9 @@ hand-written face and are documented statically here.
 | `plugins.uninstall` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"name":{"type":"string","minLength":1}},"required":["name"],"additionalProperties":false} | — |
 | `plugins.remote-list` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
 | `plugins.remote-install` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"name":{"type":"string","minLength":1}},"required":["name"],"additionalProperties":false} | — |
+| `plugins.remote-recipes` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `plugins.remote-install-recipe` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z0-9-]+$"}},"required":["id"],"additionalProperties":false} | — |
+| `plugins.remove-recipe` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z0-9-]+$"}},"required":["id"],"additionalProperties":false} | — |
 
 ## update
 

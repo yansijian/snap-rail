@@ -24,4 +24,5 @@ export default defineConfig([
   { ...shared, entry: ['lib/types/contract.js'] },
   { ...shared, entry: ['lib/types/scan.js'] },
   { ...shared, entry: ['lib/types/invariant.js'] },
+  { ...shared, entry: ['lib/types/trust.js'] },
 ])

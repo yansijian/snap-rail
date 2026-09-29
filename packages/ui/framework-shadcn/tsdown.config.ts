@@ -32,6 +32,7 @@ export default defineConfig([
   { ...shared, entry: ['lib/types/index.js'] },
   { ...shared, entry: ['lib/types/runtime.js'] },
   { ...shared, entry: ['lib/types/slots.js'] },
+  { ...shared, entry: ['lib/types/semantic.js'] },
   { ...shared, entry: ['lib/types/ui/index.js'] },
   { ...shared, entry: ['lib/types/settings-pages.js'] },
   { ...shared, entry: ['lib/types/session.js'] },

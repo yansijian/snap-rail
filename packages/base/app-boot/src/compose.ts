@@ -91,73 +91,6 @@ export function loadBuiltinLayer(path: string): EntryOptions[] {
 }
 
 /**
- * Retired row names and their successors. The ModbusTCP collapse merged the
- * bridge into the driver's root entry and moved the settings page in as
- * `./station`; the production merge moved the shift counter in as the
- * production page package's `./stats` face. User-layer rows still naming
- * the old entries are renamed in-memory on load so an upgraded
- * `plugins.yml` keeps composing (an unknown row would fail the whole
- * file). The file itself converges on its next write, which serializes the
- * renamed rows.
- */
-const RENAMED_PLUGIN_ROWS: Readonly<Record<string, string>> = {
-  // The field→equipment rename: rows naming the old package land on the new
-  // one so an upgraded `plugins.yml` keeps composing.
-  '@snap-rail/field': '@snap-rail/equipment',
-  '@snap-rail/field/rpc': '@snap-rail/equipment/rpc',
-  // The trend extraction: the shift counter left the suite as its own tool.
-  '@snap-rail/suite-terminal-ops/stats': '@snap-rail/trend',
-  '@snap-rail/driver-modbus/rpc': '@snap-rail/driver-modbus',
-  '@snap-rail/production-stats': '@snap-rail/trend',
-  '@snap-rail/process-production/stats': '@snap-rail/trend',
-  // The suite merge: the five process pages + layout + chrome collapsed into
-  // one package; renderer rows naming the old members rename onto the suite
-  // row (first row wins collisions).
-  '@snap-rail/layout-station': '@snap-rail/suite-terminal-ops',
-  '@snap-rail/chrome-titlebar': '@snap-rail/suite-terminal-ops',
-  '@snap-rail/process-maintenance': '@snap-rail/suite-terminal-ops',
-  '@snap-rail/process-production': '@snap-rail/suite-terminal-ops',
-  '@snap-rail/process-sampling': '@snap-rail/suite-terminal-ops',
-  '@snap-rail/process-fault': '@snap-rail/suite-terminal-ops',
-  '@snap-rail/process-downtime': '@snap-rail/suite-terminal-ops',
-  '@snap-rail/modbus-station': '@snap-rail/driver-modbus/station',
-}
-
-/**
- * Rows that no longer exist anywhere (renamed away first, then matched).
- * The unified field settings page replaced the ModbusTCP driver's renderer
- * station face, and the mock driver package was deleted outright; dropping
- * those rows on load keeps an upgraded `plugins.yml` composing; the next
- * write converges the file.
- */
-const RETIRED_PLUGIN_ROWS: ReadonlySet<string> = new Set([
-  '@snap-rail/driver-modbus/station',
-  '@snap-rail/driver-mock',
-])
-
-/**
- * First-party packages that left the shipped builtin layer (the app now ships
- * base only; everything else installs from zips). A user row naming one of
- * these is dropped while the package is absent — an upgraded `plugins.yml`
- * from the all-builtins era keeps composing instead of failing the boot, and
- * installing the package revives the row. Rows naming anything else that is
- * neither built-in, pool-resident, nor a renderer occupant stay a hard error
- * (typo protection for third-party names).
- */
-const UNSHIPPED_PLUGIN_ROWS: ReadonlySet<string> = new Set([
-  '@snap-rail/equipment',
-  '@snap-rail/equipment/rpc',
-  '@snap-rail/store-sqlite',
-  '@snap-rail/trend',
-  '@snap-rail/driver-modbus',
-  '@snap-rail/suite-terminal-ops',
-  '@snap-rail/framework-shadcn',
-  '@snap-rail/settings-station',
-  '@snap-rail/equipment-station',
-  '@snap-rail/forge',
-])
-
-/**
  * Load the preset layers: every `*.yml`/`*.yaml` document under the given
  * directories (lexical order, so `10-xxx.preset.yml` stacks before
  * `20-yyy.preset.yml`), each with the exact `plugins.yml` document shape —
@@ -213,6 +146,40 @@ export function mergeLayers(layers: readonly UserLayer[]): UserLayer {
 }
 
 /**
+ * The preset file name a feed-served combination (recipe) lands as. The
+ * `recipe-` prefix keeps recipe files from ever colliding with the numbered
+ * factory presets (`10-xxx.preset.yml`); both live in the same stacked
+ * preset directories and both hot-apply on write.
+ *
+ * @param id - the recipe's stable id (`standard-base`, …).
+ * @returns the preset file name carrying the combination.
+ */
+export function recipePresetFileName(id: string): string {
+  return `recipe-${id}.yml`
+}
+
+/**
+ * The recipe ids already landed as preset files under the given directories:
+ * every `recipe-<id>.yml`/`.yaml` file names its recipe. This — not any
+ * in-memory state — is the truth of "which combinations are installed", so
+ * a hand-deleted preset file also reads as removed.
+ *
+ * @param dirs - preset directories; missing ones contribute nothing.
+ * @returns the applied recipe ids.
+ */
+export function appliedRecipeIds(dirs: readonly string[]): Set<string> {
+  const ids = new Set<string>()
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue
+    for (const file of readdirSync(dir)) {
+      const match = /^recipe-([a-z0-9-]+)\.ya?ml$/.exec(file)
+      if (match !== null) ids.add(match[1]!)
+    }
+  }
+  return ids
+}
+
+/**
  * Load the user layer. A missing file is a fresh home (nothing user-mounted);
  * a present file must parse as a document with a `plugins` array.
  *
@@ -243,13 +210,8 @@ export function loadUserLayer(path: string): UserLayer {
     if (raw === null || typeof raw !== 'object' || typeof (raw as UserPluginRow).name !== 'string') {
       throw new Error(`user layer: ${path} contains a row without a name`)
     }
-    const original = raw as UserPluginRow
-    const renamed = RENAMED_PLUGIN_ROWS[original.name]
-    const row = renamed === undefined ? original : { ...original, name: renamed }
-    if (RETIRED_PLUGIN_ROWS.has(row.name)) continue
-    // A rename can collide with a same-named row already in the file; the
-    // first row wins so one entry never receives two patches.
-    if (seen.has(row.name)) continue
+    const row = raw as UserPluginRow
+    if (seen.has(row.name)) throw new Error(`user layer: ${path} contains duplicate plugin row ${row.name}`)
     seen.add(row.name)
     rows.push(row)
   }
@@ -367,7 +329,6 @@ export function composeEntries(options: {
       patches.push({ insert: [entry] })
       continue
     }
-    if (UNSHIPPED_PLUGIN_ROWS.has(row.name)) continue
     throw new Error(`user layer: plugin ${row.name} is neither built-in nor in the plugin pool`)
   }
 
@@ -422,6 +383,8 @@ export function packageManifestOf(
         ...descriptor.clientSeeds !== undefined ? { seeds: descriptor.clientSeeds } : {},
       }
     }
+    if (descriptor.capabilities !== undefined) manifest.capabilities = descriptor.capabilities
+    if (descriptor.engines !== undefined) manifest.engines = descriptor.engines
     return Object.keys(manifest).length > 0 ? manifest : undefined
   }
   try {

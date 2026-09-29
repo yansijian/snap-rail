@@ -19,3 +19,17 @@ export { SEED_MODULES } from './seeds.ts'
 export { CLIENT_EXTERNALS, CONTRIBUTED_SEED_MODULES } from './seeds.ts'
 export { clientBundle, hostBundle } from './build.ts'
 export { releaseFiles, releaseManifest, zipFileName, type ReleaseSpec } from './pack.ts'
+export {
+  RELEASE_METADATA_PATH,
+  RELEASE_SIGNATURE_PATH,
+  canonicalJson,
+  releaseMetadata,
+  sha256,
+  signReleaseFiles,
+  signReleaseMetadata,
+  verifyReleaseFiles,
+  type ReleaseFileDigests,
+  type ReleaseMetadata,
+  type ReleaseSignature,
+  type TrustedReleaseKey,
+} from './sign.ts'

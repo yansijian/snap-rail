@@ -24,6 +24,13 @@
     "exclusive": "suite",
     "category": "界面",
     "framework": "@snap-rail/framework-shadcn",
+    "capabilities": {
+      "requires": [
+        { "id": "ui.renderer.react", "range": "^1.0.0" },
+        { "id": "ui.contract", "range": "^1.0.0" },
+        { "id": "equipment.runtime", "range": "^1.0.0" }
+      ]
+    },
     "clientOnly": true,
     "requires": [
       "@snap-rail/framework-shadcn",

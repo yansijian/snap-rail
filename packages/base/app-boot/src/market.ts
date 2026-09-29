@@ -10,21 +10,26 @@
  * @module @snap-rail/app-boot/market
  */
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { load } from 'js-yaml'
 import {
   PLUGINS_FEED_URL_KEY,
+  recipePayloadSchema,
   remoteCatalogSchema,
+  remoteRecipesSchema,
+  type RecipePayload,
   type RemoteAction,
   type RemoteCatalog,
   type RemotePluginInfo,
+  type RemoteRecipes,
 } from './contract.ts'
 import { compareVersions, installedVersionOf } from './installer.ts'
 
 /** Market failures, machine-readable for the wire mapping. */
-export type MarketErrorKind = 'unreachable' | 'bad-catalog' | 'not-found'
+export type MarketErrorKind = 'unreachable' | 'bad-catalog' | 'not-found' | 'bad-checksum'
 
 /** One market failure carrying a machine-readable kind. */
 export class MarketError extends Error {
@@ -96,6 +101,75 @@ export async function fetchRemoteCatalog(feedUrl: string): Promise<RemoteCatalog
 }
 
 /**
+ * Fetch and validate the feed's recipe catalog (`recipes.json`, served
+ * beside `index.json`).
+ *
+ * @param feedUrl - the configured feed base URL.
+ * @returns the parsed recipe catalog (unknown fields stripped).
+ * @throws MarketError `'unreachable'` when the feed can not be read,
+ * `'bad-catalog'` when the payload is not a valid recipe catalog.
+ */
+export async function fetchRemoteRecipes(feedUrl: string): Promise<RemoteRecipes> {
+  const base = feedBase(feedUrl)
+  let response: Response
+  try {
+    response = await fetch(`${base}recipes.json`, { signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS) })
+  } catch (cause) {
+    throw new MarketError('unreachable', `无法访问插件源 ${base}（${cause instanceof Error ? cause.message : String(cause)}）`)
+  }
+  if (!response.ok) {
+    throw new MarketError('unreachable', `插件源 ${base}recipes.json 返回 ${response.status}`)
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await response.text())
+  } catch {
+    throw new MarketError('bad-catalog', `插件源组合目录 ${base}recipes.json 不是合法 JSON`)
+  }
+  const recipes = remoteRecipesSchema.safeParse(parsed)
+  if (!recipes.success) {
+    const issue = recipes.error.issues[0]
+    throw new MarketError('bad-catalog', `组合目录不合法（${issue?.path.join('.') ?? 'recipes'}: ${issue?.message ?? 'unknown'}）`)
+  }
+  return recipes.data
+}
+
+/**
+ * Fetch and strictly validate one recipe document: the exact `plugins.yml`
+ * shape, because the document lands verbatim as a preset file.
+ *
+ * @param feedUrl - the configured feed base URL.
+ * @param file - the recipe entry's file name (validated relative name).
+ * @returns the parsed recipe payload.
+ * @throws MarketError `'unreachable'` when the document can not be read,
+ * `'bad-catalog'` when it is not valid YAML of the recipe shape.
+ */
+export async function fetchRecipeDocument(feedUrl: string, file: string): Promise<RecipePayload> {
+  const base = feedBase(feedUrl)
+  let response: Response
+  try {
+    response = await fetch(`${base}${file}`, { signal: AbortSignal.timeout(CATALOG_TIMEOUT_MS) })
+  } catch (cause) {
+    throw new MarketError('unreachable', `无法访问插件源 ${base}（${cause instanceof Error ? cause.message : String(cause)}）`)
+  }
+  if (!response.ok) {
+    throw new MarketError('unreachable', `组合文档 ${base}${file} 返回 ${response.status}`)
+  }
+  let parsed: unknown
+  try {
+    parsed = load(await response.text())
+  } catch {
+    throw new MarketError('bad-catalog', `组合文档 ${file} 不是合法 YAML`)
+  }
+  const payload = recipePayloadSchema.safeParse(parsed)
+  if (!payload.success) {
+    const issue = payload.error.issues[0]
+    throw new MarketError('bad-catalog', `组合文档不合法（${file}: ${issue?.path.join('.') ?? 'plugins'}: ${issue?.message ?? 'unknown'}）`)
+  }
+  return payload.data
+}
+
+/**
  * Annotate a parsed catalog with the local pool's verdicts: every entry
  * gets the installed version (when present) and the install action.
  *
@@ -116,7 +190,16 @@ export function annotateCatalog(catalog: RemoteCatalog, poolDir: string): Remote
       version: entry.version,
       ...(entry.description !== undefined ? { description: entry.description } : {}),
       ...(entry.kind !== undefined ? { kind: entry.kind } : {}),
+      ...(entry.title !== undefined ? { title: entry.title } : {}),
+      ...(entry.category !== undefined ? { category: entry.category } : {}),
+      ...(entry.requires !== undefined ? { requires: entry.requires } : {}),
+      ...(entry.framework !== undefined ? { framework: entry.framework } : {}),
       file: entry.file,
+      ...(entry.sha256 !== undefined ? { sha256: entry.sha256 } : {}),
+      ...(entry.size !== undefined ? { size: entry.size } : {}),
+      ...(entry.signature !== undefined ? { signature: entry.signature } : {}),
+      ...(entry.capabilities !== undefined ? { capabilities: entry.capabilities } : {}),
+      ...(entry.engines !== undefined ? { engines: entry.engines } : {}),
       ...(installedVersion !== undefined ? { installed: { version: installedVersion } } : {}),
       action,
     }
@@ -124,15 +207,18 @@ export function annotateCatalog(catalog: RemoteCatalog, poolDir: string): Remote
 }
 
 /**
- * Download one catalog entry's zip to a temp file. The caller owns the file
- * and removes it when the install pipeline is done with it.
+ * Download one catalog entry's zip to a temp file, verifying the digest the
+ * signed catalog against the received bytes before anything touches the disk.
+ * The caller owns the file and removes it when the install pipeline is done.
  *
  * @param feedUrl - the configured feed base URL.
  * @param file - the catalog entry's file name (validated relative name).
+ * @param sha256 - the entry's sha256 hex digest; a mismatch aborts.
  * @returns the temp zip's absolute path.
- * @throws MarketError `'unreachable'` when the download fails.
+ * @throws MarketError `'unreachable'` when the download fails, `'bad-checksum'`
+ * when the received bytes do not match the declared digest.
  */
-export async function downloadRemotePluginZip(feedUrl: string, file: string): Promise<string> {
+export async function downloadRemotePluginZip(feedUrl: string, file: string, sha256?: string): Promise<string> {
   const base = feedBase(feedUrl)
   let response: Response
   try {
@@ -144,6 +230,9 @@ export async function downloadRemotePluginZip(feedUrl: string, file: string): Pr
     throw new MarketError('unreachable', `下载 ${base}${file} 返回 ${response.status}`)
   }
   const bytes = new Uint8Array(await response.arrayBuffer())
+  if (sha256 !== undefined && createHash('sha256').update(bytes).digest('hex') !== sha256) {
+    throw new MarketError('bad-checksum', `${file} 完整性校验失败（sha256 不匹配，下载可能损坏或被篡改）`)
+  }
   const target = join(tmpdir(), `snap-rail-market-${randomUUID()}.zip`)
   writeFileSync(target, bytes)
   return target

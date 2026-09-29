@@ -33,6 +33,9 @@
   "snapRail": {
     "layer": "store",
     "exclusive": "store-backend",
+    "capabilities": {
+      "provides": [{ "id": "store.backend", "version": "1.0.0" }]
+    },
     "category": "存储",
     "title": "本地存储（SQLite）"
   }

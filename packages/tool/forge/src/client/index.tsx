@@ -17,6 +17,8 @@ import { Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import '@snap-rail/station-rpc/contract'
 import '@snap-rail/framework-shadcn/slots'
+import { UI_SLOT_IDS } from '@snap-rail/framework-shadcn/slots'
+import '@snap-rail/framework-shadcn/semantic'
 import {
   applyTheme,
   Button,
@@ -66,13 +68,13 @@ function adoptStudioTheme(ctx: Context): void {
 /** The forge client plugin; mount in the client runtime tree. */
 const forgeClientPlugin: Plugin.Object<void> = {
   name: 'forge-client',
-  inject: ['client', 'uiSlots'],
+  inject: ['client', 'uiSlots', 'uiContract'],
   apply(ctx: Context): void {
     if (!isStudioWindow()) {
       // Main window: run the generated halves here (their pages target this
       // chrome) and contribute the studio's titlebar entry.
       startGenRunner(ctx)
-      ctx.uiSlots.register(ctx, 'titlebar-actions', {
+      ctx.uiSlots.register(ctx, UI_SLOT_IDS.titlebarActions, {
         id: 'forge-open',
         order: 10,
         render(): ReactNode {
@@ -92,9 +94,10 @@ const forgeClientPlugin: Plugin.Object<void> = {
     }
     // Studio window: the workbench is the whole layout.
     adoptStudioTheme(ctx)
-    ctx.uiSlots.register(ctx, 'layout', {
+    ctx.uiContract.registerLayout(ctx, {
       id: 'forge-studio',
       order: 10,
+      slots: [UI_SLOT_IDS.main],
       render(): ReactNode {
         return <ForgeStudio ctx={ctx} />
       },

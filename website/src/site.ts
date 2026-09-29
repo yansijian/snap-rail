@@ -9,7 +9,7 @@
  */
 
 /** Mark the current page's nav link and open external links in a new tab. */
-function initNav(page: 'index' | 'plugins'): void {
+function initNav(page: 'index' | 'plugins' | 'recipes'): void {
   for (const link of document.querySelectorAll<HTMLAnchorElement>('a[data-nav]')) {
     if (link.dataset.nav === page) {
       link.classList.add('active');
@@ -78,7 +78,7 @@ function initImageSlots(): void {
 }
 
 /** Wire everything a page needs; called from each page entry module. */
-export function initSite(page: 'index' | 'plugins'): void {
+export function initSite(page: 'index' | 'plugins' | 'recipes'): void {
   initNav(page);
   initReveal();
   initVideoSlots();

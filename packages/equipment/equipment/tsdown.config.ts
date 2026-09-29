@@ -24,5 +24,5 @@ const shared = {
 
 export default defineConfig([
   { ...shared, entry: ['lib/types/index.js', 'lib/types/rpc.js'] },
-  { ...shared, entry: ['lib/types/contract.js'] },
+  { ...shared, entry: ['lib/types/contract.js', 'lib/types/driver.js'] },
 ])

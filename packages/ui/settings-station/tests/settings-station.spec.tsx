@@ -521,10 +521,15 @@ describe('settings dialog', () => {
     const catalog = {
       plugins: [{ name: '@snap-rail/mini-ui', version: '0.1.0', description: 'a market plugin', file: 'mini-ui.zip' }],
     }
+    const recipes = {
+      recipes: [{ id: 'demo-base', version: '1.0.0', title: '演示基座', description: 'demo base combo', kind: 'base', file: 'demo-base.yml' }],
+    }
     // The feed is an in-memory nginx stand-in.
     vi.stubGlobal('fetch', vi.fn(async (url: string | URL) => {
       const key = String(url)
       if (key === 'http://market.test/plugins/index.json') return new Response(JSON.stringify(catalog))
+      if (key === 'http://market.test/plugins/recipes.json') return new Response(JSON.stringify(recipes))
+      if (key === 'http://market.test/plugins/demo-base.yml') return new Response("plugins:\n  - name: '@snap-rail/mini-ui'\n")
       if (key === 'http://market.test/plugins/mini-ui.zip') return new Response(zipBytes)
       return new Response('not found', { status: 404 })
     }))
@@ -540,7 +545,7 @@ describe('settings dialog', () => {
       handles: {
         builtinLayerPath: join(home, 'builtins.cordis.yml'),
         userLayerPath: join(home, 'plugins.yml'),
-        presetDirs: [],
+        presetDirs: [join(home, 'presets')],
         poolDirs: [poolDir],
         rendererPackages: [],
       },
@@ -575,6 +580,12 @@ describe('settings dialog', () => {
     expect(row!.textContent).toContain('v0.1.0')
     expect(document.querySelector('[data-market-action="install"]')).not.toBeNull()
 
+    // The feed's recipe catalog renders as a base-combination card.
+    const recipeCard = document.querySelector('[data-recipe-card="demo-base"]')
+    expect(recipeCard).not.toBeNull()
+    expect(recipeCard!.textContent).toContain('演示基座')
+    expect(document.querySelector('[data-recipe-install="demo-base"]')).not.toBeNull()
+
     // 安装 rides the market pipeline: the pool copy lands and the row flips
     // to 已是最新 with no install button left.
     document.querySelector<HTMLButtonElement>('[data-market-install="@snap-rail/mini-ui"]')!.click()
@@ -583,6 +594,23 @@ describe('settings dialog', () => {
     expect(document.querySelector('[data-market-action="current"]')).not.toBeNull()
     expect(document.querySelector('[data-market-install="@snap-rail/mini-ui"]')).toBeNull()
     expect(document.body.textContent).not.toContain('变更待重启生效')
+
+    // The recipe's plugin is already current, so one click just lands the
+    // preset file — the card flips to 已安装 with a remove affordance.
+    document.querySelector<HTMLButtonElement>('[data-recipe-install="demo-base"]')!.click()
+    await flush(20)
+    const presetPath = join(home, 'presets', 'recipe-demo-base.yml')
+    expect(existsSync(presetPath)).toBe(true)
+    expect(readFileSync(presetPath, 'utf8')).toContain('@snap-rail/mini-ui')
+    expect(document.querySelector('[data-recipe-status="已安装"]')).not.toBeNull()
+    expect(document.querySelector('[data-recipe-remove="demo-base"]')).not.toBeNull()
+
+    // 移除 deletes the preset file only — the pool package stays put.
+    document.querySelector<HTMLButtonElement>('[data-recipe-remove="demo-base"]')!.click()
+    await flush(20)
+    expect(existsSync(presetPath)).toBe(false)
+    expect(existsSync(join(poolDir, '@snap-rail__mini-ui'))).toBe(true)
+    expect(document.querySelector('[data-recipe-status="已安装"]')).toBeNull()
 
     await runtime.dispose()
     element.remove()

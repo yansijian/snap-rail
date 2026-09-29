@@ -18,6 +18,10 @@
       "types": "./lib/types/contract.d.ts",
       "default": "./lib/contract.js"
     },
+    "./driver": {
+      "types": "./lib/types/driver.d.ts",
+      "default": "./lib/driver.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
@@ -51,6 +55,9 @@
   "snapRail": {
     "layer": "equipment",
     "category": "设备",
+    "capabilities": {
+      "provides": [{ "id": "equipment.runtime", "version": "1.0.0" }]
+    },
     "requires": [
       "service:store"
     ],

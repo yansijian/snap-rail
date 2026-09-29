@@ -21,6 +21,7 @@
     { "path": "./packages/base/util" },
     { "path": "./packages/base/scope" },
     { "path": "./packages/base/plugin-kit" },
+    { "path": "./packages/base/plugin-sdk" },
     { "path": "./packages/base/settings" },
     { "path": "./packages/store/store" },
     { "path": "./packages/store/store-sqlite" },

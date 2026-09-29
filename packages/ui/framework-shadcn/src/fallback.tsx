@@ -11,7 +11,7 @@
 
 import { Context, type Plugin } from '@snap-rail/cordis'
 import './settings-pages.ts'
-import './slots.tsx'
+import { UI_SLOT_IDS } from './slots.tsx'
 import { Button, useRefresh } from './ui/index.ts'
 import type { HostLink } from '@snap-rail/connection'
 import { Fragment, type ReactNode } from 'react'
@@ -48,7 +48,7 @@ function ControlIcons(props: { onMinimize: () => void, onToggleMaximize: () => v
 /** The fallback body: minimal titlebar + install guidance. */
 function FallbackShell(props: { ctx: Context, link: HostLink }): ReactNode {
   useRefresh(props.ctx, ['ui/slot-changed', 'settings/open-changed'])
-  const layouts = props.ctx.uiSlots.list('layout')
+  const layouts = props.ctx.uiSlots.list(UI_SLOT_IDS.layout)
   const fullScreen = layouts.filter(occupant => occupant.id !== SETTINGS_OCCUPANT_ID)
   // A suite layout took over: render nothing.
   if (fullScreen.length > 1) return null
@@ -62,7 +62,7 @@ function FallbackShell(props: { ctx: Context, link: HostLink }): ReactNode {
         <div className="flex items-center" style={{ WebkitAppRegion: 'no-drag' } as never}>
           {/* Occupant-contributed icon buttons (e.g. forge's AI 创造 entry)
            * stay reachable even with no suite active. */}
-          {props.ctx.uiSlots.list('titlebar-actions').map(occupant => (
+          {props.ctx.uiSlots.list(UI_SLOT_IDS.titlebarActions).map(occupant => (
             <Fragment key={occupant.id}>{occupant.render()}</Fragment>
           ))}
           <button
@@ -100,7 +100,7 @@ const fallbackShellPlugin: Plugin.Object<void> = {
   inject: ['uiSlots', 'settingsPages'],
   apply(ctx: Context): void {
     const client = ctx.get('client') as ClientLinkService
-    ctx.uiSlots.register(ctx, 'layout', {
+    ctx.uiSlots.register(ctx, UI_SLOT_IDS.layout, {
       id: 'fallback-shell',
       order: 200,
       render(): ReactNode {

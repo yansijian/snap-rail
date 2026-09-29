@@ -2,6 +2,7 @@
 
 工业终端的开源底座：OT 现场数据与 IT 工具链在一个"一切皆插件"的宿主里汇合。
 本文是缝（seam）目录与关键决策的单一权威；代码 JSDoc 是各包契约的权威。
+插件平台的阶段性实施清单见 [plugin-platform-plan.md](plugin-platform-plan.md)。
 
 ## 产品宪法
 
@@ -60,16 +61,17 @@
 ## 进程模型
 
 ```
-Electron 主进程                        renderer（每窗口）
+Electron Shell + Node Host（当前同进程） renderer（每窗口）
 ┌───────────────────────────┐          ┌─────────────────────────┐
-│ Cordis 宿主树（boot 产物）  │  invoke  │ client Cordis 树         │
-│  loader → include(合成清单) │ ───────▶ │  kernel → framework      │
+│ Shell: 窗口/IPC             │  invoke  │ client Cordis 树         │
+│ Host: Cordis 宿主树         │ ───────▶ │  kernel → framework      │
 │  gateway ── 点表/管理方法    │ ◀─────── │   runtime → 住户(组件)   │
 │  equipment / driver-* …    │  帧流端口 │  React root（槽位驱动）   │
 └───────────────────────────┘          └─────────────────────────┘
 ```
 
-- 主进程是宿主：一切能力插件跑在这里；renderer 是纯投影客户端
+- Electron Shell 只持有 Host 边界与 IPC carrier；当前 Host 与 Shell 同进程，
+  后续可移到 utility process；一切能力插件跑在 Host，renderer 是纯投影客户端
   （contextIsolation 开、nodeIntegration 关、preload 只暴露三原语
   invoke/openStream/zipPathOf——第三个是拖拽安装的路径桥）。
 - renderer 内跑一棵轻量 client Cordis 树：kernel 引导（启动页 + HostLink），
@@ -105,7 +107,7 @@ Electron 主进程                        renderer（每窗口）
 | 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架引导安装页**（拖拽 zip 安装/启用/重启 + `droppedZipPath` 路径桥）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
 | 持久化规范 | `store/store` | `ctx.store` 的 Service Definition：`register(caller, ns, drizzle表)`；**drizzle 查询构建器即规范**（无裸 SQL/CTE/窗口函数）；命名空间 = 隔离边界；注册即建表 + append-only 加列 |
 | 持久化实现 | `store/store-sqlite` | 参考实现（zip 安装；互斥组 `store-backend`，单活）：node:sqlite + 自写 drizzle 适配器（零原生模块），`data/<ns>.db`，WAL；换后端 = 新实现包替换单活 |
-| 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。zip 声明 `requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影（消费方零改动）。`./contract` 是随应用发布的渲染契约（base 种子） |
+| 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。zip 声明 `requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影（消费方零改动）。`./contract` 是随应用发布的渲染契约（base 种子），`./driver` 是独立驱动仓库只读的纯类型面 |
 | ModbusTCP 驱动 | `equipment/driver-modbus` | 范本驱动（新驱动作者的活文档）：纯协议适配器，块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema）；无存储无渲染端；`requires: ['@snap-rail/equipment']` |
 | EtherNet/IP 驱动 | `equipment/driver-enip` | 照 modbus 范本的第二个驱动（首期对接 OMRON NX1P2）：自研轻量 ENIP/CIP 编解码（RegisterSession + SendRRData + Read/Write Tag 符号寻址，无第三方协议库），按已发布全局变量名轮询读写；变量级 CIP 失败只 null 单点（设备保持在线），写前经首读自学类型字；`slot>0` 发背板路由段（留 Logix 兼容门） |
 | UI 框架 | `ui/framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 绑定 `snapRail.framework`；换框架 = 换生态 |
@@ -403,7 +405,7 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
    （渲染面绑定）、`requires`（依赖预检：包名/`service:` 条目）、
    `clientOnly`（纯渲染包无宿主面）、`client: { entry, seeds? }`、
    `permissions`（安装时展示）。
-2. `pnpm run build && pnpm run pack:plugins` 产出
+2. `pnpm run build && pnpm run pack:plugins -- --sign-key <private.pem> --key-id <id>` 产出
    `dist-plugins/<包名>.zip`——**最终格式**：精简 manifest（`main` 指
    宿主面或 client 入口 + `exports` 映射子路径）+ 构建好的面目录，
    无源码。装配规则单源在 `@snap-rail/plugin-kit/pack`；出货清单在
@@ -481,9 +483,58 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
   `scripts/install-dev-plugins.ts <home>` 把全量 zip 装进任意 home 并启用
   （dogfooding 安装管线）。
 - 更新通道：electron-updater 座位已接线（无 publish 配置时静默）。
+- **线上三件套**：官网 + 插件源 + 更新源全静态（基准内网
+  `http://192.168.1.10/`）；`pnpm run publish` 一条命令装配并同步
+  （流程、组合与社区发布模型见 deploy.md）。插件市场页消费
+  `plugins.remote-list`/`remote-install`；组合走 `recipes.json` + 三个
+  组合方法（缺失插件补装 → 预设落地热生效）；下载带 sha256 校验。
 
 ## 一期不做、留座位的
 
 权限执行层（manifest 已声明+安装展示，未拦截）、tool 层规范缝（第三个
-工具出现时再抽象）、i18n、遥测、npm 分发源/插件市场 UI、web/头部双入口
+工具出现时再抽象）、i18n、遥测、npm 分发源、deep link 唤起
+安装、snap-rail-market 社区仓的独立 CI、完整开发者文档站、web/头部双入口
 profile、as 化部署、套件热激活（当前重启生效）、套件内条目级裁剪。
+# Plugin platform direction
+
+The runtime is split into an Electron shell, a Node Host and a Renderer. The
+shell owns windows, IPC and recovery; the Host owns Cordis, plugin discovery,
+installation, signatures, storage, device communication and RPC; the Renderer
+only mounts the selected UI framework and consumes contracts over the typed
+bridge. A plugin package may ship a Host face, a Renderer face, or both, but it
+cannot cross the boundary with private imports.
+
+Plugin manifests declare versioned capabilities in addition to package
+requirements. A provider publishes `capabilities.provides`, a consumer uses
+`capabilities.requires`, and enable/install/uninstall checks resolve those
+capabilities before composition. `engines` records the supported snap-rail,
+Host protocol and Renderer ranges so an incompatible artifact is rejected at
+the install boundary.
+
+The UI framework exposes a semantic contract (`@snap-rail/framework-shadcn/semantic`)
+on top of the slot registry. Layouts register which semantic slots they render;
+component plugins register views and navigation entries by stable ids such as
+`shell.titlebar.actions`, `shell.sidebar`, `shell.view` and
+`shell.statusbar`. A layout may publish a namespaced extension slot only as
+`custom:<publisher>.<name>`; malformed or undeclared slots produce a semantic
+diagnostic and never become an implicit global vocabulary. Layout packages
+therefore do not own component packages, and a component can move between
+layouts without changing its implementation.
+
+Independent plugin repositories use `@snap-rail/plugin-sdk` and the
+`snap-rail-plugin` CLI. Each generated repository contains its own `AGENTS.md`,
+manifest schema, build preset and release inspection commands. The release
+packer emits only built faces and the trimmed manifest; source files never enter
+the plugin pool.
+
+Installable releases are signed with Ed25519. `META-INF/release.json` contains
+canonical metadata and SHA-256 digests for every payload file;
+`META-INF/signature.json` contains the publisher key id and detached signature.
+The Host loads public keys from the host-owned `trusted-release-keys.json`
+outside the plugin pool and verifies the archive before extraction. A missing
+or unknown key fails closed.
+
+The Host exposes `plugins.diagnostics` for recovery and support tooling. It
+reports the Host/Renderer protocol versions, enabled packages, unsatisfied
+package or capability requirements, the key ids observed in installed release
+envelopes, and the latest failed layer refresh.

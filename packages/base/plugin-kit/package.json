@@ -26,6 +26,10 @@
       "types": "./lib/types/pack.d.ts",
       "default": "./lib/pack.js"
     },
+    "./sign": {
+      "types": "./lib/types/sign.d.ts",
+      "default": "./lib/sign.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },

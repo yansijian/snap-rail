@@ -13,10 +13,32 @@
 import { Context, type Plugin } from '@snap-rail/cordis'
 import type { ReactNode } from 'react'
 
-/** Well-known slot ids (the closed phase-1 vocabulary). `titlebar-actions`
- * hosts icon-button occupants (flush window-button styling) rendered inside
- * a titlebar's right-side control group. */
-export type SlotId = 'titlebar' | 'titlebar-actions' | 'sidebar' | 'view' | 'statusbar' | 'layout' | `custom:${string}`
+/** Stable semantic slot names shared by every layout implementation. */
+export const UI_SLOT_IDS = {
+  layout: 'shell.layout',
+  titlebar: 'shell.titlebar',
+  titlebarActions: 'shell.titlebar.actions',
+  menu: 'shell.menu',
+  sidebar: 'shell.sidebar',
+  main: 'shell.main',
+  view: 'shell.view',
+  statusbar: 'shell.statusbar',
+  overlay: 'shell.overlay',
+} as const
+
+/** Runtime set used by manifest/semantic validation as well as TypeScript. */
+export const STANDARD_UI_SLOT_IDS: ReadonlySet<string> = new Set(Object.values(UI_SLOT_IDS))
+
+/** A custom slot is owned by a publisher and a local slot name. */
+export const CUSTOM_UI_SLOT_PATTERN = /^custom:[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9-]*$/
+
+/** Check the public slot naming contract at runtime. */
+export function isValidUiSlotId(value: string): value is SlotId {
+  return STANDARD_UI_SLOT_IDS.has(value) || CUSTOM_UI_SLOT_PATTERN.test(value)
+}
+
+/** A layout may add a namespaced extension slot without changing the core vocabulary. */
+export type SlotId = typeof UI_SLOT_IDS[keyof typeof UI_SLOT_IDS] | `custom:${string}`
 
 /** What one occupant contributes to a slot. */
 export interface SlotOccupant {
@@ -90,7 +112,10 @@ const slotsPlugin: Plugin.Object<void> = {
         entry.occupants.set(occupant.id, { occupant, seq: entry.nextSeq++ })
         ctx.emit('ui/slot-changed', slot)
         const remove = (): void => {
-          if (entry.occupants.delete(occupant.id)) ctx.emit('ui/slot-changed', slot)
+          if (entry.occupants.get(occupant.id)?.occupant === occupant) {
+            entry.occupants.delete(occupant.id)
+            ctx.emit('ui/slot-changed', slot)
+          }
         }
         // Effects take a body producing the disposer; passing `remove`
         // itself would run it as setup.
