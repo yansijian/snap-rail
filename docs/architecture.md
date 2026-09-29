@@ -32,9 +32,10 @@
 - **出厂净身**：随应用发布的 builtin 层只有 base（`resources/
   builtins.cordis.yml`）；store/equipment/ui/tool/suite 的一切包都经
   zip 安装进 `<home>/plugins/` 池。保护语义按「来源」判定——builtin 行
-  （及 dev 静态住户行）即受保护，装来的 zip 永不可能伪装进这个集合。
-  dev（Vite harness）用 `dev/builtins.dev.cordis.yml` 全量 overlay
-  （resources 外，永不随包发布）。
+  即受保护，装来的 zip 永不可能伪装进这个集合。
+  dev（Vite harness）用 `dev/builtins.dev.cordis.yml` 覆盖 base 行
+  （resources 外，永不随包发布）；框架/驱动/套件 dev 与生产同路，经
+  `install-dev-plugins` 把各仓 dist zip 装进 dev home 的插件池。
 - **互斥组**（`snapRail.exclusive`）：启用一个成员自动停用同组其他成员
   （一次批量写）。现组：`suite`（套件默认组）、`framework`（框架插件）、
   `store-backend`（store 实现包）。池内包都可经界面启停。
@@ -104,12 +105,12 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
 | 持久化规范 | `store/store` | `ctx.store` 的 Service Definition：`register(caller, ns, drizzle表)`；**drizzle 查询构建器即规范**（无裸 SQL/CTE/窗口函数）；命名空间 = 隔离边界；注册即建表 + append-only 加列 |
 | 持久化实现 | `store/store-sqlite` | 参考实现（zip 安装；互斥组 `store-backend`，单活）：node:sqlite + 自写 drizzle 适配器（零原生模块），`data/<ns>.db`，WAL；换后端 = 新实现包替换单活 |
 | 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。zip 声明 `requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影（消费方零改动）。`./contract` 是随应用发布的渲染契约（base 种子），`./driver` 是独立驱动仓库只读的纯类型面 |
-| ModbusTCP 驱动 | `equipment/driver-modbus` | 范本驱动（新驱动作者的活文档）：纯协议适配器，块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema）；无存储无渲染端；`requires: ['@snap-rail/equipment']` |
-| EtherNet/IP 驱动 | `equipment/driver-enip` | 照 modbus 范本的第二个驱动（首期对接 OMRON NX1P2）：自研轻量 ENIP/CIP 编解码（RegisterSession + SendRRData + Read/Write Tag 符号寻址，无第三方协议库），按已发布全局变量名轮询读写；变量级 CIP 失败只 null 单点（设备保持在线），写前经首读自学类型字；`slot>0` 发背板路由段（留 Logix 兼容门） |
-| UI 框架 | `ui/framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 绑定 `snapRail.framework`；换框架 = 换生态 |
+| ModbusTCP 驱动 | 独立仓 `snap-rail-driver-modbus` | 范本驱动（新驱动作者的活文档）：纯协议适配器，块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema）；无存储无渲染端；`requires: ['@snap-rail/equipment']` |
+| EtherNet/IP 驱动 | 独立仓 `snap-rail-driver-enip` | 照 modbus 范本的第二个驱动（首期对接 OMRON NX1P2）：自研轻量 ENIP/CIP 编解码（RegisterSession + SendRRData + Read/Write Tag 符号寻址，无第三方协议库），按已发布全局变量名轮询读写；变量级 CIP 失败只 null 单点（设备保持在线），写前经首读自学类型字；`slot>0` 发背板路由段（留 Logix 兼容门） |
+| UI 框架 | 独立仓 `snap-rail-framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 绑定 `snapRail.framework`；换框架 = 换生态 |
 | 设置外壳 | `ui/settings-station` | 设置对话框壳 + 插件管理页（按 `snapRail.category` 标记动态分组——声明即归组、不问来源；未声明的安装/preset 行落「其他」，未声明的受保护出厂行恒归「内置」组垫底；分节可折叠 + 全部折叠/展开；条目平铺无组卡，`snapRail.title` 标题为主、包名小字次要；行无来源徽标；套件 radio 卡；内置/用户层行禁操作+悬浮提示）+ 主题页；clientOnly zip |
 | 统一设备管理页 | `ui/equipment-station` | equipment 缝的渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 equipment 语义节）；clientOnly zip，`requires` 声明框架与 equipment |
-| 业务套件 | `suite/terminal-ops` | **套件 = 单包单行，可双面**（互斥组 `suite`，单活）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）；宿主面 `./stats` 是同一场景的持久班产计数（store 缝 + 登录锚定 + `production/stats-changed` 帧），契约面为包内私面——场景逻辑收在套件内，杜绝跨包场景工具；`requires` 声明框架、equipment、`service:store` |
+| 业务套件 | 独立仓 `snap-rail-suite-terminal-ops` | **套件 = 单包单行，可双面**（互斥组 `suite`，单活）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）；宿主面 `./stats` 是同一场景的持久班产计数（store 缝 + 登录锚定 + `production/stats-changed` 帧），契约面为包内私面——场景逻辑收在套件内，杜绝跨包场景工具；`requires` 声明框架、equipment、`service:store` |
 
 ## 工作站语义（station 层）
 
@@ -152,11 +153,11 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
   include `refresh()` 事务性对账（逐条 create/update/remove，失败回滚）。
   预设层是"出厂组合作为数据"：型号出厂配置 = 一张可整张替换的预设文件，
   推送新版预设不覆盖用户手编；预设引用的池包拒绝卸载（行会悬空），
-  仅被预设引用的行在管理页显示「预设」来源。dev 用全量 overlay
+  仅被预设引用的行在管理页显示「预设」来源。dev 用 base overlay
   （`dev/builtins.dev.cordis.yml`，随 SNAP_RAIL_DEV_URL 切换，永不随包发布）。
 - 渲染端住户的行也写在同一个 `plugins.yml`：`clientOnly` 池包的行天然
-  不进宿主树（manifest 自描述），dev 的三个静态住户走 `rendererPackages`
-  名单挡板（仅 dev 生效）；`client-config.list` 在渲染端启动时下发，
+  不进宿主树（manifest 自描述），dev 与生产同路（静态住户挡板随拆仓移除）；
+  `client-config.list` 在渲染端启动时下发，
   行带 kind/category/贡献种子（行变更经 `client-config/changed` 帧通知，
   渲染窗自动 reload——kernel 的 `installRendererAutoReload` 去抖 500ms，
   设置键 `ui.rendererAutoReload` 可关）——用户只认识一个文件、
@@ -187,7 +188,7 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
   遗留，含 field→equipment、suite/stats→trend、trend/forge 整包删除、
   driver-mock 整包删除）在 `loadUserLayer` 内存态改名到后继行、彻底退役
   的行直接丢弃；**不再随包发布的一方包行**（equipment/store-sqlite/
-  trend/driver-modbus/forge/套件/框架/两 station）在池中无副本时自动
+  驱动/框架/套件/两 station——后五者已迁独立仓）在池中无副本时自动
   退役（装回即复活），老文件升级不炸组合，下次写回自然收敛。
 - 坏文件（YAML 解析失败、未知插件引用）**保持当前树运行**并报错；
   修好文件后下一次写自然恢复。扫描池回答"有什么"，清单回答"挂什么"。

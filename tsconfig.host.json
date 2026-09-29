@@ -32,14 +32,10 @@
     { "path": "./packages/base/gateway" },
     { "path": "./packages/base/connection" },
     { "path": "./packages/equipment/equipment" },
-    { "path": "./packages/equipment/driver-modbus" },
-    { "path": "./packages/equipment/driver-enip" },
-    { "path": "./packages/ui/framework-shadcn" },
     { "path": "./packages/ui/equipment-station" },
     { "path": "./packages/ui/settings-station" },
     { "path": "./packages/base/kernel" },
     { "path": "./packages/base/modules" },
-    { "path": "./packages/suite/terminal-ops" },
     { "path": "./apps/desktop" }
   ]
 }

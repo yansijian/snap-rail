@@ -13,7 +13,6 @@ import carrierPlugin from './carrier.ts'
 import windowRpcPlugin, { trackMainWindow } from './window-rpc.ts'
 import updateRpcPlugin from './update-rpc.ts'
 import { handlePluginScheme, registerPluginScheme } from './plugin-protocol.ts'
-import { RENDERER_PACKAGES } from './renderer-packages.ts'
 import { startDesktopHost } from './host.ts'
 
 /**
@@ -21,9 +20,10 @@ import { startDesktopHost } from './host.ts'
  * both dev source and installed layouts); `getAppPath()` is the one root
  * that names it in both. The shipped list is **base-only** — everything
  * else installs from zips. Dev runs (`SNAP_RAIL_DEV_URL`, the Vite
- * harness) swap in the full overlay from `dev/` so day-to-day work keeps
- * every first-party plugin mounted; the overlay file lives outside
- * `resources/` so packaging can never ship it.
+ * harness) swap in the base overlay from `dev/` so day-to-day base work
+ * runs the same rows production does; installable plugins come from the
+ * plugin pool. The overlay file lives outside `resources/` so packaging
+ * can never ship it.
  */
 function builtinLayerPath(): string {
   const devOverlay = process.env.SNAP_RAIL_DEV_URL !== undefined
@@ -41,17 +41,16 @@ async function start(): Promise<void> {
   // Pool plugin assets reach the renderer over the privileged scheme; the
   // handler binds to the same pool dir the boot composition scans.
   handlePluginScheme(join(home, 'plugins'))
-  // The static-occupant carve-out is a dev-harness concern: production
-  // ships base only, and every renderer resident arrives through the pool
-  // (clientOnly packages never join the host tree by their own manifest).
-  const dev = process.env.SNAP_RAIL_DEV_URL !== undefined
+  // Every renderer resident arrives through the pool — dev included (the
+  // old dev static-occupant carve-out left with the plugin split; install
+  // the zips into the dev home instead). clientOnly packages never join
+  // the host tree by their own manifest.
   const host = await startDesktopHost({
     binName: 'desktop',
     home,
     builtinLayerPath: builtinLayerPath(),
     userLayerPath: join(home, 'plugins.yml'),
     appRoot: app.getAppPath(),
-    rendererPackages: dev ? RENDERER_PACKAGES : [],
     prepare: prepared => {
       // Mounts immediately; activates once the gateway mounts in the tree.
       void prepared.plugin(carrierPlugin)

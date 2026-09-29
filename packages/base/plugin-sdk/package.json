@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/plugin-sdk",
   "description": "Public SDK for developing, validating, building, signing, and packaging snap-rail plugins outside the monorepo",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -39,3 +39,7 @@
     "title": "插件开发 SDK"
   }
 }
+
+
+
+

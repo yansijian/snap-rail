@@ -24,9 +24,6 @@
       "path": "../../vendor/cordis"
     },
     {
-      "path": "../../packages/ui/framework-shadcn"
-    },
-    {
       "path": "../../packages/base/kernel"
     },
     {
@@ -39,9 +36,6 @@
       "path": "../../packages/ui/settings-station"
     },
     {
-      "path": "../../packages/suite/terminal-ops"
-    },
-    {
       "path": "../../packages/base/station-rpc"
     },
     {
@@ -49,12 +43,6 @@
     },
     {
       "path": "../../packages/equipment/equipment"
-    },
-    {
-      "path": "../../packages/tool/trend"
-    },
-    {
-      "path": "../../packages/tool/forge"
     }
   ]
 }

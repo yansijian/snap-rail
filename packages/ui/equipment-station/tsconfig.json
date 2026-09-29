@@ -13,7 +13,6 @@
   "references": [
     { "path": "../../base/connection" },
     { "path": "../../equipment/equipment" },
-    { "path": "../framework-shadcn" },
     { "path": "../../../vendor/cordis" }
   ]
 }

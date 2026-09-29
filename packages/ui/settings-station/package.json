@@ -21,7 +21,7 @@
   "dependencies": {
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^",
-    "@snap-rail/framework-shadcn": "workspace:^"
+    "@snap-rail/framework-shadcn": "^0.1.3"
   },
   "peerDependencies": {
     "@snap-rail/cordis": "workspace:^",

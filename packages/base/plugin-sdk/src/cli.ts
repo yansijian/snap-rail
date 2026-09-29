@@ -101,15 +101,41 @@ async function packPlugin(directory: string, outDirectory: string | undefined, k
   const name = definePluginManifest({ ...source, snapRail: source.snapRail }).name
   const snapRail = source.snapRail ?? {}
   const clientEntry = typeof snapRail.client?.entry === 'string' ? snapRail.client.entry : undefined
-  const hostFace = typeof source.main === 'string' && source.main !== '' ? source.main : snapRail.clientOnly === true ? undefined : 'lib/host.js'
+  // A clientOnly zip's `main` is the client bundle; the npm `main` names the
+  // npm ESM barrel and never names a zip face.
+  const hostFace = snapRail.clientOnly === true
+    ? undefined
+    : typeof source.main === 'string' && source.main !== '' ? source.main : 'lib/host.js'
+  const hostDir = hostFace === undefined ? undefined : hostFace.replace(/\/[^/]+$/, '')
   const clientFace = clientEntry === undefined ? undefined : clientEntry.replace(/\/[^/]+$/, '')
+  // The release manifest carries a flat subpath → target map. Source exports
+  // use the standard conditional shape (`{ types, default }`) — flatten to the
+  // `default` target. The `.` voice and the `./package.json` self-export are
+  // npm conventions: the trimmed release manifest is the zip's package.json,
+  // so neither names a zip path the packer must verify. The npm package's
+  // remaining subpaths describe the npm layout (the ESM faces, templates,
+  // docs) — only targets inside a shipped face directory can ride the zip
+  // (a clientOnly zip carries no lib/ at all).
+  const faceDirs = [hostDir, clientFace].filter(dir => dir !== undefined)
   const exports = typeof source.exports === 'object' && source.exports !== null
-    ? Object.fromEntries(Object.entries(source.exports as Record<string, unknown>).filter(([key, value]) => key !== '.' && typeof value === 'string')) as Record<string, string>
+    ? Object.fromEntries(Object.entries(source.exports as Record<string, unknown>).flatMap(([key, value]): Array<[string, string]> => {
+        if (key === '.' || key === './package.json') return []
+        const raw = typeof value === 'string'
+          ? value
+          : value !== null && typeof value === 'object' && typeof (value as Record<string, unknown>).default === 'string'
+            ? (value as { default: string }).default
+            : undefined
+        // Zip paths are package-relative without the `./` the npm exports
+        // voice spells.
+        const target = raw?.replace(/^\.\//, '')
+        if (target === undefined || !faceDirs.some(dir => target.startsWith(`${dir}/`))) return []
+        return [[key, target]]
+      }))
     : undefined
   const spec: ReleaseSpec = {
     name,
     dir: root,
-    ...(hostFace === undefined ? {} : { hostDir: hostFace.replace(/\/[^/]+$/, ''), hostFace }),
+    ...(hostFace === undefined ? {} : { hostDir, hostFace }),
     ...(clientFace === undefined ? {} : { clientFace }),
     ...(exports === undefined ? {} : { exports }),
   }

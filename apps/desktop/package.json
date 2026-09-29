@@ -38,8 +38,6 @@
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/plugin-kit": "workspace:^",
-    "@snap-rail/settings-station": "workspace:^",
-    "@snap-rail/suite-terminal-ops": "workspace:^",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -52,10 +50,6 @@
     "tailwindcss": "^4.3.3",
     "vite": "^8.2.2",
     "vite-tsconfig-paths": "^5.1.4",
-    "@snap-rail/framework-shadcn": "workspace:^",
-    "@snap-rail/equipment-station": "workspace:^",
-    "@snap-rail/driver-modbus": "workspace:^",
-    "@snap-rail/driver-enip": "workspace:^",
     "@snap-rail/equipment": "workspace:^",
     "@snap-rail/store-sqlite": "workspace:^"
   }

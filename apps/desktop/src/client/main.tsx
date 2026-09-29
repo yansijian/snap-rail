@@ -1,16 +1,13 @@
 /**
  * The renderer entry: install the plugin module loader, bootstrap the
  * kernel, and seed the **base** shared-instance table (react, the spine's
- * client seam — the app ships base only). From there the build splits:
- *
- * - dev (`import.meta.env.DEV`): the static harness in `./dev-harness.tsx`
- *   mounts the framework faces and the shipped occupants from this bundle,
- *   seeding the contributed ids from static imports — the pre-pool flow.
- * - production: the pool path below — `client-config.list` decides what
- *   loads; framework faces come first (they contribute the seeds), other
- *   seed providers next, occupant faces last. With no framework face
- *   enabled, the kernel's bootstrap install page (drag a zip in, enable,
- *   restart) is the terminal's whole interface.
+ * client seam — the app ships base only). Then the pool path decides what
+ * loads: `client-config.list` rows order the enabled faces (framework
+ * first — it contributes the seeds —, other seed providers next, occupants
+ * last). Dev and production are the same flow: installable plugins come
+ * from the plugin pool in both, so `pnpm app:dev` without installed zips
+ * shows exactly what a fresh install shows — the kernel's bootstrap
+ * install page (drag a zip in, enable, restart).
  *
  * @module @snap-rail/desktop/client-main
  */
@@ -85,13 +82,7 @@ for (const [id, module] of SEED_TABLE) system.seed(id, module)
 // config, enable flag, and — for pool-installed faces — the bundle URL.
 const configResult = await handle.link.call('client-config.list', {})
 const rows = configResult.ok ? configResult.value.rows : []
-
-if (import.meta.env.DEV) {
-  const harness = await import('./dev-harness.tsx')
-  await harness.runDevRenderer({ handle, system, rows })
-} else {
-  await runPoolRenderer({ handle, system, rows })
-}
+await runPoolRenderer({ handle, system, rows })
 
 /** A cordis plugin face (the provider faces export `{ seeds }` instead). */
 function isPlugin(value: unknown): value is Plugin {

@@ -1,36 +1,110 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { zipSync } from 'fflate'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { installPluginFromZip } from '../../../base/app-boot/src/installer.ts'
 import { scanPluginPool } from '@snap-rail/app-boot/scan'
 import { releaseFiles, releaseManifest, zipFileName, type ReleaseSpec } from '../src/pack.ts'
 
-// The specs mirror scripts/pack-plugins.ts against the built workspace tree
-// (pnpm test builds first); the round-trip legs run the installer and the
-// pool scanner — the exact path a user install takes.
-const suiteSpec: ReleaseSpec = {
-  name: '@snap-rail/suite-terminal-ops',
-  dir: join(import.meta.dirname, '../../../suite/terminal-ops'),
-  hostDir: 'lib',
-  hostFace: 'lib/stats.js',
-  clientFace: 'lib-client',
-  exports: { './stats': 'lib/stats.js' },
+/**
+ * Fixture packages stand in for the standalone plugin repositories (the
+ * framework, the drivers, and the suites moved out — see
+ * docs/split-runbook.md): the assembly rules under test live in
+ * `@snap-rail/plugin-kit/pack`, so a tmpdir package with a manifest and
+ * built faces exercises them exactly, and the real equipment package rides
+ * along as the one in-repo host face. The round-trip legs run the installer
+ * and the pool scanner — the exact path a user install takes.
+ */
+
+const scratch: string[] = []
+
+afterEach(() => {
+  for (const dir of scratch.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+
+/** Materialize a fixture package directory and return its spec. Fixture
+ * dirs live for the whole file run (module-load time creation); only
+ * per-test scratch lands in `scratch`. */
+function fixturePackage(name: string, manifest: Record<string, unknown>, files: Record<string, string>): ReleaseSpec {
+  const dir = mkdtempSync(join(tmpdir(), `snap-rail-pack-${name.replaceAll(/[^a-z-]/g, '')}-`))
+  writeFileSync(join(dir, 'package.json'), `${JSON.stringify({ name, ...manifest }, null, 2)}\n`)
+  for (const [path, content] of Object.entries(files)) {
+    mkdirSync(join(dir, path.split('/').slice(0, -1).join('/')), { recursive: true })
+    writeFileSync(join(dir, path), content)
+  }
+  return { name, dir }
 }
 
-const frameworkSpec: ReleaseSpec = {
-  name: '@snap-rail/framework-shadcn',
-  dir: join(import.meta.dirname, '../../../ui/framework-shadcn'),
-  clientFace: 'lib-client',
+const HOST_FIXTURE_MANIFEST = {
+  version: '1.0.0',
+  description: 'fixture driver',
+  main: 'lib/index.js',
+  type: 'module',
+  snapRail: {
+    kind: 'driver',
+    category: '设备',
+    title: '夹具驱动',
+    requires: ['@snap-rail/equipment'],
+  },
 }
 
-const modbusSpec: ReleaseSpec = {
-  name: '@snap-rail/driver-modbus',
-  dir: join(import.meta.dirname, '../../../equipment/driver-modbus'),
+const hostFixtureSpec = fixturePackage('@fixture/host', HOST_FIXTURE_MANIFEST, {
+  'lib/index.js': 'import { z } from "zod"\nexport default { name: "@fixture/host", apply() {} }\n',
+  'lib/contract.js': 'export const dialect = "fixture"\n',
+  'lib/chunk.js': 'export const shared = 1\n',
+  'lib/types/index.d.ts': 'export {}\n',
+  'lib/types/index.js.map': '{}\n',
+  'src/index.ts': 'export {}\n',
+})
+
+const hostFixtureSpecWithExports: ReleaseSpec = {
+  ...hostFixtureSpec,
   hostDir: 'lib',
   hostFace: 'lib/index.js',
   exports: { './contract': 'lib/contract.js' },
+}
+
+const clientOnlyFixtureSpec: ReleaseSpec = {
+  ...fixturePackage('@fixture/frame', {
+    version: '2.0.0',
+    description: 'fixture framework',
+    type: 'module',
+    snapRail: {
+      kind: 'framework',
+      category: '界面',
+      clientOnly: true,
+      client: { entry: 'lib-client/client.js', seeds: ['ui', 'runtime'] },
+    },
+  }, {
+    'lib-client/client.js': 'module.exports = { seeds: { ui: {}, runtime: {} } }\n',
+    'lib-client/theme.css': '.fixture {}\n',
+    'lib/index.js': 'export const framework = "@fixture/frame"\n',
+    'src/client.ts': 'export {}\n',
+  }),
+  clientFace: 'lib-client',
+}
+
+const dualFixtureSpec: ReleaseSpec = {
+  ...fixturePackage('@fixture/suite', {
+    version: '3.0.0',
+    description: 'fixture suite',
+    main: 'lib/stats.js',
+    type: 'module',
+    snapRail: {
+      kind: 'suite',
+      category: '界面',
+      title: '夹具套件',
+      requires: ['@fixture/frame', '@snap-rail/equipment', 'service:store'],
+      client: { entry: 'lib-client/client.js' },
+    },
+  }, {
+    'lib/stats.js': 'export const counter = 1\n',
+    'lib-client/client.js': 'module.exports = { name: "@fixture/suite", apply() {} }\n',
+  }),
+  hostDir: 'lib',
+  hostFace: 'lib/stats.js',
+  clientFace: 'lib-client',
 }
 
 const equipmentSpec: ReleaseSpec = {
@@ -40,8 +114,6 @@ const equipmentSpec: ReleaseSpec = {
   hostFace: 'lib/index.js',
   exports: { './rpc': 'lib/rpc.js', './contract': 'lib/contract.js' },
 }
-
-const HOSTED_SPECS = [modbusSpec, equipmentSpec, suiteSpec] as const
 
 describe('release manifest derivation', () => {
   it('trims to npm identity + main + the exports voice and carries snapRail verbatim', () => {
@@ -67,26 +139,34 @@ describe('release manifest derivation', () => {
   })
 
   it('fails loud when the spec and the manifest disagree on the name', async () => {
-    await expect(releaseFiles({ ...modbusSpec, name: '@snap-rail/other' })).rejects.toThrow(/does not match/)
+    await expect(releaseFiles({ ...hostFixtureSpecWithExports, name: '@snap-rail/other' })).rejects.toThrow(/does not match/)
   })
 
   it('fails loud when a host-face spec omits the hostDir or the host face itself', async () => {
-    await expect(releaseFiles({ ...modbusSpec, hostDir: undefined })).rejects.toThrow(/host face without a hostDir/)
-    await expect(releaseFiles({ ...modbusSpec, hostFace: undefined })).rejects.toThrow(/snapRail.clientOnly/)
+    await expect(releaseFiles({ ...hostFixtureSpecWithExports, hostDir: undefined })).rejects.toThrow(/host face without a hostDir/)
+    await expect(releaseFiles({ ...hostFixtureSpecWithExports, hostFace: undefined })).rejects.toThrow(/snapRail.clientOnly/)
+  })
+
+  it('fails loud when an exports target does not ship', async () => {
+    await expect(releaseFiles({
+      ...hostFixtureSpecWithExports,
+      exports: { './contract': 'lib/missing.js' },
+    })).rejects.toThrow(/does not carry it/)
   })
 })
 
 describe('final-format assembly (built tree)', () => {
   it('clientOnly zip: manifest + client bundle + assets, no host face, no sources', async () => {
-    const files = await releaseFiles(frameworkSpec)
+    const files = await releaseFiles(clientOnlyFixtureSpec)
     const paths = Object.keys(files).sort()
     expect(paths).toContain('package.json')
     expect(paths).toContain('lib-client/client.js')
+    expect(paths).toContain('lib-client/theme.css')
     expect(paths.every(path => path === 'package.json' || path.startsWith('lib-client/'))).toBe(true)
     expect(paths.every(path => !path.startsWith('src/'))).toBe(true)
+    expect(paths.every(path => !path.startsWith('lib/'))).toBe(true)
     expect(paths.every(path => !path.endsWith('.d.ts') && !path.endsWith('.js.map'))).toBe(true)
     const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!))
-    expect(manifest.name).toBe('@snap-rail/framework-shadcn')
     // clientOnly: main names the client bundle; the exports voice carries it.
     expect(manifest.main).toBe('lib-client/client.js')
     expect(manifest.exports).toEqual({ '.': 'lib-client/client.js' })
@@ -96,7 +176,7 @@ describe('final-format assembly (built tree)', () => {
   })
 
   it('dual-face zip: host face + client bundle, sources never', async () => {
-    const files = await releaseFiles(suiteSpec)
+    const files = await releaseFiles(dualFixtureSpec)
     const paths = Object.keys(files).sort()
     expect(paths).toContain('lib/stats.js')
     expect(paths).toContain('lib-client/client.js')
@@ -105,35 +185,36 @@ describe('final-format assembly (built tree)', () => {
     const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!))
     // Dual-face: npm main names the host face; the client face rides snapRail.
     expect(manifest.main).toBe('lib/stats.js')
-    expect(manifest.exports).toEqual({ '.': 'lib/stats.js', './stats': 'lib/stats.js' })
     expect(manifest.snapRail.clientOnly).toBeUndefined()
     expect(manifest.snapRail.client).toEqual({ entry: 'lib-client/client.js' })
   })
 
-  it('framework zip carries the precompiled tailwind output beside the bundle', async () => {
-    const files = await releaseFiles(frameworkSpec)
+  it('host zip: manifest + host face + the exports targets, no sources', async () => {
+    const files = await releaseFiles(hostFixtureSpecWithExports)
     const paths = Object.keys(files)
-    expect(paths).toContain('lib-client/client.js')
-    expect(paths).toContain('lib-client/theme.css')
+    expect(paths).toContain('lib/index.js')
+    expect(paths).toContain('lib/contract.js')
+    // Multi-entry host builds emit shared chunks beside the entries — the
+    // whole built directory ships, declarations, maps, and the tsc staging
+    // tree never.
+    expect(paths).toContain('lib/chunk.js')
+    expect(paths).not.toContain('lib/types/index.d.ts')
+    expect(paths).not.toContain('lib/types/index.js.map')
+    expect(paths.every(path => !path.startsWith('src/'))).toBe(true)
     const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!))
-    expect(manifest.snapRail.client.seeds).toContain('ui')
-    expect(manifest.snapRail.client.seeds).toContain('runtime')
+    expect(manifest.exports).toEqual({
+      '.': 'lib/index.js',
+      './contract': 'lib/contract.js',
+    })
   })
 
-  it('host zip: manifest + host face + the exports targets, no sources', async () => {
+  it('the in-repo equipment package assembles with its rpc + contract subpaths', async () => {
     const files = await releaseFiles(equipmentSpec)
     const paths = Object.keys(files)
     expect(paths).toContain('lib/index.js')
     expect(paths).toContain('lib/rpc.js')
     expect(paths).toContain('lib/contract.js')
     expect(paths).toContain('package.json')
-    // Multi-entry host builds emit shared chunks beside the entries — the
-    // whole built directory ships, declarations, maps, and the tsc staging
-    // tree never.
-    expect(paths.filter(path => path.startsWith('lib/') && path.endsWith('.js')).length).toBeGreaterThan(2)
-    expect(paths.every(path => !path.startsWith('src/'))).toBe(true)
-    expect(paths.every(path => !path.startsWith('lib/types/'))).toBe(true)
-    expect(paths.every(path => !path.endsWith('.d.ts') && !path.endsWith('.js.map'))).toBe(true)
     const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!))
     expect(manifest.exports).toEqual({
       '.': 'lib/index.js',
@@ -170,45 +251,40 @@ describe('pool-anchor discipline (shipped host faces)', () => {
     // specs like @snap-rail/store and the shared libraries), pool fallback
     // (installed-only packages like equipment). An id in neither universe
     // dies at boot exactly there.
-    const carried = new Set<string>([...Object.keys(desktop.dependencies), ...HOSTED_SPECS.map(spec => spec.name)])
-    for (const spec of HOSTED_SPECS) {
-      const source = readFileSync(join(spec.dir, spec.hostFace!), 'utf8')
-      const ids = [...bareIds(source)].filter(id => id.startsWith('@snap-rail/') || id === 'zod' || id === 'drizzle-orm')
-      const missing = ids.filter(id => !carried.has(id))
-      expect(missing, `${spec.name} host face anchors uncarried ids`).toEqual([])
-    }
+    const carried = new Set<string>([...Object.keys(desktop.dependencies), equipmentSpec.name])
+    const source = readFileSync(join(equipmentSpec.dir, equipmentSpec.hostFace!), 'utf8')
+    const ids = [...bareIds(source)].filter(id => id.startsWith('@snap-rail/') || id === 'zod' || id === 'drizzle-orm')
+    const missing = ids.filter(id => !carried.has(id))
+    expect(missing, `${equipmentSpec.name} host face anchors uncarried ids`).toEqual([])
   })
 })
 
 describe('install round-trip', () => {
   it('packed zips install and scan back with their manifest markers', async () => {
     const base = mkdtempSync(join(tmpdir(), 'snap-rail-pack-'))
-    try {
-      const pool = join(base, 'plugins')
-      for (const spec of [suiteSpec, modbusSpec]) {
-        const zip = join(base, zipFileName(spec.name))
-        writeFileSync(zip, zipSync(await releaseFiles(spec)))
-        const installed = installPluginFromZip(zip, pool)
-        expect(installed.name).toBe(spec.name)
-      }
-      const scanned = scanPluginPool([pool])
-      const suite = scanned.get('@snap-rail/suite-terminal-ops')
-      expect(suite?.kind).toBe('suite')
-      expect(suite?.clientOnly).toBeUndefined()
-      expect(suite?.category).toBe('界面')
-      expect(suite?.title).toBe('生产作业套件')
-      expect(suite?.clientEntry).toBe('lib-client/client.js')
-      expect(suite?.requires).toEqual(['@snap-rail/framework-shadcn', '@snap-rail/equipment', 'service:store'])
-      // The pool mounts exactly one host entry per package: the manifest main.
-      expect(suite?.entryUrl.endsWith('/lib/stats.js')).toBe(true)
-      const driver = scanned.get('@snap-rail/driver-modbus')
-      expect(driver?.kind).toBe('driver')
-      expect(driver?.clientEntry).toBeUndefined()
-      expect(driver?.category).toBe('设备')
-      expect(driver?.title).toBe('ModbusTCP 驱动')
-      expect(driver?.requires).toEqual(['@snap-rail/equipment'])
-    } finally {
-      rmSync(base, { recursive: true, force: true })
+    scratch.push(base)
+    const pool = join(base, 'plugins')
+    for (const spec of [dualFixtureSpec, hostFixtureSpecWithExports]) {
+      const zip = join(base, zipFileName(spec.name))
+      writeFileSync(zip, zipSync(await releaseFiles(spec)))
+      const installed = installPluginFromZip(zip, pool)
+      expect(installed.name).toBe(spec.name)
     }
+    const scanned = scanPluginPool([pool])
+    const suite = scanned.get('@fixture/suite')
+    expect(suite?.kind).toBe('suite')
+    expect(suite?.clientOnly).toBeUndefined()
+    expect(suite?.category).toBe('界面')
+    expect(suite?.title).toBe('夹具套件')
+    expect(suite?.clientEntry).toBe('lib-client/client.js')
+    expect(suite?.requires).toEqual(['@fixture/frame', '@snap-rail/equipment', 'service:store'])
+    // The pool mounts exactly one host entry per package: the manifest main.
+    expect(suite?.entryUrl.endsWith('/lib/stats.js')).toBe(true)
+    const driver = scanned.get('@fixture/host')
+    expect(driver?.kind).toBe('driver')
+    expect(driver?.clientEntry).toBeUndefined()
+    expect(driver?.category).toBe('设备')
+    expect(driver?.title).toBe('夹具驱动')
+    expect(driver?.requires).toEqual(['@snap-rail/equipment'])
   })
 })

@@ -1,0 +1,57 @@
+name: collect-feed
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: ['feed-sources.json', 'scripts/collect-feed.ts', 'scripts/pack-plugins.ts', 'packages/**']
+  schedule:
+    - cron: '0 3 * * *'
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: download latest release zips from the plugin repos
+        env:
+          FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
+          SOURCES: ${{ vars.FEED_SOURCES }}
+        run: |
+          mkdir -p collect-dl
+          node -e '
+            const fs = require("node:fs");
+            const sources = JSON.parse(fs.readFileSync("feed-sources.json", "utf8")).sources;
+            (async () => {
+              for (const s of sources) {
+                const rel = await fetch(`http://192.168.1.9:3000/api/v1/repos/snap-rail/${s.repo}/releases/latest`, { headers: { Authorization: `token ${process.env.FEED_TOKEN}` } });
+                if (!rel.ok) { console.error(`skip ${s.repo}: release lookup ${rel.status}`); continue; }
+                const release = await rel.json();
+                const asset = (release.assets ?? []).find(a => a.name === s.asset);
+                if (!asset) { console.error(`skip ${s.repo}: no asset ${s.asset}`); continue; }
+                const zip = await fetch(asset.browser_download_url, { headers: { Authorization: `token ${process.env.FEED_TOKEN}` } });
+                if (!zip.ok) { console.error(`skip ${s.repo}: download ${zip.status}`); continue; }
+                fs.writeFileSync(`collect-dl/${s.asset}`, Buffer.from(await zip.arrayBuffer()));
+                console.log(`downloaded ${s.asset} from ${s.repo} (${release.tag_name})`);
+              }
+            })();
+          '
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm run build
+      - name: collect + publish feed (base + collected)
+        env:
+          GITEA_TOKEN: ${{ secrets.FEED_TOKEN }}
+          SIGN_KEY: ${{ secrets.RELEASE_PRIVATE_PEM }}
+          KEY_ID: ${{ secrets.RELEASE_KEY_ID }}
+        run: |
+          echo "$SIGN_KEY" > release.private.pem
+          pnpm exec tsx scripts/collect-feed.ts --from collect-dl
+          pnpm run publish -- --sign-key release.private.pem --key-id "$KEY_ID" --publisher snap-rail --market collect-out
+          rm release.private.pem
+      - name: verify assembled feed
+        run: pnpm run verify:market -- --feed dist-publish/plugins --trust keys/gitea-main-2026.trust.json

@@ -14,11 +14,10 @@ import pluginsRpcPlugin from '@snap-rail/app-boot/rpc'
 import { signReleaseFiles } from '@snap-rail/plugin-kit/sign'
 import settingsStationPlugin from '../src/index.tsx'
 import { sectionOf } from '../src/plugins-page.tsx'
-import layoutPlugin from '../../../suite/terminal-ops/src/layout.tsx'
-import titlebarPlugin from '../../../suite/terminal-ops/src/chrome.tsx'
+import fallbackShellPlugin from '@snap-rail/framework-shadcn/fallback'
 import { bootClient } from '../../../base/kernel/src/index.tsx'
 import type { HostChannel } from '../../connection/src/index.tsx'
-import { createClientRuntime } from '../../framework-shadcn/src/runtime.tsx'
+import { createClientRuntime } from '@snap-rail/framework-shadcn/runtime'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const contexts: Context[] = []
@@ -96,7 +95,7 @@ async function makeWorld(): Promise<HostChannel> {
   }
 }
 
-const OCCUPANTS = [layoutPlugin, titlebarPlugin, settingsStationPlugin]
+const OCCUPANTS = [fallbackShellPlugin, settingsStationPlugin]
 
 /** The installer refuses unsigned zips: register the test's release key as
  * trusted in the world's home and hand back the matching private key. */

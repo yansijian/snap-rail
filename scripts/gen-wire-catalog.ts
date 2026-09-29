@@ -17,19 +17,20 @@ import { z } from 'zod'
 import type { DomainContract, MethodRow } from '../packages/base/protocol/src/contract.ts'
 import { pluginsContract, updateContract } from '../packages/base/app-boot/src/contract.ts'
 import { equipmentContract } from '../packages/equipment/equipment/src/wire.ts'
-import { productionContract } from '../packages/suite/terminal-ops/src/contract.ts'
 import { stationContract } from '../packages/base/station-rpc/src/contract.ts'
 
 const root = join(import.meta.dirname, '..')
 const catalogPath = join(root, 'docs', 'wire-catalog.md')
 
-/** The zod-backed domain contracts, in stable catalog order. */
+/** The zod-backed domain contracts, in stable catalog order. Suite
+ * contracts (e.g. production) live inside their suite packages and are
+ * documented by those repositories — the app-shipped catalog covers the
+ * contracts that ride the app. */
 const CONTRACTS: readonly DomainContract[] = [
   stationContract,
   pluginsContract,
   updateContract,
   equipmentContract,
-  productionContract,
 ]
 
 /** Best-effort JSON Schema; schemas without a JSON shape (bigint payloads)

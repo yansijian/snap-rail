@@ -3,7 +3,9 @@
  * twin of the settings page's 安装插件 flow, dogfooding the exact installer
  * pipeline (zip → inspect-extracted pool package → user-layer rows).
  * Existing rows keep their state; each packed package lands enabled unless
- * a row already exists. Run after packing:
+ * a row already exists. Zips come from the client repo's `dist-plugins/`
+ * (the base catalog) plus any sibling standalone plugin repo's `dist/`
+ * (framework, drivers, suites — build them there first). Run after packing:
  * `pnpm run build && pnpm run pack:plugins && pnpm exec tsx scripts/install-dev-plugins.ts <home>`
  *
  * @module snap-rail/scripts/install-dev-plugins
@@ -14,17 +16,19 @@ import { join } from 'node:path'
 import { dump, load } from 'js-yaml'
 import { installPluginFromZip, uninstallPlugin } from '../packages/base/app-boot/src/installer.ts'
 
-/** Rows this catalog enables (subpath rows ride their package). */
-const CATALOG_ROWS: readonly string[] = [
-  '@snap-rail/store-sqlite',
-  '@snap-rail/equipment',
-  '@snap-rail/equipment/rpc',
-  '@snap-rail/driver-modbus',
-  '@snap-rail/driver-enip',
-  '@snap-rail/framework-shadcn',
-  '@snap-rail/settings-station',
-  '@snap-rail/equipment-station',
-  '@snap-rail/suite-terminal-ops',
+/** Subpath rows a package needs beyond its plain name (the pool resolves
+ * them through the package's exports voice). */
+const SUBPATH_ROWS: Readonly<Record<string, readonly string[]>> = {
+  '@snap-rail/equipment': ['@snap-rail/equipment/rpc'],
+  '@snap-rail/suite-terminal-ops': ['@snap-rail/suite-terminal-ops/stats'],
+}
+
+/** Sibling standalone plugin repos whose dist zips join the catalog when built. */
+const SIBLING_DISTS: readonly string[] = [
+  'snap-rail-framework-shadcn',
+  'snap-rail-driver-modbus',
+  'snap-rail-driver-enip',
+  'snap-rail-suite-terminal-ops',
 ]
 
 interface UserRow {
@@ -41,23 +45,29 @@ function main(): void {
     return
   }
   const repoRoot = join(import.meta.dirname, '..')
-  const distPlugins = join(repoRoot, 'dist-plugins')
+  const distDirs = [join(repoRoot, 'dist-plugins'),
+    ...SIBLING_DISTS
+      .map(name => join(repoRoot, '..', name, 'dist'))
+      .filter(dir => existsSync(dir)),
+  ]
   const poolDir = join(home, 'plugins')
   const userLayerPath = join(home, 'plugins.yml')
 
   const installed: string[] = []
-  for (const file of readdirSync(distPlugins)) {
-    if (!file.endsWith('.zip')) continue
-    const name = file.slice(0, -'.zip'.length).replaceAll('__', '/')
-    // Idempotence: an existing pool copy is replaced (uninstall first —
-    // the UI flow demands a manual uninstall, a dev loop must not).
-    try {
-      uninstallPlugin(name, poolDir, home)
-    } catch {
-      // Not installed yet — the normal first run.
+  for (const distPlugins of distDirs) {
+    for (const file of readdirSync(distPlugins)) {
+      if (!file.endsWith('.zip')) continue
+      const name = file.slice(0, -'.zip'.length).replaceAll('__', '/')
+      // Idempotence: an existing pool copy is replaced (uninstall first —
+      // the UI flow demands a manual uninstall, a dev loop must not).
+      try {
+        uninstallPlugin(name, poolDir, home)
+      } catch {
+        // Not installed yet — the normal first run.
+      }
+      installPluginFromZip(join(distPlugins, file), poolDir)
+      installed.push(name)
     }
-    installPluginFromZip(join(distPlugins, file), poolDir)
-    installed.push(name)
   }
 
   let rows: UserRow[] = []
@@ -65,9 +75,13 @@ function main(): void {
     const parsed = load(readFileSync(userLayerPath, 'utf8')) as { plugins?: UserRow[] } | undefined
     rows = parsed?.plugins ?? []
   }
-  for (const name of CATALOG_ROWS) {
-    if (rows.some(row => row.name === name)) continue
-    rows.push({ name, enabled: true })
+  const known = new Set(rows.map(row => row.name))
+  for (const name of installed) {
+    for (const row of [name, ...SUBPATH_ROWS[name] ?? []]) {
+      if (known.has(row)) continue
+      known.add(row)
+      rows.push({ name: row, enabled: true })
+    }
   }
   writeFileSync(userLayerPath, dump({ plugins: rows }))
   console.log(`installed ${installed.length} packages into ${poolDir}`)

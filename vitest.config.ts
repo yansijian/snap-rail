@@ -9,5 +9,14 @@ export default defineConfig({
     // The repo's tests only: `.zcode` holds tooling skills whose own suites
     // are not this repository's tests.
     exclude: ['**/node_modules/**', '**/dist/**', '**/lib/**', '**/.zcode/**', '**/.{idea,git,cache,output,temp}/**'],
+    server: {
+      deps: {
+        // The UI framework moved to its own repository (docs/split-runbook.md);
+        // station tests consume its published ESM faces, whose stylesheets
+        // (`lib/runtime.js` imports `./ui/theme.css`) node's loader cannot
+        // serve — inline the package so vite's css stubbing sees the import.
+        inline: [/@snap-rail\/framework-shadcn/],
+      },
+    },
   },
 })

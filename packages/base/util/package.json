@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/util",
   "description": "Zero-dependency utilities shared across snap-rail packages",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -18,7 +18,7 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/index.js",
+    "lib/**/*.js",
     "lib/types/**/*.d.ts"
   ],
   "license": "Apache-2.0",

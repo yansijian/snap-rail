@@ -33,11 +33,12 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   操作按钮禁用（悬浮提示「内置插件禁止删除/修改」），出厂行（不声明
   分类）在管理页恒归「内置」分组垫底（行无来源徽标），
   `plugins.set-enabled/set-config/uninstall` 一律拒绝；保护按**来源**判定
-  （builtin 行/dev 静态住户行，宿主从层文件计算，manifest 声明改变不了
+  （builtin 行，宿主从层文件计算，manifest 声明改变不了
   它），并有两条结构闸：与内置行重名的 zip 拒绝安装；组合解析对内置
   名字永不走池（手拷进池的同名目录也遮蔽不了）。替换 base 包的唯一路径
   是拿源码重新构建。dev（Vite）用 `apps/desktop/dev/builtins.dev.cordis.yml`
-  全量 overlay，永不随包发布。
+  覆盖 base 行（永不随包发布）；可安装插件（框架/驱动/套件）dev 与生产
+  同路——经 `install-dev-plugins` 把 zip 装进 dev home 的插件池。
 - **依赖预检（`snapRail.requires`）**：包名条目（`@snap-rail/equipment`）
   或服务名条目（`service:store`）；启用正向校验（缺 → 拒绝）、禁用/卸载
   反向校验（有依赖方 → 拒绝），`snapRail.framework` 绑定视同依赖——
@@ -67,11 +68,12 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   zip 安装、`requires: ['service:store']`；`./rpc` 桥以子路径行
   （`@snap-rail/equipment/rpc`）一并启用，`./contract` 是随应用发布的
   base 种子。驱动（modbus/…）是实例插件，**多活并存**，零渲染端代码、
-  零自有存储；新驱动照抄 `driver-modbus`（范本）。统一「设备管理」设置页在
+  零自有存储，住独立仓（org `snap-rail`；新驱动照抄
+  `snap-rail-driver-modbus`，见 docs/split-runbook.md）。统一「设备管理」设置页在
   `@snap-rail/equipment-station`（ui 层）。点位地址 = (device, group, name)
   三元组；wire 名 `equipment.*`、帧 `equipment/*`。
-- **ui 层**：`@snap-rail/framework-shadcn` 是**框架插件**（zip 安装、
-  clientOnly、单活，`snapRail.exclusive: 'framework'`），接管全套 UI
+- **ui 层**：`@snap-rail/framework-shadcn` 是**框架插件**（独立仓
+  `snap-rail-framework-shadcn`，zip 安装、clientOnly、单活，`snapRail.exclusive: 'framework'`），接管全套 UI
   栈——槽位词汇（`ctx.uiSlots`）、renderer runtime + Shell、shadcn 共享
   原语 + 主题令牌（预编译 tailwind 输出随 zip 内联）、settings/session/
   variables/workflows 服务、fallback 布局；client 面把全部面贡献为共享
@@ -83,7 +85,7 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
 - **tool 层**：暂无规范缝，工具互不依赖（门禁强制）。暂无住户——场景私有
   逻辑收进套件（见 suite 层），不再拆跨包场景工具。
 - **suite 层**：单包单行、可双面（宿主面 + 渲染面）、单活（`snapRail.exclusive: 'suite'`
-  或 kind=suite 默认）。一个场景的全部界面**与场景私有宿主逻辑**合成一个
+  或 kind=suite 默认），住独立仓（如 `snap-rail-suite-terminal-ops`）。一个场景的全部界面**与场景私有宿主逻辑**合成一个
   套件包（班产计数住 `./stats`：store 缝持久化 + 订阅 equipment 点事件 +
   `production/stats-changed` 帧）——杜绝跨包场景耦合；启用套件经
   `plugins.set-enabled` 自动停用其他同互斥组成员。
@@ -123,8 +125,8 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   访问重绑 `this`，`this` 上的可变状态会"每读一次一个世界"。
 - **文件即接口**：用户层 `plugins.yml` 按包名寻址（`enabled`/`config`），
   页面、手编、Agent 共用一条 LayerAdmin 热重载路径；坏文件保持旧树。
-  渲染端住户的行也写同一文件（`clientOnly` 池包行天然不进宿主树，dev
-  静态住户经 `rendererPackages` 挡板——仅 dev；`client-config.list`
+  渲染端住户的行也写同一文件（`clientOnly` 池包行天然不进宿主树；
+  `client-config.list`
   启动时下发，行带 kind/category/贡献种子；行变更经 `client-config/changed`
   帧通知，渲染窗自动 reload（`ui.rendererAutoReload` 键可关），子路径行如
   `@snap-rail/equipment/rpc` 经池包 exports 映射解析）。行名必须是当前

@@ -18,6 +18,8 @@ vendor/*/src/*.js.map
 vendor/*/src/*.d.ts
 vendor/*/src/*.d.ts.map
 dist-publish/
+collect-out/
+collect-dl/
 deploy.config.json
 .keys/
 .pnpm-store/

@@ -36,19 +36,21 @@ packages/    层组 packages/<层>/<包>（snapRail.layer 声明，层序 base�
                gateway / connection / app-boot / station-rpc / kernel / modules
                （出厂全集，替换经源码重建）
   store/       store（规范：drizzle 查询构建器即规范，随应用发布）+ store-sqlite（实现，zip 安装，单活）
-  equipment/   equipment（设备连接底座缝，zip 安装）+ driver-modbus（驱动多活，范本）
-  ui/          framework-shadcn（UI 框架插件，zip、clientOnly、单活）+ equipment-station / settings-station
-  tool/        forge（AI 创造）+ trend（班产趋势）
-  suite/       terminal-ops（业务套件，clientOnly、单活）
+  equipment/   equipment（设备连接底座缝，zip 安装）
+  ui/          equipment-station / settings-station（界面住户，zip、clientOnly）
+  tool/        暂无住户（场景逻辑收进套件，不再拆跨包场景工具）
 apps/desktop  Electron 应用（无框窗口、IPC 载体、打包配置；dev overlay 见 dev/）
-docs/         architecture.md（缝目录与决策）
+docs/         architecture.md（缝目录与决策）、split-runbook.md（多仓拆分）
+独立插件仓（Gitea org snap-rail，各自 tag 发版进 feed）：
+  snap-rail-framework-shadcn（UI 框架插件）、snap-rail-driver-modbus /
+  snap-rail-driver-enip（驱动范本）、snap-rail-suite-terminal-ops（业务套件）
 ```
 
 ## 命令
 
 ```sh
 pnpm install
-pnpm run build        # tsc -b (lib/types) + tailwind（框架主题预编译）+ tsdown (lib)
+pnpm run build        # tsc -b (lib/types) + tsdown (lib)
 pnpm run typecheck
 pnpm test             # vitest 全量（先构建）+ 层依赖门禁
 pnpm run pack:plugins -- --sign-key .keys/release.private.pem --key-id release-2026

@@ -30,41 +30,22 @@ function snapRailSources(): Plugin {
     '@snap-rail/audit': 'packages/base/audit/src/index.ts',
     '@snap-rail/settings': 'packages/base/settings/src/index.ts',
     '@snap-rail/app-boot': 'packages/base/app-boot/src/index.ts',
-    '@snap-rail/framework-shadcn/ui': 'packages/ui/framework-shadcn/src/ui/index.ts',
     '@snap-rail/client-kernel': 'packages/base/kernel/src/index.tsx',
-    '@snap-rail/framework-shadcn/slots': 'packages/ui/framework-shadcn/src/slots.tsx',
-    '@snap-rail/framework-shadcn/semantic': 'packages/ui/framework-shadcn/src/semantic.tsx',
-    '@snap-rail/framework-shadcn/session': 'packages/ui/framework-shadcn/src/session.ts',
-    '@snap-rail/framework-shadcn/workflows': 'packages/ui/framework-shadcn/src/workflows.ts',
-    '@snap-rail/framework-shadcn/settings-pages': 'packages/ui/framework-shadcn/src/settings-pages.ts',
-    '@snap-rail/framework-shadcn/variables': 'packages/ui/framework-shadcn/src/variables.ts',
-    '@snap-rail/framework-shadcn/runtime': 'packages/ui/framework-shadcn/src/runtime.tsx',
     '@snap-rail/client-modules': 'packages/base/modules/src/index.ts',
-    '@snap-rail/framework-shadcn/fallback': 'packages/ui/framework-shadcn/src/fallback.tsx',
-    '@snap-rail/suite-terminal-ops': 'packages/suite/terminal-ops/src/index.tsx',
-    '@snap-rail/settings-station': 'packages/ui/settings-station/src/index.tsx',
   }
   const sourceOf = new Map<string, string>()
   for (const [name, rel] of Object.entries(sourceFiles)) {
     sourceOf.set(name, `${repoRoot}/${rel}`)
   }
-  // Exact-match lookup covers both the package entry and the css subpath.
-  sourceOf.set('@snap-rail/framework-shadcn/theme.css', `${repoRoot}/packages/ui/framework-shadcn/src/ui/theme.css`)
+  // Wire-contract subpaths the renderer imports for types/rows. Installable
+  // plugins (framework, drivers, suites) never ride this table — their faces
+  // arrive from the plugin pool, exactly like production.
   sourceOf.set('@snap-rail/equipment/rpc', `${repoRoot}/packages/equipment/equipment/src/rpc.ts`)
   sourceOf.set('@snap-rail/equipment', `${repoRoot}/packages/equipment/equipment/src/index.ts`)
-  // Wire-contract subpaths the renderer imports for types/rows. The stats
-  // plugin's plugin entry itself is host-side (node:sqlite) and stays out of
-  // the client bundle; the rest are pure contract modules beside their
-  // package entries.
   sourceOf.set('@snap-rail/app-boot/contract', `${repoRoot}/packages/base/app-boot/src/contract.ts`)
   sourceOf.set('@snap-rail/station-rpc/contract', `${repoRoot}/packages/base/station-rpc/src/contract.ts`)
-  sourceOf.set('@snap-rail/driver-modbus/contract', `${repoRoot}/packages/equipment/driver-modbus/src/contract.ts`)
   sourceOf.set('@snap-rail/equipment/contract', `${repoRoot}/packages/equipment/equipment/src/contract.ts`)
   sourceOf.set('@snap-rail/plugin-kit/seeds', `${repoRoot}/packages/base/plugin-kit/src/seeds.ts`)
-  // The unified 设备管理 settings page is the field base's renderer face; its
-  // entry must never pull the node-side base (store/drizzle) into the client
-  // build — it consumes the base only through the wire.
-  sourceOf.set('@snap-rail/equipment-station', `${repoRoot}/packages/ui/equipment-station/src/index.tsx`)
 
   return {
     name: 'snap-rail-source-plane',

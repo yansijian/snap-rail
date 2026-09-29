@@ -112,11 +112,3 @@ hand-written face and are documented statically here.
 | `equipment/mappings-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} |
 | `equipment/structure-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} |
 
-## production
-
-### Frames
-
-| frame | payload schema |
-|---|---|
-| `production/stats-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"anchor":{"anyOf":[{"type":"object","properties":{"operator":{"type":"string","minLength":1},"loginAt":{"type":"number"},"shift":{"type":"string","enum":["morning","middle","night"]},"shiftKey":{"type":"string","minLength":1},"count":{"type":"number"}},"required":["operator","loginAt","shift","shiftKey","count"],"additionalProperties":false},{"type":"null"}]},"shifts":{"type":"array","items":{"type":"object","properties":{"shiftKey":{"type":"string","minLength":1},"shift":{"type":"string","enum":["morning","middle","night"]},"date":{"type":"string","minLength":1},"count":{"type":"number"},"updatedAt":{"type":"number"}},"required":["shiftKey","shift","date","count","updatedAt"],"additionalProperties":false}},"hours":{"type":"array","items":{"type":"object","properties":{"hourStart":{"type":"number"},"count":{"type":"number"}},"required":["hourStart","count"],"additionalProperties":false}}},"required":["anchor","shifts","hours"],"additionalProperties":false} |
-

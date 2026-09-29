@@ -24,10 +24,12 @@ import { signReleaseFiles, type ReleaseSignature } from '@snap-rail/plugin-kit/s
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** The packages shipped as installable zips — the non-base catalog. The
+/** The packages shipped as installable zips — the base catalog. The
  * publish pipeline reuses the list to enrich `catalog.json` from the repo
  * sources (author, repository, readme), so it lives here: the shipment
- * list has exactly one home. */
+ * list has exactly one home. Installable non-base plugins (framework,
+ * drivers, suites) live in their own repositories and reach the feed
+ * through the collect pipeline (docs/split-runbook.md §3). */
 export const PLUGIN_PACKAGES: readonly ReleaseSpec[] = [
   // 存储后端：drizzle 查询构建器规范的 node:sqlite 实现（全局单活）。
   {
@@ -45,49 +47,17 @@ export const PLUGIN_PACKAGES: readonly ReleaseSpec[] = [
     hostFace: 'lib/index.js',
     exports: { './rpc': 'lib/rpc.js', './contract': 'lib/contract.js' },
   },
-  {
-    name: '@snap-rail/driver-modbus',
-    dir: join(repoRoot, 'packages/equipment/driver-modbus'),
-    hostDir: 'lib',
-    hostFace: 'lib/index.js',
-    exports: { './contract': 'lib/contract.js' },
-  },
-  // EtherNet/IP 驱动（首期对接 OMRON NX1P2）：自研轻量 ENIP/CIP 编解码，
-  // 按已发布的全局变量名轮询读写。
-  {
-    name: '@snap-rail/driver-enip',
-    dir: join(repoRoot, 'packages/equipment/driver-enip'),
-    hostDir: 'lib',
-    hostFace: 'lib/index.js',
-    exports: { './contract': 'lib/contract.js' },
-  },
-  // 界面框架：槽位词汇 + renderer runtime + shadcn 原语 + 主题令牌，
-  // clientOnly、单活；client 面把全部面贡献为共享种子。
-  {
-    name: '@snap-rail/framework-shadcn',
-    dir: join(repoRoot, 'packages/ui/framework-shadcn'),
-    clientFace: 'lib-client',
-  },
-  // 界面住户：设置页外壳与统一设备管理页（clientOnly）。
+  // 界面住户：设置页外壳（clientOnly）。
   {
     name: '@snap-rail/settings-station',
     dir: join(repoRoot, 'packages/ui/settings-station'),
     clientFace: 'lib-client',
   },
+  // 统一设备管理页（clientOnly）。
   {
     name: '@snap-rail/equipment-station',
     dir: join(repoRoot, 'packages/ui/equipment-station'),
     clientFace: 'lib-client',
-  },
-  // 业务套件：一个工业场景的全部界面 + 宿主侧班产计数（双面包，
-  // clientOnly 已移除——场景逻辑收在套件内，不再拆跨包场景工具）。
-  {
-    name: '@snap-rail/suite-terminal-ops',
-    dir: join(repoRoot, 'packages/suite/terminal-ops'),
-    hostDir: 'lib',
-    hostFace: 'lib/stats.js',
-    clientFace: 'lib-client',
-    exports: { './stats': 'lib/stats.js' },
   },
 ]
 

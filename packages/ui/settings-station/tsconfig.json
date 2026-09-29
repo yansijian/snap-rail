@@ -17,6 +17,7 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../../base/app-boot" },
-    { "path": "../framework-shadcn" }
+    { "path": "../../base/connection" },
+    { "path": "../../base/station-rpc" }
   ]
 }
