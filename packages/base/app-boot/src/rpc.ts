@@ -15,7 +15,7 @@ import { dump } from 'js-yaml'
 import { RpcBusinessError } from '@snap-rail/protocol'
 import type { GatewayService } from '@snap-rail/gateway'
 import type { AuditService } from '@snap-rail/audit'
-import { pluginsContract, type PluginInfo, type PluginSource } from './contract.ts'
+import { pluginsContract, pluginUpdatesChangedSchema, type PluginInfo, type PluginSource } from './contract.ts'
 import {
   appliedRecipeIds,
   loadBuiltinLayer,
@@ -38,6 +38,8 @@ import {
   fetchRemoteRecipes,
   MarketError,
   readPluginFeedUrl,
+  updatableFromCatalog,
+  type PendingUpdate,
 } from './market.ts'
 import {
   compareVersions,
@@ -65,6 +67,9 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
     const view = createLayerView(layers.handles, service => ctx.get(service) !== undefined)
 
     rpc.claimDomain(ctx, 'plugins')
+    // The auto-update announcement frame: the sweep carries the pending
+    // set, an apply empties it.
+    rpc.frame(ctx, 'plugins/updates-changed', { payload: pluginUpdatesChangedSchema })
 
     const assertNotBase = (name: string): void => {
       const target = packageNameOf(name)
@@ -119,6 +124,13 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
 
     const trustedKeys = (): readonly import('@snap-rail/plugin-kit/sign').TrustedReleaseKey[] =>
       loadTrustedReleaseKeys(dirname(layers.handles.userLayerPath))
+
+    /** Every installed package whose feed version is strictly higher —
+     * the auto-update candidate set (the manual update's own rule). */
+    const computeUpdatable = async (feedUrl: string, poolDir: string): Promise<PendingUpdate[]> => {
+      const catalog = await fetchRemoteCatalog(feedUrl)
+      return updatableFromCatalog(catalog.plugins, name => installedVersionOf(poolDir, name))
+    }
 
     /** Map market fetch failures onto the wire's business codes. */
     const marketCall = async <T>(run: () => Promise<T>): Promise<T> => {
@@ -605,8 +617,93 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         audit.record({ actor: 'client', action: 'recipe.remove', subject: id })
         return { removed: true } as const
       },
+
+      'plugins.updates-check': async () => {
+        const feedUrl = marketFeedUrl()
+        const poolDir = poolDirOf()
+        const updates = await marketCall(() => computeUpdatable(feedUrl, poolDir))
+        return { updates, feedUrl }
+      },
+
+      'plugins.auto-update-apply': async () => {
+        const feedUrl = marketFeedUrl()
+        const poolDir = poolDirOf()
+        const updates = await marketCall(() => computeUpdatable(feedUrl, poolDir))
+        if (updates.length === 0) return { applied: [] }
+        const applied: Array<{ name: string, from: string, to: string }> = []
+        await withPluginPoolTransaction(poolDir, updates.map(update => update.name), async () => {
+          for (const update of updates) {
+            const zipPath = await marketCall(() => downloadRemotePluginZip(feedUrl, update.file, update.sha256))
+            try {
+              await runInstall(zipPath, 'auto-update')
+              applied.push({ name: update.name, from: update.installedVersion, to: update.feedVersion })
+            } finally {
+              rmSync(zipPath, { force: true })
+            }
+          }
+          await mutate(async () => {
+            await layers.apply()
+          })
+        })
+        // The pending set is spent — the announcement frame empties.
+        rpc.broadcast('plugins/updates-changed', { updates: [] })
+        audit.record({
+          actor: 'client',
+          action: 'plugin.auto-update',
+          subject: applied.map(entry => `${entry.name}@${entry.to}`).join(','),
+        })
+        return { applied }
+      },
+    })
+
+    // ---- plugin auto-update: a boot sweep (15s in) + an hourly sweep. The
+    // sweep only checks and announces (the frame carries the pending set);
+    // the actual apply is the user-confirmed `plugins.auto-update-apply` —
+    // a running terminal hot-applies, no restart needed. An unreachable or
+    // malformed feed stays silent; the next sweep retries.
+    let sweeping = false
+    const sweep = (): void => {
+      if (sweeping) return
+      sweeping = true
+      void (async () => {
+        try {
+          const home = dirname(layers.handles.userLayerPath)
+          if (readAutoUpdateEnabled(home) === false) return
+          const feedUrl = readPluginFeedUrl(home)
+          const poolDir = layers.handles.poolDirs[0]
+          if (feedUrl === undefined || poolDir === undefined) return
+          const updates = await computeUpdatable(feedUrl, poolDir)
+          if (updates.length > 0) {
+            rpc.broadcast('plugins/updates-changed', { updates })
+          }
+        } catch {
+          // Silence is the contract here: the market page's manual path
+          // surfaces real errors, the sweep just keeps the light on.
+        } finally {
+          sweeping = false
+        }
+      })()
+    }
+    const bootSweep = setTimeout(sweep, 15_000)
+    const sweepTimer = setInterval(sweep, 3_600_000)
+    ctx.effect(() => () => {
+      clearTimeout(bootSweep)
+      clearInterval(sweepTimer)
     })
   },
+}
+
+/** The `plugins.autoUpdate` settings flag (default on), read straight from
+ * `<home>/settings.json` — the plugins domain reads settings.json directly
+ * for the same lifecycle-decoupling reason the feed URL does. */
+function readAutoUpdateEnabled(home: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(join(home, 'settings.json'), 'utf8'))
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return true
+    return (parsed as Record<string, unknown>)['plugins.autoUpdate'] !== false
+  } catch {
+    return true
+  }
 }
 
 function satisfiesCapabilityRange(version: string, range: string): boolean {

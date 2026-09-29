@@ -67,6 +67,48 @@ export function readPluginFeedUrl(home: string): string | undefined {
   }
 }
 
+/** One pending plugin update: an installed package whose feed version is
+ * strictly higher. */
+export interface PendingUpdate {
+  name: string
+  installedVersion: string
+  feedVersion: string
+  file: string
+  sha256?: string
+  title?: string
+}
+
+/**
+ * Diff a feed catalog against the installed pool: every installed package
+ * whose feed version is strictly higher — the same rule a manual update
+ * takes (never a downgrade, never a first install; built-ins never sit in
+ * the pool so they are never candidates).
+ *
+ * @param catalog - the fetched feed catalog entries.
+ * @param installedVersionOf - the pool's installed version for a package
+ *   name, or `undefined` when the package is not installed.
+ */
+export function updatableFromCatalog(
+  catalog: RemoteCatalog['plugins'],
+  installedVersionOf: (name: string) => string | undefined,
+): PendingUpdate[] {
+  const updates: PendingUpdate[] = []
+  for (const entry of catalog) {
+    const installedVersion = installedVersionOf(entry.name)
+    if (installedVersion === undefined) continue
+    if (compareVersions(entry.version, installedVersion) <= 0) continue
+    updates.push({
+      name: entry.name,
+      installedVersion,
+      feedVersion: entry.version,
+      file: entry.file,
+      ...(entry.sha256 !== undefined ? { sha256: entry.sha256 } : {}),
+      ...(entry.title !== undefined ? { title: entry.title } : {}),
+    })
+  }
+  return updates
+}
+
 /**
  * Fetch and validate the feed's catalog.
  *

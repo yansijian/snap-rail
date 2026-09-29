@@ -11,6 +11,7 @@ import {
   fetchRemoteCatalog,
   fetchRemoteRecipes,
   MarketError,
+  updatableFromCatalog,
 } from '../src/market.ts'
 import { installPluginFromZip } from '../src/installer.ts'
 
@@ -284,5 +285,28 @@ describe('downloadRemotePluginZip', () => {
     serve({})
     const target = await downloadRemotePluginZip('http://feed.test/', 'absent.zip').catch((cause: unknown) => cause)
     expect(target).toBeInstanceOf(MarketError)
+  })
+})
+
+describe('updatableFromCatalog', () => {
+  const entries = [
+    { name: '@scope/alpha', version: '2.0.0', file: 'alpha.zip', sha256: 'a'.repeat(64) },
+    { name: '@scope/beta', version: '1.0.0', file: 'beta.zip', sha256: 'b'.repeat(64) },
+    { name: '@scope/new', version: '1.0.0', file: 'new.zip', sha256: 'c'.repeat(64) },
+  ]
+
+  it('collects strictly-higher feed versions; never downgrades or first-installs', () => {
+    const installed: Record<string, string | undefined> = {
+      '@scope/alpha': '1.5.0',
+      '@scope/beta': '2.0.0',
+      '@scope/gone': '0.9.0',
+    }
+    expect(updatableFromCatalog(entries, name => installed[name])).toEqual([
+      { name: '@scope/alpha', installedVersion: '1.5.0', feedVersion: '2.0.0', file: 'alpha.zip', sha256: 'a'.repeat(64) },
+    ])
+  })
+
+  it('reports nothing for an empty pool', () => {
+    expect(updatableFromCatalog(entries, () => undefined)).toEqual([])
   })
 })

@@ -169,6 +169,31 @@ export const pluginDiagnosticsSchema = z.object({
   lastFailure: z.object({ time: z.number(), message: z.string() }).strict().nullable(),
 }).strict()
 
+/** Payload schema of the `plugins/updates-changed` frame: the pending
+ * update set (empty once an apply lands). */
+export const pluginUpdatesChangedSchema = z.object({
+  updates: z.array(z.object({
+    name: z.string().min(1),
+    installedVersion: z.string().min(1),
+    feedVersion: z.string().min(1),
+    title: z.string().optional(),
+  }).strict()),
+}).strict()
+
+/** One pending plugin update (the frame's entry shape). */
+export type PluginUpdate = z.output<typeof pluginUpdatesChangedSchema>['updates'][number]
+
+declare module '@snap-rail/cordis' {
+  interface Events {
+    /** The auto-update sweep (or an apply) changed the pending update set
+     * (the renderer-facing projection of the `plugins/updates-changed`
+     * frame).
+     *
+     * @param updates - the pending updates; empty once an apply lands. */
+    'plugins/updates-changed'(updates: readonly PluginUpdate[]): void
+  }
+}
+
 /** One wire method of the plugins domain, from its declaration to its
  * handler: the merged `RpcMethodMap` rows, the trust-boundary request
  * schemas, and the handler table all derive from this one declaration. */
@@ -221,8 +246,24 @@ export const pluginsContract = defineContract('plugins', {
      * installed stay; uninstall them individually if desired. */
     'plugins.remove-recipe': method(z.object({ id: z.string().regex(/^[a-z0-9-]+$/) }).strict())
       .ret<{ removed: true }>(),
+    /** Compare the installed pool against the configured feed: every
+     * installed package whose feed version is strictly higher (the same
+     * rule a manual update takes — never a downgrade, never a first
+     * install). Built-ins never sit in the pool, so they never appear. */
+    'plugins.updates-check': method(z.object({}).strict())
+      .ret<{ updates: PluginUpdate[], feedUrl: string }>(),
+    /** Apply every pending update in one pool transaction: download
+     * (sha256-verified), install (strictly-higher), hot-recompose — a
+     * running terminal picks the new version up without a restart, and any
+     * failure rolls the whole set back to the prior pool. */
+    'plugins.auto-update-apply': method(z.object({}).strict())
+      .ret<{ applied: readonly { name: string, from: string, to: string }[] }>(),
   },
-  frames: {},
+  frames: {
+    /** The pending update set changed: announced by the auto-update sweep
+     * (and emptied once an apply lands). */
+    'plugins/updates-changed': pluginUpdatesChangedSchema,
+  },
 })
 
 /** The legal package-name shape the installer enforces (shared with the catalog). */

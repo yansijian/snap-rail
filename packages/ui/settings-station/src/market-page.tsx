@@ -17,6 +17,7 @@
 import '@snap-rail/app-boot/contract'
 import {
   PLUGINS_FEED_URL_KEY,
+  type PluginUpdate,
   type RemoteAction,
   type RemotePluginInfo,
   type RemoteRecipeInfo,
@@ -145,6 +146,8 @@ export function MarketPage({ ctx }: { ctx: Context }): ReactNode {
   const [busyRecipe, setBusyRecipe] = useState<string | undefined>(undefined)
   const [restartPrompt, setRestartPrompt] = useState(false)
   const [rendererNames, setRendererNames] = useState<readonly string[]>([])
+  const [pendingUpdates, setPendingUpdates] = useState<readonly PluginUpdate[]>([])
+  const [applyingUpdates, setApplyingUpdates] = useState(false)
 
   const link = ctx.client.link
 
@@ -184,6 +187,17 @@ export function MarketPage({ ctx }: { ctx: Context }): ReactNode {
     void link.call('client-config.list', {}).then(result => {
       if (result.ok) setRendererNames(result.value.rows.map(row => row.name))
     }).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx])
+
+  // The auto-update sweep announces pending updates on this frame; an
+  // opening page also asks once, so a missed sweep still shows the banner.
+  useEffect(() => {
+    const detach = ctx.on('plugins/updates-changed', updates => setPendingUpdates(updates))
+    void link.call('plugins.updates-check', {}).then(result => {
+      if (result.ok) setPendingUpdates(result.value.updates)
+    }).catch(() => undefined)
+    return () => { detach() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx])
 
@@ -255,6 +269,24 @@ export function MarketPage({ ctx }: { ctx: Context }): ReactNode {
     void link.call('window.relaunch', {}).catch(() => undefined)
   }
 
+  const applyAllUpdates = (): void => {
+    setApplyingUpdates(true)
+    setErrorMessage(undefined)
+    void link.call('plugins.auto-update-apply', {}).then(result => {
+      setApplyingUpdates(false)
+      if (!result.ok) {
+        setErrorMessage(rpcErrorText(result.error))
+        return
+      }
+      // An updated package may have swapped under a running renderer face.
+      if (result.value.applied.some(entry => rendererNames.includes(entry.name))) {
+        setRestartPrompt(true)
+      }
+      setPendingUpdates([])
+      refresh(feedUrl.trim())
+    }).catch(() => setApplyingUpdates(false))
+  }
+
   // The filtered plugin rows: one text box over name, title, and description.
   const query = filter.trim().toLowerCase()
   const visibleItems = query === ''
@@ -300,6 +332,20 @@ export function MarketPage({ ctx }: { ctx: Context }): ReactNode {
           指向插件源目录（内含 index.json、recipes.json 与插件包）；保存后立即生效。
         </p>
       </div>
+
+      {pendingUpdates.length > 0 && (
+        <div data-market-updates className="flex items-center justify-between gap-3 rounded-md border border-border bg-accent/40 px-4 py-3">
+          <div className="text-sm">
+            <span className="font-medium">有 {pendingUpdates.length} 个插件可更新</span>
+            <span className="ml-2 text-muted-foreground">
+              {pendingUpdates.map(update => update.title ?? update.name).join('、')}
+            </span>
+          </div>
+          <Button size="sm" data-market-apply-updates disabled={applyingUpdates} onClick={applyAllUpdates}>
+            {applyingUpdates ? '正在更新…' : '一键更新'}
+          </Button>
+        </div>
+      )}
 
       {phase === 'unconfigured' && (
         <div className="rounded-md border border-dashed border-border px-4 py-4 text-center text-sm text-muted-foreground">
