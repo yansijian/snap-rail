@@ -51,6 +51,14 @@ hand-written face and are documented statically here.
 | `plugins.remote-recipes` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
 | `plugins.remote-install-recipe` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z0-9-]+$"}},"required":["id"],"additionalProperties":false} | — |
 | `plugins.remove-recipe` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z0-9-]+$"}},"required":["id"],"additionalProperties":false} | — |
+| `plugins.updates-check` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `plugins.auto-update-apply` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+
+### Frames
+
+| frame | payload schema |
+|---|---|
+| `plugins/updates-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"updates":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string","minLength":1},"installedVersion":{"type":"string","minLength":1},"feedVersion":{"type":"string","minLength":1},"title":{"type":"string"}},"required":["name","installedVersion","feedVersion"],"additionalProperties":false}}},"required":["updates"],"additionalProperties":false} |
 
 ## update
 
