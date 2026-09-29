@@ -443,6 +443,10 @@ function assembleCatalog(recipes: RecipeCatalogEntry[], marketDir: string | unde
       if (!existsSync(zip)) throw new Error(`publish: --market 缺少 ${entry.file}`)
       cpSync(zip, join(stageDir, 'plugins', entry.file))
     }
+    // The terminal's market layer fetches `index.json` (catalog.json is the
+    // website's rich render) — the merged plugin set is the feed's actual
+    // catalog, so the merge rewrites it, not just the rich copy.
+    writeFileSync(join(stageDir, 'plugins', 'index.json'), `${JSON.stringify({ plugins: [...byName.values()] }, null, 2)}\n`)
   }
   const catalog = {
     generatedAt: new Date().toISOString(),
