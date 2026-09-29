@@ -192,7 +192,7 @@ function Station(props: { ctx: Context }): ReactNode {
 /** The station layout occupant. */
 const layoutPlugin: Plugin.Object<void> = {
   name: 'layout-station',
-  inject: ['uiContract', 'client', 'session', 'workflows'],
+  inject: ['uiContract', 'uiSlots', 'client', 'session', 'workflows'],
   apply(ctx: Context): void {
     // The gating feed: on every session transition, anchor the operator and
     // rebuild today's event set from the audit log (the durable truth).

@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash, generateKeyPairSync, type KeyPairKeyObjectResult } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { zipSync } from 'fflate'
 import { Context } from '@snap-rail/cordis'
 import { z } from 'zod'
 import auditPlugin from '@snap-rail/audit'
@@ -9,6 +11,7 @@ import gatewayPlugin from '@snap-rail/gateway'
 import settingsPlugin from '@snap-rail/settings'
 import stationRpcPlugin from '@snap-rail/station-rpc'
 import pluginsRpcPlugin from '@snap-rail/app-boot/rpc'
+import { signReleaseFiles } from '@snap-rail/plugin-kit/sign'
 import settingsStationPlugin from '../src/index.tsx'
 import { sectionOf } from '../src/plugins-page.tsx'
 import layoutPlugin from '../../../suite/terminal-ops/src/layout.tsx'
@@ -94,6 +97,32 @@ async function makeWorld(): Promise<HostChannel> {
 }
 
 const OCCUPANTS = [layoutPlugin, titlebarPlugin, settingsStationPlugin]
+
+/** The installer refuses unsigned zips: register the test's release key as
+ * trusted in the world's home and hand back the matching private key. */
+function trustTestReleaseKey(home: string): KeyPairKeyObjectResult['privateKey'] {
+  const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+  writeFileSync(join(home, 'trusted-release-keys.json'), JSON.stringify({
+    keys: [{
+      keyId: 'test-key',
+      publisher: 'snap-rail-tests',
+      publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+    }],
+  }))
+  return privateKey
+}
+
+/** Build a signed release zip the installer accepts (flat file set plus the
+ * META-INF signature pair `signReleaseFiles` adds). */
+function signedZip(files: Record<string, Uint8Array>, name: string, version: string, privateKey: KeyPairKeyObjectResult['privateKey']): Uint8Array {
+  return new Uint8Array(zipSync(signReleaseFiles(files, {
+    name,
+    version,
+    keyId: 'test-key',
+    publisher: 'snap-rail-tests',
+    privateKey,
+  })))
+}
 
 async function flush(times = 12): Promise<void> {
   for (let i = 0; i < times; i += 1) await new Promise(resolve => setTimeout(resolve, 0))
@@ -235,11 +264,11 @@ describe('settings dialog', () => {
     const home = mkdtempSync(join(tmpdir(), 'snap-rail-install-ui-'))
     tempDirs.push(home)
     const poolDir = join(home, 'plugins')
+    const privateKey = trustTestReleaseKey(home)
     // A minimal but honest zip: manifest declaring a renderer face plus the
     // host face entry the installer validates.
-    const { zipSync } = await import('fflate')
     const zipPath = join(home, 'mini.zip')
-    const zip = new Uint8Array(zipSync({
+    writeFileSync(zipPath, signedZip({
       'package.json': new TextEncoder().encode(JSON.stringify({
         name: '@snap-rail/mini-ui', version: '0.1.0', type: 'module',
         main: 'lib/index.js',
@@ -247,8 +276,7 @@ describe('settings dialog', () => {
       })),
       'lib/index.js': new TextEncoder().encode('export default { name: "mini", apply() {} }\n'),
       'lib-client/client.js': new TextEncoder().encode('/* bundle */\n'),
-    }))
-    writeFileSync(zipPath, zip)
+    }, '@snap-rail/mini-ui', '0.1.0', privateKey))
 
     const host = new Context()
     contexts.push(host)
@@ -330,15 +358,15 @@ describe('settings dialog', () => {
     const home = mkdtempSync(join(tmpdir(), 'snap-rail-update-ui-'))
     tempDirs.push(home)
     const poolDir = join(home, 'plugins')
-    const { zipSync } = await import('fflate')
+    const privateKey = trustTestReleaseKey(home)
     const makeMiniZip = (version: string): string => {
       const path = join(home, `mini-ui-${version}.zip`)
-      writeFileSync(path, new Uint8Array(zipSync({
+      writeFileSync(path, signedZip({
         'package.json': new TextEncoder().encode(JSON.stringify({
           name: '@snap-rail/mini-ui', version, type: 'module', main: 'lib/index.js',
         })),
         'lib/index.js': new TextEncoder().encode('export default { name: "mini", apply() {} }\n'),
-      })))
+      }, '@snap-rail/mini-ui', version, privateKey))
       return path
     }
 
@@ -511,15 +539,19 @@ describe('settings dialog', () => {
     const home = mkdtempSync(join(tmpdir(), 'snap-rail-market-ui-'))
     tempDirs.push(home)
     const poolDir = join(home, 'plugins')
-    const { zipSync } = await import('fflate')
-    const zipBytes = new Uint8Array(zipSync({
+    const privateKey = trustTestReleaseKey(home)
+    const zipBytes = signedZip({
       'package.json': new TextEncoder().encode(JSON.stringify({
         name: '@snap-rail/mini-ui', version: '0.1.0', type: 'module', main: 'lib/index.js',
       })),
       'lib/index.js': new TextEncoder().encode('export default { name: "mini", apply() {} }\n'),
-    }))
+    }, '@snap-rail/mini-ui', '0.1.0', privateKey)
     const catalog = {
-      plugins: [{ name: '@snap-rail/mini-ui', version: '0.1.0', description: 'a market plugin', file: 'mini-ui.zip' }],
+      plugins: [{
+        name: '@snap-rail/mini-ui', version: '0.1.0', description: 'a market plugin', file: 'mini-ui.zip',
+        sha256: createHash('sha256').update(zipBytes).digest('hex'), size: zipBytes.length,
+        signature: { algorithm: 'Ed25519', keyId: 'test-key' },
+      }],
     }
     const recipes = {
       recipes: [{ id: 'demo-base', version: '1.0.0', title: '演示基座', description: 'demo base combo', kind: 'base', file: 'demo-base.yml' }],

@@ -74,7 +74,7 @@ const semanticPlugin: Plugin.Object<void> = {
     const ordered = <T extends { order: number }>(values: Iterable<Stored<T>>): readonly T[] =>
       [...values].sort((a, b) => a.value.order - b.value.order || a.seq - b.seq).map(item => item.value)
 
-    const register = <T>(
+    const register = <T,>(
       table: Map<string, Stored<T>>,
       caller: Context,
       id: string,
@@ -85,11 +85,12 @@ const semanticPlugin: Plugin.Object<void> = {
       const kind = table === views ? 'view' : table === layouts ? 'layout' : 'navigation'
       ctx.emit('ui/semantic-changed', kind)
       const remove = (): void => {
-        if (table.get(id)?.value === value) {
-          table.delete(id)
-          disposeSlot?.()
-          ctx.emit('ui/semantic-changed', kind)
-        }
+        // Disposal is by contribution id: an earlier handle still removes the
+        // entry after a same-id replacement (fiber unload drops the current
+        // contribution), and repeat calls are no-ops.
+        if (!table.delete(id)) return
+        disposeSlot?.()
+        ctx.emit('ui/semantic-changed', kind)
       }
       caller.effect(() => remove)
       return remove

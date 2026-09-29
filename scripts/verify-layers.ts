@@ -91,6 +91,16 @@ function walk(dir: string): string[] {
 
 const importPattern = /(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)|require\(\s*['"]([^'"]+)['"]\s*\)/g
 
+/**
+ * Blank out template-literal contents before import matching. Generated-
+ * source scaffolds (the plugin SDK CLI's templates) carry `import '…'` text
+ * as string data — the generated plugin's edges, never the SDK package's
+ * own. Newlines survive so offsets stay meaningful.
+ */
+function stripTemplateLiterals(source: string): string {
+  return source.replace(/`(?:\\[\s\S]|[^`\\])*`/g, span => span.replace(/[^\n]/g, ' '))
+}
+
 const violations: string[] = []
 let scanned = 0
 
@@ -114,7 +124,7 @@ for (const pkg of packages) {
   }
   for (const file of walk(pkg.dir)) {
     scanned += 1
-    const source = readFileSync(file, 'utf8')
+    const source = stripTemplateLiterals(readFileSync(file, 'utf8'))
     for (const match of source.matchAll(importPattern)) {
       const specifier = match[1] ?? match[2] ?? match[3] ?? match[4]
       if (specifier === undefined) continue

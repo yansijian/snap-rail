@@ -105,7 +105,7 @@ export function signReleaseMetadata(metadata: ReleaseMetadata, key: {
     algorithm: 'Ed25519',
     keyId: key.keyId,
     signedFile: RELEASE_METADATA_PATH,
-    signature: sign(null, bytes, key.privateKey).toString('base64'),
+    signature: sign(null, bytes, key.privateKey as KeyObject | string | Buffer).toString('base64'),
   }
 }
 
@@ -147,7 +147,7 @@ export function verifyReleaseFiles(files: Readonly<Record<string, Uint8Array>>, 
   const valid = verify(
     null,
     Buffer.from(canonicalJson(metadata), 'utf8'),
-    key.publicKey,
+    key.publicKey as KeyObject | string | Buffer,
     Buffer.from(signature.signature, 'base64'),
   )
   if (!valid) throw new Error('release signature is invalid')

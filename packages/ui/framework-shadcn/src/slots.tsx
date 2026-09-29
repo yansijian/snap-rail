@@ -112,10 +112,10 @@ const slotsPlugin: Plugin.Object<void> = {
         entry.occupants.set(occupant.id, { occupant, seq: entry.nextSeq++ })
         ctx.emit('ui/slot-changed', slot)
         const remove = (): void => {
-          if (entry.occupants.get(occupant.id)?.occupant === occupant) {
-            entry.occupants.delete(occupant.id)
-            ctx.emit('ui/slot-changed', slot)
-          }
+          // Disposal is by occupant id: an earlier handle still removes the
+          // seat after a same-id replacement (fiber unload drops the current
+          // occupant), and repeat calls are no-ops.
+          if (entry.occupants.delete(occupant.id)) ctx.emit('ui/slot-changed', slot)
         }
         // Effects take a body producing the disposer; passing `remove`
         // itself would run it as setup.

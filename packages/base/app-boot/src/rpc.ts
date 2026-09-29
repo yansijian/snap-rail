@@ -9,7 +9,7 @@
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { dump } from 'js-yaml'
 import { RpcBusinessError } from '@snap-rail/protocol'

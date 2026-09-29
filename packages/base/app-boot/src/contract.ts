@@ -114,8 +114,8 @@ export interface RemotePluginInfo {
   /** Mandatory signature metadata published with the release. */
   signature?: { algorithm: 'Ed25519', keyId: string } | undefined
   /** Capabilities and engine ranges published with the release. */
-  capabilities?: { provides?: readonly { id: string, version: string }[], requires?: readonly { id: string, range: string, optional?: boolean }[] } | undefined
-  engines?: { snapRail?: string, hostProtocol?: string, renderer?: string } | undefined
+  capabilities?: { provides?: readonly { id: string, version: string }[] | undefined, requires?: readonly { id: string, range: string, optional?: boolean | undefined }[] | undefined } | undefined
+  engines?: { snapRail?: string | undefined, hostProtocol?: string | undefined, renderer?: string | undefined } | undefined
   /** The installed version when the package is already in the pool. */
   installed?: { version: string } | undefined
   action: RemoteAction

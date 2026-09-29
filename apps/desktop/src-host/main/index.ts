@@ -9,7 +9,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
-import type { Context } from '@snap-rail/cordis'
 import carrierPlugin from './carrier.ts'
 import windowRpcPlugin, { trackMainWindow } from './window-rpc.ts'
 import updateRpcPlugin from './update-rpc.ts'
@@ -60,8 +59,6 @@ async function start(): Promise<void> {
       void prepared.plugin(updateRpcPlugin)
     },
   })
-
-  const ctx: Context = host.ctx
 
   const win = new BrowserWindow({
     width: 1280,

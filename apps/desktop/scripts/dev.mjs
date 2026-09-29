@@ -66,9 +66,12 @@ const url = server.resolvedUrls?.local[0]
 if (url === undefined) throw new Error('dev: vite did not report a local url')
 console.log(`[snap-rail] vite dev server at ${url}`)
 
+// A harness that itself runs inside Electron may export ELECTRON_RUN_AS_NODE;
+// the child must boot as Electron, never inherit that flag.
+const { ELECTRON_RUN_AS_NODE: _runAsNode, ...inheritedEnv } = process.env
 const child = spawn(electronBin, ['.'], {
   cwd: appDir,
-  env: { ...process.env, SNAP_RAIL_DEV_URL: url },
+  env: { ...inheritedEnv, SNAP_RAIL_DEV_URL: url },
   stdio: 'inherit',
 })
 

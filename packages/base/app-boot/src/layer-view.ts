@@ -221,7 +221,7 @@ function parseVersion(value: string): [number, number, number] {
 
 function compareVersion(a: [number, number, number], b: [number, number, number]): number {
   for (let index = 0; index < 3; index++) {
-    if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1
+    if (a[index] !== b[index]) return (a[index] ?? 0) < (b[index] ?? 0) ? -1 : 1
   }
   return 0
 }

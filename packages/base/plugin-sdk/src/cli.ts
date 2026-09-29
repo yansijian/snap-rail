@@ -6,8 +6,8 @@
  * @module @snap-rail/plugin-sdk/cli
  */
 
-import { createPrivateKey, createPublicKey, readFileSync } from 'node:crypto'
-import { existsSync, writeFileSync } from 'node:fs'
+import { createPrivateKey, createPublicKey } from 'node:crypto'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { join } from 'node:path'
@@ -187,7 +187,7 @@ async function initPlugin(directory: string | undefined, template: PluginTemplat
   await writeFile(resolve(root, 'tsdown.config.ts'), client
     ? `import { clientBundle } from '@snap-rail/plugin-sdk'\nexport default clientBundle(${JSON.stringify(packageName)}, 'src/client.tsx')\n`
     : `import { hostBundle } from '@snap-rail/plugin-sdk'\nexport default hostBundle('src/index.ts')\n`)
-  await writeFile(resolve(root, 'README.md'), `# ${packageName}\n\nGenerated snap-rail ${template} plugin.\n\nBuild with \\`pnpm build\\`; the release zip is assembled by the publisher, never from \\`src/\\`.\n`)
+  await writeFile(resolve(root, 'README.md'), `# ${packageName}\n\nGenerated snap-rail ${template} plugin.\n\nBuild with \`pnpm build\`; the release zip is assembled by the publisher, never from \`src/\`.\n`)
   await writeFile(resolve(root, 'AGENTS.md'), pluginAgentGuide(template))
   await writeFile(resolve(root, client ? 'src/client.tsx' : 'src/index.ts'), templateSource(template))
   await writeFile(resolve(root, 'tsconfig.json'), `${JSON.stringify({ extends: '@snap-rail/plugin-sdk/tsconfig.plugin.json', include: ['src', 'tests'] }, null, 2)}\n`)
@@ -215,7 +215,7 @@ function templateManifest(template: PluginTemplate): Record<string, unknown> {
 }
 
 function pluginAgentGuide(template: PluginTemplate): string {
-  return `# snap-rail plugin guide\n\nThis repository is an independently developed ${template} plugin. Work only through the public \\`@snap-rail/plugin-sdk\\` surface. Do not import files from a snap-rail checkout or copy host internals.\n\n## Contract rules\n\n- Keep the \\`snapRail\\` manifest complete and validate it with \\`definePluginManifest\\`.\n- Declare every provided and required capability with a version range.\n- Host plugins expose a single host face; renderer plugins expose a CJS client face built by \\`clientBundle\\`.\n- Renderer code may require only the framework seeds and base wire contracts declared by the SDK.\n- Release archives contain built faces and \\`package.json\\` only. Never publish \\`src/\\`.\n\n## Local workflow\n\n\\`pnpm install && pnpm build\\` builds this repository without snap-rail. Use \\`snap-rail-plugin inspect <zip>\\` before publishing and \\`snap-rail-plugin verify <zip> --public-key <key.pem> --key-id <id>\\` to verify a signed artifact.\n`
+  return `# snap-rail plugin guide\n\nThis repository is an independently developed ${template} plugin. Work only through the public \`@snap-rail/plugin-sdk\` surface. Do not import files from a snap-rail checkout or copy host internals.\n\n## Contract rules\n\n- Keep the \`snapRail\` manifest complete and validate it with \`definePluginManifest\`.\n- Declare every provided and required capability with a version range.\n- Host plugins expose a single host face; renderer plugins expose a CJS client face built by \`clientBundle\`.\n- Renderer code may require only the framework seeds and base wire contracts declared by the SDK.\n- Release archives contain built faces and \`package.json\` only. Never publish \`src/\`.\n\n## Local workflow\n\n\`pnpm install && pnpm build\` builds this repository without snap-rail. Use \`snap-rail-plugin inspect <zip>\` before publishing and \`snap-rail-plugin verify <zip> --public-key <key.pem> --key-id <id>\` to verify a signed artifact.\n`
 }
 
 if (process.argv[1]?.endsWith('cli.js') === true) {

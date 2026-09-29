@@ -82,6 +82,7 @@ async function seedTable(): Promise<Array<[string, unknown]>> {
     ['react', await import('react')],
     ['react/jsx-runtime', await import('react/jsx-runtime')],
     ['@snap-rail/framework-shadcn/ui', await import('@snap-rail/framework-shadcn/ui')],
+    ['@snap-rail/framework-shadcn/semantic', await import('@snap-rail/framework-shadcn/semantic')],
     ['@snap-rail/client-kernel', await import('@snap-rail/client-kernel')],
     ['@snap-rail/framework-shadcn/slots', await import('@snap-rail/framework-shadcn/slots')],
     ['@snap-rail/framework-shadcn/settings-pages', await import('@snap-rail/framework-shadcn/settings-pages')],
