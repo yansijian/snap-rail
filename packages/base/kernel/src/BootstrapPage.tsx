@@ -1,7 +1,8 @@
 /**
  * The no-framework recovery console: when no UI framework face is enabled,
  * this page is the terminal's whole interface — a blank canvas with a close
- * button top-right and a center hint to drag a plugin zip in. Installing,
+ * button top-right, a center hint to drag a plugin zip in, and a plugin
+ * source section (address → browse catalog → install one by one). Installing,
  * enabling, and restarting all ride the regular `plugins.*` wire methods,
  * so the bootstrap page is a client of the very pipeline it bootstraps.
  * Styling stays local by design: theme tokens arrive only with a framework.
@@ -12,7 +13,8 @@
 import { useCallback, useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import type { HostLink } from '@snap-rail/connection'
 import type { RpcError } from '@snap-rail/protocol'
-import type { InspectedPlugin, PluginInfo } from '@snap-rail/app-boot/contract'
+import type { InspectedPlugin, PluginInfo, RemotePluginInfo } from '@snap-rail/app-boot/contract'
+import { PLUGINS_FEED_URL_KEY } from '@snap-rail/app-boot/contract'
 /** Local error text (the kernel cannot reach the framework's rpcErrorText). */
 function errorText(error: RpcError): string {
   if (error.code === 'bad-request') return error.details.issues.join('；')
@@ -60,6 +62,30 @@ const styleButton: CSSProperties = {
 
 const stylePrimary: CSSProperties = { ...styleButton, background: '#2563eb', borderColor: '#2563eb' }
 
+const styleInput: CSSProperties = {
+  width: 340,
+  padding: '8px 10px',
+  border: '1px solid #3a4048',
+  borderRadius: 6,
+  background: '#14171b',
+  color: 'inherit',
+  fontSize: 13,
+}
+
+/** The action badge text for one catalog entry (local verdict included). */
+function actionLabel(action: RemotePluginInfo['action']): string | undefined {
+  if (action === 'update') return '可更新'
+  if (action === 'current') return '已是最新'
+  if (action === 'local-newer') return '本地更新'
+  return undefined
+}
+
+/** Whether a catalog entry's install affordance is enabled (current and
+ * local-newer entries have nothing to land). */
+function actionInstallable(action: RemotePluginInfo['action']): boolean {
+  return action === 'install' || action === 'update'
+}
+
 /** Render the recovery console. See {@link BootstrapPageProps}. */
 export function BootstrapPage(props: BootstrapPageProps): ReactNode {
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
@@ -67,6 +93,12 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
   const [rows, setRows] = useState<readonly PluginInfo[]>([])
   const [restartNeeded, setRestartNeeded] = useState(false)
   const [busy, setBusy] = useState(false)
+  // The plugin source section: address → browse catalog → install per entry.
+  const [feedInput, setFeedInput] = useState('')
+  const [feedUrl, setFeedUrl] = useState<string | undefined>(undefined)
+  const [catalog, setCatalog] = useState<readonly RemotePluginInfo[] | undefined>(undefined)
+  const [catalogBusy, setCatalogBusy] = useState<string | undefined>(undefined)
+  const [feedMessage, setFeedMessage] = useState<string | undefined>(undefined)
 
   const refresh = useCallback(() => {
     void props.link.call('plugins.list', {}).then(result => {
@@ -74,7 +106,15 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
     })
   }, [props.link])
 
-  useEffect(refresh, [refresh])
+  useEffect(() => {
+    refresh()
+    void props.link.call('settings.get', { key: PLUGINS_FEED_URL_KEY }).then(result => {
+      if (!result.ok) return
+      const value = typeof result.value.value === 'string' ? result.value.value : ''
+      setFeedInput(value)
+      setFeedUrl(value === '' ? undefined : value)
+    }).catch(() => undefined)
+  }, [props.link, refresh])
 
   const fail = (message: string): void => {
     setBusy(false)
@@ -132,6 +172,45 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
     await props.link.call('window.relaunch', {})
   }
 
+  // ---- plugin source section ----
+
+  const saveFeed = async (): Promise<void> => {
+    const value = feedInput.trim()
+    setFeedMessage(undefined)
+    const result = await props.link.call('settings.set', { key: PLUGINS_FEED_URL_KEY, value })
+    if (!result.ok) {
+      setFeedMessage(errorText(result.error))
+      return
+    }
+    setFeedUrl(value === '' ? undefined : value)
+    setCatalog(undefined)
+    setFeedMessage(value === '' ? '已清除插件源地址' : '已保存')
+  }
+
+  const browse = async (): Promise<void> => {
+    setFeedMessage(undefined)
+    const result = await props.link.call('plugins.remote-list', {})
+    if (!result.ok) {
+      setFeedMessage(errorText(result.error))
+      return
+    }
+    setCatalog(result.value.plugins)
+  }
+
+  const installRemote = async (name: string): Promise<void> => {
+    setCatalogBusy(name)
+    setFeedMessage(undefined)
+    const result = await props.link.call('plugins.remote-install', { name })
+    setCatalogBusy(undefined)
+    if (!result.ok) {
+      setFeedMessage(errorText(result.error))
+      return
+    }
+    setRestartNeeded(true)
+    refresh()
+    await browse()
+  }
+
   const center: ReactNode = phase.kind === 'confirm'
     ? (
         <div style={{ display: 'grid', gap: 12, minWidth: 320, textAlign: 'left' }}>
@@ -169,26 +248,82 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
               <button type="button" style={styleButton} onClick={() => setPhase({ kind: 'idle' })}>返回</button>
             </div>
           )
-        : (
-            <div
-              onDragOver={event => {
-                event.preventDefault()
-                setDragging(true)
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={event => void onDrop(event)}
-              style={{
-                padding: '48px 64px',
-                border: `2px dashed ${dragging ? '#2563eb' : '#3a4048'}`,
-                borderRadius: 12,
-                background: dragging ? '#141a22' : 'transparent',
-                fontSize: 16,
-                transition: 'border-color .15s, background .15s',
-              }}
-            >
-              拖拽插件包（.zip）到此处安装
-            </div>
-          )
+        : phase.kind === 'idle' && catalog !== undefined
+          ? (
+              <div style={{ width: 560, maxHeight: 430, overflow: 'auto', display: 'grid', gap: 6, alignContent: 'start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ fontSize: 14, opacity: 0.85 }}>插件源目录（{catalog.length}）</div>
+                  <button type="button" style={styleButton} onClick={() => setCatalog(undefined)}>返回</button>
+                </div>
+                {catalog.map(entry => {
+                  const badge = actionLabel(entry.action)
+                  return (
+                    <div
+                      key={entry.name}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1px solid #23282e', borderRadius: 6 }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14 }}>{entry.title ?? entry.name}</div>
+                        <div style={{ fontSize: 12, opacity: 0.6, fontFamily: 'ui-monospace, monospace' }}>{entry.name} · {entry.version}</div>
+                      </div>
+                      {badge !== undefined ? <span style={{ fontSize: 12, color: '#f59e0b' }}>{badge}</span> : undefined}
+                      <button
+                        type="button"
+                        style={entry.action === 'update' ? stylePrimary : styleButton}
+                        disabled={!actionInstallable(entry.action) || catalogBusy === entry.name}
+                        onClick={() => void installRemote(entry.name)}
+                      >
+                        {catalogBusy === entry.name ? '安装中…' : (entry.action === 'update' ? '更新' : (actionLabel(entry.action) ?? '安装'))}
+                      </button>
+                    </div>
+                  )
+                })}
+                {feedMessage !== undefined && <div style={{ fontSize: 12, color: '#f87171' }}>{feedMessage}</div>}
+              </div>
+            )
+          : (
+              <div style={{ display: 'grid', gap: 24, justifyItems: 'center' }}>
+                <div
+                  onDragOver={event => {
+                    event.preventDefault()
+                    setDragging(true)
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={event => void onDrop(event)}
+                  style={{
+                    padding: '48px 64px',
+                    border: `2px dashed ${dragging ? '#2563eb' : '#3a4048'}`,
+                    borderRadius: 12,
+                    background: dragging ? '#141a22' : 'transparent',
+                    fontSize: 16,
+                    transition: 'border-color .15s, background .15s',
+                  }}
+                >
+                  拖拽插件包（.zip）到此处安装
+                </div>
+                <div style={{ display: 'grid', gap: 8, justifyItems: 'center' }}>
+                  <div style={{ fontSize: 13, opacity: 0.5 }}>—— 或 ——</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={feedInput}
+                      placeholder="插件源地址（http://…）"
+                      onChange={event => setFeedInput(event.target.value)}
+                      style={styleInput}
+                    />
+                    <button type="button" style={styleButton} onClick={() => void saveFeed()}>保存</button>
+                    <button
+                      type="button"
+                      style={stylePrimary}
+                      disabled={feedUrl === undefined}
+                      onClick={() => void browse()}
+                    >
+                      浏览插件源
+                    </button>
+                  </div>
+                  {feedMessage !== undefined && <div style={{ fontSize: 12, opacity: 0.75 }}>{feedMessage}</div>}
+                </div>
+              </div>
+            )
 
   return (
     <div style={stylePage}>
