@@ -15,7 +15,7 @@
 
 import { createHash, createPrivateKey } from 'node:crypto'
 import { createWriteStream, readFileSync } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { zipSync } from 'fflate'
@@ -108,6 +108,13 @@ async function main(): Promise<void> {
   const outDir = outDirArg()
   const signing = signingOptions()
   await mkdir(outDir, { recursive: true })
+  // The dist directory is a pure build output: stale zips from retired
+  // packages must never ride the next install or publish.
+  for (const entry of await readdir(outDir)) {
+    if (entry.endsWith('.zip') || entry === 'index.json' || entry === 'catalog.json') {
+      await rm(join(outDir, entry), { force: true })
+    }
+  }
   const entries: Array<Record<string, unknown>> = []
   for (const spec of PLUGIN_PACKAGES) {
     const unsignedFiles = await releaseFiles(spec)
