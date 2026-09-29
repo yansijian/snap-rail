@@ -1,30 +1,41 @@
 /**
  * One-command release pipeline: build the repo, pack the plugin feed,
- * assemble the recipe catalog and the website catalog, build the site, and
- * sync the three static artifacts to the server. The server stays logic-free
- * (docs/deploy.md) — everything here produces plain files under
- * `dist-publish/` first, so a release can be inspected before it syncs:
+ * assemble the recipe catalog and the website catalog, and sync the artifacts
+ * to the distribution target. Two targets are supported:
  *
- *   dist-publish/plugins/   ← index.json + recipes.json + catalog.json + zips + recipe docs (+ assets)
- *   dist-publish/site/      ← the built website (the server's web root)
- *   dist-publish/desktop/   ← latest.yml + setup exe + blockmap (when release-out has them)
+ * 1. **Gitea** (intranet default) — the static feed (`plugins/` + `desktop/`)
+ *    is committed to a dedicated feed branch of the client repo and served by
+ *    Gitea raw; the installer trio additionally rides a Gitea Release for
+ *    human download. The server stays logic-free — everything is plain files
+ *    assembled here before one commit.
+ * 2. **ssh/nginx** (legacy fallback) — rsync/tar-over-ssh into the web root,
+ *    exactly the pre-Gitea deployment.
  *
- * Usage: `pnpm run publish -- --sign-key <private.pem> --key-id <id> [--publisher <name>] [--skip-sync] [--market <dir>]`
- *   --skip-sync   stage only; nothing leaves the machine.
- *   --market <dir>  merge a second feed's index.json/zips (the snap-rail-market
- *     repo's pack output) into the catalog — community packages ride the same feed.
+ * Everything produces plain files under `dist-publish/` first, so a release
+ * can be inspected before it syncs:
+ *
+ *   dist-publish/plugins/        ← index.json + recipes.json + catalog.json + zips + recipe docs (+ assets)
+ *   dist-publish/site/           ← the built website (ssh target only)
+ *   dist-publish/desktop/        ← latest.yml + setup exe + blockmap (when release-out has them)
+ *
+ * Usage: `pnpm run publish -- --sign-key <private.pem> --key-id <id> [--publisher <name>] [--skip-sync] [--market <dir>] [--release-tag <tag>]`
+ *   --skip-sync        stage only; nothing leaves the machine.
+ *   --market <dir>     merge a second feed's index.json/zips (a plugin repo's
+ *     pack output) into the catalog.
+ *   --release-tag <t>  Gitea Release tag override (default `v<desktop version>`).
  *
  * Configuration lives in `deploy.config.json` (gitignored;
- * `deploy.config.example.json` is the template): the ssh target and the three
- * remote paths. The plugins/desktop remote directories are wiped on every
- * publish — they must be dedicated to snap-rail; the site root is extracted
- * over (stale hashed assets stay, harmless and cache-friendly).
+ * `deploy.config.example.json` is the template). The `gitea` block wins when
+ * present; otherwise the legacy `sshTarget` + `remote` block is used. The
+ * API/push token comes from the `gitea.token` field or the `GITEA_TOKEN`
+ * environment variable. The feed branch is wiped and rewritten on every
+ * publish — it must be dedicated to snap-rail.
  *
  * @module snap-rail/scripts/publish
  */
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dump, load } from 'js-yaml'
@@ -57,9 +68,27 @@ interface RecipeSource {
   dir: string
 }
 
+/** The Gitea distribution target: the static feed lives on a dedicated branch
+ * of the client repo (Gitea raw serves plain files), and the installer trio
+ * rides a Gitea Release for human download. */
+interface GiteaConfig {
+  url: string
+  owner: string
+  repo: string
+  /** Branch carrying the feed tree; seeded as an orphan branch on first publish. */
+  feedBranch?: string
+  /** Attach the installer trio to a Gitea Release (default on when desktop artifacts exist). */
+  release?: boolean
+  /** API/push token; falls back to the `GITEA_TOKEN` environment variable. */
+  token?: string
+}
+
 interface DeployConfig {
-  sshTarget: string
-  remote: { site: string, plugins: string, desktop: string }
+  /** Gitea target — the intranet distribution path; wins over ssh when present. */
+  gitea?: GiteaConfig
+  /** Legacy nginx target (ssh + rsync/tar) — the fallback deployment. */
+  sshTarget?: string
+  remote?: { site: string, plugins: string, desktop: string }
 }
 
 function dirname(path: string): string {
@@ -67,7 +96,7 @@ function dirname(path: string): string {
   return index < 0 ? '.' : path.slice(0, index)
 }
 
-function cliArgs(): { skipSync: boolean, market: string | undefined, signKey: string, keyId: string, publisher?: string } {
+function cliArgs(): { skipSync: boolean, market: string | undefined, signKey: string, keyId: string, publisher?: string, releaseTag: string | undefined } {
   const skipSync = process.argv.includes('--skip-sync')
   const marketIndex = process.argv.indexOf('--market')
   const market = marketIndex >= 0 ? process.argv[marketIndex + 1] : undefined
@@ -83,7 +112,9 @@ function cliArgs(): { skipSync: boolean, market: string | undefined, signKey: st
   }
   const publisherIndex = process.argv.indexOf('--publisher')
   const publisher = publisherIndex >= 0 ? process.argv[publisherIndex + 1] : undefined
-  return { skipSync, market, signKey, keyId, ...(publisher === undefined ? {} : { publisher }) }
+  const releaseTagIndex = process.argv.indexOf('--release-tag')
+  const releaseTag = releaseTagIndex >= 0 ? process.argv[releaseTagIndex + 1] : undefined
+  return { skipSync, market, signKey, keyId, ...(publisher === undefined ? {} : { publisher }), releaseTag }
 }
 
 function run(command: string): void {
@@ -97,14 +128,200 @@ function readDeployConfig(): DeployConfig {
     throw new Error(`publish: 缺少 ${path} —— 复制 deploy.config.example.json 为 deploy.config.json 并按现场填写`)
   }
   const parsed = JSON.parse(readFileSync(path, 'utf8')) as DeployConfig
+  if (parsed.gitea !== undefined) {
+    const { url, owner, repo } = parsed.gitea
+    if (typeof url !== 'string' || url === '' || typeof owner !== 'string' || owner === '' || typeof repo !== 'string' || repo === '') {
+      throw new Error('publish: deploy.config.json 的 gitea 块缺少 url / owner / repo')
+    }
+    return parsed
+  }
   if (typeof parsed.sshTarget !== 'string' || parsed.sshTarget === '') {
-    throw new Error('publish: deploy.config.json 缺少 sshTarget')
+    throw new Error('publish: deploy.config.json 需要 gitea 块（推荐）或 sshTarget + remote（nginx 兼容路径）')
   }
   if (typeof parsed.remote?.site !== 'string' || typeof parsed.remote?.plugins !== 'string' || typeof parsed.remote?.desktop !== 'string') {
     throw new Error('publish: deploy.config.json 缺少 remote.site / remote.plugins / remote.desktop')
   }
   return parsed
 }
+
+/** The version the desktop installer was built with (electron-builder reads
+ * the same manifest), used for the default Release tag and commit messages. */
+function desktopVersion(): string {
+  const manifest = JSON.parse(readFileSync(join(repoRoot, 'apps/desktop/package.json'), 'utf8')) as { version?: string }
+  return manifest.version ?? '0.0.0'
+}
+
+// ---------------------------------------------------------------------------
+// Gitea target
+// ---------------------------------------------------------------------------
+
+const FEED_BRANCH_DEFAULT = 'feed'
+
+function giteaToken(gitea: GiteaConfig): string {
+  const token = gitea.token ?? process.env.GITEA_TOKEN ?? ''
+  return token.trim()
+}
+
+function giteaBase(gitea: GiteaConfig): string {
+  return gitea.url.replace(/\/+$/, '')
+}
+
+function repoPushUrl(gitea: GiteaConfig): string {
+  const origin = `${giteaBase(gitea)}/${gitea.owner}/${gitea.repo}.git`
+  const token = giteaToken(gitea)
+  return token === '' ? origin : origin.replace('://', `://oauth2:${token}@`)
+}
+
+async function giteaRequest<T>(gitea: GiteaConfig, token: string, path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${giteaBase(gitea)}/api/v1${path}`, {
+    ...init,
+    headers: {
+      ...(token === '' ? {} : { Authorization: `token ${token}` }),
+      ...(init?.headers ?? {}),
+    },
+  })
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 300)
+    throw new Error(`gitea: ${response.status} ${response.statusText} — ${path}${detail === '' ? '' : `：${detail}`}`)
+  }
+  const text = await response.text()
+  return (text === '' ? undefined : JSON.parse(text)) as T
+}
+
+/** Git with the token carried in an extra HTTP header (never in the URL or
+ * remote config, so credentials never leak into logs or the worktree). */
+function gitAuthArgs(gitea: GiteaConfig): string[] {
+  const token = giteaToken(gitea)
+  return token === '' ? [] : ['-c', `http.extraHeader=Authorization: token ${token}`]
+}
+
+function git(dir: string, gitea: GiteaConfig, ...args: string[]): string {
+  return execFileSync('git', [...gitAuthArgs(gitea), ...args], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim()
+}
+
+function hasHead(dir: string): boolean {
+  try {
+    execFileSync('git', ['rev-parse', '--verify', 'HEAD'], { cwd: dir, stdio: 'ignore' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Push the staged feed tree to the dedicated feed branch. The branch is an
+ * orphan seeded from an empty tree on first publish, and its whole tree is
+ * replaced on every publish — it must be dedicated to snap-rail. */
+export async function syncGiteaFeed(gitea: GiteaConfig, stageDir: string, version: string): Promise<void> {
+  const branch = gitea.feedBranch ?? FEED_BRANCH_DEFAULT
+  const worktree = join(stageDir, 'feed-worktree')
+  rmSync(worktree, { recursive: true, force: true })
+  const remote = repoPushUrl(gitea)
+  try {
+    execFileSync('git', [...gitAuthArgs(gitea), 'clone', '--depth', '1', '--branch', branch, remote, worktree], { stdio: 'ignore' })
+  } catch {
+    // The branch does not exist yet (or the repo is empty): clone the default
+    // state and seed the feed branch from an empty tree.
+    rmSync(worktree, { recursive: true, force: true })
+    execFileSync('git', [...gitAuthArgs(gitea), 'clone', '--depth', '1', remote, worktree], { stdio: 'inherit' })
+    git(worktree, gitea, 'switch', ...(hasHead(worktree) ? ['--orphan'] : ['-c']), branch)
+  }
+  for (const entry of readdirSync(worktree)) {
+    if (entry === '.git') continue
+    rmSync(join(worktree, entry), { recursive: true, force: true })
+  }
+  cpSync(join(stageDir, 'plugins'), join(worktree, 'plugins'), { recursive: true })
+  const desktopStaged = join(stageDir, 'desktop')
+  if (existsSync(desktopStaged)) cpSync(desktopStaged, join(worktree, 'desktop'), { recursive: true })
+  // The feed is served byte-exact: forbid every EOL/normalization conversion
+  // regardless of the publisher's core.autocrlf.
+  writeFileSync(join(worktree, '.gitattributes'), '* -text\n')
+  git(worktree, gitea, 'add', '-A')
+  const identityArgs = (() => {
+    try {
+      return git(worktree, gitea, 'config', 'user.email') === ''
+        ? ['-c', 'user.name=snap-rail publisher', '-c', 'user.email=publisher@snap-rail.invalid']
+        : []
+    } catch {
+      return ['-c', 'user.name=snap-rail publisher', '-c', 'user.email=publisher@snap-rail.invalid']
+    }
+  })()
+  execFileSync(
+    'git',
+    [...identityArgs, 'commit', '-m', `chore(feed): publish for v${version} (${new Date().toISOString()})`],
+    { cwd: worktree, stdio: 'inherit' },
+  )
+  execFileSync('git', [...gitAuthArgs(gitea), 'push', '-u', 'origin', branch], { cwd: worktree, stdio: 'inherit' })
+  rmSync(worktree, { recursive: true, force: true })
+  console.log(`feed branch pushed: ${giteaBase(gitea)}/${gitea.owner}/${gitea.repo}/raw/branch/${branch}/plugins/`)
+}
+
+interface GiteaRelease {
+  id: number
+  assets?: Array<{ id: number, name: string }>
+}
+
+/** Create (or reuse) the tag Release and upload the installer trio for human
+ * download. Same-name assets are replaced, so republishing a tag is safe. */
+export async function publishGiteaRelease(gitea: GiteaConfig, stageDir: string, tag: string): Promise<void> {
+  const token = giteaToken(gitea)
+  if (token === '') {
+    console.log('gitea: 未配置 token（gitea.token 或 GITEA_TOKEN），跳过 Release 发布（feed 分支已推送）')
+    return
+  }
+  const assetDir = join(stageDir, 'desktop')
+  if (!existsSync(join(assetDir, 'latest.yml'))) {
+    console.log('gitea: 无 desktop 产物（release-out/latest.yml 缺失），跳过 Release 发布')
+    return
+  }
+  const assetNames = readdirSync(assetDir).filter(file => file === 'latest.yml' || file.endsWith('.exe') || file.endsWith('.exe.blockmap'))
+  let release = await giteaRequest<GiteaRelease | undefined>(gitea, token, `/repos/${gitea.owner}/${gitea.repo}/releases/tags/${encodeURIComponent(tag)}`)
+    .catch(() => undefined)
+  if (release === undefined || release === null || typeof release.id !== 'number') {
+    release = await giteaRequest<GiteaRelease>(gitea, token, `/repos/${gitea.owner}/${gitea.repo}/releases`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tag_name: tag,
+        name: tag,
+        body: `snap-rail 客户端 ${tag}\n\n- 人工下载：本页附件（snap-rail-*-setup.exe）\n- 自动更新与插件市场：feed 分支静态目录（见 docs/deploy.md 的 Gitea 部署节）`,
+        draft: false,
+        prerelease: false,
+      }),
+    })
+  }
+  for (const name of assetNames) {
+    for (const existing of release.assets ?? []) {
+      if (existing.name === name) {
+        await giteaRequest(gitea, token, `/repos/${gitea.owner}/${gitea.repo}/releases/${release.id}/assets/${existing.id}`, { method: 'DELETE' })
+      }
+    }
+    const bytes = readFileSync(join(assetDir, name))
+    await giteaRequest(gitea, token, `/repos/${gitea.owner}/${gitea.repo}/releases/${release.id}/assets?name=${encodeURIComponent(name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: bytes,
+    })
+    console.log(`release asset uploaded: ${name} (${(bytes.length / 1024 / 1024).toFixed(1)} MiB)`)
+  }
+  console.log(`release: ${giteaBase(gitea)}/${gitea.owner}/${gitea.repo}/releases/tag/${encodeURIComponent(tag)}`)
+}
+
+async function syncGitea(gitea: GiteaConfig, stageDir: string, releaseTag: string | undefined): Promise<void> {
+  const version = desktopVersion()
+  await syncGiteaFeed(gitea, stageDir, version)
+  if (gitea.release !== false) {
+    await publishGiteaRelease(gitea, stageDir, releaseTag ?? `v${version}`)
+  }
+  const branch = gitea.feedBranch ?? FEED_BRANCH_DEFAULT
+  const base = `${giteaBase(gitea)}/${gitea.owner}/${gitea.repo}/raw/branch/${branch}`
+  console.log(`\npublished to ${giteaBase(gitea)} (${gitea.owner}/${gitea.repo})`)
+  console.log(`  update.feedUrl → ${base}/desktop/`)
+  console.log(`  plugins.feedUrl → ${base}/plugins/`)
+}
+
+// ---------------------------------------------------------------------------
+// Recipes / catalog assembly
+// ---------------------------------------------------------------------------
 
 /** Load and sanity-check one recipe source directory. The plugins block must
  * already be the exact wire shape — publish is the first gate, the client
@@ -214,9 +431,8 @@ function assembleCatalog(recipes: RecipeCatalogEntry[], marketDir: string | unde
       cpSync(assets, join(stageDir, 'plugins', 'assets', 'plugins', entry.name.replaceAll('@', '').replaceAll('/', '-')), { recursive: true })
     }
   }
-  // Community packages ride the same feed: merge the market repo's pack
-  // output (its index.json wins collisions; its own catalog prose, if any,
-  // is already baked into its index entries).
+  // Contributor packages ride the same feed: merge the contributor repo's
+  // pack output (its index.json wins collisions).
   if (marketDir !== undefined) {
     const marketIndex = join(resolve(marketDir), 'index.json')
     if (!existsSync(marketIndex)) throw new Error(`publish: --market ${marketDir} 缺少 index.json`)
@@ -248,6 +464,10 @@ function assembleCatalog(recipes: RecipeCatalogEntry[], marketDir: string | unde
   console.log(`catalog.json: ${catalog.plugins.length} plugins, ${catalog.recipes.length} recipes`)
 }
 
+// ---------------------------------------------------------------------------
+// Legacy ssh/nginx target
+// ---------------------------------------------------------------------------
+
 /** rsync when the machine has it (keeps the feed clean with --delete);
  * otherwise a tar-over-ssh pipe — ssh exists wherever scp does, and this
  * avoids shell globbing entirely. */
@@ -260,7 +480,9 @@ function hasRsync(): boolean {
   }
 }
 
-function syncDir(local: string, remote: string, config: DeployConfig, wipe: boolean): void {
+interface LegacyConfig { sshTarget: string, remote: { site: string, plugins: string, desktop: string } }
+
+function syncDir(local: string, remote: string, config: LegacyConfig, wipe: boolean): void {
   const target = `${config.sshTarget}:${remote}`
   if (wipe) execSync(`ssh ${config.sshTarget} "rm -rf ${remote} && mkdir -p ${remote}"`, { stdio: 'inherit' })
   else execSync(`ssh ${config.sshTarget} "mkdir -p ${remote}"`, { stdio: 'inherit' })
@@ -271,8 +493,12 @@ function syncDir(local: string, remote: string, config: DeployConfig, wipe: bool
   execSync(`tar -czf - -C ${local} . | ssh ${config.sshTarget} "tar -xzf - -C ${remote}"`, { stdio: 'inherit', shell: 'bash' })
 }
 
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
 async function main(): Promise<void> {
-  const { skipSync, market, signKey, keyId, publisher } = cliArgs()
+  const { skipSync, market, signKey, keyId, publisher, releaseTag } = cliArgs()
   rmSync(stageDir, { recursive: true, force: true })
   mkdirSync(join(stageDir, 'plugins'), { recursive: true })
 
@@ -281,11 +507,22 @@ async function main(): Promise<void> {
   const recipes = assembleRecipes()
   assembleCatalog(recipes, market)
 
-  // The website renders from the feed's catalog: regenerate its data module,
-  // then build. dist-publish/site is what becomes the web root.
-  run('pnpm exec tsx scripts/gen-website-catalog.ts')
-  run('pnpm run website:build')
-  cpSync(join(repoRoot, 'website', 'dist'), join(stageDir, 'site'), { recursive: true })
+  // The distribution target decides whether the website ships at all: the
+  // Gitea feed carries no site (the website stays on nginx per docs/deploy.md).
+  let gitea: GiteaConfig | undefined
+  let legacy: LegacyConfig | undefined
+  if (!skipSync) {
+    const config = readDeployConfig()
+    gitea = config.gitea
+    legacy = gitea === undefined ? { sshTarget: config.sshTarget!, remote: config.remote! } : undefined
+  }
+  if (gitea === undefined) {
+    // The website renders from the feed's catalog: regenerate its data module,
+    // then build. dist-publish/site is what becomes the web root.
+    run('pnpm exec tsx scripts/gen-website-catalog.ts')
+    run('pnpm run website:build')
+    cpSync(join(repoRoot, 'website', 'dist'), join(stageDir, 'site'), { recursive: true })
+  }
 
   // The desktop installer trio, when a packaged build exists.
   const releaseOut = join(repoRoot, 'apps/desktop/release-out')
@@ -307,18 +544,22 @@ async function main(): Promise<void> {
     console.log('--skip-sync: nothing was uploaded')
     return
   }
-  const config = readDeployConfig()
+  if (gitea !== undefined) {
+    await syncGitea(gitea, stageDir, releaseTag)
+    return
+  }
+  if (legacy === undefined) throw new Error('publish: 未配置分发目标')
   // The site root is extracted over (stale hashed assets are harmless);
   // the feed and the desktop directory are wiped — they must be dedicated.
-  syncDir(join(stageDir, 'site'), config.remote.site, config, false)
-  syncDir(join(stageDir, 'plugins'), config.remote.plugins, config, true)
+  syncDir(join(stageDir, 'site'), legacy.remote.site, legacy, false)
+  syncDir(join(stageDir, 'plugins'), legacy.remote.plugins, legacy, true)
   if (existsSync(join(stageDir, 'desktop'))) {
-    syncDir(join(stageDir, 'desktop'), config.remote.desktop, config, true)
+    syncDir(join(stageDir, 'desktop'), legacy.remote.desktop, legacy, true)
   }
-  console.log(`\npublished to ${config.sshTarget}`)
-  console.log(`  site    → http://${config.sshTarget.split('@')[1] ?? config.sshTarget}/`)
-  console.log(`  plugins → http://${config.sshTarget.split('@')[1] ?? config.sshTarget}/snap-rail/plugins/`)
-  console.log(`  desktop → http://${config.sshTarget.split('@')[1] ?? config.sshTarget}/snap-rail/desktop/`)
+  console.log(`\npublished to ${legacy.sshTarget}`)
+  console.log(`  site    → http://${legacy.sshTarget.split('@')[1] ?? legacy.sshTarget}/`)
+  console.log(`  plugins → http://${legacy.sshTarget.split('@')[1] ?? legacy.sshTarget}/snap-rail/plugins/`)
+  console.log(`  desktop → http://${legacy.sshTarget.split('@')[1] ?? legacy.sshTarget}/snap-rail/desktop/`)
 }
 
 // Run only when invoked directly.

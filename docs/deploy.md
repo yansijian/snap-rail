@@ -1,13 +1,59 @@
-# 部署：官网、插件源与更新源（静态托管）
+# 部署：插件源与更新源（Gitea / 静态托管）
 
-snap-rail 的线上存在是**纯静态三件套**——官网、插件源（含组合）、应用
-更新源共用一个静态文件服务器（任意能吐文件的 HTTP 服务即可）。基准部署
-是内网服务器 `http://192.168.1.10/`（nginx，web 根目录即官网）。服务器上
-没有任何逻辑——只有目录、zip、yml 和几个 JSON 清单；所有校验都在终端侧
-完成。未来迁云（阿里云 OSS+CDN 等）只换 DNS 与发布目标，客户端零改动
-（两个 feed 地址是设置键，热切换）。
+snap-rail 的线上存在是**纯静态**——插件源（含组合）与应用更新源就是一组
+普通文件，服务器零逻辑，所有校验都在终端侧完成。基准部署是**内网 Gitea**：
+发布产物由 publish 提交到客户端仓的专用 feed 分支（Gitea raw 按字节直出），
+安装包另挂 Gitea Release 供人工下载；官网仍走任意静态文件服务器（nginx 等，
+不在 Gitea 测试范围）。未来迁云（阿里云 OSS+CDN 等）只换发布目标与两个
+feed 地址，客户端零改动（两个 feed 地址是设置键，热切换）。
 
-## 目录布局
+## Gitea 部署（推荐路径）
+
+### 一次性准备
+
+1. Gitea 建组织 `snap-rail` 与客户端仓 `snap-rail`（本仓推上去）；
+2. 建一个对该仓有写权限的 token（Gitea → 设置 → 应用 → 生成新令牌），
+   通过环境变量 `GITEA_TOKEN`（或配置的 `gitea.token`）提供给发布机；
+3. 复制 `deploy.config.example.json` 为 `deploy.config.json`，按现场填
+   `gitea` 块（url / owner / repo / feedBranch，缺省分支 `feed`）；
+   `sshTarget` 块仅在仍要同步 nginx 官网时保留（`gitea` 块存在时优先）。
+
+### 发布
+
+```sh
+pnpm run plugin:generate-key -- .keys gitea-main-2026 --publisher snap-rail   # 一次性
+pnpm run publish -- --sign-key .keys/gitea-main-2026.private.pem --key-id gitea-main-2026 --publisher snap-rail
+```
+
+publish 依次：构建 → 打包插件 zip（Ed25519 签名 + index.json）→ 装配组合
+与目录 → 把 `plugins/` 与 `desktop/` 整树提交到 feed 分支（孤儿分支自动
+播种，整树替换）→ 建 Release 并上传安装包三件套。产物地址：
+
+| 通道 | 地址（feedBranch=feed） |
+| --- | --- |
+| 应用更新 `update.feedUrl` | `http://<gitea>/snap-rail/snap-rail/raw/branch/feed/desktop/` |
+| 插件市场 `plugins.feedUrl` | `http://<gitea>/snap-rail/snap-rail/raw/branch/feed/plugins/` |
+| 人工下载 | `http://<gitea>/snap-rail/snap-rail/releases/tag/v<版本>` |
+
+`--release-tag` 可覆盖默认 tag（`v<desktop 版本>`）；`--skip-sync` 只在
+本地 `dist-publish/` 装配（gitea 目标下不构建官网）。
+
+### 验证（发布后、指终端前）
+
+```sh
+pnpm exec tsx scripts/check-feed-endpoint.ts \
+  --update http://<gitea>/snap-rail/snap-rail/raw/branch/feed/desktop/ \
+  --plugins http://<gitea>/snap-rail/snap-rail/raw/branch/feed/plugins/
+```
+
+脚本核对四件事：feed 文件字节一致（zip 的 sha256/size 对清单）、
+latest.yml 是 electron-builder 清单而非错误页伪装 200、安装包支持 Range
+（决定 blockmap 差量下载可用性）、以及该 Gitea 实际服务的 raw URL 形状
+（`/raw/branch/<ref>/` 与 `/raw/<ref>/` 两者谁生效）。通过后再把终端的
+两个设置键指过来，各走一次「检查更新 → 后台下载 → 确认重启」与「市场
+安装一个插件」，即完成 Phase 0 验收。
+
+## 目录布局（nginx 兼容变体；Gitea 目标只提交其中 plugins/ 与 desktop/ 到 feed 分支）
 
 ```
 <web 根>\                          ← 官网（website/ 构建产物）
@@ -125,34 +171,13 @@ pnpm run build && pnpm app:dist
    的 publish.url 重打包）；
 4. 官网完全自包含（无外部 CDN 字体/脚本），内网外网表现一致。
 
-## 本地 Gitea + Nginx 验证
+## 部署变体与验证清单
 
-正式发布前可以用本地 Gitea 和 Nginx 跑完整的插件市场链路。Gitea 只保存
-插件源码、tag、PR 和构建记录；客户端不访问 Gitea API。插件构建产物由本机
-脚本或 Gitea Actions 生成，再由 Nginx 提供静态 feed。
-
-本机先执行：
-
-```sh
-pnpm run plugin:generate-key -- .keys gitea-main-2026 --publisher snap-rail
-pnpm run publish:local -- --sign-key .keys/gitea-main-2026.private.pem --key-id gitea-main-2026 --publisher snap-rail
-pnpm run verify:market -- --feed dist-publish/plugins --trust .keys/gitea-main-2026.trust.json
-```
-
-该命令生成 `dist-publish/plugins/`。Nginx 的 `/plugins/` location 指向这个
-目录。将 `.keys/gitea-main-2026.trust.json` 的 `keys` 合并到终端 home 的
-`trusted-release-keys.json`，客户端设置 `plugins.feedUrl` 为：
-
-```text
-http://127.0.0.1:8088/plugins/
-```
-
-独立 market 仓的构建产物可以合并进本地 feed：
-
-```sh
-pnpm run publish -- --skip-sync --market D:/Project/snap-rail-market/dist-plugins --sign-key .keys/gitea-main-2026.private.pem --key-id gitea-main-2026 --publisher snap-rail
-```
-
-仓库根目录的 `deploy.nginx.example.conf` 是本地 Nginx 配置模板。验证顺序
-应覆盖本地 zip 安装、feed 安装、recipe 组合、哈希或签名错误、版本更新、
-回滚、feed 离线启动和 Host 恢复。
+- **nginx 文件服务（兼容路径）**：deploy.config.json 删掉 `gitea` 块、
+  只留 `sshTarget` + `remote`，即回到 ssh/rsync 同步 nginx 的旧流程
+  （官网 + `snap-rail/plugins|desktop/`）；终端地址相应为
+  `http://<server>/snap-rail/desktop|plugins/`。
+- **贡献仓合流**：独立插件仓的构建产物可经 `--market <仓>/dist-plugins`
+  并入同一次发布（拆仓后由 feed 装配的 Release 收集取代，见拆仓阶段）。
+- 验证顺序应覆盖：本地 zip 安装、feed 安装、recipe 组合、哈希或签名错误、
+  版本更新、回滚、feed 离线启动和 Host 恢复。

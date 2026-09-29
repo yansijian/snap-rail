@@ -1,4 +1,11 @@
 {
+  "gitea": {
+    "url": "http://192.168.1.10",
+    "owner": "snap-rail",
+    "repo": "snap-rail",
+    "feedBranch": "feed",
+    "release": true
+  },
   "sshTarget": "root@192.168.1.10",
   "remote": {
     "site": "/var/www/html",
