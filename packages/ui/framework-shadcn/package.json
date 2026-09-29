@@ -46,13 +46,17 @@
       "types": "./lib/types/fallback.d.ts",
       "default": "./lib/fallback.js"
     },
+    "./templates/*": "./templates/*",
+    "./docs/*": "./docs/*",
     "./theme.css": "./src/ui/theme.css",
     "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
-    "src/ui/theme.css"
+    "src/ui/theme.css",
+    "templates",
+    "docs"
   ],
   "license": "Apache-2.0",
   "dependencies": {

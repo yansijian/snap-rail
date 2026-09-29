@@ -17,7 +17,7 @@ import { definePluginManifest, PLUGIN_TEMPLATES, releaseFiles, signReleaseFiles,
 const usage = `snap-rail-plugin <command>
 
 Commands:
-  init <directory> --template <driver|store-provider|ui-view|ui-layout|host-service|tool|suite>
+  init <directory> --template <driver|store-provider|ui-view|ui-layout|ui-extension|host-service|tool|suite> [--framework <package>]
   pack <directory> --out <directory> [--sign-key <key.pem> --key-id <id>]
   doctor <directory>
   inspect <plugin.zip>
@@ -28,7 +28,7 @@ Commands:
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   const [command, target] = argv
   if (command === 'init') {
-    await initPlugin(target, option(argv, '--template') as PluginTemplate | undefined)
+    await initPlugin(target, option(argv, '--template') as PluginTemplate | undefined, option(argv, '--framework'))
     return
   }
   if (command === 'inspect' || command === 'verify') {
@@ -150,29 +150,38 @@ function archiveFiles(path: string): Record<string, Uint8Array> {
   return normalized
 }
 
-async function initPlugin(directory: string | undefined, template: PluginTemplate | undefined): Promise<void> {
+async function initPlugin(directory: string | undefined, template: PluginTemplate | undefined, framework: string | undefined): Promise<void> {
   if (directory === undefined || template === undefined || !PLUGIN_TEMPLATES.includes(template)) {
     throw new Error(`${usage.trim()}\nAvailable templates: ${PLUGIN_TEMPLATES.join(', ')}`)
   }
+  if (framework !== undefined && template !== 'ui-view' && template !== 'ui-layout' && template !== 'ui-extension' && template !== 'suite') {
+    throw new Error('init: --framework applies to the ui-view, ui-layout, ui-extension, and suite templates')
+  }
+  // The UI faces bind one framework package: its name rides the manifest
+  // binding, the devDependencies, the template imports, and — through
+  // `client.externalSeeds` — the bundle's external surface (the framework's
+  // contributed seeds stay single-instance at runtime).
+  const ui = framework ?? '@snap-rail/framework-shadcn'
   const root = resolve(directory)
   const packageName = `@local/${root.split(/[\\/]/).at(-1) ?? 'snap-plugin'}`.toLowerCase().replaceAll(/[^a-z0-9@/_-]/g, '-')
   await mkdir(resolve(root, 'src'), { recursive: true })
   await mkdir(resolve(root, 'tests'), { recursive: true })
-  const manifest = templateManifest(template)
+  const client = template === 'ui-view' || template === 'ui-layout' || template === 'ui-extension' || template === 'suite'
+  const manifest = templateManifest(template, client ? ui : undefined)
   await writeFile(resolve(root, 'package.json'), `${JSON.stringify({
     name: packageName,
     version: '0.1.0',
     type: 'module',
-    ...(template === 'ui-view' || template === 'ui-layout' || template === 'suite' ? {} : { main: 'lib-host/host.js' }),
+    ...(client ? {} : { main: 'lib-host/host.js' }),
     scripts: { build: 'tsdown', test: 'vitest run', inspect: 'snap-rail-plugin inspect dist/*.zip' },
     devDependencies: {
       '@snap-rail/plugin-sdk': '^0.1.0',
       '@snap-rail/cordis': '^4.0.1',
       ...(template === 'driver' ? { '@snap-rail/equipment': '^0.1.0' } : {}),
       ...(template === 'store-provider' ? { '@snap-rail/store': '^0.1.0' } : {}),
-      ...(template === 'ui-view' || template === 'ui-layout' || template === 'suite'
+      ...(client
         ? {
-            '@snap-rail/framework-shadcn': '^0.1.0',
+            [ui]: '^0.1.0',
             react: '^19.0.0',
             'react-dom': '^19.0.0',
             '@types/react': '^19.0.0',
@@ -183,35 +192,58 @@ async function initPlugin(directory: string | undefined, template: PluginTemplat
     ...(template === 'driver' ? { dependencies: { zod: '^4.4.3' } } : {}),
     snapRail: manifest,
   }, null, 2)}\n`)
-  const client = template === 'ui-view' || template === 'ui-layout' || template === 'suite'
   await writeFile(resolve(root, 'tsdown.config.ts'), client
     ? `import { clientBundle } from '@snap-rail/plugin-sdk'\nexport default clientBundle(${JSON.stringify(packageName)}, 'src/client.tsx')\n`
     : `import { hostBundle } from '@snap-rail/plugin-sdk'\nexport default hostBundle('src/index.ts')\n`)
-  await writeFile(resolve(root, 'README.md'), `# ${packageName}\n\nGenerated snap-rail ${template} plugin.\n\nBuild with \`pnpm build\`; the release zip is assembled by the publisher, never from \`src/\`.\n`)
+  await writeFile(resolve(root, 'README.md'), `# ${packageName}\n\nGenerated snap-rail ${template} plugin${client ? ` bound to ${ui}` : ''}.\n\nBuild with \`pnpm build\`; the release zip is assembled by the publisher, never from \`src/\`.\n`)
   await writeFile(resolve(root, 'AGENTS.md'), pluginAgentGuide(template))
-  await writeFile(resolve(root, client ? 'src/client.tsx' : 'src/index.ts'), templateSource(template))
+  await writeFile(resolve(root, client ? 'src/client.tsx' : 'src/index.ts'), templateSource(template, client ? ui : undefined))
   await writeFile(resolve(root, 'tsconfig.json'), `${JSON.stringify({ extends: '@snap-rail/plugin-sdk/tsconfig.plugin.json', include: ['src', 'tests'] }, null, 2)}\n`)
-  console.log(`initialized ${packageName} in ${root}`)
+  console.log(`initialized ${packageName} in ${root}${client ? ` (framework: ${ui})` : ''}`)
 }
 
-function templateSource(template: PluginTemplate): string {
+function templateSource(template: PluginTemplate, ui?: string): string {
+  const boundUi = ui ?? '@snap-rail/framework-shadcn'
   if (template === 'driver') return `import '@snap-rail/equipment'\nimport { z } from 'zod'\nimport type { DriverRegistration } from '@snap-rail/equipment/driver'\nimport { definePlugin } from '@snap-rail/plugin-sdk'\n\nconst driver: DriverRegistration = {\n  id: 'generated-driver',\n  title: 'Generated driver',\n  schemas: { device: z.object({}), point: z.object({}) },\n  createConnection: () => ({ update() {}, dispose() {} }),\n}\n\nexport default definePlugin({\n  name: 'generated-driver',\n  inject: ['equipment'],\n  apply(ctx) { ctx.equipment.registerDriver(ctx, driver) },\n})\n`
   if (template === 'store-provider') return `import '@snap-rail/store'\nimport type { StoreService } from '@snap-rail/store'\nimport { definePlugin } from '@snap-rail/plugin-sdk'\n\nconst store: StoreService = {\n  register() { throw new Error('implement the store backend') },\n}\n\nexport default definePlugin({\n  name: 'generated-store-provider',\n  apply(ctx) { ctx.provide('store', store) },\n})\n`
-  if (template === 'ui-view') return `import '@snap-rail/framework-shadcn/semantic'\nimport { UI_SLOT_IDS } from '@snap-rail/framework-shadcn/slots'\nimport { definePlugin } from '@snap-rail/plugin-sdk'\n\nexport default definePlugin({\n  name: 'generated-ui-view',\n  inject: ['uiContract'],\n  apply(ctx) {\n    ctx.uiContract.registerView(ctx, { id: 'generated-ui-view', title: 'Generated view', slot: UI_SLOT_IDS.view, order: 100, render: () => null })\n  },\n})\n`
-  if (template === 'ui-layout') return `import '@snap-rail/framework-shadcn/semantic'\nimport { UI_SLOT_IDS } from '@snap-rail/framework-shadcn/slots'\nimport { definePlugin } from '@snap-rail/plugin-sdk'\n\nexport default definePlugin({\n  name: 'generated-ui-layout',\n  inject: ['uiContract'],\n  apply(ctx) {\n    ctx.uiContract.registerLayout(ctx, { id: 'generated-ui-layout', order: 0, slots: Object.values(UI_SLOT_IDS), render: () => null })\n  },\n})\n`
+  if (template === 'ui-view') return `import '${boundUi}/semantic'\nimport { UI_SLOT_IDS } from '${boundUi}/slots'\nimport { definePlugin } from '@snap-rail/plugin-sdk'\n\nexport default definePlugin({\n  name: 'generated-ui-view',\n  inject: ['uiContract'],\n  apply(ctx) {\n    ctx.uiContract.registerView(ctx, { id: 'generated-ui-view', title: 'Generated view', slot: UI_SLOT_IDS.view, order: 100, render: () => null })\n  },\n})\n`
+  if (template === 'ui-layout') return `import '${boundUi}/semantic'\nimport { UI_SLOT_IDS } from '${boundUi}/slots'\nimport { definePlugin } from '@snap-rail/plugin-sdk'\n\nexport default definePlugin({\n  name: 'generated-ui-layout',\n  inject: ['uiContract'],\n  apply(ctx) {\n    ctx.uiContract.registerLayout(ctx, { id: 'generated-ui-layout', order: 0, slots: Object.values(UI_SLOT_IDS), render: () => null })\n  },\n})\n`
+  if (template === 'ui-extension') return `import * as ui from '${boundUi}/ui'\n\n/** Shared components contributed back to every component plugin: the\n * client face exports a \`seeds\` map — the shell seeds \`<package>/<key>\`\n * ids from it and all consumers share these single instances. Build each\n * component on the framework's own primitives (the \`ui\` namespace), never\n * on a private copy. */\nconst widget = () => null\n\nexport default {\n  seeds: { widget },\n}\n`
   if (template === 'host-service') return `import { definePlugin } from '@snap-rail/plugin-sdk'\n/** Provide a Host capability here. */\nexport default definePlugin({ name: 'generated-host-service', apply() {} })\n`
   if (template === 'tool') return `import { definePlugin } from '@snap-rail/plugin-sdk'\n/** Register a standalone tool here. */\nexport default definePlugin({ name: 'generated-tool', apply() {} })\n`
   return `import { definePlugin } from '@snap-rail/plugin-sdk'\n/** Register a client suite here. */\nexport default definePlugin({ name: 'generated-suite', apply() {} })\n`
 }
 
-function templateManifest(template: PluginTemplate): Record<string, unknown> {
+function templateManifest(template: PluginTemplate, ui?: string): Record<string, unknown> {
+  const boundUi = ui ?? '@snap-rail/framework-shadcn'
   if (template === 'driver') return { kind: 'driver', layer: 'equipment', requires: ['service:equipment'], capabilities: { requires: [{ id: 'equipment.runtime', range: '^1.0.0' }] } }
   if (template === 'store-provider') return { kind: 'plugin', layer: 'store', exclusive: 'store-backend', capabilities: { provides: [{ id: 'store.backend', version: '1.0.0' }] } }
-  if (template === 'ui-view') return { kind: 'plugin', layer: 'ui', framework: '@snap-rail/framework-shadcn', clientOnly: true, client: { entry: 'lib-client/client.js' }, capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] } }
-  if (template === 'ui-layout') return { kind: 'plugin', layer: 'ui', framework: '@snap-rail/framework-shadcn', clientOnly: true, client: { entry: 'lib-client/client.js' }, capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] } }
+  if (template === 'ui-view') {
+    return {
+      kind: 'plugin', layer: 'ui', framework: boundUi, clientOnly: true,
+      client: { entry: 'lib-client/client.js', externalSeeds: [`${boundUi}/slots`, `${boundUi}/semantic`] },
+      capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] },
+    }
+  }
+  if (template === 'ui-layout') {
+    return {
+      kind: 'plugin', layer: 'ui', framework: boundUi, clientOnly: true,
+      client: { entry: 'lib-client/client.js', externalSeeds: [`${boundUi}/slots`, `${boundUi}/semantic`] },
+      capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] },
+    }
+  }
+  if (template === 'ui-extension') {
+    return {
+      kind: 'plugin', layer: 'ui', framework: boundUi, clientOnly: true,
+      // The extension's own shared components ride `client.seeds`; the
+      // components themselves build on the framework's contributed seeds.
+      client: { entry: 'lib-client/client.js', seeds: ['widget'], externalSeeds: [`${boundUi}/ui`] },
+      capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] },
+    }
+  }
   if (template === 'host-service') return { kind: 'plugin', layer: 'base' }
   if (template === 'tool') return { kind: 'plugin', layer: 'tool' }
-  return { kind: 'suite', layer: 'suite', exclusive: 'suite', framework: '@snap-rail/framework-shadcn', clientOnly: true, client: { entry: 'lib-client/client.js' }, capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] } }
+  return { kind: 'suite', layer: 'suite', exclusive: 'suite', framework: boundUi, client: { entry: 'lib-client/client.js' }, capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] } }
 }
 
 function pluginAgentGuide(template: PluginTemplate): string {
