@@ -13,7 +13,10 @@ import { releaseFiles, releaseManifest, zipFileName, type ReleaseSpec } from '..
 const suiteSpec: ReleaseSpec = {
   name: '@snap-rail/suite-terminal-ops',
   dir: join(import.meta.dirname, '../../../suite/terminal-ops'),
+  hostDir: 'lib',
+  hostFace: 'lib/stats.js',
   clientFace: 'lib-client',
+  exports: { './stats': 'lib/stats.js' },
 }
 
 const frameworkSpec: ReleaseSpec = {
@@ -38,24 +41,7 @@ const equipmentSpec: ReleaseSpec = {
   exports: { './rpc': 'lib/rpc.js', './contract': 'lib/contract.js' },
 }
 
-const trendSpec: ReleaseSpec = {
-  name: '@snap-rail/trend',
-  dir: join(import.meta.dirname, '../../../tool/trend'),
-  hostDir: 'lib',
-  hostFace: 'lib/index.js',
-  exports: { './contract': 'lib/contract.js' },
-}
-
-const forgeSpec: ReleaseSpec = {
-  name: '@snap-rail/forge',
-  dir: join(import.meta.dirname, '../../../tool/forge'),
-  hostDir: 'lib',
-  hostFace: 'lib/index.js',
-  clientFace: 'lib-client',
-  exports: { './contract': 'lib/contract.js' },
-}
-
-const HOSTED_SPECS = [modbusSpec, equipmentSpec, trendSpec, forgeSpec] as const
+const HOSTED_SPECS = [modbusSpec, equipmentSpec, suiteSpec] as const
 
 describe('release manifest derivation', () => {
   it('trims to npm identity + main + the exports voice and carries snapRail verbatim', () => {
@@ -92,7 +78,7 @@ describe('release manifest derivation', () => {
 
 describe('final-format assembly (built tree)', () => {
   it('clientOnly zip: manifest + client bundle + assets, no host face, no sources', async () => {
-    const files = await releaseFiles(suiteSpec)
+    const files = await releaseFiles(frameworkSpec)
     const paths = Object.keys(files).sort()
     expect(paths).toContain('package.json')
     expect(paths).toContain('lib-client/client.js')
@@ -100,13 +86,27 @@ describe('final-format assembly (built tree)', () => {
     expect(paths.every(path => !path.startsWith('src/'))).toBe(true)
     expect(paths.every(path => !path.endsWith('.d.ts') && !path.endsWith('.js.map'))).toBe(true)
     const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!))
-    expect(manifest.name).toBe('@snap-rail/suite-terminal-ops')
+    expect(manifest.name).toBe('@snap-rail/framework-shadcn')
     // clientOnly: main names the client bundle; the exports voice carries it.
     expect(manifest.main).toBe('lib-client/client.js')
     expect(manifest.exports).toEqual({ '.': 'lib-client/client.js' })
     expect(manifest.snapRail.clientOnly).toBe(true)
     expect(manifest.snapRail.category).toBe('界面')
-    expect(manifest.snapRail.title).toBe('生产作业套件')
+    expect(manifest.snapRail.client?.entry).toBe('lib-client/client.js')
+  })
+
+  it('dual-face zip: host face + client bundle, sources never', async () => {
+    const files = await releaseFiles(suiteSpec)
+    const paths = Object.keys(files).sort()
+    expect(paths).toContain('lib/stats.js')
+    expect(paths).toContain('lib-client/client.js')
+    expect(paths.every(path => !path.startsWith('src/'))).toBe(true)
+    expect(paths.every(path => !path.startsWith('lib/types/'))).toBe(true)
+    const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!))
+    // Dual-face: npm main names the host face; the client face rides snapRail.
+    expect(manifest.main).toBe('lib/stats.js')
+    expect(manifest.exports).toEqual({ '.': 'lib/stats.js', './stats': 'lib/stats.js' })
+    expect(manifest.snapRail.clientOnly).toBeUndefined()
     expect(manifest.snapRail.client).toEqual({ entry: 'lib-client/client.js' })
   })
 
@@ -194,12 +194,13 @@ describe('install round-trip', () => {
       const scanned = scanPluginPool([pool])
       const suite = scanned.get('@snap-rail/suite-terminal-ops')
       expect(suite?.kind).toBe('suite')
-      expect(suite?.clientOnly).toBe(true)
+      expect(suite?.clientOnly).toBeUndefined()
       expect(suite?.category).toBe('界面')
       expect(suite?.title).toBe('生产作业套件')
       expect(suite?.clientEntry).toBe('lib-client/client.js')
+      expect(suite?.requires).toEqual(['@snap-rail/framework-shadcn', '@snap-rail/equipment', 'service:store'])
       // The pool mounts exactly one host entry per package: the manifest main.
-      expect(suite?.entryUrl.endsWith('/lib-client/client.js')).toBe(true)
+      expect(suite?.entryUrl.endsWith('/lib/stats.js')).toBe(true)
       const driver = scanned.get('@snap-rail/driver-modbus')
       expect(driver?.kind).toBe('driver')
       expect(driver?.clientEntry).toBeUndefined()

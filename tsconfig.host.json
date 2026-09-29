@@ -40,8 +40,6 @@
     { "path": "./packages/base/kernel" },
     { "path": "./packages/base/modules" },
     { "path": "./packages/suite/terminal-ops" },
-    { "path": "./packages/tool/forge" },
-    { "path": "./packages/tool/trend" },
     { "path": "./apps/desktop" }
   ]
 }

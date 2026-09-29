@@ -39,7 +39,7 @@ import {
   type CountBinding,
   type ProductionStatsSnapshot,
   type ShiftName,
-} from '@snap-rail/trend/contract'
+} from './contract.ts'
 import { MAINTENANCE_COMPLETE } from './maintenance.tsx'
 import {
   deriveState,
@@ -48,7 +48,7 @@ import {
   type ModelInfo,
   type ProductionEvent,
   type ProductionState,
-} from '@snap-rail/trend/contract'
+} from './contract.ts'
 import '@snap-rail/framework-shadcn/slots'
 import '@snap-rail/framework-shadcn/runtime'
 import '@snap-rail/framework-shadcn/session'
@@ -93,8 +93,8 @@ export type ProductionConfig = z.infer<typeof productionConfigSchema>
 // The counting binding contract is shared with this package's host-side
 // counter (`./stats`) and re-exported here for consumers of the page's
 // public surface.
-export { COUNT_BINDING_KEY, DEFAULT_COUNT_BINDING, countBindingSchema } from '@snap-rail/trend/contract'
-export type { CountBinding } from '@snap-rail/trend/contract'
+export { COUNT_BINDING_KEY, DEFAULT_COUNT_BINDING, countBindingSchema } from './contract.ts'
+export type { CountBinding } from './contract.ts'
 
 declare module '@snap-rail/cordis' {
   interface Events {

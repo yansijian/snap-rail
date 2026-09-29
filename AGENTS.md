@@ -80,11 +80,12 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   已接受的决策**：Component 插件在 manifest 声明
   `snapRail.framework: '@snap-rail/framework-shadcn'`，框架不匹配不挂载
   （fail-loud）；换框架 = 换生态。Component 永不互相 import，只占槽。
-- **tool 层**：暂无规范缝，工具互不依赖（门禁强制）。现居民：`forge`（AI 创造）、
-  `trend`（班产统计：登录锚定班次、计数绑定点、8h 桶、`production/stats-changed` 帧；
-  纯 contract 面 `@snap-rail/trend/contract` 是随应用发布的 base 种子）。
-- **suite 层**：单包单行、clientOnly、单活（`snapRail.exclusive: 'suite'`
-  或 kind=suite 默认）。一个场景的全部界面合成一个套件包；启用套件经
+- **tool 层**：暂无规范缝，工具互不依赖（门禁强制）。暂无住户——场景私有
+  逻辑收进套件（见 suite 层），不再拆跨包场景工具。
+- **suite 层**：单包单行、可双面（宿主面 + 渲染面）、单活（`snapRail.exclusive: 'suite'`
+  或 kind=suite 默认）。一个场景的全部界面**与场景私有宿主逻辑**合成一个
+  套件包（班产计数住 `./stats`：store 缝持久化 + 订阅 equipment 点事件 +
+  `production/stats-changed` 帧）——杜绝跨包场景耦合；启用套件经
   `plugins.set-enabled` 自动停用其他同互斥组成员。
 
 ## 硬约定
@@ -93,10 +94,11 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   角色不独立演化不拆包。新增能力先补缝，再补首方实现。
 - **渲染面零宿主入口**：任何进浏览器图的代码禁止 import 双面包的宿主入口——
   node 侧实现（store-sqlite/drizzle/node:sqlite）永不进 client bundle；跨端消费
-  类型/schema 走该包 `./contract` 纯面（equipment/trend 的 contract 是随应用
-  发布的 base 种子）。渲染面运行时 require 的模块 id 必须在
+  类型/schema 走该包 `./contract` 纯面（equipment 的 contract 是随应用
+  发布的 base 种子；场景契约住在套件包内）。渲染面运行时 require 的模块 id 必须在
   `CLIENT_EXTERNALS`（= base 种子 `SEED_MODULES` ∪ 框架贡献种子
-  `CONTRIBUTED_SEED_MODULES`；基础层单源三处一致：种子表 = 客户端入口
+  `CONTRIBUTED_SEED_MODULES` ∪ 消费方 manifest 声明的 `client.externalSeeds`；
+  基础层单源三处一致：种子表 = 客户端入口
   播种 = `clientBundle` external，客户端入口 boot 时 parity fail-loud，加
   base id 是 base 层决策；框架的面经其 client 入口的 `seeds` 映射贡献，
   壳 require 后统一播种——跨插件共享框架单实例）。
@@ -192,13 +194,12 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   普通插件，挂载即校验本域持久数据的「永远应成立的规则」，违规以数据
   报告（logger + 事件），**永不修复、永不抛、不进默认组合**（`plugins.yml`
   子路径行显式挂载才生效）。现居民：`@snap-rail/app-boot/invariant`
-  （层文件不变量）、`@snap-rail/trend/invariant`（production_stats 表）。
+  （层文件不变量）。
 - **scope 作用域原语（`@snap-rail/scope`）**：`createScope(ctx, key)` 铸出
   带标签的子 context——注册上下文同时决定可见性与所有权（`ScopedLayers`
   注册表：本域贡献只对该 scope 可见、子域就近覆盖、销毁整层回收；
   `scopeTarget` 事件向上放行不下行）。**是可信路由不是沙箱**——信任边界
-  仍在进程/OS 层。forge 宿主半边白名单已含 `@snap-rail/scope`（生成插件
-  可自建作用域子世界）。
+  仍在进程/OS 层。
 - 命名：包一律 `@snap-rail/<name>`；目录 `packages/<层>/<包>`
   （base/store/equipment/ui/tool/suite 六组）；wire 名全 kebab-case（方法
   `域.资源.动词`、帧 `域/事件`）。

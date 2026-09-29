@@ -24,8 +24,6 @@ const CATALOG_ROWS: readonly string[] = [
   '@snap-rail/framework-shadcn',
   '@snap-rail/settings-station',
   '@snap-rail/equipment-station',
-  '@snap-rail/trend',
-  '@snap-rail/forge',
   '@snap-rail/suite-terminal-ops',
 ]
 

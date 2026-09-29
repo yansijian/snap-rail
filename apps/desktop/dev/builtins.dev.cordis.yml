@@ -25,11 +25,13 @@
   name: '@snap-rail/app-boot/rpc'
 - id: station-rpc
   name: '@snap-rail/station-rpc'
-# 班产统计: the trend tool's host face — counts the bound output point into
+# 班产统计: the suite's host face — counts the bound output point into
 # three 8-hour shift buckets (data/production_stats.db), anchored at login
 # time, and broadcasts the snapshot frames the production page renders.
-- id: trend
-  name: '@snap-rail/trend'
+# A subpath row: the plain suite name stays a renderer-only occupant
+# (rendererPackages carve-out), while ./stats mounts the host counter.
+- id: suite-stats
+  name: '@snap-rail/suite-terminal-ops/stats'
   config:
     flushMs: 1000
 # ModbusTCP: a pure protocol adapter over the equipment base. Devices, groups,

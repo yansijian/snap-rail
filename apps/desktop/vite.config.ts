@@ -59,7 +59,6 @@ function snapRailSources(): Plugin {
   sourceOf.set('@snap-rail/app-boot/contract', `${repoRoot}/packages/base/app-boot/src/contract.ts`)
   sourceOf.set('@snap-rail/station-rpc/contract', `${repoRoot}/packages/base/station-rpc/src/contract.ts`)
   sourceOf.set('@snap-rail/driver-modbus/contract', `${repoRoot}/packages/equipment/driver-modbus/src/contract.ts`)
-  sourceOf.set('@snap-rail/trend/contract', `${repoRoot}/packages/tool/trend/src/contract.ts`)
   sourceOf.set('@snap-rail/equipment/contract', `${repoRoot}/packages/equipment/equipment/src/contract.ts`)
   sourceOf.set('@snap-rail/plugin-kit/seeds', `${repoRoot}/packages/base/plugin-kit/src/seeds.ts`)
   // The unified 设备管理 settings page is the field base's renderer face; its

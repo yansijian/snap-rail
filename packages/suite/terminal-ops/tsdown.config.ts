@@ -5,22 +5,28 @@ import { defineConfig } from 'tsdown'
 import { clientBundle } from '@snap-rail/plugin-kit/src/build.ts'
 
 /**
- * The suite's two outputs: the workspace renderer entry (lib/index.js —
- * Vite-bundled into dist/client for the dev harness's static path) and the
- * installable client face (lib-client/client.js — the CJS factory bundle
- * the pool-installed renderer loads over snap-plugin://, seeds external).
- * The package is clientOnly: the host-side shift counter lives in
- * @snap-rail/trend since the trend extraction; no host face ships.
+ * The suite's two faces in one package:
+ *
+ * - host (`src/stats.ts` → `lib/stats.js`, the `./stats` subpath and npm
+ *   main): the durable shift counter — settings seam + store tables +
+ *   `production/stats-changed` frames. tsc compiles it to
+ *   `lib/types/stats.js`; this config re-bundles that node-side output.
+ * - renderer (`src/index.tsx` → `lib-client/client.js`): the installable
+ *   CJS factory bundle the pool-installed renderer loads over
+ *   snap-plugin://, seeds external. The dev harness mounts the renderer
+ *   from source (vite sourceOf) and the host from the built `./stats`.
  */
 export default defineConfig([
   {
-    entry: { index: 'lib/types/index.js' },
+    entry: { stats: 'lib/types/stats.js' },
     outDir: 'lib',
     format: ['esm'],
-    platform: 'browser',
+    platform: 'node',
     target: 'es2024',
+    fixedExtension: false,
     dts: false,
     clean: false,
+    external: [/\.(png|jpe?g|webp|gif|svg)$/, /\.css$/],
   },
   clientBundle('@snap-rail/suite-terminal-ops', 'src/index.tsx'),
 ])

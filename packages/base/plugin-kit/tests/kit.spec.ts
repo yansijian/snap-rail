@@ -43,11 +43,11 @@ describe('seed tiers', () => {
     // Spine faces the renderer consumes at runtime: contract subpaths, the
     // timer primitives, and the pure utilities.
     expect(SEED_MODULES).toContain('@snap-rail/equipment/contract')
-    expect(SEED_MODULES).toContain('@snap-rail/trend/contract')
     expect(SEED_MODULES).toContain('@snap-rail/util')
     expect(SEED_MODULES).toContain('@snap-rail/cordis-plugin-timer')
-    // No plugin packages: cross-plugin value imports are forbidden.
-    expect(SEED_MODULES.filter(id => id.includes('suite-') || id.includes('driver-'))).toEqual([])
+    // No plugin packages: cross-plugin value imports are forbidden — a
+    // scenario's contract lives inside its suite package.
+    expect(SEED_MODULES.filter(id => id.includes('suite-') || id.includes('driver-') || id.includes('trend'))).toEqual([])
     // No host entries: the node side must never enter the client graph.
     expect(SEED_MODULES.filter(id => id === '@snap-rail/equipment' || id === '@snap-rail/store')).toEqual([])
     // The framework's faces are NOT base — they arrive with the installed

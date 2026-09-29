@@ -79,27 +79,15 @@ export const PLUGIN_PACKAGES: readonly ReleaseSpec[] = [
     dir: join(repoRoot, 'packages/ui/equipment-station'),
     clientFace: 'lib-client',
   },
-  // 工具：班产统计（宿主计数器）与 forge（AI 创造）。
-  {
-    name: '@snap-rail/trend',
-    dir: join(repoRoot, 'packages/tool/trend'),
-    hostDir: 'lib',
-    hostFace: 'lib/index.js',
-    exports: { './contract': 'lib/contract.js' },
-  },
-  {
-    name: '@snap-rail/forge',
-    dir: join(repoRoot, 'packages/tool/forge'),
-    hostDir: 'lib',
-    hostFace: 'lib/index.js',
-    clientFace: 'lib-client',
-    exports: { './contract': 'lib/contract.js' },
-  },
-  // 业务套件：一个工业场景的全部界面（clientOnly、单活）。
+  // 业务套件：一个工业场景的全部界面 + 宿主侧班产计数（双面包，
+  // clientOnly 已移除——场景逻辑收在套件内，不再拆跨包场景工具）。
   {
     name: '@snap-rail/suite-terminal-ops',
     dir: join(repoRoot, 'packages/suite/terminal-ops'),
+    hostDir: 'lib',
+    hostFace: 'lib/stats.js',
     clientFace: 'lib-client',
+    exports: { './stats': 'lib/stats.js' },
   },
 ]
 

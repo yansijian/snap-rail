@@ -17,8 +17,7 @@ import { z } from 'zod'
 import type { DomainContract, MethodRow } from '../packages/base/protocol/src/contract.ts'
 import { pluginsContract, updateContract } from '../packages/base/app-boot/src/contract.ts'
 import { equipmentContract } from '../packages/equipment/equipment/src/wire.ts'
-import { forgeContract } from '../packages/tool/forge/src/contract.ts'
-import { productionContract } from '../packages/tool/trend/src/contract.ts'
+import { productionContract } from '../packages/suite/terminal-ops/src/contract.ts'
 import { stationContract } from '../packages/base/station-rpc/src/contract.ts'
 
 const root = join(import.meta.dirname, '..')
@@ -30,7 +29,6 @@ const CONTRACTS: readonly DomainContract[] = [
   pluginsContract,
   updateContract,
   equipmentContract,
-  forgeContract,
   productionContract,
 ]
 

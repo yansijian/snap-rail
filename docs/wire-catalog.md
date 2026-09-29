@@ -104,35 +104,6 @@ hand-written face and are documented statically here.
 | `equipment/mappings-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} |
 | `equipment/structure-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} |
 
-## forge
-
-### Methods
-
-| method | request schema | response schema |
-|---|---|---|
-| `forge.session.list` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
-| `forge.session.messages` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"sessionId":{"type":"string","minLength":1}},"required":["sessionId"],"additionalProperties":false} | — |
-| `forge.session.send` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"sessionId":{"type":"string","minLength":1},"text":{"type":"string","minLength":1,"maxLength":16000},"focusPluginId":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,38}$"}},"required":["text"],"additionalProperties":false} | — |
-| `forge.session.stop` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"sessionId":{"type":"string","minLength":1}},"required":["sessionId"],"additionalProperties":false} | — |
-| `forge.session.remove` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"sessionId":{"type":"string","minLength":1}},"required":["sessionId"],"additionalProperties":false} | — |
-| `forge.plugin.list` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
-| `forge.plugin.read` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,38}$"},"versionId":{"type":"string","minLength":1}},"required":["id"],"additionalProperties":false} | — |
-| `forge.plugin.set-enabled` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,38}$"},"enabled":{"type":"boolean"}},"required":["id","enabled"],"additionalProperties":false} | — |
-| `forge.plugin.set-version` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,38}$"},"versionId":{"type":"string","pattern":"^v\\d+$"}},"required":["id","versionId"],"additionalProperties":false} | — |
-| `forge.plugin.remove` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,38}$"}},"required":["id"],"additionalProperties":false} | — |
-| `forge.plugin.export` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,38}$"},"versionId":{"type":"string","pattern":"^v\\d+$"},"path":{"type":"string","minLength":1,"maxLength":1024}},"required":["id","path"],"additionalProperties":false} | — |
-| `forge.client-report` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,38}$"},"versionId":{"type":"string","minLength":1},"stage":{"type":"string","enum":["load","render"]},"ok":{"type":"boolean"},"message":{"type":"string","maxLength":8000}},"required":["id","versionId","stage","ok"],"additionalProperties":false} | — |
-| `forge.gen-faces` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
-
-### Frames
-
-| frame | payload schema |
-|---|---|
-| `forge/session-delta` | {"$schema":"https://json-schema.org/draft/2020-12/schema","oneOf":[{"type":"object","properties":{"kind":{"type":"string","const":"text"},"sessionId":{"type":"string","minLength":1},"text":{"type":"string"}},"required":["kind","sessionId","text"],"additionalProperties":false},{"type":"object","properties":{"kind":{"type":"string","const":"tool"},"sessionId":{"type":"string","minLength":1},"tool":{"type":"string","minLength":1},"phase":{"type":"string","enum":["start","end"]},"input":{},"output":{},"ok":{"type":"boolean"}},"required":["kind","sessionId","tool","phase"],"additionalProperties":false},{"type":"object","properties":{"kind":{"type":"string","const":"state"},"sessionId":{"type":"string","minLength":1},"state":{"type":"string","enum":["running","idle","error"]},"message":{"type":"string"}},"required":["kind","sessionId","state"],"additionalProperties":false}]} |
-| `forge/plugins-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} |
-| `forge/gen-mounted` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,38}$"},"versionId":{"type":"string","minLength":1},"src":{"type":"string"}},"required":["id","versionId","src"],"additionalProperties":false} |
-| `forge/gen-unmounted` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"id":{"type":"string","pattern":"^[a-z][a-z0-9-]{1,38}$"}},"required":["id"],"additionalProperties":false} |
-
 ## production
 
 ### Frames

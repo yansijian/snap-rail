@@ -57,7 +57,6 @@
     "@snap-rail/driver-modbus": "workspace:^",
     "@snap-rail/driver-enip": "workspace:^",
     "@snap-rail/equipment": "workspace:^",
-    "@snap-rail/store-sqlite": "workspace:^",
-    "@snap-rail/trend": "workspace:^"
+    "@snap-rail/store-sqlite": "workspace:^"
   }
 }

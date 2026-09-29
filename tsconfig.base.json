@@ -81,10 +81,6 @@
       "@snap-rail/client-modules": ["./packages/base/modules/src"],
       "@snap-rail/settings-station": ["./packages/ui/settings-station/src"],
       "@snap-rail/suite-terminal-ops": ["./packages/suite/terminal-ops/src"],
-      "@snap-rail/trend": ["./packages/tool/trend/src/index.ts"],
-      "@snap-rail/trend/contract": ["./packages/tool/trend/src/contract.ts"],
-      "@snap-rail/forge": ["./packages/tool/forge/src"],
-      "@snap-rail/forge/contract": ["./packages/tool/forge/src/contract.ts"],
       "@snap-rail/station-rpc": ["./packages/base/station-rpc/src"],
       "@snap-rail/station-rpc/contract": ["./packages/base/station-rpc/src/contract.ts"]
     }

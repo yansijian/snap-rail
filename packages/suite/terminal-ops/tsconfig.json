@@ -24,7 +24,6 @@
     { "path": "../../base/connection" },
     { "path": "../../base/settings" },
     { "path": "../../store/store" },
-    { "path": "../../tool/trend" },
     { "path": "../../ui/framework-shadcn" }
   ]
 }

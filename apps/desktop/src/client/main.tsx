@@ -12,10 +12,6 @@
  *   enabled, the kernel's bootstrap install page (drag a zip in, enable,
  *   restart) is the terminal's whole interface.
  *
- * The same entry serves the AI 创造 studio window (`?window=forge`): that
- * window loads only the forge face — its layout occupant is the whole
- * window.
- *
  * @module @snap-rail/desktop/client-main
  */
 
@@ -34,7 +30,6 @@ import * as protocol from '@snap-rail/protocol'
 import * as stationRpcContract from '@snap-rail/station-rpc/contract'
 import * as appBootContract from '@snap-rail/app-boot/contract'
 import * as equipmentContract from '@snap-rail/equipment/contract'
-import * as trendContract from '@snap-rail/trend/contract'
 import * as snapRailUtil from '@snap-rail/util'
 import { SEED_MODULES } from '@snap-rail/plugin-kit/seeds'
 import * as cordis from '@snap-rail/cordis'
@@ -43,9 +38,6 @@ import type { Plugin } from '@snap-rail/cordis'
 
 const element = document.getElementById('root')
 if (element === null) throw new Error('client: #root is missing from index.html')
-
-// The studio window branch: same entry, different occupant set (below).
-const studioWindow = new URLSearchParams(window.location.search).get('window') === 'forge'
 
 // The module system: installed plugins' client bundles register through the
 // global; the seed table hands them the same instances this bundle uses.
@@ -75,7 +67,6 @@ const SEED_TABLE: ReadonlyArray<readonly [id: string, module: unknown]> = [
   ['@snap-rail/station-rpc/contract', stationRpcContract],
   ['@snap-rail/app-boot/contract', appBootContract],
   ['@snap-rail/equipment/contract', equipmentContract],
-  ['@snap-rail/trend/contract', trendContract],
   ['@snap-rail/util', snapRailUtil],
   ['zod', zod],
 ]
@@ -97,9 +88,9 @@ const rows = configResult.ok ? configResult.value.rows : []
 
 if (import.meta.env.DEV) {
   const harness = await import('./dev-harness.tsx')
-  await harness.runDevRenderer({ handle, system, rows, studioWindow })
+  await harness.runDevRenderer({ handle, system, rows })
 } else {
-  await runPoolRenderer({ handle, system, rows, studioWindow })
+  await runPoolRenderer({ handle, system, rows })
 }
 
 /** A cordis plugin face (the provider faces export `{ seeds }` instead). */
@@ -131,9 +122,8 @@ async function runPoolRenderer(options: {
   handle: ClientHandle
   system: ModuleSystem
   rows: readonly (typeof rows)[number][]
-  studioWindow: boolean
 }): Promise<void> {
-  const { handle, system, rows, studioWindow } = options
+  const { handle, system, rows } = options
   const enabled = rows.filter(
     (row): row is (typeof rows)[number] & { clientUrl: string } =>
       row.enabled !== false && row.clientUrl !== undefined,
@@ -144,7 +134,6 @@ async function runPoolRenderer(options: {
 
   const faces: LoadedFace[] = []
   for (const row of ordered) {
-    if (studioWindow && row.name !== '@snap-rail/forge' && row.kind !== 'framework') continue
     try {
       await loadPluginBundle(document, row.clientUrl)
       const value = system.require(row.name)

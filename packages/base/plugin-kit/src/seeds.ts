@@ -12,13 +12,13 @@
  * spine decision.
  *
  * `CONTRIBUTED_SEED_MODULES` is the **installed tier**: ids that arrive with
- * an installed plugin's client face (the framework's primitives, tool
- * contracts). The provider's client entry default-exports a `seeds` map
- * (`{ seeds: { ui: namespace, … } }`); the shell requires the face once and
- * seeds every `<package>/<key>` id from that map, so every consumer shares
- * the provider's single instances. The shell never seeds these itself — an
- * absent provider simply leaves the ids unseeded and dependent faces skip
- * with a load error instead of mounting half a UI.
+ * an installed plugin's client face (the framework's primitives, an
+ * extension pack's components). The provider's client entry default-exports
+ * a `seeds` map (`{ seeds: { ui: namespace, … } }`); the shell requires the
+ * face once and seeds every `<package>/<key>` id from that map, so every
+ * consumer shares the provider's single instances. The shell never seeds
+ * these itself — an absent provider simply leaves the ids unseeded and
+ * dependent faces skip with a load error instead of mounting half a UI.
  *
  * `CLIENT_EXTERNALS` (the union) is the external surface client bundles
  * build against: the plugin-kit's client preset externalizes exactly these
@@ -42,7 +42,6 @@ export const SEED_MODULES: readonly string[] = [
   '@snap-rail/station-rpc/contract',
   '@snap-rail/app-boot/contract',
   '@snap-rail/equipment/contract',
-  '@snap-rail/trend/contract',
   '@snap-rail/util',
   'zod',
 ]
@@ -51,11 +50,11 @@ export const SEED_MODULES: readonly string[] = [
  * Module ids installed plugins contribute through their client face's
  * `seeds` map — the framework tier: every face of an installed UI framework
  * (primitives, slot registry, runtime, fallback) serves as a shared
- * instance for the components bound to it. The wire contracts
- * (`equipment/contract`, `trend/contract`) ride the base tier instead —
- * they are the station platform's API surface, not an installed framework's.
- * A third-party framework contributes its own ids; this list covers the
- * in-repo builds.
+ * instance for the components bound to it. The equipment wire contract
+ * rides the base tier instead — it is the station platform's API surface,
+ * not an installed framework's; a scenario's own contract stays inside its
+ * suite package. A third-party framework contributes its own ids; this
+ * list covers the in-repo builds.
  */
 export const CONTRIBUTED_SEED_MODULES: readonly string[] = [
   '@snap-rail/framework-shadcn/ui',

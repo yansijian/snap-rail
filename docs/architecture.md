@@ -55,7 +55,7 @@
   （规范包）+ Provider（实现/实例包）+ Consumer；消费者只依赖规范包并
   `inject` 对应服务，provider 缺席时依赖它的插件不激活（终端仍可启动，
   framework 的 fallback 布局兜底）。**规范随应用、实现随插件**：纯类型/
-  契约面（`@snap-rail/store`、equipment/trend 的 `./contract`）随应用
+  契约面（`@snap-rail/store`、equipment 的 `./contract`）随应用
   惰性发布，可替换的实现全部走池。
 
 ## 进程模型
@@ -82,10 +82,6 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
   （恢复控制台）就是全部界面**：空白页 + 右上角关闭 + 中央「拖拽插件包
   （.zip）到此处安装」——inspect → 确认 → 安装 → 启用 → 重启，全走
   常规 `plugins.*`/`window.*` 方法。
-- **第二窗口（AI 创造）**：`window.open-forge` 开一个单例 frameless
-  窗口，加载同一渲染入口 + `?window=forge`——该分支只装 `@snap-rail/forge`
-  的池面、跳过内置住户清单；carrier 的帧端口按 WebContents 天然多开，
-  广播扇出到全部窗口，`window.control` 用 `target:'forge'` 定向。
 - **文件即接口**：`plugins.yml` 同时被页面按钮、手编、Agent 编辑——一条
   热重载路径服务全部三种来源。
 
@@ -113,9 +109,7 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
 | UI 框架 | `ui/framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 绑定 `snapRail.framework`；换框架 = 换生态 |
 | 设置外壳 | `ui/settings-station` | 设置对话框壳 + 插件管理页（按 `snapRail.category` 标记动态分组——声明即归组、不问来源；未声明的安装/preset 行落「其他」，未声明的受保护出厂行恒归「内置」组垫底；分节可折叠 + 全部折叠/展开；条目平铺无组卡，`snapRail.title` 标题为主、包名小字次要；行无来源徽标；套件 radio 卡；内置/用户层行禁操作+悬浮提示）+ 主题页；clientOnly zip |
 | 统一设备管理页 | `ui/equipment-station` | equipment 缝的渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 equipment 语义节）；clientOnly zip，`requires` 声明框架与 equipment |
-| 班产趋势 | `tool/trend` | 班产计数工具（宿主面 zip）：跟随计数绑定点正增量、按三班 8-16/16-24/0-8 落 `ctx.store`、登录时刻锚定班次、`production/stats-changed` 帧广播快照；纯 `./contract` 面（班次/快照/理论曲线）是随应用发布的 base 种子，`requires` 声明 equipment 与 `service:store` |
-| AI 创造工坊 | `tool/forge` | **常驻外部可装插件**（zip 发行，与业务套件共存）：OpenAI 兼容流式 Agent 循环 + `rail_*` 五工具造运行时插件；版本不可变、`data/forge.db` 持久、boot 重挂；三段错误回喂修复环；独立工作室窗口；`forge.plugin.export` 合成可安装 zip；工具互不依赖（层门禁） |
-| 业务套件 | `suite/terminal-ops` | **套件 = 单包单行**（互斥组 `suite`，单活，clientOnly）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）。生产页消费 `@snap-rail/trend/contract` 渲染班产快照与理论曲线；`requires` 声明框架、trend、equipment |
+| 业务套件 | `suite/terminal-ops` | **套件 = 单包单行，可双面**（互斥组 `suite`，单活）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）；宿主面 `./stats` 是同一场景的持久班产计数（store 缝 + 登录锚定 + `production/stats-changed` 帧），契约面为包内私面——场景逻辑收在套件内，杜绝跨包场景工具；`requires` 声明框架、equipment、`service:store` |
 
 ## 工作站语义（station 层）
 
@@ -131,9 +125,9 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
   （`session.operatorId`），重启保持登录，标题栏提供退出登录换人；换人后
   `operator-day` 门控自动重算（换人重做当日维护）。
 - **生产理论计数**：rate × 净运行时长；故障与停机区间取并集剔除，故障与
-  停机可并发。理论曲线函数住在 `@snap-rail/trend/contract`。
-- **班产统计（实际计数）**：计数在宿主侧运行——`@snap-rail/trend`
-  （tool 层）：监听 equipment 的 `point/updated`、只累计正增量（负增量=
+  停机可并发。理论曲线函数住在套件自己的 `./contract` 面。
+- **班产统计（实际计数）**：计数在宿主侧运行——套件的双面宿主
+  `./stats`：监听 equipment 的 `point/updated`、只累计正增量（负增量=
   计数器复位忽略、`null`=异常重播种基线），按三班分桶落 store
   （班行 + 小时桶 + 登录锚），页面开闭/注销/重启都不丢。
   班次以**登录时刻**锚定：整个登录会话计入登录时所在班，只有退出重登
@@ -190,11 +184,11 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
 - **互斥组单活**：启用带 `snapRail.exclusive`（或 kind=suite 默认组）的包
   时，`plugins.set-enabled` 在同一次 `setUserRows` 批量写里停用同组其他
   成员的全部行——套件、框架、store 实现都走这一条路。退役行名（包合并
-  遗留，含 field→equipment、suite/stats→trend、driver-mock 整包删除）
-  在 `loadUserLayer` 内存态改名到后继行、彻底退役的行直接丢弃；**不再随
-  包发布的一方包行**（equipment/store-sqlite/trend/driver-modbus/套件/
-  框架/两 station/forge）在池中无副本时自动退役（装回即复活），老文件
-  升级不炸组合，下次写回自然收敛。
+  遗留，含 field→equipment、suite/stats→trend、trend/forge 整包删除、
+  driver-mock 整包删除）在 `loadUserLayer` 内存态改名到后继行、彻底退役
+  的行直接丢弃；**不再随包发布的一方包行**（equipment/store-sqlite/
+  trend/driver-modbus/forge/套件/框架/两 station）在池中无副本时自动
+  退役（装回即复活），老文件升级不炸组合，下次写回自然收敛。
 - 坏文件（YAML 解析失败、未知插件引用）**保持当前树运行**并报错；
   修好文件后下一次写自然恢复。扫描池回答"有什么"，清单回答"挂什么"。
 
@@ -253,14 +247,12 @@ schema；`interface RpcMethodMap extends MethodRows<typeof contract> {}`
   校验本域持久数据的"永远应成立的规则"，违规以数据报告（logger +
   cordis 事件），永不修复、永不抛、不进默认组合——诊断与运行时解耦。
   现居民：`@snap-rail/app-boot/invariant`（行可解析、互斥组单活、
-  requires 双向满足），`@snap-rail/trend/invariant`（计数非负、
-  小时桶对齐、班次键合法、锚点单行）。
+  requires 双向满足）。
 - **`@snap-rail/scope`**（移植自 deepseek-harness dsh-scope，同源
   vendored cordis）:`createScope(ctx, key)` 铸带标签子 context——
   注册上下文即决定可见性与所有权（`ScopedLayers`：本域贡献只对该
   scope 可见、子域就近覆盖、dispose 整层回收；`scopeTarget` 事件沿
-  父链向上放行）。**可信路由而非沙箱**；宿主半边白名单已对 forge
-  生成插件开放。
+  父链向上放行）。**可信路由而非沙箱**。
 
 ### 高频点值与帧消费
 
@@ -445,13 +437,13 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
 - **渲染端模块系统**（`base/modules` + desktop 客户端入口）：种子两层。
   **base 层**（`SEED_MODULES`）由客户端入口静态播种并 parity fail-loud
   ——react 家族、cordis、timer、kernel/modules、connection/protocol、
-  station-rpc/app-boot/equipment/trend 的 `./contract`、util、zod（契约
-  面随应用发布）。**贡献层**（`CONTRIBUTED_SEED_MODULES`）由已安装框架的
-  client 面提供：框架入口默认导出 `{ seeds: { ui, slots, …, runtime } }`，
-  壳 require 该面后逐 id `system.seed('<包>/<子路径>', 实例)`——每个
-  Component 与框架共享同一份原语/槽位/运行时实例。装载顺序：framework
-  行 → 其他种子提供方（`client.seeds` 非空）→ 普通住户面；`?window=forge`
-  分支只装 forge 面与框架。
+  station-rpc/app-boot/equipment 的 `./contract`、util、zod（契约
+  面随应用发布；场景契约住在套件包内，不入种子）。**贡献层**
+  （`CONTRIBUTED_SEED_MODULES` + 消费方 `client.externalSeeds`）由已安装
+  框架/扩展库的 client 面提供：框架入口默认导出 `{ seeds: { ui, slots, …,
+  runtime } }`，壳 require 该面后逐 id `system.seed('<包>/<子路径>', 实例)`
+  ——每个 Component 与框架共享同一份原语/槽位/运行时实例。装载顺序：
+  framework 行 → 其他种子提供方（`client.seeds` 非空）→ 普通住户面。
 - **无框架引导**：没有已启用的 framework 行时渲染 `kernel` 的引导安装页
   （拖拽 zip → `zipPathOf` 桥 → inspect/confirm → install → 启用开关 →
   重启按钮），关闭回到连接页、角落入口重开——base 永远是救生艇。
@@ -475,9 +467,10 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
   文件需可 watch。防篡改需求出现时再评估自定义协议方案。
 - **出厂净身**：desktop 生产依赖 = base 包 + 纯类型规范包
   `@snap-rail/store` + 共享库（zod/drizzle-orm/electron-updater）；
-  equipment/trend 的 `./contract` 以 base 种子形态随客户端 bundle 发布。
+  equipment 的 `./contract` 以 base 种子形态随客户端 bundle 发布（场景
+  契约住在套件包内）。
   一切可替换实现（store-sqlite、equipment、驱动、framework、两 station、
-  trend、forge、套件）不在生产依赖里——只能 zip 安装。
+  套件）不在生产依赖里——只能 zip 安装。
 - 发行插件 zip 由 `pnpm run pack:plugins` 产出（`dist-plugins/`），
   **最终格式 = 精简 manifest（含 exports 映射）+ 构建产物，无源码**。
   `scripts/install-dev-plugins.ts <home>` 把全量 zip 装进任意 home 并启用

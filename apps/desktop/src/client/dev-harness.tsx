@@ -37,7 +37,6 @@ export interface DevHarnessOptions {
   handle: ClientHandle
   system: ModuleSystem
   rows: readonly ClientConfigRow[]
-  studioWindow: boolean
 }
 
 /**
@@ -46,7 +45,7 @@ export interface DevHarnessOptions {
  * of the same name), and hand the root to the client runtime.
  */
 export async function runDevRenderer(options: DevHarnessOptions): Promise<void> {
-  const { handle, system, rows, studioWindow } = options
+  const { handle, system, rows } = options
 
   // The contributed-seed tier, dev flavor: the framework's faces, seeded
   // here from the app bundle's own instances (the wire contracts ride the
@@ -65,13 +64,10 @@ export async function runDevRenderer(options: DevHarnessOptions): Promise<void> 
   for (const [id, module] of CONTRIBUTED_TABLE) system.seed(id, module)
 
   // Pool-installed client faces: fetch each bundle (the wrapper registers
-  // through the global) and require the value back. The studio window loads
-  // only the forge face — other faces' registrations target the main
-  // window's chrome and must not run twice.
+  // through the global) and require the value back.
   const installed: Array<{ name: string, plugin: Plugin }> = []
   for (const row of rows) {
     if (row.enabled === false || row.clientUrl === undefined) continue
-    if (studioWindow && row.name !== '@snap-rail/forge' && row.kind !== 'framework') continue
     try {
       await loadPluginBundle(document, row.clientUrl)
       const value = system.require(row.name) as Plugin | { seeds: Record<string, unknown> }
@@ -79,16 +75,6 @@ export async function runDevRenderer(options: DevHarnessOptions): Promise<void> 
     } catch (cause) {
       console.error(`client: plugin face "${row.name}" failed to load`, cause)
     }
-  }
-
-  if (studioWindow) {
-    const seats: (Plugin | OccupantSpec)[] = []
-    for (const seat of installed) {
-      const row = rows.find(candidate => candidate.name === seat.name)
-      seats.push(row?.config === undefined ? seat.plugin : { plugin: seat.plugin, config: row.config })
-    }
-    await createClientRuntime(handle, { plugins: seats })
-    return
   }
 
   // This build's shipped occupants — the pairing must cover the shipped

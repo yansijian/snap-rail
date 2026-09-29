@@ -134,9 +134,6 @@ importers:
       '@snap-rail/suite-terminal-ops':
         specifier: workspace:^
         version: link:../../packages/suite/terminal-ops
-      '@snap-rail/trend':
-        specifier: workspace:^
-        version: link:../../packages/tool/trend
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
@@ -408,7 +405,7 @@ importers:
         version: link:../../store/store
       '@testing-library/react':
         specifier: ^16.3.3
-        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       happy-dom:
         specifier: ^18.0.0
         version: 18.0.0
@@ -481,9 +478,6 @@ importers:
 
   packages/suite/terminal-ops:
     dependencies:
-      '@snap-rail/trend':
-        specifier: workspace:^
-        version: link:../../tool/trend
       '@snap-rail/util':
         specifier: workspace:^
         version: link:../../base/util
@@ -537,101 +531,6 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8
 
-  packages/tool/forge:
-    dependencies:
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2
-      fflate:
-        specifier: ^0.8.3
-        version: 0.8.3
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@snap-rail/audit':
-        specifier: workspace:^
-        version: link:../../base/audit
-      '@snap-rail/client-kernel':
-        specifier: workspace:^
-        version: link:../../base/kernel
-      '@snap-rail/client-modules':
-        specifier: workspace:^
-        version: link:../../base/modules
-      '@snap-rail/connection':
-        specifier: workspace:^
-        version: link:../../base/connection
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/equipment':
-        specifier: workspace:^
-        version: link:../../equipment/equipment
-      '@snap-rail/framework-shadcn':
-        specifier: workspace:^
-        version: link:../../ui/framework-shadcn
-      '@snap-rail/gateway':
-        specifier: workspace:^
-        version: link:../../base/gateway
-      '@snap-rail/plugin-kit':
-        specifier: workspace:^
-        version: link:../../base/plugin-kit
-      '@snap-rail/protocol':
-        specifier: workspace:^
-        version: link:../../base/protocol
-      '@snap-rail/scope':
-        specifier: workspace:^
-        version: link:../../base/scope
-      '@snap-rail/settings':
-        specifier: workspace:^
-        version: link:../../base/settings
-      '@snap-rail/store':
-        specifier: workspace:^
-        version: link:../../store/store
-      '@types/react':
-        specifier: ^19.2.14
-        version: 19.2.18
-      lucide-react:
-        specifier: ^1.34.0
-        version: 1.34.0(react@19.2.8)
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-
-  packages/tool/trend:
-    dependencies:
-      drizzle-orm:
-        specifier: ^0.45.2
-        version: 0.45.2
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@snap-rail/cordis':
-        specifier: workspace:^
-        version: link:../../../vendor/cordis
-      '@snap-rail/cordis-plugin-timer':
-        specifier: workspace:^
-        version: link:../../../vendor/timer
-      '@snap-rail/equipment':
-        specifier: workspace:^
-        version: link:../../equipment/equipment
-      '@snap-rail/gateway':
-        specifier: workspace:^
-        version: link:../../base/gateway
-      '@snap-rail/settings':
-        specifier: workspace:^
-        version: link:../../base/settings
-      '@snap-rail/store':
-        specifier: workspace:^
-        version: link:../../store/store
-      '@snap-rail/store-sqlite':
-        specifier: workspace:^
-        version: link:../../store/store-sqlite
-      '@types/node':
-        specifier: ^22.20.0
-        version: 22.20.1
-
   packages/ui/equipment-station:
     devDependencies:
       '@snap-rail/audit':
@@ -666,7 +565,7 @@ importers:
         version: link:../../store/store-sqlite
       '@testing-library/react':
         specifier: ^16.3.3
-        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
@@ -757,10 +656,10 @@ importers:
         version: link:../../base/station-rpc
       '@testing-library/dom':
         specifier: ^10.4.0
-        version: 10.4.1
+        version: 10.4.2
       '@testing-library/react':
         specifier: ^16.1.0
-        version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.18
@@ -1984,8 +1883,8 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
 
-  '@testing-library/dom@10.4.1':
-    resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
+  '@testing-library/dom@10.4.2':
+    resolution: {integrity: sha512-yzr2S9HyAIdhz2/6qHgbs665Q7PKVcDF05vsOlHPxG1mo36gKVesdYVeDLnXgfjJ03CrKRk08knc6+E/9m8v2Q==}
     engines: {node: '>=18'}
 
   '@testing-library/react@16.3.3':
@@ -4249,7 +4148,7 @@ snapshots:
       '@types/istanbul-reports': 3.0.4
       '@types/node': 22.20.1
       '@types/yargs': 16.0.11
-      chalk: 4.1.2
+      chalk: 4.1.0
 
   '@jridgewell/gen-mapping@0.3.12':
     dependencies:
@@ -4873,7 +4772,7 @@ snapshots:
       tailwindcss: 4.3.3
       vite: 8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)
 
-  '@testing-library/dom@10.4.1':
+  '@testing-library/dom@10.4.2':
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/runtime': 7.29.7
@@ -4884,10 +4783,10 @@ snapshots:
       picocolors: 1.1.1
       pretty-format: 27.0.2
 
-  '@testing-library/react@16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@testing-library/react@16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@babel/runtime': 7.29.7
-      '@testing-library/dom': 10.4.1
+      '@testing-library/dom': 10.4.2
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
     optionalDependencies:
