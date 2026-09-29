@@ -17,6 +17,15 @@ vendor/*/src/*.js
 vendor/*/src/*.js.map
 vendor/*/src/*.d.ts
 vendor/*/src/*.d.ts.map
+# same for package sources — a mis-rooted tsc run must never pollute the tree
+packages/*/src/*.js
+packages/*/src/*.js.map
+packages/*/src/*.d.ts
+packages/*/src/*.d.ts.map
+packages/*/*/src/*.js
+packages/*/*/src/*.js.map
+packages/*/*/src/*.d.ts
+packages/*/*/src/*.d.ts.map
 dist-publish/
 collect-out/
 collect-dl/
