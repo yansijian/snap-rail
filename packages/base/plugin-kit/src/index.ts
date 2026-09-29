@@ -18,6 +18,12 @@ export {
 export { SEED_MODULES } from './seeds.ts'
 export { CLIENT_EXTERNALS, CONTRIBUTED_SEED_MODULES } from './seeds.ts'
 export { clientBundle, hostBundle } from './build.ts'
+export {
+  CUSTOM_SLOT_PATTERN,
+  defineSlotVocabulary,
+  type SlotIdOf,
+  type SlotVocabulary,
+} from './slot-vocabulary.ts'
 export { releaseFiles, releaseManifest, zipFileName, type ReleaseSpec } from './pack.ts'
 export {
   RELEASE_METADATA_PATH,

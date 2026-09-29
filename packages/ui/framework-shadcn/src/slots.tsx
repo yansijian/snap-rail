@@ -7,6 +7,14 @@
  * Degradation rule: every slot is optional. The layout owner decides what an
  * empty slot renders (usually nothing); nothing throws on a missing occupant.
  *
+ * Occupancy modes: `stack` slots render every occupant in order (menu items,
+ * actions); `single` slots render only the winner — the highest
+ * `precedence`, ties by latest registration — so a component plugin can
+ * replace a default tenant (a third-party titlebar over the suite's
+ * built-in one) and unloading it falls back to the default automatically:
+ * the default is never destroyed, only shadowed. The framework owns the mode
+ * table for its standard slots; `custom:*` slots are stack.
+ *
  * @module @snap-rail/framework-shadcn/slots
  */
 
@@ -40,18 +48,58 @@ export function isValidUiSlotId(value: string): value is SlotId {
 /** A layout may add a namespaced extension slot without changing the core vocabulary. */
 export type SlotId = typeof UI_SLOT_IDS[keyof typeof UI_SLOT_IDS] | `custom:${string}`
 
+/** How a slot renders its occupants: all in order, or one elected winner. */
+export type UiSlotMode = 'stack' | 'single'
+
+/**
+ * The mode table for the standard slots — the framework owns it.
+ *
+ * `titlebar` and `main` are `single`: exactly one tenant renders (a skin or
+ * replacement displaces the default and falls back on unload). `layout`
+ * stays `stack` on purpose — the settings dialog is a permanent overlay
+ * occupant beside the active layout, and the fallback shell yields by
+ * counting; every other slot collects contributions.
+ */
+export const UI_SLOT_MODES = {
+  [UI_SLOT_IDS.layout]: 'stack',
+  [UI_SLOT_IDS.titlebar]: 'single',
+  [UI_SLOT_IDS.titlebarActions]: 'stack',
+  [UI_SLOT_IDS.menu]: 'stack',
+  [UI_SLOT_IDS.sidebar]: 'stack',
+  [UI_SLOT_IDS.main]: 'single',
+  [UI_SLOT_IDS.view]: 'stack',
+  [UI_SLOT_IDS.statusbar]: 'stack',
+  [UI_SLOT_IDS.overlay]: 'stack',
+} as const satisfies Record<string, UiSlotMode>
+
+const STANDARD_SLOT_MODES: ReadonlyMap<string, UiSlotMode> = new Map(Object.entries(UI_SLOT_MODES))
+
+/** The occupancy mode of a slot; `custom:*` slots are `stack`. */
+export function slotModeOf(slot: SlotId): UiSlotMode {
+  return STANDARD_SLOT_MODES.get(slot) ?? 'stack'
+}
+
 /** What one occupant contributes to a slot. */
 export interface SlotOccupant {
   /** Stable plugin-chosen key; later registrations with it replace earlier ones. */
   id: string
   /** Rendering order within the slot; ties break by registration time. */
   order: number
+  /**
+   * Winner election for `single` slots: the highest value renders, and
+   * unloading it falls back to the next (a built-in default stays at 0, an
+   * override registers higher). Ignored in `stack` slots. Default 0.
+   */
+  precedence?: number
   render(): ReactNode
 }
 
 /** Registry of slot occupants exposed as `ctx.uiSlots`. */
 export interface UiSlotsService {
-  /** Current occupants of a slot in render order.
+  /**
+   * Current occupants of a slot in render order. `single` slots answer with
+   * at most one occupant — the elected winner.
+   *
    * @param slot - the slot to read.
    */
   list(slot: SlotId): readonly SlotOccupant[]
@@ -103,9 +151,18 @@ const slotsPlugin: Plugin.Object<void> = {
     ctx.provide('uiSlots', {
       list(slot: SlotId): readonly SlotOccupant[] {
         const entry = entryOf(slot)
-        return [...entry.occupants.values()]
+        const ranked = [...entry.occupants.values()]
           .sort((a, b) => a.occupant.order - b.occupant.order || a.seq - b.seq)
-          .map(item => item.occupant)
+        if (slotModeOf(slot) === 'single' && ranked.length > 0) {
+          // Winner election: precedence first, latest registration breaks
+          // ties. Losers stay registered — dropping the winner falls back.
+          const winner = ranked.reduce((best, item) => {
+            const byPrecedence = (item.occupant.precedence ?? 0) - (best.occupant.precedence ?? 0)
+            return byPrecedence > 0 || (byPrecedence === 0 && item.seq > best.seq) ? item : best
+          })
+          return [winner.occupant]
+        }
+        return ranked.map(item => item.occupant)
       },
       register(caller: Context, slot: SlotId, occupant: SlotOccupant): () => void {
         const entry = entryOf(slot)

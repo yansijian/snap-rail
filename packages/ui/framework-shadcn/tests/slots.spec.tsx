@@ -73,4 +73,38 @@ describe('uiSlots', () => {
     const ctx = await makeSlots()
     expect(ctx.uiSlots.list(UI_SLOT_IDS.titlebar).map(item => item.render())).toEqual([])
   })
+
+  it('single slot: the highest-precedence occupant wins and unloading falls back', async () => {
+    const ctx = await makeSlots()
+    // The built-in default registers at precedence 0 (the floor).
+    ctx.uiSlots.register(ctx, UI_SLOT_IDS.titlebar, { id: 'default', order: 0, render: () => 'default' })
+    expect(ctx.uiSlots.list(UI_SLOT_IDS.titlebar).map(item => item.render())).toEqual(['default'])
+
+    const fiber = await ctx.plugin(Object.assign(
+      function skin(sub): void {
+        sub.uiSlots.register(sub, UI_SLOT_IDS.titlebar, { id: 'skin', order: 0, precedence: 5, render: () => 'skin' })
+      },
+      { inject: ['uiSlots'] },
+    ))
+    expect(ctx.uiSlots.list(UI_SLOT_IDS.titlebar).map(item => item.render())).toEqual(['skin'])
+
+    // The default was shadowed, never destroyed: dropping the override
+    // falls back to it.
+    await fiber.dispose()
+    expect(ctx.uiSlots.list(UI_SLOT_IDS.titlebar).map(item => item.render())).toEqual(['default'])
+  })
+
+  it('single slot: equal precedence breaks by latest registration', async () => {
+    const ctx = await makeSlots()
+    ctx.uiSlots.register(ctx, UI_SLOT_IDS.titlebar, { id: 'a', order: 0, render: () => 'A' })
+    ctx.uiSlots.register(ctx, UI_SLOT_IDS.titlebar, { id: 'b', order: 0, render: () => 'B' })
+    expect(ctx.uiSlots.list(UI_SLOT_IDS.titlebar).map(item => item.render())).toEqual(['B'])
+  })
+
+  it('stack slots ignore precedence and keep order', async () => {
+    const ctx = await makeSlots()
+    ctx.uiSlots.register(ctx, UI_SLOT_IDS.view, { id: 'a', order: 1, precedence: 9, render: () => 'A' })
+    ctx.uiSlots.register(ctx, UI_SLOT_IDS.view, { id: 'b', order: 0, render: () => 'B' })
+    expect(ctx.uiSlots.list(UI_SLOT_IDS.view).map(item => item.render())).toEqual(['B', 'A'])
+  })
 })

@@ -8,6 +8,7 @@
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
+import type { ReactNode } from 'react'
 import type { SlotId, SlotOccupant, UiSlotsService } from './slots.tsx'
 import { isValidUiSlotId, UI_SLOT_IDS } from './slots.tsx'
 
@@ -31,6 +32,9 @@ export interface UiNavigationContribution {
   label: string
   viewId: string
   order: number
+  /** Optional leading visual for layouts that render navigation items —
+   * the component renders its own SVG/asset, the layout only places it. */
+  icon?: ReactNode
 }
 
 /** The shared UI contract service exposed to all client plugins. */
