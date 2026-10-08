@@ -17,6 +17,10 @@ jobs:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
       - name: Checkout
+        # job 容器在默认桥接网络，解析不了 runner 的内网注册地址（gitea:3000），
+        # 检出地址必须显式指向宿主机发布端口。
+        env:
+          GIT_SERVER_URL: http://192.168.1.9:3000
         run: |
           GIT_SERVER_URL="${GIT_SERVER_URL:-$GITHUB_SERVER_URL}"
           git clone --depth 1 --branch "$GITHUB_REF_NAME" \
