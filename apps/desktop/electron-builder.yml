@@ -15,6 +15,10 @@ win:
   target:
     - nsis
   artifactName: ${productName}-${version}-${arch}-setup.${ext}
+  # No Authenticode cert in play: skip signing everywhere (keeps resedit
+  # resource editing — icon/version metadata). Required for the Linux CI
+  # cross-build, where the default test-sign path would demand wine.
+  signExecutable: false
 nsis:
   oneClick: false
   perMachine: false

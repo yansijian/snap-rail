@@ -1,0 +1,87 @@
+name: build-desktop
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release 标签名（tag push 触发时自动为 v*；手动派发缺省为 v<desktop 版本>）'
+        required: false
+
+# Linux runner 交叉打包 Windows NSIS 安装包并挂到主仓 Release：
+# - 不走 marketplace（与 admin 仓 CI 同策略）：git clone 检出、npmmirror 装 pnpm；
+# - electron / electron-builder 二进制全走 npmmirror 镜像（ELECTRON_MIRROR +
+#   ELECTRON_BUILDER_BINARIES_MIRROR）；NSIS 编译器 makensis.exe 是 Windows 程序，
+#   Linux 上经 wine 运行（阿里云 apt 镜像装 wine 元包）；Authenticode 签名经
+#   win.signExecutable: false 关闭（apps/desktop/electron-builder.yml）；
+# - 产物三件套（setup.exe / blockmap / latest.yml）幂等挂到 Release，供人工
+#   下载与 collect-feed 收集进 feed 分支 desktop/ 目录。
+jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # job 容器在默认桥接网络，解析不了 runner 的内网注册地址（gitea:3000），
+        # 检出地址必须显式指向宿主机发布端口。
+        env:
+          GIT_SERVER_URL: http://192.168.1.9:3000
+        run: |
+          GIT_SERVER_URL="${GIT_SERVER_URL:-$GITHUB_SERVER_URL}"
+          git clone --depth 1 --branch "$GITHUB_REF_NAME" \
+            -c credential.helper='!f() { echo "username=${{ github.actor }}"; echo "password=${{ secrets.GITEA_TOKEN }}"; }; f' \
+            "$GIT_SERVER_URL/$GITHUB_REPOSITORY.git" .
+      - name: wine（NSIS 编译器 makensis.exe 经 wine 运行；默认源，内网实测可达）
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          dpkg --add-architecture i386
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends wine wine64 wine32
+          wine --version
+      - name: pnpm + 源凭据（国内源；@snap-rail 走本机 Gitea）
+        env:
+          FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
+        run: |
+          npm config set registry https://registry.npmmirror.com
+          npm install -g pnpm@11.22.0
+          printf '//192.168.1.9:3000/api/packages/snap-rail/npm/:_authToken=%s\n' "$FEED_TOKEN" >> ~/.npmrc
+          pnpm -v
+      - run: pnpm install --no-frozen-lockfile
+        env:
+          # 只装 electron 的 npm 包（类型），构建期由 electron-builder 按镜像自取 win32 zip
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - run: pnpm run build
+      - name: build NSIS installer（Linux→Windows 交叉打包）
+        env:
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: pnpm --filter @snap-rail/desktop run dist
+      - name: create release + upload installer trio
+        env:
+          FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
+        run: |
+          cd apps/desktop/release-out
+          VER=$(node -p "require('../package.json').version")
+          REF="${{ github.ref_name }}"
+          INPUT_TAG="${{ github.event.inputs.tag }}"
+          if [ -n "$INPUT_TAG" ]; then TAG_NAME="$INPUT_TAG"
+          elif case "$REF" in v*) true ;; *) false ;; esac; then TAG_NAME="$REF"
+          else TAG_NAME="v$VER"; fi
+          API="http://192.168.1.9:3000/api/v1/repos/snap-rail/snap-rail"
+          AUTH="Authorization: token $FEED_TOKEN"
+          # 创建 Release（已存在则继续——重跑幂等）
+          curl -s -f -X POST "$API/releases" -H "$AUTH" -H "Content-Type: application/json" \
+            -d "{\"tag_name\":\"$TAG_NAME\",\"name\":\"snap-rail desktop $TAG_NAME\"}" > /dev/null || true
+          id=$(curl -sf "$API/releases/tags/$TAG_NAME" -H "$AUTH" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).id))')
+          # 三件套逐个上传；同名资产先删再传（重跑幂等）
+          shopt -s nullglob
+          for ASSET in *.exe *.exe.blockmap latest.yml; do
+            [ -f "$ASSET" ] || continue
+            asset_name="$(basename "$ASSET")"
+            old_id=$(curl -sf "$API/releases/$id/assets" -H "$AUTH" | ASSET_NAME="$asset_name" node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{const hit=JSON.parse(d).find(a=>a.name===process.env.ASSET_NAME);console.log(hit?hit.id:"")})')
+            if [ -n "$old_id" ]; then curl -s -f -X DELETE "$API/releases/$id/assets/$old_id" -H "$AUTH" > /dev/null || true; fi
+            encoded=$(node -e 'console.log(encodeURIComponent(process.argv[1]))' "$asset_name")
+            curl -sf -X POST "$API/releases/$id/assets?name=$encoded" \
+              -H "$AUTH" -H "Content-Type: application/octet-stream" --data-binary @"$ASSET"
+            echo "uploaded $asset_name to release $TAG_NAME (id=$id)"
+          done

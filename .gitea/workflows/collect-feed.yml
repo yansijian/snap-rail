@@ -56,6 +56,29 @@ jobs:
               }
             })();
           '
+      - name: download desktop installer trio from the main repo release
+        env:
+          FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
+        run: |
+          mkdir -p apps/desktop/release-out
+          node -e '
+            (async () => {
+              const api = "http://192.168.1.9:3000/api/v1/repos/snap-rail/snap-rail";
+              const headers = { Authorization: `token ${process.env.FEED_TOKEN}` };
+              const rel = await fetch(`${api}/releases/latest`, { headers });
+              if (!rel.ok) { console.error(`skip desktop: release lookup ${rel.status}（build-desktop 未跑过则正常跳过）`); return; }
+              const release = await rel.json();
+              const trio = (release.assets ?? []).filter(a => a.name === "latest.yml" || a.name.endsWith(".exe") || a.name.endsWith(".exe.blockmap"));
+              if (trio.length === 0) { console.error("skip desktop: release has no installer assets"); return; }
+              const fs = require("node:fs");
+              for (const asset of trio) {
+                const res = await fetch(asset.browser_download_url, { headers });
+                if (!res.ok) { console.error(`skip desktop asset ${asset.name}: ${res.status}`); continue; }
+                fs.writeFileSync(`apps/desktop/release-out/${asset.name}`, Buffer.from(await res.arrayBuffer()));
+                console.log(`downloaded ${asset.name} from release ${release.tag_name}`);
+              }
+            })();
+          '
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm run build
       - name: collect + publish feed (base + collected)
@@ -66,9 +89,11 @@ jobs:
         run: |
           # deploy.config.json 现场文件不进仓——CI 里按本机 Gitea 现场生成
           # （remote 段是 schema 必填，gitea 同步路径不使用它）。
+          # release:false —— 桌面三件套已由 build-desktop 工作流挂到 Release，
+          # 这里从 Release 取件进 feed 分支即可，不重复上传。
           cat > deploy.config.json <<'JSON'
           {
-            "gitea": { "url": "http://192.168.1.9:3000", "owner": "snap-rail", "repo": "snap-rail", "feedBranch": "feed", "release": true },
+            "gitea": { "url": "http://192.168.1.9:3000", "owner": "snap-rail", "repo": "snap-rail", "feedBranch": "feed", "release": false },
             "remote": { "site": "/var/www/html", "plugins": "/var/www/html/snap-rail/plugins", "desktop": "/var/www/html/snap-rail/desktop" }
           }
           JSON
