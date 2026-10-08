@@ -3,25 +3,36 @@ on:
   workflow_dispatch:
   push:
     branches: [master]
-    paths: ['feed-sources.json', 'scripts/collect-feed.ts', 'scripts/pack-plugins.ts', 'packages/**']
+    paths: ['feed-sources.json', 'scripts/collect-feed.ts', 'scripts/pack-plugins.ts', 'scripts/publish.ts', 'packages/**', '.gitea/workflows/collect-feed.yml']
   schedule:
     - cron: '0 3 * * *'
 
+# 国内 runner 不走 marketplace（与 admin 仓 CI 同策略）：git clone 检出、
+# npmmirror 装 pnpm；@snap-rail scope 走本机 Gitea npm（凭据注入 ~/.npmrc）。
 jobs:
   collect:
     runs-on: ubuntu-latest
+    env:
+      # 只装 electron 的 npm 包（类型），二进制不下载——本流水线不打包桌面应用
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
+      - name: Checkout
+        run: |
+          GIT_SERVER_URL="${GIT_SERVER_URL:-$GITHUB_SERVER_URL}"
+          git clone --depth 1 --branch "$GITHUB_REF_NAME" \
+            -c credential.helper='!f() { echo "username=${{ github.actor }}"; echo "password=${{ secrets.GITEA_TOKEN }}"; }; f' \
+            "$GIT_SERVER_URL/$GITHUB_REPOSITORY.git" .
+      - name: pnpm + 源凭据（国内源；@snap-rail 走本机 Gitea）
+        env:
+          FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
+        run: |
+          npm config set registry https://registry.npmmirror.com
+          npm install -g pnpm@11.22.0
+          printf '//192.168.1.9:3000/api/packages/snap-rail/npm/:_authToken=%s\n' "$FEED_TOKEN" >> ~/.npmrc
+          pnpm -v
       - name: download latest release zips from the plugin repos
         env:
           FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
-          SOURCES: ${{ vars.FEED_SOURCES }}
         run: |
           mkdir -p collect-dl
           node -e '
@@ -49,7 +60,7 @@ jobs:
           SIGN_KEY: ${{ secrets.RELEASE_PRIVATE_PEM }}
           KEY_ID: ${{ secrets.RELEASE_KEY_ID }}
         run: |
-          echo "$SIGN_KEY" > release.private.pem
+          printf '%s' "$SIGN_KEY" | base64 -d > release.private.pem
           pnpm exec tsx scripts/collect-feed.ts --from collect-dl
           pnpm run publish -- --sign-key release.private.pem --key-id "$KEY_ID" --publisher snap-rail --market collect-out
           rm release.private.pem
