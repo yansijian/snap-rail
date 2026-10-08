@@ -64,6 +64,14 @@ jobs:
           SIGN_KEY: ${{ secrets.RELEASE_PRIVATE_PEM }}
           KEY_ID: ${{ secrets.RELEASE_KEY_ID }}
         run: |
+          # deploy.config.json 现场文件不进仓——CI 里按本机 Gitea 现场生成
+          # （remote 段是 schema 必填，gitea 同步路径不使用它）。
+          cat > deploy.config.json <<'JSON'
+          {
+            "gitea": { "url": "http://192.168.1.9:3000", "owner": "snap-rail", "repo": "snap-rail", "feedBranch": "feed", "release": true },
+            "remote": { "site": "/var/www/html", "plugins": "/var/www/html/snap-rail/plugins", "desktop": "/var/www/html/snap-rail/desktop" }
+          }
+          JSON
           printf '%s' "$SIGN_KEY" | base64 -d > release.private.pem
           pnpm exec tsx scripts/collect-feed.ts --from collect-dl
           pnpm run publish -- --sign-key release.private.pem --key-id "$KEY_ID" --publisher snap-rail --market collect-out
