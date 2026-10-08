@@ -225,13 +225,27 @@ export async function syncGiteaFeed(gitea: GiteaConfig, stageDir: string, versio
     execFileSync('git', [...gitAuthArgs(gitea), 'clone', '--depth', '1', remote, worktree], { stdio: 'inherit' })
     git(worktree, gitea, 'switch', ...(hasHead(worktree) ? ['--orphan'] : ['-c']), branch)
   }
+  // The desktop trio outlives plugin-only publishes: a CI publish (which
+  // builds no installer) must not wipe the feed's installer files. Stash the
+  // branch's existing desktop/ before the whole-tree replace, restore it when
+  // nothing new was staged.
+  const preservedDesktop = join(stageDir, 'desktop-preserved')
+  const existingDesktop = join(worktree, 'desktop')
+  const hadDesktop = existsSync(existingDesktop)
+  if (hadDesktop) cpSync(existingDesktop, preservedDesktop, { recursive: true })
   for (const entry of readdirSync(worktree)) {
     if (entry === '.git') continue
     rmSync(join(worktree, entry), { recursive: true, force: true })
   }
   cpSync(join(stageDir, 'plugins'), join(worktree, 'plugins'), { recursive: true })
   const desktopStaged = join(stageDir, 'desktop')
-  if (existsSync(desktopStaged)) cpSync(desktopStaged, join(worktree, 'desktop'), { recursive: true })
+  if (existsSync(desktopStaged)) {
+    cpSync(desktopStaged, join(worktree, 'desktop'), { recursive: true })
+  } else if (hadDesktop) {
+    cpSync(preservedDesktop, join(worktree, 'desktop'), { recursive: true })
+    console.log('gitea: 本地无 desktop 产物，保留 feed 分支上现有 desktop/')
+  }
+  rmSync(preservedDesktop, { recursive: true, force: true })
   // The feed is served byte-exact: forbid every EOL/normalization conversion
   // regardless of the publisher's core.autocrlf.
   writeFileSync(join(worktree, '.gitattributes'), '* -text\n')
