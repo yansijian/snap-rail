@@ -78,6 +78,10 @@ function productionCsp(): Plugin {
 
 export default defineConfig({
   root: join(import.meta.dirname, 'src/client'),
+  // Relative asset URLs: the production shell loads this bundle through
+  // loadFile (file://), where the default root-absolute "/assets/..." lands
+  // on the drive root and the renderer stays a blank frame forever.
+  base: './',
   plugins: [react(), tailwindcss(), snapRailSources(), productionCsp()],
   build: {
     outDir: join(import.meta.dirname, 'dist/client'),
