@@ -8,7 +8,7 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import carrierPlugin from './carrier.ts'
 import windowRpcPlugin, { trackMainWindow } from './window-rpc.ts'
 import updateRpcPlugin from './update-rpc.ts'
@@ -34,6 +34,13 @@ function builtinLayerPath(): string {
 }
 
 async function start(): Promise<void> {
+  // The packed app's `app.getName()` reads the package name, which equals the
+  // dev package name — without this move, an installed terminal shares the dev
+  // home, and a dev-era `plugins.yml` (rows for pool plugins that will never
+  // exist in the installed world) bricks boot before the first window.
+  if (app.isPackaged) {
+    app.setPath('userData', join(app.getPath('appData'), 'snap-rail'))
+  }
   registerPluginScheme()
   await app.whenReady()
 
@@ -88,6 +95,11 @@ async function start(): Promise<void> {
 }
 
 start().catch(cause => {
-  console.error(cause instanceof Error ? cause.stack ?? cause.message : cause)
+  const detail = cause instanceof Error ? cause.stack ?? cause.message : String(cause)
+  // Boot failures must reach the operator: there is no window yet and a
+  // double-clicked terminal has no console, so console.error alone dies
+  // unseen. The native box works without any BrowserWindow.
+  dialog.showErrorBox('snap-rail 启动失败', `${detail}\n\nhome: ${app.getPath('userData')}`)
+  console.error(detail)
   app.exit(1)
 })

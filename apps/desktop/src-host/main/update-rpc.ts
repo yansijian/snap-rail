@@ -26,6 +26,9 @@ import type { GatewayService } from '@snap-rail/gateway'
 import type { SettingsService } from '@snap-rail/settings'
 import { createUpdateChannel } from './update-machine.ts'
 
+/** The built-in default feed seat; mirrors the packaged publish config. */
+const DEFAULT_FEED_URL = 'http://192.168.1.9:3000/snap-rail/snap-rail/raw/branch/feed/desktop/'
+
 /** The update bridge plugin; consumes the rpc and settings services. */
 const updateRpcPlugin: Plugin.Object<void> = {
   name: 'desktop-update-rpc',
@@ -40,7 +43,14 @@ const updateRpcPlugin: Plugin.Object<void> = {
       currentVersion: app.getVersion(),
       load: async () => {
         if (!app.isPackaged) return null
-        const { autoUpdater } = (await import('electron-updater')) as typeof import('electron-updater')
+        // electron-updater is CJS: this build's `autoUpdater` named export is
+        // not statically detectable on the ESM namespace, so read it off the
+        // default export first and fail loud when neither seat carries it.
+        const mod = (await import('electron-updater')) as typeof import('electron-updater') & {
+          default?: typeof import('electron-updater')
+        }
+        const autoUpdater = mod.autoUpdater ?? mod.default?.autoUpdater
+        if (autoUpdater === undefined) throw new Error('electron-updater 未暴露 autoUpdater')
         // Check and download automatically; installing stays an explicit
         // operator act — a running terminal must never restart itself.
         autoUpdater.autoDownload = true
@@ -50,7 +60,12 @@ const updateRpcPlugin: Plugin.Object<void> = {
       hasPackagedFeed: app.isPackaged && existsSync(join(process.resourcesPath, 'app-update.yml')),
       resolveFeedUrl: () => {
         const url = settings.get<string>(UPDATE_FEED_URL_KEY)
-        return typeof url === 'string' && url !== '' ? url : undefined
+        if (typeof url === 'string' && url !== '') return url
+        // Directory packs (and deployments whose app-update.yml is absent)
+        // still get the documented default seat instead of a dead channel.
+        return app.isPackaged && !existsSync(join(process.resourcesPath, 'app-update.yml'))
+          ? DEFAULT_FEED_URL
+          : undefined
       },
       autoCheck: settings.get<boolean>(UPDATE_AUTO_CHECK_KEY) !== false,
       broadcast: (status: UpdateStatus) => {

@@ -82,9 +82,6 @@ importers:
       '@snap-rail/gateway':
         specifier: workspace:^
         version: link:../../packages/base/gateway
-      '@snap-rail/plugin-kit':
-        specifier: workspace:^
-        version: link:../../packages/base/plugin-kit
       '@snap-rail/protocol':
         specifier: workspace:^
         version: link:../../packages/base/protocol
@@ -122,6 +119,9 @@ importers:
       '@snap-rail/equipment':
         specifier: workspace:^
         version: link:../../packages/equipment/equipment
+      '@snap-rail/plugin-kit':
+        specifier: workspace:^
+        version: link:../../packages/base/plugin-kit
       '@snap-rail/store-sqlite':
         specifier: workspace:^
         version: link:../../packages/store/store-sqlite
@@ -268,9 +268,6 @@ importers:
       '@snap-rail/util':
         specifier: workspace:^
         version: link:../util
-      tsdown:
-        specifier: ^0.22.2
-        version: 0.22.14(tsx@4.23.12)(typescript@6.0.3)
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -278,6 +275,9 @@ importers:
       rolldown:
         specifier: ^1.2.5
         version: 1.2.5
+      tsdown:
+        specifier: ^0.22.2
+        version: 0.22.14(tsx@4.23.12)(typescript@6.0.3)
 
   packages/base/plugin-sdk:
     dependencies:

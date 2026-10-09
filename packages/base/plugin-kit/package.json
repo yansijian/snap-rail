@@ -40,11 +40,14 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@snap-rail/util": "workspace:^",
-    "tsdown": "^0.22.2",
     "zod": "^4.4.3"
   },
+  "peerDependencies": {
+    "tsdown": "^0.22.2"
+  },
   "devDependencies": {
-    "rolldown": "^1.2.5"
+    "rolldown": "^1.2.5",
+    "tsdown": "^0.22.2"
   },
   "snapRail": {
     "layer": "base"

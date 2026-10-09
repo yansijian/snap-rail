@@ -193,7 +193,15 @@ export function createUpdateChannel(options: UpdateChannelOptions): UpdateChanne
   }
 
   void (async () => {
-    updater = await options.load()
+    // A failing updater load (missing native glue, broken interop) must land
+    // in a visible phase, not die as an unhandled rejection off this IIFE.
+    try {
+      updater = await options.load()
+    } catch (cause) {
+      setPhase('unsupported', { message: `更新通道初始化失败：${errorText(cause)}` })
+      resolveReady(state)
+      return
+    }
     if (updater === null) {
       resolveReady(state)
       return

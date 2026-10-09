@@ -203,6 +203,8 @@ async function initPlugin(directory: string | undefined, template: PluginTemplat
     devDependencies: {
       '@snap-rail/plugin-sdk': '^0.1.0',
       '@snap-rail/cordis': '^4.0.1',
+      tsdown: '^0.22.2',
+      vitest: '^3.2.4',
       ...(template === 'driver' ? { '@snap-rail/equipment': '^0.1.0' } : {}),
       ...(template === 'store-provider' ? { '@snap-rail/store': '^0.1.0' } : {}),
       ...(client
