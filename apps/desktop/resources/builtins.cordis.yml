@@ -14,7 +14,7 @@
   name: '@snap-rail/gateway'
   config:
     name: snap-rail
-    version: 0.1.0
+    version: 0.1.3
     bin: desktop
 - id: plugins-rpc
   name: '@snap-rail/app-boot/rpc'
