@@ -67,6 +67,15 @@ importers:
       '@snap-rail/cordis':
         specifier: workspace:^
         version: link:../../vendor/cordis
+      '@snap-rail/cordis-plugin-group':
+        specifier: workspace:^
+        version: link:../../vendor/group
+      '@snap-rail/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../vendor/include
+      '@snap-rail/cordis-plugin-loader':
+        specifier: workspace:^
+        version: link:../../vendor/loader
       '@snap-rail/cordis-plugin-timer':
         specifier: workspace:^
         version: link:../../vendor/timer

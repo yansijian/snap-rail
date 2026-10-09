@@ -15,6 +15,10 @@ win:
   target:
     - nsis
   artifactName: ${productName}-${version}-${arch}-setup.${ext}
+  # One square PNG (>=256px) drives every Windows icon: app exe, NSIS
+  # installer and uninstaller all derive from it (electron-builder converts
+  # to .ico internally). Source: website/public/logo.svg rasterized at 512.
+  icon: build/icon.png
   # No Authenticode cert in play: skip signing everywhere (keeps resedit
   # resource editing — icon/version metadata). Required for the Linux CI
   # cross-build, where the default test-sign path would demand wine.

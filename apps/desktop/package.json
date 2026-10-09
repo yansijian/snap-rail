@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/desktop",
   "description": "The snap-rail desktop shell: frameless Electron window over the host plugin tree",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "main": "dist/main/index.js",
@@ -19,6 +19,9 @@
     "@snap-rail/audit": "workspace:^",
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-group": "workspace:^",
+    "@snap-rail/cordis-plugin-include": "workspace:^",
+    "@snap-rail/cordis-plugin-loader": "workspace:^",
     "@snap-rail/cordis-plugin-timer": "workspace:^",
     "@snap-rail/gateway": "workspace:^",
     "@snap-rail/plugin-kit": "workspace:^",
