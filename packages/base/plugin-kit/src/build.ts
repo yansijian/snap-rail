@@ -210,6 +210,11 @@ export interface ClientBundleOptions {
  */
 export function clientBundle(packageName: string, entry: string, options: ClientBundleOptions = {}): ReturnType<typeof defineConfig> {
   const entryFile = entry.replaceAll('\\', '/')
+  // The transform hook ids are resolved absolute paths — compare against
+  // the absolute entry (a relative `entry` never equals one, which used to
+  // silently disable the whole extra-css injection). Normalized to forward
+  // slashes like every id below.
+  const entryPath = resolve(process.cwd(), entryFile).replaceAll('\\', '/')
   // Extra-css files resolve from the package directory (tsdown runs there).
   const extraCss = (options.css ?? []).map(file => resolve(process.cwd(), file).replaceAll('\\', '/'))
   /** Prepend the extra-css imports to the entry so the styles ride the
@@ -218,7 +223,7 @@ export function clientBundle(packageName: string, entry: string, options: Client
     name: 'snap-rail-inject-extra-css',
     transform(code, id) {
       const file = id.replaceAll('\\', '/').split('?')[0]!.replace(/#.*$/, '')
-      if (file !== entryFile || extraCss.length === 0) return undefined
+      if (file !== entryPath || extraCss.length === 0) return undefined
       return `${extraCss.map(css => `import ${JSON.stringify(css)};\n`).join('')}${code}`
     },
   }
