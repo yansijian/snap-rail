@@ -73,10 +73,33 @@ export function showStartup(handle: ClientHandle, options: { onInstall?: () => v
 }
 
 /** Render the bootstrap install page (the no-framework recovery console). */
-export function showBootstrap(handle: ClientHandle): void {
+export function showBootstrap(handle: ClientHandle, options: { notice?: string } = {}): void {
   handle.root.render(
-    <BootstrapPage link={handle.link} zipPathOf={droppedZipPath} onClose={() => showStartup(handle, { onInstall: () => showBootstrap(handle) })} />,
+    <BootstrapPage
+      link={handle.link}
+      zipPathOf={droppedZipPath}
+      {...options.notice !== undefined ? { notice: options.notice } : {}}
+      onClose={() => showStartup(handle, { onInstall: () => showBootstrap(handle) })}
+    />,
   )
+}
+
+/**
+ * The crash fallback: the framework's runtime failed after taking the boot
+ * root over. Release whatever root state remains, re-root a fresh React
+ * tree on the boot element (the old root may be unmounted or wedged), and
+ * bring the recovery console up with the failure surfaced on the page —
+ * the operator keeps plugin management instead of a dead splash.
+ */
+export function showBootstrapAfterFailure(handle: ClientHandle, notice: string): void {
+  try {
+    handle.root.unmount()
+  } catch {
+    // The framework may have unmounted the boot root before failing — the
+    // fresh root below is the authority either way.
+  }
+  handle.root = createRoot(handle.element)
+  showBootstrap(handle, { notice })
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/settings-station",
   "description": "The settings dialog shell: renders the settingsPages registry (menu + content) and the first-party plugin management page",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

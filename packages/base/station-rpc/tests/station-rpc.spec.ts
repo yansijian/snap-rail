@@ -177,6 +177,9 @@ describe('station-rpc', () => {
     writeFileSync(join(home, 'plugins.yml'), "plugins:\n  - name: '@snap-rail/ui-fw'\n    enabled: true\n")
 
     const result = await client.call('client-config.list', {})
+    // The live seed table rides every list — the renderer's boot handshakes
+    // each face's stamped ABI against it.
+    expect(result.ok && result.value.seedAbi.revision).toBeGreaterThanOrEqual(1)
     expect(result.ok && result.value.rows).toEqual([
       {
         name: '@snap-rail/ui-fw',

@@ -49,6 +49,41 @@ function declaredExternalSeeds(): readonly string[] {
 /** Extensions the client preset ships as emitted assets beside the bundle. */
 const ASSET_EXTENSIONS = /\.(png|jpe?g|webp|gif|svg)$/
 
+/**
+ * The seed interop guard: a client face must consume seed modules through
+ * **named or star imports only**. A default import compiles — under
+ * rolldown's CJS node-mode interop (`__toESM(require(id), 1)`) — into
+ * `.default` = the required namespace itself, never the module's own
+ * default export. A class-shaped seed (the timer service) then arrives as
+ * a plain object and cordis refuses it at mount: on the user's terminal,
+ * as a dead renderer, instead of here at build time. Star and named
+ * imports survive both interop modes; `import type` erases and is fine.
+ *
+ * Source-level scan (emit-independent), plugin sources only — inlined
+ * third-party dependencies keep their own import style.
+ */
+export function seedImportGuard(): Plugin {
+  const seedPattern = CLIENT_EXTERNALS
+    .map(id => id.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`))
+    .join('|')
+  const pattern = new RegExp(
+    String.raw`import\s+(?![{*])(?!type\b)([\w$]+)\s*(?:,[^;]*?)?\s*from\s*['"](` + seedPattern + String.raw`)['"]`,
+  )
+  return {
+    name: 'snap-rail-seed-import-guard',
+    transform(code, id) {
+      if (id.includes('node_modules')) return undefined
+      const match = pattern.exec(code)
+      if (match === null) return undefined
+      this.error(
+        `种子模块 "${match[2]}" 被默认导入（import ${match[1]} from '${match[2]}'）。`
+        + '种子只允许 named/star 导入：rolldown 的 CJS interop 会把 default 变成整个命名空间对象，'
+        + '运行时挂载即崩。请改为 import { … } from \'' + match[2] + '\' 或 import * as ns from \'' + match[2] + '\'。',
+      )
+    },
+  }
+}
+
 /** The pool directory name an installed package occupies (installer rule). */
 function poolDirName(packageName: string): string {
   return packageName.replaceAll('/', '__')
@@ -206,7 +241,7 @@ export function clientBundle(packageName: string, entry: string, options: Client
     // the seed whitelist plus this package's declared externalSeeds.
     noExternal: [/.*/],
     external: [...CLIENT_EXTERNALS, ...declaredExternalSeeds()],
-    plugins: [injectExtraCss, cssModules(), assetUrls(packageName, 'lib-client')],
+    plugins: [injectExtraCss, cssModules(), assetUrls(packageName, 'lib-client'), seedImportGuard()],
     outputOptions: {
       // The welded wrapper: the entire bundle body becomes the factory the
       // module loader executes with its own `require` (seeds resolve there).

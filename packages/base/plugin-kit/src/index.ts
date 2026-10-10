@@ -11,13 +11,21 @@
 export {
   PLUGIN_KINDS,
   clientFaceSchema,
+  seedAbiSchema,
   snapRailManifestSchema,
   type SnapRailManifest,
   type SnapRailManifestInput,
 } from './manifest.ts'
 export { SEED_MODULES } from './seeds.ts'
-export { CLIENT_EXTERNALS, CONTRIBUTED_SEED_MODULES } from './seeds.ts'
-export { clientBundle, hostBundle } from './build.ts'
+export {
+  CLIENT_EXTERNALS,
+  CONTRIBUTED_SEED_MODULES,
+  SEED_ABI_REVISION,
+  checkSeedAbi,
+  type SeedAbi,
+  type SeedAbiVerdict,
+} from './seeds.ts'
+export { clientBundle, hostBundle, seedImportGuard } from './build.ts'
 export {
   CUSTOM_SLOT_PATTERN,
   defineSlotVocabulary,

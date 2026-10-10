@@ -29,14 +29,14 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   `ui → @snap-rail/framework-shadcn`。同层其余包互不依赖
   （驱动不 import 驱动、工具不 import 工具、套件不 import 套件）。
 - **base 层 = 出厂全集**：打包只带 base；store/equipment/ui/tool/suite
-  的一切包都经 zip 安装进 `<home>/plugins/` 池。内置不可禁用——设置页
-  操作按钮禁用（悬浮提示「内置插件禁止删除/修改」），出厂行（不声明
-  分类）在管理页恒归「内置」分组垫底（行无来源徽标），
+  的一切包都经 zip 安装进 `<home>/plugins/` 池。内置不可禁用——
   `plugins.set-enabled/set-config/uninstall` 一律拒绝；保护按**来源**判定
   （builtin 行，宿主从层文件计算，manifest 声明改变不了
   它），并有两条结构闸：与内置行重名的 zip 拒绝安装；组合解析对内置
   名字永不走池（手拷进池的同名目录也遮蔽不了）。替换 base 包的唯一路径
-  是拿源码重新构建。dev（Vite）用 `apps/desktop/dev/builtins.dev.cordis.yml`
+  是拿源码重新构建。管理面**不显示内置行**（全部操作都被拒绝的行是噪音；
+  dev overlay 住户一并隐藏，开发经引导页/手编层文件）。dev（Vite）用
+  `apps/desktop/dev/builtins.dev.cordis.yml`
   覆盖 base 行（永不随包发布）；可安装插件（框架/驱动/套件）dev 与生产
   同路——经 `install-dev-plugins` 把 zip 装进 dev home 的插件池。
 - **依赖预检（`snapRail.requires`）**：包名条目（`@snap-rail/equipment`）
@@ -103,7 +103,14 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   基础层单源三处一致：种子表 = 客户端入口
   播种 = `clientBundle` external，客户端入口 boot 时 parity fail-loud，加
   base id 是 base 层决策；框架的面经其 client 入口的 `seeds` 映射贡献，
-  壳 require 后统一播种——跨插件共享框架单实例）。
+  壳 require 后统一播种——跨插件共享框架单实例）。**种子消费只准
+  named/star 导入**——default 导入经 rolldown 的 CJS node-mode interop
+  会把 `.default` 变成整个命名空间对象而非模块自身的 default（类形种子
+  挂载即崩），`clientBundle` 构建期护栏硬错；zip 由 pack 盖
+  `snapRail.client.seedAbi` 章（构建时真实 require 到的种子 id + 本包
+  解析到的版本 + 当前 `SEED_ABI_REVISION`），安装期（installer 拒装）与
+  渲染端 boot（`client-config.list` 附宿主活表，面加载前比对、不符
+  skip + fail-loud）双向校验；缺章的存量 zip 放行（过渡宽限）。
 - **可安装插件是构建产物**：发行 zip = 精简 manifest（`main` 指宿主面或
   （clientOnly 包）client 入口，`exports` 映射子路径，池内包单宿主入口）
   + 构建好的面目录，永不带 src；经设置页「安装插件」或无框架时的引导页

@@ -36,6 +36,9 @@ export interface SnapRailManifest {
     seeds?: readonly string[]
     /** Contributed seed ids this face requires from other installed plugins. */
     externalSeeds?: readonly string[]
+    /** The pack-stamped seed contract: the installer prechecks it against
+     * the live table; the renderer boot re-checks it before loading. */
+    seedAbi?: { revision: number, versions: Record<string, string> }
   }
   /** Capabilities provided by and required from the active runtime. */
   capabilities?: {
@@ -84,6 +87,8 @@ export interface PluginDescriptor {
   clientSeeds?: readonly string[]
   /** Contributed seed ids required from other plugins (`snapRail.client.externalSeeds`), when declared. */
   externalSeeds?: readonly string[]
+  /** The pack-stamped seed contract (`snapRail.client.seedAbi`), when declared. */
+  clientSeedAbi?: NonNullable<SnapRailManifest['client']>['seedAbi']
   /** Declared runtime capabilities. */
   capabilities?: SnapRailManifest['capabilities']
   /** Supported runtime versions. */
@@ -209,6 +214,7 @@ export function scanPluginPool(dirs: readonly string[]): Map<string, PluginDescr
       if (clientSeeds !== undefined) descriptor.clientSeeds = clientSeeds
       const externalSeeds = stringArrayOrUndefined(snapRail?.client?.externalSeeds)
       if (externalSeeds !== undefined) descriptor.externalSeeds = externalSeeds
+      if (snapRail?.client?.seedAbi !== undefined) descriptor.clientSeedAbi = snapRail.client.seedAbi
       const capabilities = capabilitiesOrUndefined(snapRail?.capabilities)
       if (capabilities !== undefined) descriptor.capabilities = capabilities
       if (snapRail?.engines !== undefined) descriptor.engines = snapRail.engines

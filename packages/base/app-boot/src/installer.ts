@@ -19,6 +19,7 @@ import { join } from 'node:path'
 import { unzipSync } from 'fflate'
 import { verifyReleaseFiles, type TrustedReleaseKey } from '@snap-rail/plugin-kit/sign'
 import { snapRailManifestSchema } from '@snap-rail/plugin-kit/manifest'
+import { checkSeedAbi, type SeedAbi } from '@snap-rail/plugin-kit/seeds'
 import type { SnapRailManifest } from './scan.ts'
 
 /** Installer failures, machine-readable for the wire mapping. */
@@ -316,6 +317,10 @@ export function installedVersionOf(poolDir: string, name: string): string | unde
 export function installPluginFromZip(zipPath: string, poolDir: string, options?: {
   reserved?: readonly string[]
   trustedKeys?: readonly TrustedReleaseKey[]
+  /** The host's live seed table; when supplied, a client face stamped with a
+   * foreign seed ABI (revision or a major drift) is refused before any byte
+   * lands. Faces without a stamp pass — the grace window. */
+  seedAbi?: SeedAbi
 }): InstallResult {
   let files: Record<string, Uint8Array>
   try {
@@ -340,6 +345,12 @@ export function installPluginFromZip(zipPath: string, poolDir: string, options?:
     throw new InstallError('bad-manifest', `package name "${String(manifest.name)}" is not a legal package name`)
   }
   validateSnapRail(manifest)
+  if (options?.seedAbi !== undefined) {
+    const verdict = checkSeedAbi(validateSnapRail(manifest).client?.seedAbi, options.seedAbi)
+    if (!verdict.ok) {
+      throw new InstallError('conflict', `${manifest.name} 的种子依赖与宿主不匹配：${verdict.reason ?? '未知原因'}`)
+    }
+  }
   verifyArchiveSignature(files, root, options?.trustedKeys, manifest.name, typeof manifest.version === 'string' ? manifest.version : '0.0.0')
   if (options?.reserved?.includes(manifest.name) === true) {
     throw new InstallError('conflict', `${manifest.name} is a built-in package name (an install cannot replace built-ins)`)

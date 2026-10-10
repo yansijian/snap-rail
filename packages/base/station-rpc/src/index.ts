@@ -21,6 +21,7 @@ import type { AuditService } from '@snap-rail/audit'
 import type { SettingsService } from '@snap-rail/settings'
 import { loadUserLayer } from '@snap-rail/app-boot'
 import { scanPluginPool } from '@snap-rail/app-boot/scan'
+import { resolveSeedAbi } from '@snap-rail/app-boot/seed-abi'
 import { SESSION_OPERATOR_KEY, stationContract, type ClientConfigRow } from './contract.ts'
 
 /** The station bridge plugin; mount after rpc, settings, audit, and boot. */
@@ -97,7 +98,7 @@ const stationRpcPlugin: Plugin.Object<void> = {
         return { time: entry.time } as const
       },
 
-      'client-config.list': () => {
+      'client-config.list': async () => {
         const rendererPackages = new Set(layers.handles.rendererPackages)
         // Pool-installed occupants with a renderer face: the bundle URL rides
         // the row so the renderer's module loader knows what to fetch, along
@@ -109,6 +110,7 @@ const stationRpcPlugin: Plugin.Object<void> = {
           kind?: string
           category?: string
           seeds?: readonly string[]
+          seedAbi?: { revision: number, versions: Record<string, string> }
         }
         const clientFaces = new Map<string, ClientFace>()
         for (const [name, descriptor] of pool) {
@@ -118,6 +120,7 @@ const stationRpcPlugin: Plugin.Object<void> = {
             ...descriptor.kind !== undefined ? { kind: descriptor.kind } : {},
             ...descriptor.category !== undefined ? { category: descriptor.category } : {},
             ...descriptor.clientSeeds !== undefined && descriptor.clientSeeds.length > 0 ? { seeds: descriptor.clientSeeds } : {},
+            ...descriptor.clientSeedAbi !== undefined ? { seedAbi: descriptor.clientSeedAbi } : {},
           })
         }
         const seen = new Set<string>()
@@ -130,6 +133,7 @@ const stationRpcPlugin: Plugin.Object<void> = {
           ...face?.kind !== undefined ? { kind: face.kind } : {},
           ...face?.category !== undefined ? { category: face.category } : {},
           ...face?.seeds !== undefined ? { seeds: face.seeds } : {},
+          ...face?.seedAbi !== undefined ? { seedAbi: face.seedAbi } : {},
         })
         for (const row of loadUserLayer(layers.handles.userLayerPath).plugins) {
           const face = clientFaces.get(row.name)
@@ -147,7 +151,9 @@ const stationRpcPlugin: Plugin.Object<void> = {
           if (seen.has(name)) continue
           rows.push(faceRow(name, false, undefined, face))
         }
-        return { rows }
+        // The live seed table rides the list so the renderer's boot can
+        // handshake each face's stamped ABI before loading it.
+        return { rows, seedAbi: await resolveSeedAbi(layers.handles.appRoot) }
       },
     })
 

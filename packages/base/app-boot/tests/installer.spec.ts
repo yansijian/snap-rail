@@ -242,3 +242,54 @@ describe('plugin installer', () => {
     rmSync(base, { recursive: true, force: true })
   })
 })
+
+describe('seed ABI precheck', () => {
+  const hostAbi = { revision: 1, versions: { 'zod': '4.4.3' } }
+
+  function abiZip(seedAbi: Record<string, unknown> | undefined): string {
+    const snapRail: Record<string, unknown> = { kind: 'driver' }
+    if (seedAbi !== undefined) snapRail.client = { entry: 'lib/client.js', seedAbi }
+    return makeZip({
+      'p/package.json': JSON.stringify({
+        name: '@scope/demo-plugin', version: '1.0.0', type: 'module', main: 'lib/index.js', snapRail,
+      }),
+      'p/lib/client.js': 'module.exports = {}',
+    })
+  }
+
+  it('refuses a foreign revision before anything lands', () => {
+    const base = mkdtempSync(join(tmpdir(), 'snap-rail-abi-'))
+    const pool = join(base, 'plugins')
+    try {
+      installPluginFromZip(abiZip({ revision: 99, versions: {} }), pool, { seedAbi: hostAbi })
+      expect.unreachable()
+    } catch (cause) {
+      expect((cause as InstallError).kind).toBe('conflict')
+      expect((cause as InstallError).message).toContain('r99')
+    }
+    expect(existsSync(join(pool, '@snap-rail__demo-plugin'))).toBe(false)
+    rmSync(base, { recursive: true, force: true })
+  })
+
+  it('refuses a major drift on a declared seed', () => {
+    const base = mkdtempSync(join(tmpdir(), 'snap-rail-abi-'))
+    const pool = join(base, 'plugins')
+    expect(() => installPluginFromZip(abiZip({ revision: 1, versions: { 'zod': '5.0.0' } }), pool, { seedAbi: hostAbi }))
+      .toThrow(/主版本不一致/)
+    expect(existsSync(join(pool, '@snap-rail__demo-plugin'))).toBe(false)
+    rmSync(base, { recursive: true, force: true })
+  })
+
+  it('passes same-major stamps and absent declarations', () => {
+    const base = mkdtempSync(join(tmpdir(), 'snap-rail-abi-'))
+    const pool = join(base, 'plugins')
+    installPluginFromZip(abiZip({ revision: 1, versions: { 'zod': '4.9.1' } }), pool, { seedAbi: hostAbi })
+    expect(installedVersionOf(pool, '@scope/demo-plugin')).toBe('1.0.0')
+    const plain = makeZip({
+      'p/package.json': JSON.stringify({ name: '@scope/demo-plugin', version: '2.0.0', type: 'module', main: 'lib/index.js' }),
+    })
+    const updated = installPluginFromZip(plain, pool, { seedAbi: hostAbi })
+    expect(updated.updated).toBe(true)
+    rmSync(base, { recursive: true, force: true })
+  })
+})

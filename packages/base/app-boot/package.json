@@ -22,6 +22,10 @@
       "types": "./lib/types/scan.d.ts",
       "default": "./lib/scan.js"
     },
+    "./seed-abi": {
+      "types": "./lib/types/seed-abi.d.ts",
+      "default": "./lib/seed-abi.js"
+    },
     "./src/*": "./src/*",
     "./package.json": "./package.json",
     "./invariant": {

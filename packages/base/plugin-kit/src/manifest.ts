@@ -16,6 +16,16 @@ export const PLUGIN_KINDS = ['suite', 'driver', 'framework', 'plugin'] as const
 /** The layer taxonomy — single source in `@snap-rail/util/manifest`. */
 export { PLUGIN_LAYERS }
 
+/** The seed-ABI stamp a pack writes into a client face's manifest (shape of
+ * `snapRail.client.seedAbi`). Computed by the packer from the built bundle
+ * and the build tree's resolved seed versions — authors never hand-write it. */
+export const seedAbiSchema = z.object({
+  /** The seed-contract revision the face was built against. */
+  revision: z.number().int().min(1),
+  /** Base-package versions of the seeds the bundle requires, by seed id. */
+  versions: z.record(z.string().min(1), z.string().min(1)),
+}).strict()
+
 /** The renderer face declaration: where the client bundle lives. */
 export const clientFaceSchema = z.object({
   /** Path of the CJS factory bundle inside the package (from its root). */
@@ -35,6 +45,13 @@ export const clientFaceSchema = z.object({
    * installed and declares the id.
    */
   externalSeeds: z.array(z.string().min(1)).optional(),
+  /**
+   * The seed-contract stamp the packer computed at pack time (see
+   * `@snap-rail/plugin-kit/seeds` for the comparison contract). Present in
+   * the release manifest only; the installer and the renderer boot both
+   * check it against the live table, absent declarations pass untouched.
+   */
+  seedAbi: seedAbiSchema.optional(),
 }).strict()
 
 /** The `snapRail` manifest field's schema. */

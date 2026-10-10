@@ -199,10 +199,12 @@ describe('settings dialog', () => {
     document.querySelector<HTMLButtonElement>('button[aria-label="设置"]')!.click()
     await flush()
 
-    // The builtin timer pins into the 内置 section; the modbus package and
-    // its subpath row each render as their own flat row under 驱动 — no
-    // group card, no master toggle, nothing to expand first.
-    expect(document.querySelector('[data-plugins-section="内置"] [data-plugin-row="@snap-rail/cordis-plugin-timer"]')).not.toBeNull()
+    // Built-ins never list (every operation on the shipped set is refused —
+    // un-actionable rows are noise); the modbus package and its subpath row
+    // each render as their own flat row under 驱动 — no group card, no
+    // master toggle, nothing to expand first.
+    expect(document.querySelector('[data-plugins-section="内置"]')).toBeNull()
+    expect(document.querySelector('[data-plugin-row="@snap-rail/cordis-plugin-timer"]')).toBeNull()
     const main = document.querySelector('[data-plugins-section="驱动"] [data-plugin-row="@snap-rail/driver-modbus"]')
     expect(main).not.toBeNull()
     const bridge = document.querySelector('[data-plugins-section="驱动"] [data-plugin-row="@snap-rail/driver-modbus/bridge"]')
@@ -242,18 +244,15 @@ describe('settings dialog', () => {
     document.querySelector<HTMLButtonElement>('[data-section-toggle="驱动"]')!.click()
     await flush()
     expect(document.querySelector('[data-plugins-section="驱动"] [data-plugin-row="@snap-rail/driver-modbus"]')).toBeNull()
-    expect(document.querySelector('[data-plugins-section="内置"] [data-plugin-row="@snap-rail/cordis-plugin-timer"]')).not.toBeNull()
+    expect(document.querySelector('[data-plugins-section="内置"]')).toBeNull()
 
-    // 全部折叠 empties every section; the button flips to 全部展开.
-    document.querySelector<HTMLButtonElement>('[data-collapse-all]')!.click()
-    await flush()
-    expect(document.querySelector('[data-plugins-section="内置"] [data-plugin-row="@snap-rail/cordis-plugin-timer"]')).toBeNull()
+    // Built-ins hidden leaves one section here: with it collapsed the button
+    // reads 全部展开, and expanding brings the rows back.
     const expand = document.querySelector<HTMLButtonElement>('[data-collapse-all]')!
     expect(expand.textContent).toContain('全部展开')
     expand.click()
     await flush()
     expect(document.querySelector('[data-plugins-section="驱动"] [data-plugin-row="@snap-rail/driver-modbus"]')).not.toBeNull()
-    expect(document.querySelector('[data-plugins-section="内置"] [data-plugin-row="@snap-rail/cordis-plugin-timer"]')).not.toBeNull()
 
     await runtime.dispose()
     element.remove()

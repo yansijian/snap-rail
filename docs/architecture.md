@@ -27,7 +27,7 @@
   import 套件）。
 - **base 层**：boot 关键内置（vendor 同级待遇）——cordis 装载、协议信封、
   工作站桥、settings/audit、kernel/modules。base 是插件但**不可经界面或
-  RPC 禁用/替换**：设置页开关禁用（悬浮提示「内置插件禁止删除/修改」），
+  RPC 禁用/替换**：管理面不显示内置行（全部操作都被拒绝的行是噪音），
   `plugins.set-enabled/set-config/uninstall` 一律拒绝；替换 = 拿源码重建。
 - **出厂净身**：随应用发布的 builtin 层只有 base（`resources/
   builtins.cordis.yml`）；store/equipment/ui/tool/suite 的一切包都经
@@ -100,15 +100,15 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
 | RPC 客户端侧 | `base/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势；`rpcErrorText` 统一错误文案 |
 | 设置持久化 | `base/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
 | 审计 | `base/audit` | 追加式 JSONL：启停/配置/控制写全记录；`list(filter)` 读回；wire 类型（`AuditEntryInfo`）由它导出 |
-| 工具 | `base/util`、`base/plugin-kit` | Branded、assertNever、`formatClock`/`formatDuration`；`util/manifest` 是层词汇与规则单源。plugin-kit：`snapRail` manifest 词汇表（zod：kind/layer/category/exclusive/framework/requires/clientOnly/client/permissions）、种子两层（`SEED_MODULES` 基础层 + `CONTRIBUTED_SEED_MODULES` 框架贡献层，并集 `CLIENT_EXTERNALS` 是 clientBundle external 面）、tsdown preset（含 CSS 内联与三方库全内联）、最终格式打包器 `./pack`（含 exports 映射与 clientOnly 形态） |
-| 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架引导安装页**（拖拽 zip 安装/启用/重启 + `droppedZipPath` 路径桥）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
+| 工具 | `base/util`、`base/plugin-kit` | Branded、assertNever、`formatClock`/`formatDuration`；`util/manifest` 是层词汇与规则单源。plugin-kit：`snapRail` manifest 词汇表（zod：kind/layer/category/exclusive/framework/requires/clientOnly/client/permissions）、种子两层（`SEED_MODULES` 基础层 + `CONTRIBUTED_SEED_MODULES` 框架贡献层，并集 `CLIENT_EXTERNALS` 是 clientBundle external 面）、tsdown preset（含 CSS 内联、三方库全内联、**种子导入护栏**——种子只准 named/star 导入，default 经 rolldown CJS interop 会变成命名空间对象，构建期硬错）、最终格式打包器 `./pack`（含 exports 映射、clientOnly 形态、**pack 时盖 `snapRail.client.seedAbi` 章**——bundle 真实 require 到的种子 id + 本包解析到的版本 + `SEED_ABI_REVISION`） |
+| 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架引导安装页**（统一插件列表：已装行启用/禁用/卸载 + 插件源目录条目安装/更新按包名合并成一张表，拖拽 zip 与源地址为次级操作；`droppedZipPath` 路径桥；`showBootstrapAfterFailure` 崩溃回退——框架运行时抛异常时重植 root 并带错误横幅回到此页）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
 | 持久化规范 | `store/store` | `ctx.store` 的 Service Definition：`register(caller, ns, drizzle表)`；**drizzle 查询构建器即规范**（无裸 SQL/CTE/窗口函数）；命名空间 = 隔离边界；注册即建表 + append-only 加列 |
 | 持久化实现 | `store/store-sqlite` | 参考实现（zip 安装；互斥组 `store-backend`，单活）：node:sqlite + 自写 drizzle 适配器（零原生模块），`data/<ns>.db`，WAL；换后端 = 新实现包替换单活 |
 | 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。zip 声明 `requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影（消费方零改动）。`./contract` 是随应用发布的渲染契约（base 种子），`./driver` 是独立驱动仓库只读的纯类型面 |
 | ModbusTCP 驱动 | 独立仓 `snap-rail-driver-modbus` | 范本驱动（新驱动作者的活文档）：纯协议适配器，块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema）；无存储无渲染端；`requires: ['@snap-rail/equipment']` |
 | EtherNet/IP 驱动 | 独立仓 `snap-rail-driver-enip` | 照 modbus 范本的第二个驱动（首期对接 OMRON NX1P2）：自研轻量 ENIP/CIP 编解码（RegisterSession + SendRRData + Read/Write Tag 符号寻址，无第三方协议库），按已发布全局变量名轮询读写；变量级 CIP 失败只 null 单点（设备保持在线），写前经首读自学类型字；`slot>0` 发背板路由段（留 Logix 兼容门） |
 | UI 框架 | 独立仓 `snap-rail-framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 绑定 `snapRail.framework`；换框架 = 换生态 |
-| 设置外壳 | `ui/settings-station` | 设置对话框壳 + 插件管理页（按 `snapRail.category` 标记动态分组——声明即归组、不问来源；未声明的安装/preset 行落「其他」，未声明的受保护出厂行恒归「内置」组垫底；分节可折叠 + 全部折叠/展开；条目平铺无组卡，`snapRail.title` 标题为主、包名小字次要；行无来源徽标；套件 radio 卡；内置/用户层行禁操作+悬浮提示）+ 主题页；clientOnly zip |
+| 设置外壳 | `ui/settings-station` | 设置对话框壳 + 插件管理页（按 `snapRail.category` 标记动态分组——声明即归组、不问来源；未声明的安装/preset 行落「其他」；**内置来源的行不显示**；分节可折叠 + 全部折叠/展开；条目平铺无组卡，`snapRail.title` 标题为主、包名小字次要；行无来源徽标；套件 radio 卡）+ 主题页；clientOnly zip |
 | 统一设备管理页 | `ui/equipment-station` | equipment 缝的渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 equipment 语义节）；clientOnly zip，`requires` 声明框架与 equipment |
 | 业务套件 | 独立仓 `snap-rail-suite-terminal-ops` | **套件 = 单包单行，可双面**（互斥组 `suite`，单活）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）；宿主面 `./stats` 是同一场景的持久班产计数（store 缝 + 登录锚定 + `production/stats-changed` 帧），契约面为包内私面——场景逻辑收在套件内，杜绝跨包场景工具；`requires` 声明框架、equipment、`service:store` |
 
@@ -167,12 +167,11 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
 - 包是管理单元：`plugins.list` 给每行带 `packageName`、`kind`、
   `title`、`category`、`exclusive`、`framework`、`requires`、`clientOnly`
   （经池清单或 appRoot 解析 manifest），插件管理页条目平铺——一个包
-  与其子路径行各占一行、各带开关，无包组合卡；**来源为内置/用户层的
-  行开关禁用**（悬浮提示「内置插件禁止删除/修改」，RPC 侧同样拒绝——
-  保护按来源判定，zip 永不
-  入保护集）。行上无来源徽标：声明的 `category` 优先归组（不问来源，
-  dev overlay 住户也各归其标记），未声明的安装/preset 行落「其他」，
-  未声明的受保护出厂行恒归「内置」组垫底——徽标是冗余，分类即归属。
+  与其子路径行各占一行、各带开关，无包组合卡；**内置行不显示**
+  （全部操作都被拒绝的行是噪音；保护仍在——RPC 侧同样拒绝，保护按
+  来源判定，zip 永不入保护集）。行上无来源徽标：声明的 `category`
+  优先归组（不问来源，dev overlay 住户各归其标记——内置来源的行不进
+  管理面），未声明的安装/preset 行落「其他」——徽标是冗余，分类即归属。
 - **防冒充双闸**：保护集（builtin 行 + 包名 + dev 住户）由宿主从层文件
   计算，manifest 声明改变不了它；在此之上 `plugins.install` 拒装与内置
   行重名的 zip（conflict，解压前拒绝），组合解析对内置名字永不走池
@@ -446,20 +445,32 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
   ——每个 Component 与框架共享同一份原语/槽位/运行时实例。装载顺序：
   framework 行 → 其他种子提供方（`client.seeds` 非空）→ 普通住户面。
 - **无框架引导**：没有已启用的 framework 行时渲染 `kernel` 的引导安装页
-  （拖拽 zip → `zipPathOf` 桥 → inspect/confirm → install → 启用开关 →
-  重启按钮），关闭回到连接页、角落入口重开——base 永远是救生艇。
+  （统一插件列表：已装池包行启用/禁用/卸载与插件源目录条目安装/更新按
+  包名合并成一张表，内置行不出现；拖拽 zip → `zipPathOf` 桥 →
+  inspect/confirm → install 与源地址配置为次级操作；变更后「重启生效」），
+  关闭回到连接页、角落入口重开——base 永远是救生艇。框架运行时抛异常
+  时 `showBootstrapAfterFailure` 重植 React root 带错误横幅回到此页，
+  操作员永远保有插件管理入口（配置错插件不再等于锁死终端）。
 - **装载纪律**（三条硬边界）：渲染面永不 import 双面包的宿主入口
   （跨端类型/schema 走该包 `./contract` 纯面）；渲染面运行时 require 的
   id ⊆ `CLIENT_EXTERNALS`（= base ∪ 贡献种子；种子表 = 客户端入口播种 =
   `clientBundle` external，三处单源；加 base id 是 base 层决策，框架
-  贡献自己的 id）；池内包单宿主入口。
+  贡献自己的 id）；池内包单宿主入口。**种子消费只准 named/star
+  导入**——default 导入经 rolldown CJS node-mode interop 会把 `.default`
+  变成整个命名空间对象而非模块自身的 default，`clientBundle` 的
+  `seedImportGuard` 构建期硬错（r1 黑屏事故的根因）。**seedAbi 握手**：
+  pack 盖章（bundle 实际 require 的种子 + 本包解析到的版本 + revision）→
+  安装期 `plugins.install` 对照宿主活表拒装（`resolveSeedAbi(appRoot)`，
+  appRoot 缺失降级为仅 revision）→ 渲染端 boot 经 `client-config.list`
+  附带宿主表、面加载前比对（不符 skip + console.error，框架被拒即回退
+  引导页）；缺章的存量 zip 放行（过渡宽限）。
 - **管理页**（settings-station）：按 `snapRail.category` 标记动态分组
   （开放词汇，作者命名；声明即归组、不问来源——dev overlay 住户也各归
-  其标记；未声明落「其他」，未声明的受保护出厂行恒归「内置」组垫底，
-  行上无来源徽标）+ 分节折叠与全部折叠/展开（带图标按钮，顶栏与
-  安装插件并排）+ 条目平铺（无包组合卡，一行一开关）+
-  `snapRail.title` 两行式身份（标题为主、包名小字次要，未声明回退
-  包名）+ 套件 radio 卡 + 安装流（inspect 警告缺依赖，
+  其标记；未声明落「其他」；**内置来源的行不显示**——全部操作都被
+  拒绝的行是噪音，保护语义不变；行上无来源徽标）+ 分节折叠与全部
+  折叠/展开（带图标按钮，顶栏与安装插件并排）+ 条目平铺（无包组合卡，
+  一行一开关）+ `snapRail.title` 两行式身份（标题为主、包名小字次要，
+  未声明回退包名）+ 套件 radio 卡 + 安装流（inspect 警告缺依赖，
   重名内置拒装）+ 待重启徽标 + 套件切换弹框。
 
 ## 打包决策

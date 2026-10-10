@@ -15,7 +15,7 @@
 import * as React from 'react'
 import * as ReactDom from 'react-dom'
 import * as ReactDomClient from 'react-dom/client'
-import { bootClient, installRendererAutoReload, showBootstrap, type ClientHandle } from '@snap-rail/client-kernel'
+import { bootClient, installRendererAutoReload, showBootstrap, showBootstrapAfterFailure, type ClientHandle } from '@snap-rail/client-kernel'
 import {
   installModuleLoader,
   loadPluginBundle,
@@ -28,7 +28,7 @@ import * as stationRpcContract from '@snap-rail/station-rpc/contract'
 import * as appBootContract from '@snap-rail/app-boot/contract'
 import * as equipmentContract from '@snap-rail/equipment/contract'
 import * as snapRailUtil from '@snap-rail/util'
-import { SEED_MODULES } from '@snap-rail/plugin-kit/seeds'
+import { checkSeedAbi, SEED_MODULES, type SeedAbi } from '@snap-rail/plugin-kit/seeds'
 import * as cordis from '@snap-rail/cordis'
 import * as zod from 'zod'
 import type { Plugin } from '@snap-rail/cordis'
@@ -80,9 +80,12 @@ for (const [id, module] of SEED_TABLE) system.seed(id, module)
 
 // The plugins.yml rows addressed to renderer occupants carry each one's
 // config, enable flag, and — for pool-installed faces — the bundle URL.
+// `seedAbi` is the host's live seed table: every stamped face handshakes
+// against it before its bundle loads.
 const configResult = await handle.link.call('client-config.list', {})
 const rows = configResult.ok ? configResult.value.rows : []
-await runPoolRenderer({ handle, system, rows })
+const hostSeedAbi: SeedAbi | undefined = configResult.ok ? configResult.value.seedAbi : undefined
+await runPoolRenderer({ handle, system, rows, hostSeedAbi })
 
 /** A cordis plugin face (the provider faces export `{ seeds }` instead). */
 function isPlugin(value: unknown): value is Plugin {
@@ -107,14 +110,19 @@ interface FrameworkRuntimeFace {
  * The production renderer: load enabled pool faces in dependency order
  * (framework first, then other seed providers, then occupants), seed every
  * contributed id from the providers, and hand the root to the framework's
- * runtime. Without a framework face, the bootstrap install page takes over.
+ * runtime. A face whose stamped seed ABI disagrees with the live table is
+ * skipped with a loud console error — a drift fails here, on the page, not
+ * as a crashed window. Without a framework face, the bootstrap install page
+ * takes over; a framework runtime that throws falls back to it too, with
+ * the failure surfaced on the page.
  */
 async function runPoolRenderer(options: {
   handle: ClientHandle
   system: ModuleSystem
   rows: readonly (typeof rows)[number][]
+  hostSeedAbi: SeedAbi | undefined
 }): Promise<void> {
-  const { handle, system, rows } = options
+  const { handle, system, rows, hostSeedAbi } = options
   const enabled = rows.filter(
     (row): row is (typeof rows)[number] & { clientUrl: string } =>
       row.enabled !== false && row.clientUrl !== undefined,
@@ -125,6 +133,13 @@ async function runPoolRenderer(options: {
 
   const faces: LoadedFace[] = []
   for (const row of ordered) {
+    if (row.seedAbi !== undefined && hostSeedAbi !== undefined) {
+      const verdict = checkSeedAbi(row.seedAbi, hostSeedAbi)
+      if (!verdict.ok) {
+        console.error(`client: face "${row.name}" refused — ${verdict.reason}`)
+        continue
+      }
+    }
     try {
       await loadPluginBundle(document, row.clientUrl)
       const value = system.require(row.name)
@@ -155,5 +170,15 @@ async function runPoolRenderer(options: {
     if (!isPlugin(face.value)) continue
     seats.push(face.row.config === undefined ? face.value : { plugin: face.value, config: face.row.config })
   }
-  await runtime.createClientRuntime(handle, { plugins: seats })
+  try {
+    await runtime.createClientRuntime(handle, { plugins: seats })
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    console.error('client: the framework runtime failed — falling back to the bootstrap console', cause)
+    showBootstrapAfterFailure(
+      handle,
+      `界面框架启动失败，已回退到引导页：\n${detail}\n\n`
+      + '可在下方列表中禁用或卸载出问题的插件后重启；引导页其余功能不受影响。',
+    )
+  }
 }

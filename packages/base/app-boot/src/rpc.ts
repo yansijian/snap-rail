@@ -52,6 +52,7 @@ import {
   withPluginPoolTransaction,
 } from './installer.ts'
 import { loadTrustedReleaseKeys } from './trust.ts'
+import { resolveSeedAbi } from './seed-abi.ts'
 
 /** The plugin-admin bridge plugin; mount after rpc, audit, and boot. */
 const pluginAdminRpcPlugin: Plugin.Object<void> = {
@@ -173,6 +174,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         installed = installPluginFromZip(zipPath, poolDir, {
           reserved: [...view.shippedNames()],
           trustedKeys: trustedKeys(),
+          seedAbi: await resolveSeedAbi(layers.handles.appRoot),
         })
       } catch (cause) {
         if (cause instanceof InstallError && cause.kind === 'conflict') {

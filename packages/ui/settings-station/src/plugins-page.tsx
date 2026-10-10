@@ -330,9 +330,15 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
 
   // Rows file straight under their classification marker — no package-level
   // grouping; every entry (a package or one of its subpath rows) is its own
-  // flat row with its own toggle. Sections collapse on demand; 内置 pins last.
+  // flat row with its own toggle. Sections collapse on demand.
+  // Built-ins never list: the shipped set is read-only by design (every
+  // operation on it is refused), so listing un-actionable rows is noise.
+  // Dev's overlay mounts installable packages as protected builtin rows —
+  // they hide here too; the bootstrap console and the layer files remain
+  // the development levers.
   const sections = new Map<string, PluginRow[]>()
   for (const row of rows) {
+    if (row.source === 'builtin') continue
     const marker = sectionOf(row)
     const bucket = sections.get(marker)
     if (bucket === undefined) sections.set(marker, [row])

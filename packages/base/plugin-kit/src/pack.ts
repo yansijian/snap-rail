@@ -11,7 +11,9 @@
  */
 
 import { readFile, readdir } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { join, relative } from 'node:path'
+import { CLIENT_EXTERNALS, SEED_ABI_REVISION, type SeedAbi } from './seeds.ts'
 
 /** The manifest fields the release manifest carries over from the source. */
 interface SourceManifest {
@@ -59,15 +61,23 @@ function isBuildPlumbing(path: string): boolean {
 /**
  * Derive the release manifest: the npm identity plus `main` plus the trimmed
  * `exports` map. Everything else (scripts, dev dependencies) is workspace
- * plumbing the pool never reads and the zip never carries.
+ * plumbing the pool never reads and the zip never carries. A stamped seed
+ * ABI merges into `snapRail.client` — the build-truth declaration replaces
+ * anything a source manifest may have carried.
  *
  * @param source - the parsed source `package.json`.
  * @param main - the entry the manifest `main` names.
  * @param exports - subpath exports beyond `.`; the root voice is always
- * included.
+ *   included.
+ * @param seedAbi - the pack-time seed-contract stamp for client faces.
  * @returns the manifest serialized for the zip root.
  */
-export function releaseManifest(source: SourceManifest, main: string, exports?: Readonly<Record<string, string>>): string {
+export function releaseManifest(
+  source: SourceManifest,
+  main: string,
+  exports?: Readonly<Record<string, string>>,
+  seedAbi?: SeedAbi | undefined,
+): string {
   const snapRail = source.snapRail
   const manifest: Record<string, unknown> = {
     name: source.name,
@@ -77,8 +87,59 @@ export function releaseManifest(source: SourceManifest, main: string, exports?: 
     main,
     exports: { '.': main, ...exports },
   }
-  if (snapRail !== undefined) manifest.snapRail = snapRail
+  if (snapRail !== undefined) {
+    manifest.snapRail = seedAbi === undefined
+      ? snapRail
+      : {
+          ...snapRail,
+          client: { ...snapRail.client, seedAbi },
+        }
+  }
   return `${JSON.stringify(manifest, null, 2)}\n`
+}
+
+/** The base npm package of a seed id (`react/jsx-runtime` → `react`;
+ * `@scope/name/sub` → `@scope/name`). */
+function basePackageOf(seedId: string): string {
+  const parts = seedId.split('/')
+  return seedId.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]!
+}
+
+/**
+ * Stamp the seed ABI a built client face was built against: the seeds its
+ * bundle actually requires (a `require("…")` literal scan — externals are
+ * the only bare requires the welded CJS output carries) plus each seed's
+ * base-package version resolved from the package's own dependency tree.
+ * Ids whose base package cannot be resolved here are omitted — the runtime
+ * check compares only the intersection, so an omitted id is unchecked,
+ * never failed. Returns `undefined` when the bundle requires no seeds or
+ * none could be versioned (nothing to enforce).
+ *
+ * @param packageDir - the package being packed (version resolution root).
+ * @param bundleCode - the built client bundle's source text.
+ */
+async function seedAbiStamp(packageDir: string, bundleCode: string): Promise<SeedAbi | undefined> {
+  const seeds = new Set(CLIENT_EXTERNALS)
+  const required = new Set<string>()
+  for (const match of bundleCode.matchAll(/require\(\s*(['"])([^'"\n]+)\1\s*\)/g)) {
+    const id = match[2]
+    if (id !== undefined && seeds.has(id)) required.add(id)
+  }
+  if (required.size === 0) return undefined
+  const require = createRequire(join(packageDir, 'package.json'))
+  const versions: Record<string, string> = {}
+  for (const id of required) {
+    try {
+      const manifestPath = require.resolve(`${basePackageOf(id)}/package.json`)
+      const parsed = JSON.parse(await readFile(manifestPath, 'utf8')) as { version?: unknown }
+      if (typeof parsed.version === 'string' && parsed.version !== '') versions[id] = parsed.version
+    } catch {
+      // Not resolvable from this package (not a declared dependency) —
+      // declare nothing; the boot check compares only what is declared.
+    }
+  }
+  if (Object.keys(versions).length === 0) return undefined
+  return { revision: SEED_ABI_REVISION, versions }
 }
 
 /** Collect every file under `dir` (zip paths use forward slashes). */
@@ -135,9 +196,7 @@ export async function releaseFiles(spec: ReleaseSpec): Promise<Record<string, Ui
   const clientEntry = typeof snapRail?.client?.entry === 'string' ? snapRail.client.entry : 'lib/client.js'
   const main = spec.hostFace ?? clientEntry
 
-  const files: Record<string, Uint8Array> = {
-    'package.json': new TextEncoder().encode(releaseManifest(source, main, spec.exports)),
-  }
+  const files: Record<string, Uint8Array> = {}
   if (spec.hostDir !== undefined) {
     Object.assign(files, await collectDir(join(spec.dir, spec.hostDir), spec.dir))
     // The tsc staging tree (`<hostDir>/types` — type-stripped intermediates the
@@ -147,15 +206,22 @@ export async function releaseFiles(spec: ReleaseSpec): Promise<Record<string, Ui
       if (path === `${spec.hostDir}/types` || path.startsWith(`${spec.hostDir}/types/`)) delete files[path]
     }
   }
-  if (spec.hostFace !== undefined && files[spec.hostFace] === undefined) {
-    throw new Error(`pack: ${spec.name} is missing its host face ${spec.hostFace} under ${String(spec.hostDir)}`)
-  }
   if (spec.clientFace !== undefined) {
     Object.assign(files, await collectDir(join(spec.dir, spec.clientFace), spec.dir))
+  }
+  if (spec.hostFace !== undefined && files[spec.hostFace] === undefined) {
+    throw new Error(`pack: ${spec.name} is missing its host face ${spec.hostFace} under ${String(spec.hostDir)}`)
   }
   if (declaredClient && files[clientEntry] === undefined) {
     throw new Error(`pack: ${spec.name} declares client entry ${clientEntry} but the zip does not carry it`)
   }
+  // The manifest lands last: a client face's seed ABI is stamped from the
+  // built bundle it ships (seed ids actually required + the versions this
+  // build tree resolved for them).
+  const seedAbi = declaredClient && files[clientEntry] !== undefined
+    ? await seedAbiStamp(spec.dir, new TextDecoder().decode(files[clientEntry]!))
+    : undefined
+  files['package.json'] = new TextEncoder().encode(releaseManifest(source, main, spec.exports, seedAbi))
   for (const [subpath, target] of Object.entries(spec.exports ?? {})) {
     if (files[target] === undefined) {
       throw new Error(`pack: ${spec.name} exports ${subpath} to ${target} but the zip does not carry it`)

@@ -55,6 +55,10 @@ export interface ClientConfigRow {
   /** Contributed-seed subpaths (`snapRail.client.seeds`) — non-empty rows
    * are seed providers and load before plain occupant faces. */
   seeds?: readonly string[] | undefined
+  /** The pack-stamped seed contract (`snapRail.client.seedAbi`) the face
+   * was built against, when it declares one. The renderer boot compares it
+   * against the list result's live table before loading the face. */
+  seedAbi?: { revision: number, versions: Readonly<Record<string, string>> } | undefined
 }
 
 const emptyRequest = z.object({}).strict()
@@ -97,8 +101,15 @@ export const stationContract = defineContract('station', {
       subject: z.string().optional(),
       detail: z.unknown().optional(),
     }).strict()).ret<{ time: number }>(),
-    /** Renderer-occupant configuration carved out of the shared `plugins.yml`. */
-    'client-config.list': method(emptyRequest).ret<{ rows: readonly ClientConfigRow[] }>(),
+    /** Renderer-occupant configuration carved out of the shared `plugins.yml`.
+     * `seedAbi` is the host's live seed table (revision + base-package
+     * versions) the renderer boot checks each face's stamped declaration
+     * against — a foreign-ABI face is skipped with a loud console error
+     * instead of crashing the window. */
+    'client-config.list': method(emptyRequest).ret<{
+      rows: readonly ClientConfigRow[]
+      seedAbi: { revision: number, versions: Readonly<Record<string, string>> }
+    }>(),
   },
   frames: {
     /** Follows every settings.json write; consumers filter by key. */
