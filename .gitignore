@@ -1,5 +1,8 @@
 node_modules/
 lib/
+# scripts/lib is source (the shared catalog-entry emitter), not a build output
+!scripts/lib/
+!scripts/lib/**
 lib-client/
 lib-host/
 dist/

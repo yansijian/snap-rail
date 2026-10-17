@@ -16,6 +16,11 @@ export default defineConfig({
         // (`lib/runtime.js` imports `./ui/theme.css`) node's loader cannot
         // serve — inline the package so vite's css stubbing sees the import.
         inline: [/@snap-rail\/framework-shadcn/],
+        // store-sqlite is a host-side package (node:sqlite). Happy-dom suites
+        // still import it to build a real host world; load the built package
+        // in Node instead of asking Vite's client environment to bundle a
+        // Node built-in (fresh runners have no dep cache to hide this).
+        external: [/@snap-rail\/store-sqlite/],
       },
     },
   },
