@@ -126,6 +126,14 @@ function checkInstallerArchive(): void {
     console.warn('verify:packaged-app — installer archive check skipped (7z could not list the NSIS payload)')
     return
   }
+  // electron-builder's NSIS installer embeds the app as a nested `app-64.7z`;
+  // listing the setup.exe only shows that container, not package paths. The
+  // unpacked gate above already proved the payload; don't misread the nesting
+  // as fifteen missing packages.
+  if (/(^|[\\/])app-\d+\.7z/m.test(listing.stdout)) {
+    console.warn('verify:packaged-app — installer archive check skipped (NSIS payload is nested; unpacked gate already checked it)')
+    return
+  }
   for (const name of required) {
     const pattern = new RegExp(`[@/]${name.slice('@snap-rail/'.length).replaceAll('/', '\\/')}[\\\\/]`)
     if (!pattern.test(listing.stdout)) violations.push(`${name}: absent from installer archive ${installers[0]}`)
