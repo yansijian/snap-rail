@@ -83,7 +83,7 @@ jobs:
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
           ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: pnpm --filter @snap-rail/desktop run dist
+        run: pnpm run app:dist
       - name: create release + upload installer trio
         env:
           FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
