@@ -1,30 +1,32 @@
 /**
- * Feed collector: assemble the standalone plugin repositories' release zips
- * into one market directory — `index.json` entries read back out of the
- * signed zips themselves (manifest, signature, digest), so the feed can
+ * Feed collector: assemble the org's own standalone plugin repositories'
+ * release zips into one directory — `index.json` entries read back out of
+ * the signed zips themselves (manifest, signature, digest), so the feed can
  * never advertise something a zip does not carry. The publish pipeline
- * merges the directory via `--market` (its index wins collisions) and
- * syncs the feed branch; `verify:market` then checks the assembled feed
+ * merges the directory via `--collect` (its entries win collisions) and
+ * syncs the rolling release; `verify:feed` then checks the assembled feed
  * against the release trust store.
  *
- * Sources come from `feed-sources.json`: each names the Gitea repo, the
- * release asset, and — locally — the already-built dist directory. The CI
- * collect workflow downloads the latest release assets instead and passes
- * that directory here.
+ * This is first-party collection only: community authors own their feeds and
+ * users add them by URL. Sources come from `feed-sources.json`; each names
+ * the repo, the release asset, and — locally — the already-built dist
+ * directory. The CI collect workflow downloads the latest release assets
+ * instead and passes that directory here.
  *
  * Usage:
- *   tsx scripts/collect-feed.ts                    # feeds from `local` dirs
- *   tsx scripts/collect-feed.ts --from <dir>       # zips already downloaded
- *   tsx scripts/collect-feed.ts --out <dir>        # default collect-out/
+ *   tsx scripts/collect-feed.ts                          # feeds from `local` dirs
+ *   tsx scripts/collect-feed.ts --from <dir>             # zips already downloaded
+ *   tsx scripts/collect-feed.ts --out <dir>              # default collect-out/
+ *   tsx scripts/collect-feed.ts --provider gitea|github  # source-repository URL base
  *
  * @module snap-rail/scripts/collect-feed
  */
 
-import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { unzipSync } from 'fflate'
-import type { ReleaseSignature } from '@snap-rail/plugin-kit/sign'
+import { catalogEntryFromZip } from './lib/catalog-entry.ts'
+
+type FeedProvider = 'gitea' | 'github'
 
 interface FeedSource {
   repo: string
@@ -33,20 +35,39 @@ interface FeedSource {
   local?: string
 }
 
+interface FeedSources {
+  /** The default repository-URL provider when `--provider` is absent. */
+  provider?: FeedProvider
+  /** Provider → organization/user URL base for source-repository links. */
+  providers?: Partial<Record<FeedProvider, string>>
+  sources: FeedSource[]
+}
+
 function option(name: string): string | undefined {
   const index = process.argv.indexOf(name)
   return index < 0 ? undefined : process.argv[index + 1]
+}
+
+function providerArg(): FeedProvider | undefined {
+  const value = option('--provider')
+  if (value === undefined) return undefined
+  if (value !== 'gitea' && value !== 'github') throw new Error(`collect: --provider 只支持 gitea 或 github（收到 ${value}）`)
+  return value
 }
 
 function main(): void {
   const root = join(import.meta.dirname, '..')
   const outDir = resolve(option('--out') ?? join(root, 'collect-out'))
   const downloadDir = option('--from')
-  const sources = (JSON.parse(readFileSync(join(root, 'feed-sources.json'), 'utf8')) as { sources: FeedSource[] }).sources
+  const document = JSON.parse(readFileSync(join(root, 'feed-sources.json'), 'utf8')) as FeedSources
+  const provider = providerArg() ?? document.provider ?? 'gitea'
+  const repositoryBase = document.providers?.[provider]?.replace(/\/+$/, '')
+  const repositoryOf = (repo: string): string | undefined =>
+    repositoryBase === undefined || repositoryBase === '' ? undefined : `${repositoryBase}/${repo}`
 
   mkdirSync(outDir, { recursive: true })
   const entries: Array<Record<string, unknown>> = []
-  for (const source of sources) {
+  for (const source of document.sources) {
     const zipPath = downloadDir !== undefined
       ? join(resolve(downloadDir), source.asset)
       : join(root, source.local ?? throwMissingLocal(source.repo), source.asset)
@@ -57,47 +78,17 @@ function main(): void {
       continue
     }
     const zipped = new Uint8Array(readFileSync(zipPath))
-    const files = unzipSync(zipped)
-    const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!)) as {
-      version?: string
-      description?: string
-      snapRail?: {
-        kind?: string
-        title?: string
-        category?: string
-        requires?: string[]
-        framework?: string
-        permissions?: string[]
-        capabilities?: { provides?: { id: string, version: string }[], requires?: { id: string, range: string, optional?: boolean }[] }
-        engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
-      }
-    }
-    const signatureFile = files['META-INF/signature.json']
-    if (signatureFile === undefined) throw new Error(`collect: ${source.asset} 没有签名（META-INF/signature.json 缺失）`)
-    const signature = JSON.parse(new TextDecoder().decode(signatureFile)) as ReleaseSignature
     writeFileSync(join(outDir, source.asset), zipped)
-    entries.push({
-      name: manifest.name ?? source.asset,
-      version: manifest.version ?? '0.0.0',
-      ...(manifest.description !== undefined && manifest.description !== '' ? { description: manifest.description } : {}),
-      ...(manifest.snapRail?.kind !== undefined ? { kind: manifest.snapRail.kind } : {}),
-      ...(manifest.snapRail?.title !== undefined ? { title: manifest.snapRail.title } : {}),
-      ...(manifest.snapRail?.category !== undefined ? { category: manifest.snapRail.category } : {}),
-      ...(manifest.snapRail?.requires !== undefined ? { requires: manifest.snapRail.requires } : {}),
-      ...(manifest.snapRail?.framework !== undefined ? { framework: manifest.snapRail.framework } : {}),
-      ...(manifest.snapRail?.permissions !== undefined ? { permissions: manifest.snapRail.permissions } : {}),
-      ...(manifest.snapRail?.capabilities !== undefined ? { capabilities: manifest.snapRail.capabilities } : {}),
-      ...(manifest.snapRail?.engines !== undefined ? { engines: manifest.snapRail.engines } : {}),
-      file: source.asset,
-      sha256: createHash('sha256').update(zipped).digest('hex'),
-      size: zipped.length,
-      signature: { algorithm: signature.algorithm, keyId: signature.keyId },
-      repository: `http://192.168.1.9:3000/snap-rail/${source.repo}`,
-    })
-    console.log(`collected ${source.asset} (${manifest.version ?? '?'}, ${(zipped.length / 1024).toFixed(0)} KiB)`)
+    const repository = repositoryOf(source.repo)
+    entries.push(catalogEntryFromZip(zipped, source.asset, source.asset, {
+      requireSignature: true,
+      ...(repository === undefined ? {} : { repository }),
+    }))
+    const version = (entries[entries.length - 1]!.version as string) ?? '?'
+    console.log(`collected ${source.asset} (${version}, ${(zipped.length / 1024).toFixed(0)} KiB)`)
   }
   writeFileSync(join(outDir, 'index.json'), `${JSON.stringify({ plugins: entries }, null, 2)}\n`)
-  console.log(`collect: wrote ${outDir}${'/'}index.json (${entries.length} plugins)`)
+  console.log(`collect: wrote ${join(outDir, 'index.json')} (${entries.length} plugins, provider ${provider})`)
 }
 
 function throwMissingLocal(repo: string): never {

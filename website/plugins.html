@@ -6,7 +6,7 @@
     <title>插件生态 · snap-rail</title>
     <meta
       name="description"
-      content="snap-rail 插件生态目录：业务套件、通讯驱动、工具插件，zip 即插即用；安装四步与插件开发指引。"
+      content="snap-rail 插件生态：业务套件、通讯驱动、界面框架、工具插件，zip 即插即用；离线下载组合包，拖入内网终端即可安装。"
     />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
     <link rel="stylesheet" href="/src/styles.css" />
@@ -23,10 +23,10 @@
         <div class="ml-auto flex items-center gap-1">
           <a data-nav="index" class="nav-link hidden sm:inline-flex" href="./index.html">主页</a>
           <a data-nav="plugins" class="nav-link whitespace-nowrap" href="./plugins.html">插件生态</a>
-          <a data-nav="recipes" class="nav-link hidden whitespace-nowrap sm:inline-flex" href="./recipes.html">组合示例</a>
+          <a data-nav="recipes" class="nav-link hidden whitespace-nowrap sm:inline-flex" href="./recipes.html">组合套件</a>
           <a
             class="nav-link hidden sm:inline-flex"
-            href="https://gitee.com/yansijian/snap-rail/blob/master/docs/architecture.md"
+            href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md"
             target="_blank"
             rel="noopener"
             >文档</a
@@ -44,16 +44,17 @@
           <h1 class="glow-number mt-4 text-4xl font-bold md:text-5xl">插件生态</h1>
           <p class="mt-4 max-w-2xl leading-relaxed text-muted-foreground">
             每一枚插件都是同格式的 zip：精简 manifest + 构建好的宿主面（与渲染面），经设置页预检确认后落进
-            &lt;home&gt;/plugins/ 即时挂载。应用内「插件市场」页直接浏览并安装本源目录；组合示例见<a
-            class="underline underline-offset-2" href="./recipes.html">组合示例页</a>。
+            &lt;home&gt;/plugins/ 即时挂载。每张卡片都能直接下载 zip——在联网 PC 下载、拷进内网、拖入终端安装。
+            组合套件见<a class="underline underline-offset-2" href="./recipes.html">组合套件页</a>。
           </p>
           <div
             class="mt-8 flex flex-wrap items-center gap-3 rounded-lg border border-primary/40 bg-primary/5 px-5 py-4"
           >
-            <span class="badge text-primary">已上线</span>
+            <span class="badge text-primary">静态插件源</span>
             <p class="text-sm text-muted-foreground">
-              插件源 = 这个服务器上的静态目录（index.json + recipes.json + 插件 zip，下载带 sha256
-              完整性校验）；社区插件经 snap-rail-market 仓 PR 上架同名源。
+              插件源 = 任意静态目录（index.json + 插件 zip，下载带 sha256 完整性校验），官方源就是
+              <a class="underline underline-offset-2" href="https://github.com/yansijian/snap-rail/releases" target="_blank" rel="noopener">主仓的滚动 Release</a>。
+              没有集中市场仓：社区作者在自己的仓库发布并签名，用户把作者 Release 地址加为插件源即可。
             </p>
           </div>
         </div>
@@ -64,17 +65,45 @@
         <div class="mx-auto max-w-6xl px-6" id="catalog"></div>
       </section>
 
+      <!-- 社区发现方式（只解释，不维护策展列表） -->
+      <section class="pb-16">
+        <div class="mx-auto max-w-6xl px-6">
+          <div class="reveal section-card grid gap-6 p-7 md:grid-cols-[1.2fr_1fr]">
+            <div>
+              <p class="kicker">community</p>
+              <h2 class="mt-3 text-2xl font-bold">社区插件怎么发现</h2>
+              <p class="mt-3 text-sm leading-relaxed text-muted-foreground">
+                社区作者按同一套约定发布：源码在自己的 GitHub 仓库、用作者自己的 Ed25519 密钥签名、发布为自仓滚动
+                Release，并给仓库打上 <code class="font-mono text-xs">snap-rail-plugin</code> topic。发现方式是开放的——
+                在 GitHub topic 里浏览，或从作者 README 拿到 Release 地址，然后在终端「插件」页的源设置里添加。
+                官方这里不维护名单、不做 PR 上架，也不转存社区 zip。
+              </p>
+              <div class="mt-5 flex flex-wrap gap-3">
+                <a class="btn btn-ghost" href="https://github.com/topics/snap-rail-plugin" target="_blank" rel="noopener">GitHub topic · snap-rail-plugin →</a>
+                <a class="btn btn-ghost" href="https://github.com/yansijian/snap-rail/blob/master/docs/plugin-development.md" target="_blank" rel="noopener">社区发布指引 →</a>
+              </div>
+            </div>
+            <pre class="code-block"><code># 终端里添加作者源（静态目录）
+设置 → 插件 → ⚙ 插件源
+https://github.com/&lt;author&gt;/&lt;repo&gt;/releases/download/feed/
+
+# 搜索引擎可直接用 topic 页发现
+github.com/topics/snap-rail-plugin</code></pre>
+          </div>
+        </div>
+      </section>
+
       <!-- 下载 + 上手三步 -->
       <section id="download" class="border-y border-border/60 bg-card/30 py-20">
         <div class="mx-auto max-w-6xl px-6">
           <div id="download-body" class="reveal"></div>
           <ol id="install-steps" class="mt-10 grid gap-5 sm:grid-cols-3"></ol>
-          <div class="reveal section-card mt-8 overflow-hidden" data-image="plugin-settings" data-alt="应用内插件市场设置页截图">
-            <div class="slot-fallback flex aspect-32/9 flex-col items-center justify-center gap-3">
-              <p class="font-mono text-sm text-muted-foreground">plugin-settings.png</p>
-              <p class="text-xs text-muted-foreground/70">截图待放置 · 应用内「插件市场」设置页（组合区 + 分类目录）</p>
+            <div class="reveal section-card mt-8 overflow-hidden" data-image="plugin-settings" data-alt="应用内插件设置页截图">
+              <div class="slot-fallback flex aspect-32/9 flex-col items-center justify-center gap-3">
+                <p class="font-mono text-sm text-muted-foreground">plugin-settings.png</p>
+                <p class="text-xs text-muted-foreground/70">截图待放置 · 应用内「插件」设置页（源设置 + 分类目录 + 组合安装预览）</p>
+              </div>
             </div>
-          </div>
         </div>
       </section>
 
@@ -86,25 +115,40 @@
             <h2 class="mt-3 text-2xl font-bold">开发自己的插件</h2>
             <p class="mt-4 leading-relaxed text-muted-foreground">
               能力缝三件套齐备再动手：Service Definition / Provider / Consumer。驱动是纯协议适配器，照抄
-              driver-modbus；渲染面必须是 plugin-kit clientBundle 产出的 CJS
-              工厂包。源码提交到 snap-rail-market 社区仓，PR 合入即上架（命名不得占用
-              <code class="font-mono text-xs">@snap-rail/*</code>）。缝目录与开发配方见 architecture.md。
+              driver-modbus；渲染面必须是 plugin-kit clientBundle 产出的 CJS 工厂包。独立仓库用
+              <code class="font-mono text-xs">@snap-rail/plugin-sdk</code> 与
+              <code class="font-mono text-xs">snap-rail-plugin</code> CLI 打包签名，发布成自己的滚动 Release，
+              再给仓库打上 <code class="font-mono text-xs">snap-rail-plugin</code> topic——不需要 PR 到主仓，
+              命名也不得占用 <code class="font-mono text-xs">@snap-rail/*</code>。缝目录与开发配方见 architecture.md。
             </p>
-            <a
-              class="btn btn-ghost mt-6"
-              href="https://gitee.com/yansijian/snap-rail/blob/master/docs/architecture.md"
-              target="_blank"
-              rel="noopener"
-              >阅读 architecture.md →</a
-            >
+            <div class="mt-6 flex flex-wrap gap-3">
+              <a
+                class="btn btn-ghost"
+                href="https://github.com/yansijian/snap-rail/blob/master/docs/plugin-development.md"
+                target="_blank"
+                rel="noopener"
+                >插件开发指南 →</a
+              >
+              <a
+                class="btn btn-ghost"
+                href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md"
+                target="_blank"
+                rel="noopener"
+                >architecture.md →</a
+              >
+            </div>
           </div>
-          <pre class="code-block reveal"><code># 克隆并构建
-git clone https://gitee.com/yansijian/snap-rail.git
-cd snap-rail &amp;&amp; pnpm install
+          <pre class="code-block reveal"><code># 插件作者：在空目录初始化（driver/store-provider/ui-view/... 任选模板）
+mkdir my-plugin &amp;&amp; cd my-plugin
+pnpm add -D @snap-rail/plugin-sdk
+pnpm exec snap-rail-plugin init . --template driver
 
-# 构建库 + 装配发布（feed/官网/更新源 → deploy.config.json 里的服务器）
+# 构建 + 用你自己的密钥签名打包
 pnpm run build
-pnpm run publish</code></pre>
+pnpm exec snap-rail-plugin pack . --sign-key release.private.pem --key-id my-key
+
+# 发布：把 dist/*.zip 传到你仓库的滚动 Release（tag: feed）
+# 再给仓库打 topic: snap-rail-plugin</code></pre>
         </div>
       </section>
     </main>
@@ -113,10 +157,10 @@ pnpm run publish</code></pre>
     <footer class="border-t border-border/60 py-10">
       <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-6 text-sm">
         <a class="font-semibold" href="./index.html">snap-rail</a>
-        <a class="text-muted-foreground hover:text-foreground" href="https://gitee.com/yansijian/snap-rail" target="_blank" rel="noopener"
-          >Gitee</a
+        <a class="text-muted-foreground hover:text-foreground" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener"
+          >GitHub</a
         >
-        <a class="text-muted-foreground hover:text-foreground" href="./recipes.html">组合示例</a>
+        <a class="text-muted-foreground hover:text-foreground" href="./recipes.html">组合套件</a>
         <span class="ml-auto text-xs text-muted-foreground/70">Apache-2.0 · © 2026 snap-rail contributors</span>
       </div>
     </footer>

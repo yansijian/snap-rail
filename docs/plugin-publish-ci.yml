@@ -1,0 +1,77 @@
+# 社区插件作者的自发布工作流模板（复制到你自己的插件仓
+# .github/workflows/publish.yml，仓库归你，密钥也归你）。
+#
+# 模型：插件住你自己的仓库，依赖公共 npm 的 @snap-rail/* SDK，用你自己的
+# Ed25519 密钥签名，发布为你仓库的滚动 Release（固定 tag `feed`，删旧建新，
+# 资产平铺 index.json + zip）。终端把你的 Release 地址填进「插件页 → ⚙
+# 插件源」即可搜索安装：
+#   https://github.com/<you>/<your-plugin>/releases/download/feed/
+#
+# 发现：给仓库打上 GitHub topic `snap-rail-plugin`（零门槛注册）。官方没有
+# 集中市场仓、不转存你的 zip、也不需要 PR 上架——你的 Release 就是你的源。
+#
+# 需要的仓库 secret（你自己的密钥）：
+#   RELEASE_PRIVATE_PEM — 你的 Ed25519 私钥（base64；
+#     `openssl genpkey -algorithm ed25519 -out release.private.pem` 生成，
+#     `base64 -w0 < release.private.pem` 配进 secret）
+#   RELEASE_KEY_ID      — 你选定的 key id（写入 META-INF/signature.json，
+#     终端按它展示发布者；用户把你的公钥加进本机信任文件后升级为已验证）
+#
+# 终端侧的信任语义：你的签名在本机信任名单之外时，安装预览会显示
+# 「未验证 · keyId <你的 keyId>」，用户确认后仍可安装；一旦用户登记了你的
+# 公钥，后续更新即有完整性锚（换 key 的更新会被单独确认）。
+#
+# 若你也发布组合包：把 `<id>.zip`（根目录 recipe.yml + plugins/*.zip）一起
+# 传到同一个 Release；终端按内容识别，拖入即批量安装。组合包本身不签名，
+# 成员 zip 必须各自带签名。
+
+name: publish-plugin
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: ['packages/**', 'scripts/**', '.github/workflows/publish.yml']
+
+permissions:
+  contents: write # 滚动 Release 的写权限（gh CLI 用 GITHUB_TOKEN）
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Build all plugins
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Pack + sign (your own key from secret)
+        env:
+          SIGN_KEY: ${{ secrets.RELEASE_PRIVATE_PEM }}
+          KEY_ID: ${{ secrets.RELEASE_KEY_ID }}
+        run: |
+          printf '%s' "$SIGN_KEY" | base64 -d > release.private.pem
+          # 仓库根部提供 pack 脚本：逐包走 snap-rail-plugin pack（装配规则
+          # 单源 @snap-rail/plugin-kit/pack），产出 dist-plugins/{*.zip,index.json}。
+          pnpm run pack -- --sign-key release.private.pem --key-id "$KEY_ID" --publisher "$GITHUB_REPOSITORY_OWNER"
+          rm release.private.pem
+      - name: Verify assembled feed（签名与摘要离线复核）
+        run: pnpm run verify -- --feed dist-plugins
+      - name: Publish rolling release (feed)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete feed --yes --cleanup-tag 2>/dev/null || true
+          gh release create feed --title feed --notes \
+            "插件源（滚动发布，$(date -u +%FT%TZ)）——终端插件源填本页 releases/download/feed/" \
+            --latest
+          gh release upload feed dist-plugins/*
+          echo "feed → https://github.com/${GITHUB_REPOSITORY}/releases/download/feed/"

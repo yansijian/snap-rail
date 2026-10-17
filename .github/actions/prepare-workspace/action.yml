@@ -1,0 +1,30 @@
+name: prepare workspace
+description: Stage the split plugin repos, install dependencies, and build their faces
+
+inputs:
+  ref:
+    description: Git ref of the split plugin repos
+    required: false
+    default: master
+
+runs:
+  using: composite
+  steps:
+    - name: stage split plugin repos
+      shell: bash
+      env:
+        SNAP_RAIL_EXTERNAL_REF: ${{ inputs.ref }}
+      # node, not pnpm: pnpm may run its deps-status check before the script
+      # and fail because external/ is not staged yet.
+      run: node scripts/setup-external.mjs
+    - name: install dependencies
+      shell: bash
+      # The external workspace importers follow the split repos' current
+      # manifests; the lockfile is refreshed rather than frozen.
+      run: pnpm install --no-frozen-lockfile
+    - name: build framework face
+      shell: bash
+      run: pnpm --filter @snap-rail/framework-shadcn run build
+    - name: build modbus driver face
+      shell: bash
+      run: pnpm --filter @snap-rail/driver-modbus run build

@@ -50,7 +50,11 @@ Object.defineProperty(ValidationError.prototype, kValidationError, {
 export function resolveConfig(runtime: Plugin.Runtime, config: any) {
   if (!runtime.Config) return config
   // TODO: async validation
-  const result = runtime.Config['~standard'].validate(config)
+  // An absent row config reads as the empty one: standard-schema object
+  // schemas reject undefined outright, but "no config written" must mean
+  // "apply the schema's defaults" (Schemastery's historical behavior), so
+  // the validation input is {} whenever the layer carries nothing.
+  const result = runtime.Config['~standard'].validate(config ?? {})
   if ('then' in result) {
     throw new TypeError('Async config validation is not supported')
   }

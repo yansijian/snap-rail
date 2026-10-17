@@ -14,8 +14,8 @@ on:
 #   ELECTRON_BUILDER_BINARIES_MIRROR）；NSIS 编译器 makensis.exe 是 Windows 程序，
 #   Linux 上经 wine 运行（阿里云 apt 镜像装 wine 元包）；Authenticode 签名经
 #   win.signExecutable: false 关闭（apps/desktop/electron-builder.yml）；
-# - 产物三件套（setup.exe / blockmap / latest.yml）幂等挂到 Release，供人工
-#   下载与 collect-feed 收集进 feed 分支 desktop/ 目录。
+# - 产物三件套（setup.exe / blockmap / latest.yml）幂等挂到版本化 Release，供人工
+#   下载；collect-feed 把它收进滚动 feed（与插件源同址），应用自更新读取该基址。
 jobs:
   build-windows:
     runs-on: ubuntu-latest
@@ -45,11 +45,30 @@ jobs:
           npm install -g pnpm@11.22.0
           printf '//192.168.1.9:3000/api/packages/snap-rail/npm/:_authToken=%s\n' "$FEED_TOKEN" >> ~/.npmrc
           pnpm -v
+      - name: stage split plugin repos (workspace deps)
+        env:
+          FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
+        run: |
+          git config --global credential.helper '!f() { echo "username=${{ github.actor }}"; echo "password=$FEED_TOKEN"; }; f'
+          SNAP_RAIL_EXTERNAL_BASE=http://192.168.1.9:3000/snap-rail node scripts/setup-external.mjs
       - run: pnpm install --no-frozen-lockfile
         env:
           # 只装 electron 的 npm 包（类型），构建期由 electron-builder 按镜像自取 win32 zip
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: pnpm run build
+      - name: stamp the intranet feed + update source
+        env:
+          FEED_BASE: http://192.168.1.9:3000/snap-rail/snap-rail/releases/download/feed/
+        run: |
+          # 出厂默认插件源与 electron-builder 的更新基址都指向本机 Gitea 的
+          # 滚动 Release(feed tag)；仓库默认值是公网 GitHub。
+          pnpm exec tsx scripts/stamp-feed-default.ts "$FEED_BASE"
+          node -e '
+            const fs = require("node:fs");
+            const path = "apps/desktop/electron-builder.yml";
+            const next = fs.readFileSync(path, "utf8").replace(/^    url: .*$/m, `    url: ${process.env.FEED_BASE}`);
+            fs.writeFileSync(path, next);
+          '
       - name: build NSIS installer（Linux→Windows 交叉打包）
         env:
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/

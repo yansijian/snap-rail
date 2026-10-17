@@ -1,24 +1,29 @@
 {
+  "provider": "gitea",
+  "providers": {
+    "gitea": "http://192.168.1.9:3000/snap-rail",
+    "github": "https://github.com/yansijian"
+  },
   "sources": [
     {
       "repo": "snap-rail-framework-shadcn",
       "asset": "@snap-rail__framework-shadcn.zip",
-      "local": "../snap-rail-framework-shadcn/dist"
+      "local": "external/snap-rail-framework-shadcn/dist"
     },
     {
       "repo": "snap-rail-driver-modbus",
       "asset": "@snap-rail__driver-modbus.zip",
-      "local": "../snap-rail-driver-modbus/dist"
+      "local": "external/snap-rail-driver-modbus/dist"
     },
     {
       "repo": "snap-rail-driver-enip",
       "asset": "@snap-rail__driver-enip.zip",
-      "local": "../snap-rail-driver-enip/dist"
+      "local": "external/snap-rail-driver-enip/dist"
     },
     {
       "repo": "snap-rail-suite-terminal-ops",
       "asset": "@snap-rail__suite-terminal-ops.zip",
-      "local": "../snap-rail-suite-terminal-ops/dist"
+      "local": "external/snap-rail-suite-terminal-ops/dist"
     }
   ]
 }

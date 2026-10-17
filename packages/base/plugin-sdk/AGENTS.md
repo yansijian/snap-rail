@@ -4,19 +4,24 @@ Read `README.md` first. This package is the only authoring surface an
 independent plugin repository needs; never solve a missing contract by copying
 files from the snap-rail workspace.
 
-- Validate `package.json.snapRail` with `definePluginManifest` and declare every
-  versioned capability in `provides`/`requires`.
-- Depend on published SDK and contract packages. Do not import `apps/desktop` or
-  `packages/*/src` from an external plugin.
+- Validate `package.json.snapRail` with `definePluginManifest` and declare
+  every dependency once in `requires` — package names, `name@range`
+  version-constrained packages (the framework binding is such an entry), or
+  `service:` ids. `snapRail.framework` / `snapRail.capabilities` are retired.
+- Depend on published SDK and contract packages from public npm. Do not import
+  `apps/desktop` or `packages/*/src` from an external plugin.
 - Drivers import the pure `@snap-rail/equipment/driver` registration contract
   and do not own equipment storage. UI plugins register semantic
   views/layouts/navigation through the
   framework contract and use shared renderer primitives.
-- Store providers implement the versioned `store.backend` capability and are
-  globally exclusive; use the pure `@snap-rail/store` `StoreService` type and
-  let the provider own its backend. Consumers depend on the store definition
-  instead of importing a backend implementation.
+- Store providers implement the store seam and are globally exclusive
+  (`snapRail.exclusive: 'store-backend'`); use the pure `@snap-rail/store`
+  `StoreService` type and let the provider own its backend. Consumers depend on
+  the store definition instead of importing a backend implementation.
 - Build with `hostBundle` and/or `clientBundle`; the release packer includes
-  only built faces and the trimmed manifest, never `src/`.
+  only built faces and the trimmed manifest, never `src/`. `clientBundle`
+  stamps `snapRail.client.seedAbi`; never hand-write it.
+- Publish to your own repository's rolling `feed` release and tag the repo
+  `snap-rail-plugin` — there is no central market repo and no PR gate.
 - Before publishing, run `snap-rail-plugin doctor .`, `pnpm build`, `snap-rail-plugin inspect <zip>`, and
   `snap-rail-plugin verify <zip> --public-key <key.pem> --key-id <id>`.

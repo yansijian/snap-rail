@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/equipment-station",
   "description": "The unified 设备管理 settings page: devices, groups, and points of the equipment base, edited through the driver dialect forms",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -22,15 +22,15 @@
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/equipment": "workspace:^",
-    "@snap-rail/framework-shadcn": "^0.1.3",
+    "@snap-rail/framework-shadcn": "^0.2.0",
     "react": ">=19"
   },
   "devDependencies": {
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
-    "@snap-rail/driver-modbus": "^0.1.0",
+    "@snap-rail/driver-modbus": "workspace:*",
     "@snap-rail/equipment": "workspace:^",
-    "@snap-rail/framework-shadcn": "^0.1.3",
+    "@snap-rail/framework-shadcn": "workspace:*",
     "@snap-rail/gateway": "workspace:^",
     "@snap-rail/protocol": "workspace:^",
     "@snap-rail/audit": "workspace:^",
@@ -46,17 +46,9 @@
   "snapRail": {
     "layer": "ui",
     "category": "界面",
-    "capabilities": {
-      "requires": [
-        { "id": "ui.renderer.react", "range": "^1.0.0" },
-        { "id": "ui.contract", "range": "^1.0.0" },
-        { "id": "equipment.runtime", "range": "^1.0.0" }
-      ]
-    },
-    "framework": "@snap-rail/framework-shadcn",
     "clientOnly": true,
     "requires": [
-      "@snap-rail/framework-shadcn",
+      "@snap-rail/framework-shadcn@^0.2",
       "@snap-rail/equipment"
     ],
     "client": {

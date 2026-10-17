@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/util",
   "description": "Zero-dependency utilities shared across snap-rail packages",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -13,6 +13,10 @@
     "./manifest": {
       "types": "./lib/types/manifest.d.ts",
       "default": "./lib/manifest.js"
+    },
+    "./semver": {
+      "types": "./lib/types/semver.d.ts",
+      "default": "./lib/semver.js"
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json"

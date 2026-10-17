@@ -84,7 +84,7 @@ function doctorPlugin(directory: string): void {
     layer: snapRail.layer,
     hostFace: hostEntry ?? null,
     clientFace: typeof clientEntry === 'string' ? clientEntry : null,
-    capabilities: snapRail.capabilities ?? null,
+    requires: snapRail.requires ?? [],
   }
   console.log(JSON.stringify(report, null, 2))
 }
@@ -244,38 +244,40 @@ function templateSource(template: PluginTemplate, ui?: string): string {
 
 function templateManifest(template: PluginTemplate, ui?: string): Record<string, unknown> {
   const boundUi = ui ?? '@snap-rail/framework-shadcn'
-  if (template === 'driver') return { kind: 'driver', layer: 'equipment', requires: ['service:equipment'], capabilities: { requires: [{ id: 'equipment.runtime', range: '^1.0.0' }] } }
-  if (template === 'store-provider') return { kind: 'plugin', layer: 'store', exclusive: 'store-backend', capabilities: { provides: [{ id: 'store.backend', version: '1.0.0' }] } }
+  // The framework binding IS a requires entry (name@range) — the single
+  // compatibility declaration; there is no separate framework field.
+  if (template === 'driver') return { kind: 'driver', layer: 'equipment', requires: ['service:equipment'] }
+  if (template === 'store-provider') return { kind: 'plugin', layer: 'store', exclusive: 'store-backend' }
   if (template === 'ui-view') {
     return {
-      kind: 'plugin', layer: 'ui', framework: boundUi, clientOnly: true,
+      kind: 'plugin', layer: 'ui', clientOnly: true,
+      requires: [`${boundUi}@^0.1`],
       client: { entry: 'lib-client/client.js', externalSeeds: [`${boundUi}/slots`, `${boundUi}/semantic`] },
-      capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] },
     }
   }
   if (template === 'ui-layout') {
     return {
-      kind: 'plugin', layer: 'ui', framework: boundUi, clientOnly: true,
+      kind: 'plugin', layer: 'ui', clientOnly: true,
+      requires: [`${boundUi}@^0.1`],
       client: { entry: 'lib-client/client.js', externalSeeds: [`${boundUi}/slots`, `${boundUi}/semantic`] },
-      capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] },
     }
   }
   if (template === 'ui-extension') {
     return {
-      kind: 'plugin', layer: 'ui', framework: boundUi, clientOnly: true,
+      kind: 'plugin', layer: 'ui', clientOnly: true,
       // The extension's own shared components ride `client.seeds`; the
       // components themselves build on the framework's contributed seeds.
+      requires: [`${boundUi}@^0.1`],
       client: { entry: 'lib-client/client.js', seeds: ['widget'], externalSeeds: [`${boundUi}/ui`] },
-      capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] },
     }
   }
   if (template === 'host-service') return { kind: 'plugin', layer: 'base' }
   if (template === 'tool') return { kind: 'plugin', layer: 'tool' }
-  return { kind: 'suite', layer: 'suite', exclusive: 'suite', framework: boundUi, client: { entry: 'lib-client/client.js' }, capabilities: { requires: [{ id: 'ui.contract', range: '^1.0.0' }] } }
+  return { kind: 'suite', layer: 'suite', exclusive: 'suite', requires: [`${boundUi}@^0.1`], client: { entry: 'lib-client/client.js' } }
 }
 
 function pluginAgentGuide(template: PluginTemplate): string {
-  return `# snap-rail plugin guide\n\nThis repository is an independently developed ${template} plugin. Work only through the public \`@snap-rail/plugin-sdk\` surface. Do not import files from a snap-rail checkout or copy host internals.\n\n## Contract rules\n\n- Keep the \`snapRail\` manifest complete and validate it with \`definePluginManifest\`.\n- Declare every provided and required capability with a version range.\n- Host plugins expose a single host face; renderer plugins expose a CJS client face built by \`clientBundle\`.\n- Renderer code may require only the framework seeds and base wire contracts declared by the SDK.\n- Release archives contain built faces and \`package.json\` only. Never publish \`src/\`.\n\n## Local workflow\n\n\`pnpm install && pnpm build\` builds this repository without snap-rail. Use \`snap-rail-plugin inspect <zip>\` before publishing and \`snap-rail-plugin verify <zip> --public-key <key.pem> --key-id <id>\` to verify a signed artifact.\n`
+  return `# snap-rail plugin guide\n\nThis repository is an independently developed ${template} plugin. Work only through the public \`@snap-rail/plugin-sdk\` surface. Do not import files from a snap-rail checkout or copy host internals.\n\n## Contract rules\n\n- Keep the \`snapRail\` manifest complete and validate it with \`definePluginManifest\`.\n- Declare every dependency once in \`requires\` — package names, \`name@range\` version-constrained packages (the framework binding is \`@snap-rail/framework-shadcn@^0.1\`), or \`service:\` ids.\n- Host plugins expose a single host face; renderer plugins expose a CJS client face built by \`clientBundle\`.\n- Renderer code may require only the framework seeds and base wire contracts declared by the SDK.\n- Release archives contain built faces and \`package.json\` only. Never publish \`src/\`.\n\n## Local workflow\n\n\`pnpm install && pnpm build\` builds this repository without snap-rail. Use \`snap-rail-plugin inspect <zip>\` before publishing and \`snap-rail-plugin verify <zip> --public-key <key.pem> --key-id <id>\` to verify a signed artifact.\n`
 }
 
 if (process.argv[1]?.endsWith('cli.js') === true) {

@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/store-sqlite",
   "description": "The persistence seam's reference implementation: one node:sqlite database per namespace under the snap-rail home (single-active store backend)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -33,9 +33,6 @@
   "snapRail": {
     "layer": "store",
     "exclusive": "store-backend",
-    "capabilities": {
-      "provides": [{ "id": "store.backend", "version": "1.0.0" }]
-    },
     "category": "存储",
     "title": "本地存储（SQLite）"
   }

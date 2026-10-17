@@ -1,0 +1,9 @@
+{
+  "keys": [
+    {
+      "keyId": "gitea-main-2026",
+      "publisher": "snap-rail",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMqsppRZrPnWWIGHJk/SEao/3MjeAzWEzbIpfcm9GM40=\n-----END PUBLIC KEY-----\n"
+    }
+  ]
+}

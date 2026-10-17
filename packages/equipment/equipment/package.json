@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/equipment",
   "description": "The equipment seam: configuration tables (devices/groups/points), the live point table, and the driver registry — the unified 设备管理 page lives in @snap-rail/equipment-station",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -55,9 +55,6 @@
   "snapRail": {
     "layer": "equipment",
     "category": "设备",
-    "capabilities": {
-      "provides": [{ "id": "equipment.runtime", "version": "1.0.0" }]
-    },
     "requires": [
       "service:store"
     ],

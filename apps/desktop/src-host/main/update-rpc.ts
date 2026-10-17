@@ -27,7 +27,7 @@ import type { SettingsService } from '@snap-rail/settings'
 import { createUpdateChannel } from './update-machine.ts'
 
 /** The built-in default feed seat; mirrors the packaged publish config. */
-const DEFAULT_FEED_URL = 'http://192.168.1.9:3000/snap-rail/snap-rail/raw/branch/feed/desktop/'
+const DEFAULT_FEED_URL = 'https://github.com/yansijian/snap-rail/releases/download/feed/'
 
 /** The update bridge plugin; consumes the rpc and settings services. */
 const updateRpcPlugin: Plugin.Object<void> = {

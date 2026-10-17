@@ -2,16 +2,22 @@
  *
  * This is deliberately transport-agnostic: `--feed` may be an nginx URL or a
  * local directory. It checks the catalog's zip digest and, when `--trust` is
- * supplied, every Ed25519 release envelope as the Host installer does.
+ * supplied, every Ed25519 release envelope as the Host installer does. When
+ * the feed also carries a website `catalog.json`, every offline combo zip is
+ * checked too: `recipe.yml` must parse strictly, every referenced package
+ * must have exactly the feed's signed zip inside, and the archive itself is
+ * unsigned by design (trust rides the members).
  *
  * @module snap-rail/scripts/verify-plugin-feed
  */
 
 import { createHash, createPublicKey } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { unzipSync } from 'fflate'
+import { recipeDocumentSchema, recipePackageNames } from '@snap-rail/plugin-kit/recipe'
 import { verifyReleaseFiles, type TrustedReleaseKey } from '@snap-rail/plugin-kit/sign'
+import { load } from 'js-yaml'
 
 interface CatalogEntry {
   name: string
@@ -90,6 +96,7 @@ async function main(): Promise<void> {
   }
 
   const checked: string[] = []
+  const catalogEntries = catalog.plugins as CatalogEntry[]
   for (const raw of catalog.plugins) {
     const entry = raw as CatalogEntry
     if (typeof entry.name !== 'string' || typeof entry.file !== 'string') throw new Error('feed: catalog entry lacks name/file')
@@ -112,7 +119,63 @@ async function main(): Promise<void> {
     }
     checked.push(`${entry.name}@${entry.version}`)
   }
-  console.log(JSON.stringify({ ok: true, feed: base, plugins: checked }, null, 2))
+
+  // The offline combo packages, when the site catalog rides the same feed:
+  // the archive carries `recipe.yml` + the exact signed member zips; verify
+  // the manifest against the document and every member against the feed.
+  const combos: string[] = []
+  if (!/^https?:\/\//i.test(base)) {
+    const richPath = join(resolve(base), 'catalog.json')
+    if (existsSync(richPath)) {
+      const rich = JSON.parse(readFileSync(richPath, 'utf8')) as {
+        combos?: Array<{ id?: unknown, file?: unknown }>
+      }
+      const byName = new Map(catalogEntries.map(entry => [entry.name, entry]))
+      for (const combo of rich.combos ?? []) {
+        if (typeof combo.id !== 'string' || typeof combo.file !== 'string') {
+          throw new Error('feed: catalog.json combo lacks id/file')
+        }
+        const comboPath = join(resolve(base), combo.file)
+        if (!existsSync(comboPath)) throw new Error(`feed: combo ${combo.id} 缺少 ${combo.file}`)
+        const archive = unzipSync(new Uint8Array(readFileSync(comboPath)))
+        const entries = Object.keys(archive).filter(name => !name.endsWith('/'))
+        const roots = new Set(entries.map(name => name.includes('/') ? name.split('/')[0]! : ''))
+        const root = roots.size === 1 && !roots.has('') ? `${[...roots][0]!}/` : ''
+        const recipeFile = archive[`${root}recipe.yml`]
+        if (recipeFile === undefined) throw new Error(`feed: combo ${combo.id} 缺少 recipe.yml`)
+        const parsed = recipeDocumentSchema.safeParse(load(new TextDecoder().decode(recipeFile)))
+        if (!parsed.success) {
+          const issue = parsed.error.issues[0]
+          throw new Error(`feed: combo ${combo.id} 的 recipe.yml 不合法（${issue?.path.join('.') ?? 'recipe'}: ${issue?.message ?? 'unknown'}）`)
+        }
+        if (parsed.data.id !== combo.id) throw new Error(`feed: combo ${combo.id} 的文件名与 recipe.yml id 不一致`)
+        const expected = recipePackageNames(parsed.data)
+        const members = new Map<string, Uint8Array>()
+        for (const entry of entries) {
+          if (!entry.startsWith(`${root}plugins/`) || !entry.endsWith('.zip')) continue
+          const memberBytes = archive[entry]!
+          const member = JSON.parse(new TextDecoder().decode(normalizedArchive(memberBytes)['package.json'] ?? new Uint8Array())) as { name?: string, version?: string }
+          if (typeof member.name !== 'string') throw new Error(`feed: combo ${combo.id} 的成员 ${entry} 缺少 package.json.name`)
+          if (members.has(member.name)) throw new Error(`feed: combo ${combo.id} 含重复成员 ${member.name}`)
+          members.set(member.name, memberBytes)
+        }
+        const missing = expected.filter(name => !members.has(name))
+        const extra = [...members.keys()].filter(name => !expected.includes(name))
+        if (missing.length > 0) throw new Error(`feed: combo ${combo.id} 缺少成员 zip：${missing.join('、')}`)
+        if (extra.length > 0) throw new Error(`feed: combo ${combo.id} 含未引用的成员：${extra.join('、')}`)
+        for (const name of expected) {
+          const feedEntry = byName.get(name)
+          if (feedEntry === undefined) throw new Error(`feed: combo ${combo.id} 引用的 ${name} 不在 index.json 中`)
+          const memberBytes = members.get(name)!
+          if (feedEntry.sha256 !== sha256(memberBytes) || feedEntry.size !== memberBytes.length) {
+            throw new Error(`feed: combo ${combo.id} 的成员 ${name} 与 feed 发布的 zip 不一致`)
+          }
+        }
+        combos.push(`${combo.id}@${parsed.data.version}`)
+      }
+    }
+  }
+  console.log(JSON.stringify({ ok: true, feed: base, plugins: checked, combos }, null, 2))
 }
 
 if (process.argv[1]?.endsWith('verify-plugin-feed.ts') === true) {

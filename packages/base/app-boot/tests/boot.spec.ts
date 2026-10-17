@@ -124,6 +124,41 @@ describe('boot', () => {
     expect(ctx.get('demo.greeting')).toBe('hi from the pool')
   })
 
+  it('mounts a Config-declaring plugin from a row without a config key (absent reads as empty)', async () => {
+    // The terminal-ops suite failure, minimized: a strict zod `Config`
+    // schema rejects `undefined` outright, but a layer row that carries no
+    // config must mean "apply the schema's defaults" — not a boot failure.
+    const world = makeWorld()
+    const poolDir = join(world.home, 'plugins', 'strict-config')
+    mkdirSync(join(poolDir, 'lib'), { recursive: true })
+    writeFileSync(join(poolDir, 'package.json'), JSON.stringify({
+      name: 'strict-config', version: '0.0.1', type: 'module', main: 'lib/index.js',
+    }))
+    writeFileSync(join(poolDir, 'lib', 'index.js'), [
+      "import { z } from 'zod'",
+      'export default {',
+      "  name: 'strict-config',",
+      '  Config: z.object({ flushMs: z.number().int().min(10).default(1000) }).strict(),',
+      '  apply(ctx, config) {',
+      "    ctx.provide('strict-config.seen', config)",
+      '  },',
+      '}',
+      '',
+    ].join('\n'))
+    // The pool entry imports zod — resolve through the app root like the
+    // host's bare-import boundary does.
+    symlinkSync(join(repoRoot, 'node_modules'), join(poolDir, 'node_modules'), 'junction')
+    writeFileSync(world.userPath, [
+      'plugins:',
+      '  - name: strict-config',
+      '    enabled: true',
+      '',
+    ].join('\n'))
+    const ctx = await bootWorld(world)
+
+    expect(ctx.get('strict-config.seen')).toEqual({ flushMs: 1000 })
+  })
+
   it('fails loud on a user row naming an unknown plugin', async () => {
     const world = makeWorld()
     writeFileSync(world.userPath, [

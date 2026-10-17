@@ -1,0 +1,60 @@
+name: release
+
+# Versioned release: the human-facing changelog + installer. It is NOT the
+# plugin feed — that stays the rolling `feed` release owned by feed.yml; this
+# workflow kicks the feed once the installer trio is uploaded.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. v0.2.0'
+        required: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: ./.github/actions/prepare-workspace
+      - run: pnpm run build
+      - name: clean stale installer artifacts
+        shell: bash
+        # electron-builder does not clear its output directory; a reused
+        # workspace would upload yesterday's setup.exe next to today's.
+        run: rm -rf apps/desktop/release-out
+      - name: build + verify the NSIS installer
+        # Root script appends verify:packaged-app — the installer must carry
+        # every base runtime package, not just finish electron-builder.
+        run: pnpm run app:dist
+      - name: create versioned release and upload the installer trio
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          VERSION=$(node -p "require('./apps/desktop/package.json').version")
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "snap-rail $TAG" --generate-notes
+          gh release upload "$TAG" \
+            "apps/desktop/release-out/snap-rail-$VERSION-x64-setup.exe" \
+            "apps/desktop/release-out/snap-rail-$VERSION-x64-setup.exe.blockmap" \
+            apps/desktop/release-out/latest.yml \
+            --clobber
+      - name: kick the rolling feed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run feed.yml --ref master

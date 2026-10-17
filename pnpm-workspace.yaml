@@ -3,6 +3,9 @@ packages:
   - vendor/*
   # Capability groups: every package lives at packages/<group>/<pkg>.
   - packages/*/*
+  # Split first-party plugin repos checked out here for a GitHub-only build
+  # (`node scripts/setup-external.mjs`); empty in an ordinary checkout.
+  - external/*
   # Product assemblies (apps/desktop owns the Electron shell).
   - apps/*
   # Marketing website (static two-page site; never enters the app build graph).

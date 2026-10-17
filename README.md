@@ -5,7 +5,8 @@ Electron 宿主。基于 vendored Cordis 元框架；一期交付核心 + 插件
 
 不复现组态画布与传统 HMI——底座提供进程模型、数据缝与最小 UI 骨架，
 界面创新留给社区与 Agent（见 [docs/architecture.md](docs/architecture.md)）。
-完整插件平台实施顺序见 [docs/plugin-platform-plan.md](docs/plugin-platform-plan.md)。
+插件开发与自发布见 [docs/plugin-development.md](docs/plugin-development.md)，
+部署、组合包与信任模型见 [docs/deploy.md](docs/deploy.md)。
 
 ## 一分钟看懂
 
@@ -22,10 +23,12 @@ Electron 宿主。基于 vendored Cordis 元框架；一期交付核心 + 插件
 - **renderer** 是投影客户端：preload 只暴露 `invoke`/`openStream`/
   `zipPathOf` 三原语，四象限 RPC 协议在此之上类型化；框架、布局、
   标题栏、看板、管理页全部是插件，没有框架时内置引导页兜底安装。
-- **独立插件开发**：插件仓库使用 `@snap-rail/plugin-sdk` 和
-  `snap-rail-plugin` CLI，不需要放进本仓库；manifest 能力、Host/Renderer
+- **独立插件开发**：插件仓库使用公共 npm 的 `@snap-rail/plugin-sdk` 和
+  `snap-rail-plugin` CLI，不需要放进本仓库；manifest 依赖声明、Host/Renderer
   面、语义 UI 槽位和 Ed25519 发布签名见
-  [docs/plugin-development.md](docs/plugin-development.md)。
+  [docs/plugin-development.md](docs/plugin-development.md)。发布是去中心化
+  的：作者自持钥、发自己的滚动 Release，仓库打 GitHub topic
+  `snap-rail-plugin` 即可被发现；没有集中市场仓、没有 PR 上架。
 
 ## 布局
 
@@ -37,11 +40,11 @@ packages/    层组 packages/<层>/<包>（snapRail.layer 声明，层序 base�
                （出厂全集，替换经源码重建）
   store/       store（规范：drizzle 查询构建器即规范，随应用发布）+ store-sqlite（实现，zip 安装，单活）
   equipment/   equipment（设备连接底座缝，zip 安装）
-  ui/          equipment-station / settings-station（界面住户，zip、clientOnly）
+  ui/          equipment-station（界面住户，zip、clientOnly；设置外壳随框架包发布）
   tool/        暂无住户（场景逻辑收进套件，不再拆跨包场景工具）
 apps/desktop  Electron 应用（无框窗口、IPC 载体、打包配置；dev overlay 见 dev/）
 docs/         architecture.md（缝目录与决策）、split-runbook.md（多仓拆分）
-独立插件仓（Gitea org snap-rail，各自 tag 发版进 feed）：
+独立插件仓（GitHub `yansijian`，内网 Gitea 作镜像；feed 由主仓从源码统一打包）：
   snap-rail-framework-shadcn（UI 框架插件）、snap-rail-driver-modbus /
   snap-rail-driver-enip（驱动范本）、snap-rail-suite-terminal-ops（业务套件）
 ```
@@ -49,14 +52,18 @@ docs/         architecture.md（缝目录与决策）、split-runbook.md（多�
 ## 命令
 
 ```sh
+node scripts/setup-external.mjs   # 首次/CI：拆分仓拉到 external/ 作 workspace 链接
+                                  # feed 打包时用 SNAP_RAIL_EXTERNAL_REPOS 追加 enip/suite
 pnpm install
 pnpm run build        # tsc -b (lib/types) + tsdown (lib)
 pnpm run typecheck
-pnpm test             # vitest 全量（先构建）+ 层依赖门禁
+pnpm test             # vitest 全量（先构建）+ 层依赖门禁 + wire-catalog 门禁
 pnpm run pack:plugins -- --sign-key .keys/release.private.pem --key-id release-2026
 pnpm run plugin:generate-key -- .keys gitea-main-2026 --publisher snap-rail
-pnpm run publish:local -- --sign-key .keys/gitea-main-2026.private.pem --key-id gitea-main-2026 --publisher snap-rail
-pnpm run verify:market -- --feed dist-publish/plugins --trust .keys/gitea-main-2026.trust.json
+pnpm run collect:feed -- --provider gitea
+pnpm run publish:local -- --collect collect-out --sign-key .keys/gitea-main-2026.private.pem --key-id gitea-main-2026 --publisher snap-rail
+pnpm run verify:feed -- --feed dist-publish/plugins --trust apps/desktop/resources/trusted-release-keys.json
+pnpm run site:build   # 官网：从 dist-publish 的 catalog.json 生成并构建
 pnpm app:dev          # Vite dev server + Electron（全量 overlay），热重载开发
 pnpm app:pack         # win-unpacked 目录形态（release-out/）
 pnpm app:dist         # NSIS 安装包 + blockmap

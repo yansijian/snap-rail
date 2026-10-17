@@ -64,7 +64,7 @@ function retryableWriteError(error: unknown): boolean {
  * Write a file atomically: land the bytes in a sibling temp file, then
  * rename over the target, retrying the Windows-busy errors a watching
  * process (an editor, an antivirus scan) can raise. The preset-file writer
- * for feed-served recipes shares this with the user-layer commits.
+ * for combo installs shares this with the user-layer commits.
  */
 export function atomicWrite(path: string, content: string): void {
   const tmp = `${path}.tmp`

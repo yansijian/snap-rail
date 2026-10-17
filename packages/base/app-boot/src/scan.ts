@@ -23,9 +23,13 @@ export interface SnapRailManifest {
   category?: string
   /** Mutex group: enabling a member deactivates the other enabled members. */
   exclusive?: string
-  /** The framework package a renderer face binds to. */
-  framework?: string
-  /** Declared dependencies checked on enable/disable/uninstall. */
+  /**
+   * Declared dependencies checked on enable/disable/uninstall — the single
+   * compatibility declaration. Entries: a package name, a `name@range`
+   * version-constrained package (`@snap-rail/util/semver` semantics; a
+   * renderer face's framework binding IS a `requires` entry), or a
+   * `service:` live-service id.
+   */
   requires?: readonly string[]
   /** True when the package has no host face (renderer-only). */
   clientOnly?: boolean
@@ -39,11 +43,6 @@ export interface SnapRailManifest {
     /** The pack-stamped seed contract: the installer prechecks it against
      * the live table; the renderer boot re-checks it before loading. */
     seedAbi?: { revision: number, versions: Record<string, string> }
-  }
-  /** Capabilities provided by and required from the active runtime. */
-  capabilities?: {
-    provides?: readonly { id: string, version: string }[]
-    requires?: readonly { id: string, range: string, optional?: boolean }[]
   }
   /** Supported snap-rail, Host protocol, and renderer versions. */
   engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
@@ -75,8 +74,6 @@ export interface PluginDescriptor {
   category?: string
   /** The manifest's `snapRail.exclusive`, when declared. */
   exclusive?: string
-  /** The manifest's `snapRail.framework`, when declared. */
-  framework?: string
   /** The manifest's `snapRail.requires`, when declared. */
   requires?: readonly string[]
   /** The manifest's `snapRail.clientOnly`, when declared. */
@@ -89,8 +86,6 @@ export interface PluginDescriptor {
   externalSeeds?: readonly string[]
   /** The pack-stamped seed contract (`snapRail.client.seedAbi`), when declared. */
   clientSeedAbi?: NonNullable<SnapRailManifest['client']>['seedAbi']
-  /** Declared runtime capabilities. */
-  capabilities?: SnapRailManifest['capabilities']
   /** Supported runtime versions. */
   engines?: SnapRailManifest['engines']
   /** Key id recorded in the signed release envelope, when present. */
@@ -111,13 +106,6 @@ const stringArrayOrUndefined = (value: unknown): readonly string[] | undefined =
   Array.isArray(value) && value.every(item => typeof item === 'string' && item !== '')
     ? value as readonly string[]
     : undefined
-
-const capabilitiesOrUndefined = (value: SnapRailManifest['capabilities']): SnapRailManifest['capabilities'] | undefined => {
-  if (value === undefined) return undefined
-  if (value.provides !== undefined && !value.provides.every(item => item.id !== '' && item.version !== '')) return undefined
-  if (value.requires !== undefined && !value.requires.every(item => item.id !== '' && item.range !== '')) return undefined
-  return value
-}
 
 /**
  * Resolve one subpath (`'./rpc'`) inside a pool package directory: the
@@ -203,8 +191,6 @@ export function scanPluginPool(dirs: readonly string[]): Map<string, PluginDescr
       if (category !== undefined) descriptor.category = category
       const exclusive = stringOrUndefined(snapRail?.exclusive)
       if (exclusive !== undefined) descriptor.exclusive = exclusive
-      const framework = stringOrUndefined(snapRail?.framework)
-      if (framework !== undefined) descriptor.framework = framework
       const requires = stringArrayOrUndefined(snapRail?.requires)
       if (requires !== undefined) descriptor.requires = requires
       if (snapRail?.clientOnly === true) descriptor.clientOnly = true
@@ -215,15 +201,14 @@ export function scanPluginPool(dirs: readonly string[]): Map<string, PluginDescr
       const externalSeeds = stringArrayOrUndefined(snapRail?.client?.externalSeeds)
       if (externalSeeds !== undefined) descriptor.externalSeeds = externalSeeds
       if (snapRail?.client?.seedAbi !== undefined) descriptor.clientSeedAbi = snapRail.client.seedAbi
-      const capabilities = capabilitiesOrUndefined(snapRail?.capabilities)
-      if (capabilities !== undefined) descriptor.capabilities = capabilities
       if (snapRail?.engines !== undefined) descriptor.engines = snapRail.engines
       try {
         const signature = JSON.parse(readFileSync(join(pluginDir, 'META-INF', 'signature.json'), 'utf8')) as { keyId?: unknown }
         if (typeof signature.keyId === 'string' && signature.keyId !== '') descriptor.signatureKeyId = signature.keyId
       } catch {
-        // Unsigned development fixtures remain discoverable; the RPC installer
-        // still rejects them whenever a production trust store is supplied.
+        // Unsigned installs stay discoverable — the key id doubles as the
+        // update anchor: a feed entry signed by a different key is flagged
+        // keyChanged and never auto-applies.
       }
       pool.set(manifest.name, descriptor)
     }

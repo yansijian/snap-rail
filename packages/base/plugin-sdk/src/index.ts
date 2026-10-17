@@ -55,25 +55,3 @@ export function definePlugin<T extends Plugin>(plugin: T): T {
 /** Public plugin template categories used by the standalone CLI. */
 export const PLUGIN_TEMPLATES = ['driver', 'store-provider', 'ui-view', 'ui-layout', 'ui-extension', 'host-service', 'tool', 'suite'] as const
 export type PluginTemplate = typeof PLUGIN_TEMPLATES[number]
-
-/** Capability dependency declared by an independently developed plugin. */
-export const capabilityRequirementSchema = z.object({
-  id: z.string().min(1),
-  range: z.string().min(1),
-  optional: z.boolean().optional(),
-}).strict()
-export type CapabilityRequirement = z.output<typeof capabilityRequirementSchema>
-
-/** Public manifest additions used by the standalone SDK. */
-export const pluginSdkManifestSchema = z.object({
-  capabilities: z.object({
-    provides: z.array(z.object({ id: z.string().min(1), version: z.string().min(1) }).strict()).optional(),
-    requires: z.array(capabilityRequirementSchema).optional(),
-  }).strict().optional(),
-  engines: z.object({
-    snapRail: z.string().min(1).optional(),
-    hostProtocol: z.string().min(1).optional(),
-    renderer: z.string().min(1).optional(),
-  }).strict().optional(),
-}).strict()
-export type PluginSdkManifest = z.output<typeof pluginSdkManifestSchema>

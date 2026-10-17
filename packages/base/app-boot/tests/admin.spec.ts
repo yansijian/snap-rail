@@ -123,13 +123,13 @@ async function sleepUntil(predicate: () => boolean, ms = 3000): Promise<void> {
 /** Drop a minimal but honest plugin package into the home's pool: the
  * plugin provides a service keyed by its short name so the mounted state is
  * observable through `ctx.get`. */
-function seedPoolPackage(home: string, name: string, snapRail?: Record<string, unknown>): string {
+function seedPoolPackage(home: string, name: string, snapRail?: Record<string, unknown>, version = '0.1.0'): string {
   const dir = join(home, 'plugins', name.replaceAll('/', '__'))
   const id = name.slice('@snap-rail/'.length)
   mkdirSync(join(dir, 'lib'), { recursive: true })
   writeFileSync(join(dir, 'package.json'), JSON.stringify({
     name,
-    version: '0.1.0',
+    version,
     type: 'module',
     main: 'lib/index.js',
     ...snapRail !== undefined ? { snapRail } : {},
@@ -214,6 +214,33 @@ describe('plugin layers admin', () => {
     expect((await listed()).get('@snap-rail/mini')).toMatchObject({ source: 'pool', enabled: false })
   })
 
+  it('reports client-only pool packages from the row flag, not composition', async () => {
+    // A clientOnly pool package (an installed framework or station) never
+    // joins the host composition — its face rides client-config.list — so
+    // composition presence would read as permanently off. The row's flag is
+    // the mounted truth for it.
+    const world = await makeWorld()
+    const dir = join(world.home, 'plugins', '@snap-rail__station')
+    mkdirSync(join(dir, 'lib'), { recursive: true })
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      name: '@snap-rail/station', version: '0.2.0', type: 'module', main: 'lib/index.js',
+      snapRail: { kind: 'plugin', clientOnly: true },
+    }))
+    writeFileSync(join(dir, 'lib', 'index.js'), 'export default { name: "station", apply() {} }\n')
+
+    const listed = async (): Promise<Map<string, { source: string, enabled: boolean }>> => {
+      const result = await world.client.call('plugins.list', {})
+      if (!result.ok) throw new Error('plugins.list failed')
+      return new Map(result.value.plugins.map(plugin => [plugin.name, plugin]))
+    }
+
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/station'\n    enabled: true\n")
+    expect((await listed()).get('@snap-rail/station')).toMatchObject({ source: 'pool', enabled: true })
+
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/station'\n    enabled: false\n")
+    expect((await listed()).get('@snap-rail/station')).toMatchObject({ source: 'pool', enabled: false })
+  })
+
   it('keeps renderer rows on the user source with the row flag as truth', async () => {
     const world = await makeWorld(undefined, ['@snap-rail/renderer-demo'])
     writeFileSync(world.userPath, [
@@ -272,9 +299,9 @@ describe('plugin layers admin', () => {
     // Inspecting a newer zip names the installed version and the verdict.
     const peek = await world.client.call('plugins.inspect', { zipPath: writeZip('0.2.0') })
     expect(peek.ok).toBe(true)
-    if (peek.ok) {
-      expect(peek.value.plugin.action).toBe('update')
-      expect(peek.value.plugin.installed).toEqual({ version: '0.1.0' })
+    if (peek.ok && peek.value.archive.kind === 'plugin') {
+      expect(peek.value.archive.plugin.action).toBe('update')
+      expect(peek.value.archive.plugin.installed).toEqual({ version: '0.1.0' })
     }
 
     // The update goes through the wire: the pool copy is swapped, the user
@@ -296,15 +323,15 @@ describe('plugin layers admin', () => {
     const listed = await world.client.call('plugins.list', {})
     expect(listed.ok && listed.value.plugins.find(plugin => plugin.name === '@snap-rail/mini')?.version).toBe('0.2.0')
     const back = await world.client.call('plugins.inspect', { zipPath: writeZip('0.1.0') })
-    expect(back.ok && back.value.plugin.action).toBe('blocked')
-    // Refusal on the wire; the conflict *code* mapping is asserted in the
-    // settings-station UI spec (this world mixes source-plane and built
-    // protocol instances, so business-error identity stops at ok:false).
+    expect(back.ok && back.value.archive.kind === 'plugin' && back.value.archive.plugin.action).toBe('blocked')
+    // Refusal on the wire (this world mixes source-plane and built protocol
+    // instances, so business-error identity stops at ok:false; the conflict
+    // *code* mapping is consumed by the framework's settings pages).
     const refused = await world.client.call('plugins.install', { zipPath: writeZip('0.1.0') })
     expect(refused.ok).toBe(false)
   })
 
-  it('serves the market over the wire: catalog verdicts and remote installs', async () => {
+  it('serves the feed over the wire: catalog verdicts and remote installs', async () => {
     const world = await makeWorld()
     const poolDir = join(world.home, 'plugins')
     const zipBytes = (version: string): Uint8Array => signedZip(world, {
@@ -320,7 +347,7 @@ describe('plugin layers admin', () => {
       sha256: string, size: number, signature: { algorithm: 'Ed25519', keyId: string }
     }> } = {
       plugins: [{
-        name: '@snap-rail/mini', version: currentVersion, description: 'mini market plugin', file: 'mini.zip',
+        name: '@snap-rail/mini', version: currentVersion, description: 'mini feed plugin', file: 'mini.zip',
         sha256: createHash('sha256').update(currentZip).digest('hex'), size: currentZip.length,
         signature: { algorithm: 'Ed25519', keyId: 'test-key' },
       }],
@@ -332,7 +359,7 @@ describe('plugin layers admin', () => {
       return new Response('not found', { status: 404 })
     }))
 
-    // Without a configured feed the market refuses before any fetch.
+    // Without a configured feed the plugins domain refuses before any fetch.
     const unconfigured = await world.client.call('plugins.remote-list', {})
     expect(unconfigured.ok).toBe(false)
     expect(downloadsOf()).toHaveLength(0)
@@ -341,16 +368,17 @@ describe('plugin layers admin', () => {
     const listed = await world.client.call('plugins.remote-list', {})
     expect(listed.ok).toBe(true)
     if (listed.ok) {
-      expect(listed.value.feedUrl).toBe('http://feed.test/plugins')
+      // The legacy singular key reads as a one-element list.
+      expect(listed.value.feedUrls).toEqual(['http://feed.test/plugins'])
       expect(listed.value.plugins[0]).toMatchObject({ name: '@snap-rail/mini', version: '0.3.0', action: 'install' })
     }
 
-    // The remote install lands the pool copy; the audit marks the market path.
+    // The remote install lands the pool copy; the audit marks the feed path.
     const installed = await world.client.call('plugins.remote-install', { name: '@snap-rail/mini' })
     expect(installed).toEqual({ ok: true, value: { installed: { name: '@snap-rail/mini', version: '0.3.0', updated: false } } })
     expect(readFileSync(join(poolDir, '@snap-rail__mini', 'lib', 'index.js'), 'utf8')).toContain('// v0.3.0')
     const trail = readFileSync(join(world.home, 'audit.jsonl'), 'utf8')
-    expect(trail).toContain('"via":"market"')
+    expect(trail).toContain('"via":"feed"')
 
     // A newer feed version updates in place; an unknown name is a refusal.
     currentVersion = '0.4.0'
@@ -375,102 +403,66 @@ describe('plugin layers admin', () => {
     return stub === undefined ? [] : stub.mock.calls
   }
 
-  it('installs a recipe over the wire: plugins first, then the preset file', async () => {
+  it('installs an offline combo: member zips first, then the preset file', async () => {
     const world = await makeWorld()
     const poolDir = join(world.home, 'plugins')
     const presetPath = join(world.home, 'presets', 'recipe-demo-base.yml')
-    const zipBytes = (name: string, version: string, rpc?: boolean): Uint8Array => {
+    /** One signed member zip; `rpc` adds the subpath entry the recipe row
+     * addresses. */
+    const memberZip = (name: string, version: string, rpc = false): Uint8Array => {
       const id = name.slice('@snap-rail/'.length)
       const files: Record<string, Uint8Array> = {
         'package.json': new TextEncoder().encode(JSON.stringify({
           name, version, type: 'module', main: 'lib/index.js',
-          ...(rpc === true ? { exports: { '.': './lib/index.js', './rpc': './lib/rpc.js' } } : {}),
+          ...(rpc ? { exports: { '.': './lib/index.js', './rpc': './lib/rpc.js' } } : {}),
         })),
         'lib/index.js': new TextEncoder().encode(
           `export default { name: ${JSON.stringify(id)}, apply(c) { c.provide(${JSON.stringify(id)}, true) } }\n// v${version}\n`),
       }
-      if (rpc === true) {
+      if (rpc) {
         files['lib/rpc.js'] = new TextEncoder().encode(
           `export default { name: ${JSON.stringify(`${id}-rpc`)}, apply(c) { c.provide(${JSON.stringify(`${id}-rpc`)}, true) } }\n`)
       }
       return signedZip(world, files, name, version)
     }
-    const digestOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex')
-    const bytes = {
-      'mini.zip': zipBytes('@snap-rail/mini', '0.3.0'),
-      'sub.zip': zipBytes('@snap-rail/sub', '1.0.0', true),
-    }
-    const catalog = {
-      plugins: [
-        {
-          name: '@snap-rail/mini', version: '0.3.0', file: 'mini.zip',
-          sha256: digestOf(bytes['mini.zip']!), size: bytes['mini.zip']!.length,
-          signature: { algorithm: 'Ed25519', keyId: 'test-key' },
-        },
-        {
-          name: '@snap-rail/sub', version: '1.0.0', file: 'sub.zip',
-          sha256: digestOf(bytes['sub.zip']!), size: bytes['sub.zip']!.length,
-          signature: { algorithm: 'Ed25519', keyId: 'test-key' },
-        },
-      ],
-    }
-    const recipes = {
-      recipes: [
-        { id: 'demo-base', version: '1.0.0', title: '演示基座', description: 'demo base', kind: 'base', file: 'demo-base.yml' },
-        { id: 'broken', version: '1.0.0', title: '坏组合', kind: 'scenario', file: 'broken.yml' },
-      ],
-    }
-    const recipeDoc = [
-      'plugins:',
-      "  - name: '@snap-rail/mini'",
-      "  - name: '@snap-rail/sub'",
-      "  - name: '@snap-rail/sub/rpc'",
-      '',
-    ].join('\n')
-    vi.stubGlobal('fetch', vi.fn(async (url: string | URL) => {
-      const key = String(url)
-      const prefix = 'http://feed.test/plugins/'
-      if (key === `${prefix}index.json`) return new Response(JSON.stringify(catalog))
-      if (key === `${prefix}recipes.json`) return new Response(JSON.stringify(recipes))
-      if (key === `${prefix}demo-base.yml`) return new Response(recipeDoc)
-      if (key === `${prefix}broken.yml`) return new Response("plugins:\n  - name: '@snap-rail/absent'\n")
-      const file = key.slice(prefix.length)
-      const hit = bytes[file as keyof typeof bytes]
-      if (hit !== undefined) return new Response(hit)
-      return new Response('not found', { status: 404 })
+    const mini = memberZip('@snap-rail/mini', '0.3.0')
+    const sub = memberZip('@snap-rail/sub', '1.0.0', true)
+    const recipe = (id: string, rows: readonly string[]): string =>
+      [`id: ${id}`, 'version: 1.0.0', 'title: 演示基座', 'kind: base', 'plugins:', ...rows.map(row => `  - name: '${row}'`), ''].join('\n')
+
+    // A combo whose recipe references a package it does not carry is refused
+    // before any pool write or preset file.
+    const brokenPath = join(world.home, 'broken.zip')
+    writeFileSync(brokenPath, zipSync({
+      'recipe.yml': new TextEncoder().encode(recipe('broken', ['@snap-rail/mini', '@snap-rail/sub'])),
+      'plugins/mini.zip': mini,
     }))
-
-    // Without a configured feed every recipe method refuses before any fetch.
-    const unconfigured = await world.client.call('plugins.remote-recipes', {})
-    expect(unconfigured.ok).toBe(false)
-
-    world.ctx.settings.set('plugins.feedUrl', 'http://feed.test/plugins')
-
-    // The annotated view: both referenced packages are still pending, nothing
-    // is unavailable, and the recipe has not landed as a preset file.
-    const listed = await world.client.call('plugins.remote-recipes', {})
-    expect(listed.ok).toBe(true)
-    if (listed.ok) {
-      const info = listed.value.recipes.find(recipe => recipe.id === 'demo-base')
-      expect(info).toMatchObject({
-        title: '演示基座', kind: 'base',
-        plugins: ['@snap-rail/mini', '@snap-rail/sub'],
-        pending: ['@snap-rail/mini', '@snap-rail/sub'],
-        unavailable: [], applied: false,
-      })
-    }
-
-    // An unknown id is a refusal; a recipe the feed cannot satisfy refuses
-    // and writes no preset file.
-    const absent = await world.client.call('plugins.remote-install-recipe', { id: 'no-such-recipe' })
-    expect(absent.ok).toBe(false)
-    const broken = await world.client.call('plugins.remote-install-recipe', { id: 'broken' })
+    const broken = await world.client.call('plugins.install-combo', { zipPath: brokenPath })
     expect(broken.ok).toBe(false)
     expect(existsSync(join(world.home, 'presets', 'recipe-broken.yml'))).toBe(false)
 
-    // The real install lands both pool packages (fresh installs), then the
-    // preset file — and the composition mounts everything.
-    const installed = await world.client.call('plugins.remote-install-recipe', { id: 'demo-base' })
+    // The valid combo: same-directory member zips + the document.
+    const comboPath = join(world.home, 'demo-base.zip')
+    writeFileSync(comboPath, zipSync({
+      'recipe.yml': new TextEncoder().encode(recipe('demo-base', ['@snap-rail/mini', '@snap-rail/sub', '@snap-rail/sub/rpc'])),
+      'plugins/mini.zip': mini,
+      'plugins/sub.zip': sub,
+    }))
+
+    // Inspect reports the combo kind, members, and landing actions — a
+    // subpath row maps to its package zip.
+    const peek = await world.client.call('plugins.inspect', { zipPath: comboPath })
+    expect(peek.ok).toBe(true)
+    if (peek.ok && peek.value.archive.kind === 'combo') {
+      expect(peek.value.archive.combo).toMatchObject({
+        id: 'demo-base', version: '1.0.0', title: '演示基座', kind: 'base',
+        missing: [], hasClient: false,
+      })
+      expect(peek.value.archive.combo.plugins.map(plugin => plugin.name)).toEqual(['@snap-rail/mini', '@snap-rail/sub'])
+      expect(peek.value.archive.combo.plugins.map(plugin => plugin.action)).toEqual(['install', 'install'])
+    }
+
+    const installed = await world.client.call('plugins.install-combo', { zipPath: comboPath })
     expect(installed).toEqual({
       ok: true,
       value: {
@@ -478,7 +470,7 @@ describe('plugin layers admin', () => {
           { name: '@snap-rail/mini', version: '0.3.0', updated: false },
           { name: '@snap-rail/sub', version: '1.0.0', updated: false },
         ],
-        applied: true,
+        preset: 'recipe-demo-base.yml',
       },
     })
     expect(existsSync(join(poolDir, '@snap-rail__mini'))).toBe(true)
@@ -487,27 +479,54 @@ describe('plugin layers admin', () => {
     await sleepUntil(() =>
       world.ctx.get('mini') !== undefined && world.ctx.get('sub') !== undefined && world.ctx.get('sub-rpc') !== undefined)
 
-    // Re-running is a no-op on the pool (everything current) and the view
-    // flips to applied.
-    const again = await world.client.call('plugins.remote-install-recipe', { id: 'demo-base' })
-    expect(again).toEqual({ ok: true, value: { installed: [], applied: true } })
-    const listedAgain = await world.client.call('plugins.remote-recipes', {})
-    expect(listedAgain.ok && listedAgain.value.recipes.find(recipe => recipe.id === 'demo-base')?.applied).toBe(true)
+    // Re-running skips the `current` members and keeps the same preset.
+    const again = await world.client.call('plugins.install-combo', { zipPath: comboPath })
+    expect(again).toEqual({ ok: true, value: { installed: [], preset: 'recipe-demo-base.yml' } })
 
-    // The recipe's preset references the packages, so uninstall is refused —
-    // remove the recipe first, then the pool packages are ordinary again.
+    // The combo's preset references the packages, so uninstall is refused —
+    // removing a combo is deliberately manual (delete the preset file).
     const blocked = await world.client.call('plugins.uninstall', { name: '@snap-rail/mini' })
     expect(blocked.ok).toBe(false)
-    const removed = await world.client.call('plugins.remove-recipe', { id: 'demo-base' })
-    expect(removed).toEqual({ ok: true, value: { removed: true } })
-    expect(existsSync(presetPath)).toBe(false)
+    rmSync(presetPath, { force: true })
+    await world.layers.apply()
     const uninstalled = await world.client.call('plugins.uninstall', { name: '@snap-rail/mini' })
     expect(uninstalled.ok).toBe(true)
     expect(existsSync(join(poolDir, '@snap-rail__mini'))).toBe(false)
 
     const trail = readFileSync(join(world.home, 'audit.jsonl'), 'utf8')
-    expect(trail).toContain('"action":"recipe.install"')
-    expect(trail).toContain('"action":"recipe.remove"')
+    expect(trail).toContain('"action":"combo.install"')
+  })
+
+  it('rolls the pool and preset back when a combo member fails to apply', async () => {
+    const world = await makeWorld()
+    const poolDir = join(world.home, 'plugins')
+    const presetPath = join(world.home, 'presets', 'recipe-boom.yml')
+    const member = signedZip(world, {
+      'package.json': new TextEncoder().encode(JSON.stringify({
+        name: '@snap-rail/boom', version: '1.0.0', type: 'module', main: 'lib/index.js',
+      })),
+      'lib/index.js': new TextEncoder().encode("export default { name: 'boom', apply() { throw new Error('boom') } }\n"),
+    }, '@snap-rail/boom', '1.0.0')
+    const comboPath = join(world.home, 'boom.zip')
+    writeFileSync(comboPath, zipSync({
+      'recipe.yml': new TextEncoder().encode([
+        'id: boom',
+        'version: 1.0.0',
+        'title: 爆炸组合',
+        'kind: base',
+        'plugins:',
+        "  - name: '@snap-rail/boom'",
+        '',
+      ].join('\n')),
+      'plugins/boom.zip': member,
+    }))
+
+    const result = await world.client.call('plugins.install-combo', { zipPath: comboPath })
+    expect(result.ok).toBe(false)
+    // The failed mount rolled back both halves of the combo transaction.
+    expect(existsSync(join(poolDir, '@snap-rail__boom'))).toBe(false)
+    expect(existsSync(presetPath)).toBe(false)
+    expect(() => world.layers.recompose()).not.toThrow()
   })
 
   it('refuses a write that would not compose, leaving the file untouched', async () => {
@@ -798,6 +817,24 @@ describe('plugin layers admin', () => {
     expect(world.ctx.get('needy')).toBeDefined()
   })
 
+  it('enforces the @range suffix on a requires entry against the installed version', async () => {
+    const world = await makeWorld()
+    // dep@0.9.0 installed; needy demands ^1.0 — the enable refuses even
+    // though the package is present and enabled.
+    seedPoolPackage(world.home, '@snap-rail/dep', {}, '0.9.0')
+    seedPoolPackage(world.home, '@snap-rail/needy', { requires: ['@snap-rail/dep@^1.0'] })
+    const refused = await world.client.call('plugins.set-enabled', { name: '@snap-rail/needy', enabled: true })
+    expect(refused.ok).toBe(false)
+    expect(JSON.stringify(refused.error)).toContain('@snap-rail/dep@^1.0')
+
+    // Upgrading dep to 1.1.0 satisfies the range: enable dep, then needy.
+    seedPoolPackage(world.home, '@snap-rail/dep', {}, '1.1.0')
+    const depOn = await world.client.call('plugins.set-enabled', { name: '@snap-rail/dep', enabled: true })
+    expect(depOn.ok).toBe(true)
+    const accepted = await world.client.call('plugins.set-enabled', { name: '@snap-rail/needy', enabled: true })
+    expect(accepted.ok).toBe(true)
+  })
+
   it('refuses disabling or uninstalling a package another enabled row requires', async () => {
     const world = await makeWorld()
     seedPoolPackage(world.home, '@snap-rail/dep')
@@ -820,8 +857,9 @@ describe('plugin layers admin', () => {
     expect(readFileSync(world.userPath, 'utf8')).toBe(before)
     expect(existsSync(join(world.home, 'plugins', '@snap-rail__dep'))).toBe(true)
 
-    // The framework binding counts as a requirement in both directions.
-    seedPoolPackage(world.home, '@snap-rail/bound', { framework: '@snap-rail/dep' })
+    // The framework binding IS a requires entry — the reverse check sees it
+    // like any other dependency.
+    seedPoolPackage(world.home, '@snap-rail/bound', { requires: ['@snap-rail/dep'] })
     writeFileSync(world.userPath, [
       'plugins:',
       "  - name: '@snap-rail/dep'",

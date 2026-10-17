@@ -1,11 +1,14 @@
 /**
  * The plugin installer: the runtime path a plugin zip takes from a file on
- * disk to a mounted pool package — validation, extraction, and removal. The
- * marketplace of the future is just another source of the same zips.
+ * disk to a mounted pool package — validation, extraction, and removal.
+ * Plugin feeds and offline combo archives are just other sources of the
+ * same zips.
  *
  * Zip layout: one root directory (the package) or the package at the zip
- * root. The manifest must name a legal package name; `snapRail` fields,
- * capabilities and runtime engine ranges are validated before extraction.
+ * root. The manifest must name a legal package name; `snapRail` fields and
+ * runtime engine ranges are validated before extraction. Compatibility is
+ * one declaration — `requires`, whose entries carry optional `@range`
+ * suffixes (`@snap-rail/util/semver` semantics).
  * Installing over an installed package updates it in place when the zip's
  * version is strictly higher. Uninstalling removes the pool directory and
  * the package's namespaced store database (its data is its own).
@@ -22,8 +25,28 @@ import { snapRailManifestSchema } from '@snap-rail/plugin-kit/manifest'
 import { checkSeedAbi, type SeedAbi } from '@snap-rail/plugin-kit/seeds'
 import type { SnapRailManifest } from './scan.ts'
 
-/** Installer failures, machine-readable for the wire mapping. */
-export type InstallErrorKind = 'bad-zip' | 'bad-manifest' | 'bad-signature' | 'conflict' | 'not-installed' | 'io'
+/** Installer failures, machine-readable for the wire mapping. `bad-combo`
+ * covers offline combo archive validation in `./combo`. */
+export type InstallErrorKind = 'bad-zip' | 'bad-manifest' | 'bad-signature' | 'conflict' | 'not-installed' | 'io' | 'bad-combo'
+
+/**
+ * The install-time signature gate. `open` (the factory default) installs
+ * unverified archives and hands the verdict to the UI — whether a plugin is
+ * worth its declared permissions stays the operator's call. `strict`
+ * restores the closed-fleet behavior: only trusted-publisher signatures
+ * install.
+ */
+export type SignaturePolicy = 'open' | 'strict'
+
+/**
+ * How the signature gate judged one archive. `publisher` only ever comes
+ * from the local trust file (a publisher claimed inside the zip is attacker
+ * controlled and never displayed); `keyId` on an unverified verdict is the
+ * envelope's own claim — shown as-is, trusted by nobody.
+ */
+export type SignatureVerdict =
+  | { state: 'verified', keyId: string, publisher?: string }
+  | { state: 'unverified', keyId?: string, reason: 'unsigned' | 'unknown-key' }
 
 /** Engine versions implemented by this Host/Renderer release. */
 export const HOST_ENGINE_VERSIONS = {
@@ -73,10 +96,10 @@ export interface InspectResult {
   requires: readonly string[]
   /** Contributed seed ids the client face requires from other plugins. */
   externalSeeds: readonly string[]
-  capabilities?: { provides?: readonly { id: string, version: string }[], requires?: readonly { id: string, range: string, optional?: boolean }[] }
   engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
-  /** The release signature key id when the archive carries signed metadata. */
-  signatureKeyId?: string
+  /** How the signature gate judged the archive — the confirmation dialog's
+   * 签名 row and its risk branch derive from this. */
+  signature: SignatureVerdict
 }
 
 /**
@@ -87,7 +110,10 @@ export interface InspectResult {
  * @param zipPath - absolute path of the plugin zip on the host.
  * @throws InstallError for the same malformed inputs {@link installPluginFromZip} rejects.
  */
-export function inspectPluginZip(zipPath: string, options?: { trustedKeys?: readonly TrustedReleaseKey[] }): InspectResult {
+export function inspectPluginZip(zipPath: string, options?: {
+  trustedKeys?: readonly TrustedReleaseKey[]
+  signaturePolicy?: SignaturePolicy
+}): InspectResult {
   let files: Record<string, Uint8Array>
   try {
     files = unzipSync(new Uint8Array(readFileSync(zipPath)))
@@ -108,7 +134,8 @@ export function inspectPluginZip(zipPath: string, options?: { trustedKeys?: read
     throw new InstallError('bad-manifest', `package name "${String(manifest.name)}" is not a legal package name`)
   }
   const snapRail = validateSnapRail(manifest)
-  const signatureKeyId = verifyArchiveSignature(files, root, options?.trustedKeys, manifest.name, typeof manifest.version === 'string' ? manifest.version : '0.0.0')
+  const signature = verifyArchiveSignature(files, root, options?.trustedKeys, manifest.name, typeof manifest.version === 'string' ? manifest.version : '0.0.0')
+  enforceSignaturePolicy(manifest.name, signature, options?.trustedKeys !== undefined, options?.signaturePolicy)
   return {
     name: manifest.name,
     version: typeof manifest.version === 'string' ? manifest.version : '0.0.0',
@@ -119,39 +146,69 @@ export function inspectPluginZip(zipPath: string, options?: { trustedKeys?: read
     hasClient: snapRail.client !== undefined,
     requires: snapRail.requires ?? [],
     externalSeeds: snapRail.client?.externalSeeds ?? [],
-    ...(snapRail.capabilities === undefined ? {} : { capabilities: snapRail.capabilities }),
     ...(snapRail.engines === undefined ? {} : { engines: snapRail.engines }),
-    ...(signatureKeyId === undefined ? {} : { signatureKeyId }),
+    signature,
   }
 }
 
-/** Verify a release envelope when the caller supplies a trust store. */
+/**
+ * Verify a release envelope when the caller supplies a trust store — the
+ * three-state open gate. Signed metadata whose key sits in the trust store
+ * is verified hard (any failure — digest, identity, publisher — refuses,
+ * it is tamper evidence); an unsigned archive or an unregistered key reads
+ * as `unverified` and only the policy layer decides what that costs.
+ */
 function verifyArchiveSignature(
   files: Record<string, Uint8Array>,
   root: string,
   trustedKeys: readonly TrustedReleaseKey[] | undefined,
   expectedName?: string,
   expectedVersion?: string,
-): string | undefined {
+): SignatureVerdict {
   const prefix = root === '' ? '' : `${root}/`
   const metadata = files[`${prefix}META-INF/release.json`]
   const signature = files[`${prefix}META-INF/signature.json`]
-  if (trustedKeys === undefined) return signature === undefined ? undefined : readSignatureKeyId(signature)
-  if (metadata === undefined || signature === undefined) throw new InstallError('bad-signature', 'signed release metadata is missing')
+  if (metadata === undefined || signature === undefined) return { state: 'unverified', reason: 'unsigned' }
+  const keyId = readSignatureKeyId(signature)
+  if (keyId === undefined) return { state: 'unverified', reason: 'unsigned' }
+  const trusted = trustedKeys?.find(key => key.keyId === keyId)
+  if (trusted === undefined) return { state: 'unverified', keyId, reason: 'unknown-key' }
   const normalized: Record<string, Uint8Array> = {}
   for (const [path, data] of Object.entries(files)) {
     const relative = root === '' ? path : path.startsWith(prefix) ? path.slice(prefix.length) : path
     normalized[relative] = data
   }
   try {
-    const verified = verifyReleaseFiles(normalized, trustedKeys)
+    const verified = verifyReleaseFiles(normalized, [trusted])
     if ((expectedName !== undefined && verified.name !== expectedName) || (expectedVersion !== undefined && verified.version !== expectedVersion)) {
       throw new Error('release metadata identity does not match package.json')
     }
-    const parsed = JSON.parse(new TextDecoder().decode(signature)) as { keyId?: unknown }
-    return typeof parsed.keyId === 'string' ? parsed.keyId : verified.name
+    return { state: 'verified', keyId, ...(trusted.publisher !== undefined ? { publisher: trusted.publisher } : {}) }
   } catch (cause) {
     throw new InstallError('bad-signature', cause instanceof Error ? cause.message : String(cause))
+  }
+}
+
+/**
+ * The policy layer over a verdict: a no-op for verified archives and for
+ * the ungated dev path (no trust store supplied). Under `strict` every
+ * unverified archive refuses; the `@snap-rail/*` namespace refuses unless
+ * verified whatever the policy — a community package must never wear the
+ * org's name, and the org's own releases always carry its signature.
+ */
+function enforceSignaturePolicy(
+  name: string,
+  verdict: SignatureVerdict,
+  gated: boolean,
+  policy: SignaturePolicy | undefined,
+): void {
+  if (!gated || verdict.state === 'verified') return
+  const detail = verdict.keyId !== undefined ? `keyId ${verdict.keyId} 未登记` : '包未携带签名'
+  if (policy === 'strict') {
+    throw new InstallError('bad-signature', `严格签名策略要求受信发布者签名（${name}：${detail}）`)
+  }
+  if (name.startsWith('@snap-rail/')) {
+    throw new InstallError('bad-signature', `官方命名空间 @snap-rail/* 只接受受信发布者的签名（${name}：${detail}）`)
   }
 }
 
@@ -206,71 +263,14 @@ function validateSnapRail(manifest: PackageJson): SnapRailManifest {
   return parsed
 }
 
+/** The one version comparator — single source in `@snap-rail/util/semver`;
+ * re-exported for the installer's existing importers (feed annotations,
+ * rpc's update verdicts, combo member actions). */
+import { compareVersions, satisfiesRange } from '@snap-rail/util/semver'
+export { compareVersions, satisfiesRange }
+
 function satisfiesRuntimeRange(version: string, range: string): boolean {
-  const actual = parseRuntimeVersion(version)
-  const trimmed = range.trim()
-  const target = parseRuntimeVersion(trimmed.replace(/^(\^|~|>=|>|<=|<|=)\s*/, ''))
-  if (target === undefined || actual === undefined) return false
-  if (trimmed.startsWith('^')) return actual[0] === target[0] && compareRuntimeTuple(actual, target) >= 0
-  if (trimmed.startsWith('~')) return actual[0] === target[0] && actual[1] === target[1] && compareRuntimeTuple(actual, target) >= 0
-  if (trimmed.startsWith('>=')) return compareRuntimeTuple(actual, target) >= 0
-  if (trimmed.startsWith('>')) return compareRuntimeTuple(actual, target) > 0
-  if (trimmed.startsWith('<=')) return compareRuntimeTuple(actual, target) <= 0
-  if (trimmed.startsWith('<')) return compareRuntimeTuple(actual, target) < 0
-  return compareRuntimeTuple(actual, target) === 0
-}
-
-function parseRuntimeVersion(value: string): [number, number, number] | undefined {
-  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(value)
-  return match === null ? undefined : [Number(match[1]), Number(match[2]), Number(match[3])]
-}
-
-function compareRuntimeTuple(a: readonly [number, number, number], b: readonly [number, number, number]): number {
-  for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return a[index]! - b[index]!
-  }
-  return 0
-}
-
-/**
- * Compare two version strings (semver-ish, no semver dependency): core
- * segments compare numerically (missing or non-numeric = 0), a `-suffix`
- * prerelease orders before its release, and prerelease identifiers compare
- * numerically when both numeric and lexicographically otherwise.
- *
- * @returns negative when `a < b`, positive when `a > b`, zero when equal.
- */
-export function compareVersions(a: string, b: string): number {
-  const [coreA, ...preA] = a.split('-')
-  const [coreB, ...preB] = b.split('-')
-  const segsA = (coreA ?? '').split('.')
-  const segsB = (coreB ?? '').split('.')
-  for (let i = 0; i < Math.max(segsA.length, segsB.length); i++) {
-    const rawA = segsA[i]
-    const rawB = segsB[i]
-    const numA = rawA !== undefined && /^\d+$/.test(rawA) ? Number(rawA) : 0
-    const numB = rawB !== undefined && /^\d+$/.test(rawB) ? Number(rawB) : 0
-    if (numA !== numB) return numA < numB ? -1 : 1
-  }
-  const isPreA = preA.length > 0
-  const isPreB = preB.length > 0
-  if (isPreA !== isPreB) return isPreA ? -1 : 1
-  if (!isPreA) return 0
-  const idsA = preA.join('-').split('.')
-  const idsB = preB.join('-').split('.')
-  for (let i = 0; i < Math.max(idsA.length, idsB.length); i++) {
-    const idA = idsA[i]
-    const idB = idsB[i]
-    if (idA === idB) continue
-    if (idA === undefined) return -1
-    if (idB === undefined) return 1
-    const numA = /^\d+$/.test(idA) ? Number(idA) : null
-    const numB = /^\d+$/.test(idB) ? Number(idB) : null
-    if (numA !== null && numB !== null && numA !== numB) return numA < numB ? -1 : 1
-    if ((numA === null) !== (numB === null)) return numA !== null ? -1 : 1
-    return idA < idB ? -1 : 1
-  }
-  return 0
+  return satisfiesRange(version, range)
 }
 
 /** The pool directory one package occupies (`/` sanitized to `__`). */
@@ -317,6 +317,9 @@ export function installedVersionOf(poolDir: string, name: string): string | unde
 export function installPluginFromZip(zipPath: string, poolDir: string, options?: {
   reserved?: readonly string[]
   trustedKeys?: readonly TrustedReleaseKey[]
+  /** The signature gate over the verdict (`open` default, see
+   * {@link SignaturePolicy}); only meaningful with `trustedKeys`. */
+  signaturePolicy?: SignaturePolicy
   /** The host's live seed table; when supplied, a client face stamped with a
    * foreign seed ABI (revision or a major drift) is refused before any byte
    * lands. Faces without a stamp pass — the grace window. */
@@ -344,14 +347,15 @@ export function installPluginFromZip(zipPath: string, poolDir: string, options?:
   if (typeof manifest.name !== 'string' || !/^(?:@[a-z0-9][a-z0-9-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(manifest.name)) {
     throw new InstallError('bad-manifest', `package name "${String(manifest.name)}" is not a legal package name`)
   }
-  validateSnapRail(manifest)
+  const snapRail = validateSnapRail(manifest)
   if (options?.seedAbi !== undefined) {
-    const verdict = checkSeedAbi(validateSnapRail(manifest).client?.seedAbi, options.seedAbi)
+    const verdict = checkSeedAbi(snapRail.client?.seedAbi, options.seedAbi)
     if (!verdict.ok) {
       throw new InstallError('conflict', `${manifest.name} 的种子依赖与宿主不匹配：${verdict.reason ?? '未知原因'}`)
     }
   }
-  verifyArchiveSignature(files, root, options?.trustedKeys, manifest.name, typeof manifest.version === 'string' ? manifest.version : '0.0.0')
+  const signature = verifyArchiveSignature(files, root, options?.trustedKeys, manifest.name, typeof manifest.version === 'string' ? manifest.version : '0.0.0')
+  enforceSignaturePolicy(manifest.name, signature, options?.trustedKeys !== undefined, options?.signaturePolicy)
   if (options?.reserved?.includes(manifest.name) === true) {
     throw new InstallError('conflict', `${manifest.name} is a built-in package name (an install cannot replace built-ins)`)
   }

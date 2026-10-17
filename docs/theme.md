@@ -1,7 +1,7 @@
 # 主题与图表色规范
 
-单源在 `packages/ui/framework-shadcn/src/theme.css`；本文件是使用规范。设计出处见
-`docs/design/theme-samples.html`（明暗各 9 款候选，最终选钴蓝）。
+单源在框架独立仓 `snap-rail-framework-shadcn` 的 `src/ui/theme.css`；本文件是使用规范。
+设计出处见 `docs/design/theme-samples.html`（明暗各 9 款候选，最终选钴蓝）。
 
 ## 两种模式，一套令牌
 
@@ -10,24 +10,27 @@ Tailwind v4 `@theme` 里的令牌就是黑夜模式（石墨钢面板 + 钴蓝�
 运行时切模式只是改 `<html>` 上的 `data-mode` 属性：
 
 - 模式选择存 settings.json 键 `ui.theme`（`{ mode: 'system' | 'light' | 'dark' }`），
-  由设置站「主题」页写入，`settings/changed` 帧当场热应用（见
-  `packages/ui/settings-station`）。
+  由框架设置外壳的「主题」页写入（框架仓 `src/settings-dialog.tsx`），
+  `settings/changed` 帧当场热应用。
 - 读写走 `@snap-rail/framework-shadcn/ui` 导出的 `themeSettingsSchema` / `applyTheme`，
   不要在别处再写一套。
 
 页面代码永远只用令牌工具类（`bg-card`、`text-muted-foreground`…），**不得出现
-硬编码色值或 `dark:` 变体**——模式切换靠令牌自动生效。
+硬编码色值或 `dark:` 变体**——模式切换靠令牌自动生效。唯一例外是内核
+引导/启动页（`packages/base/kernel`）：它运行在任何框架面加载之前，拿不到
+令牌，色值以**镜像值**写死并注明（`BootstrapPage.tsx` 顶部的 `theme` 块），
+改令牌时同步。
 
 ## 类扫描（工具类从哪来）
 
-全仓唯一样式表就是 `theme.css`，工具类靠 Tailwind 扫源码生成。`@source`
-按 **CSS 文件自身位置** 解析（不是 Vite cwd，自动探测只覆盖
-`apps/desktop/src/client`）：一条宽 glob `../../../**/src/**/*.{ts,tsx}`
-覆盖 `packages/` 下所有包的 src（框架渲染面、套件、equipment-station 一起），
-住户名单不在此复列；构建产物被 gitignore 天然排除。**放进 `packages/` 的
-新渲染包无需改扫描**；但把渲染源码挪出 `packages/` 的 src 会让它独有的
-类静默消失——`packages/ui/framework-shadcn/tests/theme-scan.spec.ts` 的门禁（每条
-`@source` 前缀真实存在 + 覆盖每个包）会当场红。
+唯一样式表就是框架仓的 `theme.css`，工具类靠 Tailwind 扫源码生成。`@source`
+按 **CSS 文件自身位置** 解析（不是 Vite cwd）：框架仓 `src/ui/theme.css` 的
+宽 glob `../../../../**/src/**/*.{ts,tsx}` 从仓库位置出发，把主仓
+`packages/` 的渲染包 src 与各独立仓（套件、equipment-station 所在的兄弟
+checkout）一起扫进来，住户名单不在此复列；构建产物被 gitignore 天然排除。
+**新渲染包放进任一被扫描的 `src/` 即自动覆盖**；挪出扫描范围会让它独有的
+类静默消失——框架仓 `tests/theme-scan.spec.ts` 的门禁（每条 `@source`
+前缀真实存在 + 覆盖每个包）会当场红。
 
 ## 调色板
 

@@ -33,7 +33,6 @@
     { "path": "./packages/base/connection" },
     { "path": "./packages/equipment/equipment" },
     { "path": "./packages/ui/equipment-station" },
-    { "path": "./packages/ui/settings-station" },
     { "path": "./packages/base/kernel" },
     { "path": "./packages/base/modules" },
     { "path": "./apps/desktop" }

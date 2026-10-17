@@ -34,6 +34,14 @@ export {
 } from './slot-vocabulary.ts'
 export { releaseFiles, releaseManifest, zipFileName, type ReleaseSpec } from './pack.ts'
 export {
+  packageNameOf,
+  recipeDocumentSchema,
+  recipePackageNames,
+  recipeRowSchema,
+  type RecipeDocument,
+  type RecipeRow,
+} from './recipe.ts'
+export {
   RELEASE_METADATA_PATH,
   RELEASE_SIGNATURE_PATH,
   canonicalJson,

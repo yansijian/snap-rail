@@ -65,7 +65,7 @@ export function StartupPage(props: { describe: () => Promise<HostIdentity>, diag
       {line}
       {diagnostics !== undefined && (diagnostics.missing.length > 0 || diagnostics.lastFailure !== null)
         ? (
-            <div style={{ position: 'absolute', bottom: 18, maxWidth: '80%', fontSize: 12, color: '#d99b45' }}>
+            <div style={{ position: 'absolute', bottom: 18, maxWidth: '80%', fontSize: 12, color: '#d29922' }}>
               {diagnostics.lastFailure?.message ?? `缺少依赖：${diagnostics.missing.map(row => row.name).join('、')}`}
             </div>
           )

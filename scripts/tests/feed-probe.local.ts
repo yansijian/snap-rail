@@ -24,7 +24,7 @@ const zip = randomBytes(1024)
 const sha256 = createHash('sha256').update(zip).digest('hex')
 writeFileSync(join(feed, 'plugins', '@t__mini.zip'), zip)
 writeFileSync(join(feed, 'plugins', 'index.json'), `${JSON.stringify({ plugins: [{ name: '@t/mini', version: '1.0.0', file: '@t__mini.zip', sha256, size: zip.length }] }, null, 2)}\n`)
-writeFileSync(join(feed, 'plugins', 'recipes.json'), `${JSON.stringify({ recipes: [] }, null, 2)}\n`)
+writeFileSync(join(feed, 'plugins', 'catalog.json'), `${JSON.stringify({ generatedAt: new Date().toISOString(), plugins: [], combos: [] }, null, 2)}\n`)
 
 const server = createServer((request, response) => {
   const path = normalize(decodeURIComponent(new URL(request.url!, 'http://x').pathname)).replaceAll('..', '')

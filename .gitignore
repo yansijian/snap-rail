@@ -11,6 +11,7 @@ tsconfig.tsbuildinfo
 apps/desktop/release*/
 .snap-rail/
 .zcode/*
+external/
 
 # tsc emissions strayed into vendored sources (main points at lib/)
 vendor/*/src/*.js
@@ -29,6 +30,8 @@ packages/*/*/src/*.d.ts.map
 dist-publish/
 collect-out/
 collect-dl/
+dl/
 deploy.config.json
 .keys/
 .pnpm-store/
+website/public/site-assets/

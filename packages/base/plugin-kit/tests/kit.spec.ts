@@ -30,9 +30,13 @@ describe('snapRail manifest schema', () => {
     expect(parsed.permissions).toEqual(['field:write'])
   })
 
-  it('rejects unknown kinds and unknown fields', () => {
+  it('rejects unknown kinds; strips retired fields (legacy-zip tolerance)', () => {
     expect(snapRailManifestSchema.safeParse({ kind: 'widget' }).success).toBe(false)
-    expect(snapRailManifestSchema.safeParse({ kind: 'driver', extra: 1 }).success).toBe(false)
+    // The snapRail level is deliberately not strict: retired vocabulary in
+    // already-published zips (framework/capabilities) strips off instead of
+    // failing the install.
+    const stripped = snapRailManifestSchema.parse({ kind: 'driver', extra: 1, framework: '@scope/x' })
+    expect(stripped).toEqual({ kind: 'driver' })
     expect(snapRailManifestSchema.safeParse({ client: { entry: '' } }).success).toBe(false)
   })
 

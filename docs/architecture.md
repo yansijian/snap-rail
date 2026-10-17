@@ -2,7 +2,8 @@
 
 工业终端的开源底座：OT 现场数据与 IT 工具链在一个"一切皆插件"的宿主里汇合。
 本文是缝（seam）目录与关键决策的单一权威；代码 JSDoc 是各包契约的权威。
-插件平台的阶段性实施清单见 [plugin-platform-plan.md](plugin-platform-plan.md)。
+插件开发与社区发布见 [plugin-development.md](plugin-development.md)；部署、
+组合包与信任模型见 [deploy.md](deploy.md)。
 
 ## 产品宪法
 
@@ -39,19 +40,23 @@
 - **互斥组**（`snapRail.exclusive`）：启用一个成员自动停用同组其他成员
   （一次批量写）。现组：`suite`（套件默认组）、`framework`（框架插件）、
   `store-backend`（store 实现包）。池内包都可经界面启停。
-- **依赖预检**（`snapRail.requires`）：包作者声明依赖——包名条目
-  （`@snap-rail/equipment`）或服务名条目（`service:store`）。启用前
-  正向校验（缺依赖 → bad-request「先安装/启用」；`snapRail.framework`
-  绑定视同包依赖），禁用/卸载前反向校验（还有已启用行依赖时拒绝并
-  列出依赖方）——错序安装不再变成下次开机失败。
+- **依赖预检**（`snapRail.requires`，唯一兼容声明）：包作者声明依赖——
+  包名条目（`@snap-rail/equipment`）、带版本范围的包名条目
+  （`name@range`，如 `@snap-rail/framework-shadcn@^0.2`，语义单源
+  `@snap-rail/util/semver`）或服务名条目（`service:store`）。启用前
+  正向校验（缺依赖或版本不合 → bad-request「先安装/启用」），禁用/卸载
+  前反向校验（还有已启用行依赖时拒绝并列出依赖方）——错序安装不再变成
+  下次开机失败。
 - **分类标记**（`snapRail.category`）：开放字符串，插件作者随意命名
   （中文可用）；管理页按标记原文动态分组，无硬编码枚举。**显示名**
   （`snapRail.title`）：同一哲学的人面名字——行上标题为主、包名小字
   次要，未声明回退包名。`kind` 退居
   纯功能（互斥默认、套件 radio 卡），`layer` 只是仓内门禁词汇。
-- **框架绑定**（`snapRail.framework`）：渲染面 Component 声明它绑定的
-  框架包；框架不匹配不挂载（fail-loud）。**生态断裂是已接受的决策**：
-  换框架 = 换生态，旧 Component 需重写。
+- **框架绑定**：渲染面 Component 在 `requires` 里声明框架包
+  （`@snap-rail/framework-shadcn@^0.2`，绑定即依赖）；框架不匹配装不上
+  /启不了。**生态断裂是已接受的决策**：换框架 = 换生态，旧 Component 需
+  重写。（历史的 `snapRail.framework`/`snapRail.capabilities` 字段已
+  退役：manifest 校验剥离旧 zip 里的残留，宿主永不再读。）
 - 缝纪律与 deepseek-harness 的 core/seam 分类同构：Service Definition
   （规范包）+ Provider（实现/实例包）+ Consumer；消费者只依赖规范包并
   `inject` 对应服务，provider 缺席时依赖它的插件不激活（终端仍可启动，
@@ -101,15 +106,14 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
 | 设置持久化 | `base/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
 | 审计 | `base/audit` | 追加式 JSONL：启停/配置/控制写全记录；`list(filter)` 读回；wire 类型（`AuditEntryInfo`）由它导出 |
 | 工具 | `base/util`、`base/plugin-kit` | Branded、assertNever、`formatClock`/`formatDuration`；`util/manifest` 是层词汇与规则单源。plugin-kit：`snapRail` manifest 词汇表（zod：kind/layer/category/exclusive/framework/requires/clientOnly/client/permissions）、种子两层（`SEED_MODULES` 基础层 + `CONTRIBUTED_SEED_MODULES` 框架贡献层，并集 `CLIENT_EXTERNALS` 是 clientBundle external 面）、tsdown preset（含 CSS 内联、三方库全内联、**种子导入护栏**——种子只准 named/star 导入，default 经 rolldown CJS interop 会变成命名空间对象，构建期硬错）、最终格式打包器 `./pack`（含 exports 映射、clientOnly 形态、**pack 时盖 `snapRail.client.seedAbi` 章**——bundle 真实 require 到的种子 id + 本包解析到的版本 + `SEED_ABI_REVISION`） |
-| 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架引导安装页**（统一插件列表：已装行启用/禁用/卸载 + 插件源目录条目安装/更新按包名合并成一张表，拖拽 zip 与源地址为次级操作；`droppedZipPath` 路径桥；`showBootstrapAfterFailure` 崩溃回退——框架运行时抛异常时重植 root 并带错误横幅回到此页）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
+| 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架朴素插件页**（三合一输入：地址/拖拽/搜索安装 + 已安装列表 + 红色异常提示条；`droppedZipPath` 路径桥；`showBootstrapAfterFailure` 崩溃回退——框架运行时抛异常时重植 root 并把错误带上提示条回到此页）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
 | 持久化规范 | `store/store` | `ctx.store` 的 Service Definition：`register(caller, ns, drizzle表)`；**drizzle 查询构建器即规范**（无裸 SQL/CTE/窗口函数）；命名空间 = 隔离边界；注册即建表 + append-only 加列 |
 | 持久化实现 | `store/store-sqlite` | 参考实现（zip 安装；互斥组 `store-backend`，单活）：node:sqlite + 自写 drizzle 适配器（零原生模块），`data/<ns>.db`，WAL；换后端 = 新实现包替换单活 |
 | 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。zip 声明 `requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影（消费方零改动）。`./contract` 是随应用发布的渲染契约（base 种子），`./driver` 是独立驱动仓库只读的纯类型面 |
 | ModbusTCP 驱动 | 独立仓 `snap-rail-driver-modbus` | 范本驱动（新驱动作者的活文档）：纯协议适配器，块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema）；无存储无渲染端；`requires: ['@snap-rail/equipment']` |
 | EtherNet/IP 驱动 | 独立仓 `snap-rail-driver-enip` | 照 modbus 范本的第二个驱动（首期对接 OMRON NX1P2）：自研轻量 ENIP/CIP 编解码（RegisterSession + SendRRData + Read/Write Tag 符号寻址，无第三方协议库），按已发布全局变量名轮询读写；变量级 CIP 失败只 null 单点（设备保持在线），写前经首读自学类型字；`slot>0` 发背板路由段（留 Logix 兼容门） |
-| UI 框架 | 独立仓 `snap-rail-framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 绑定 `snapRail.framework`；换框架 = 换生态 |
-| 设置外壳 | `ui/settings-station` | 设置对话框壳 + 插件管理页（按 `snapRail.category` 标记动态分组——声明即归组、不问来源；未声明的安装/preset 行落「其他」；**内置来源的行不显示**；分节可折叠 + 全部折叠/展开；条目平铺无组卡，`snapRail.title` 标题为主、包名小字次要；行无来源徽标；套件 radio 卡）+ 主题页；clientOnly zip |
-| 统一设备管理页 | `ui/equipment-station` | equipment 缝的渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 equipment 语义节）；clientOnly zip，`requires` 声明框架与 equipment |
+| UI 框架 | 独立仓 `snap-rail-framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、**设置外壳（对话框 occupant + 主题热应用 + 一方「插件/主题/软件更新」三页——原 `ui/settings-station` 包已退役并入，只装框架即得完整管理界面）**、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 经 `requires` 里的框架条目绑定（绑定即依赖）；换框架 = 换生态 |
+| 统一设备管理页 | `ui/equipment-station` | equipment 缝的渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 equipment 语义节）；经 `ctx.settingsPages` 缝贡献设置页；clientOnly zip，`requires` 声明框架与 equipment |
 | 业务套件 | 独立仓 `snap-rail-suite-terminal-ops` | **套件 = 单包单行，可双面**（互斥组 `suite`，单活）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）；宿主面 `./stats` 是同一场景的持久班产计数（store 缝 + 登录锚定 + `production/stats-changed` 帧），契约面为包内私面——场景逻辑收在套件内，杜绝跨包场景工具；`requires` 声明框架、equipment、`service:store` |
 
 ## 工作站语义（station 层）
@@ -366,8 +370,9 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
 
 ### 四、新增一个页面插件（渲染端住户）
 
-1. manifest 声明 `snapRail.framework: '@snap-rail/framework-shadcn'`
-   （框架绑定，启用预检的一部分）+ `clientOnly: true` + `client:
+1. manifest 在 `requires` 里声明框架包
+   （`'@snap-rail/framework-shadcn@^0.2'`，绑定即依赖、启用预检的一部分）
+   + `clientOnly: true` + `client:
    { entry }`（纯渲染包），或带宿主面的双面包；tsdown 配置加
    `clientBundle('<包名>', 'src/index.tsx')`。
 2. 页面只组合 `@snap-rail/framework-shadcn/ui` 原语（client bundle 经
@@ -464,7 +469,7 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
   appRoot 缺失降级为仅 revision）→ 渲染端 boot 经 `client-config.list`
   附带宿主表、面加载前比对（不符 skip + console.error，框架被拒即回退
   引导页）；缺章的存量 zip 放行（过渡宽限）。
-- **管理页**（settings-station）：按 `snapRail.category` 标记动态分组
+- **管理页**（框架设置外壳的一方「插件」页，随框架 zip 走）：按 `snapRail.category` 标记动态分组
   （开放词汇，作者命名；声明即归组、不问来源——dev overlay 住户也各归
   其标记；未声明落「其他」；**内置来源的行不显示**——全部操作都被
   拒绝的行是噪音，保护语义不变；行上无来源徽标）+ 分节折叠与全部
@@ -488,18 +493,20 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
   `scripts/install-dev-plugins.ts <home>` 把全量 zip 装进任意 home 并启用
   （dogfooding 安装管线）。
 - 更新通道：electron-updater 座位已接线（无 publish 配置时静默）。
-- **线上三件套**：官网 + 插件源 + 更新源全静态（基准内网
-  `http://192.168.1.10/`）；`pnpm run publish` 一条命令装配并同步
-  （流程、组合与社区发布模型见 deploy.md）。插件市场页消费
-  `plugins.remote-list`/`remote-install`；组合走 `recipes.json` + 三个
-  组合方法（缺失插件补装 → 预设落地热生效）；下载带 sha256 校验。
+- **线上四件套**：官网 + 插件源 + 离线组合包 + 更新源全静态（公网基准是
+  GitHub 滚动 Release，内网基准是 Gitea）；`pnpm run publish` 一条命令装配
+  并同步（流程、组合包与社区发布模型见 deploy.md）。插件页消费
+  `plugins.remote-list`/`remote-install`；组合包按内容识别后走
+  `plugins.install-combo`（缺失/需更新的成员逐个安装 → 预设原子落地热
+  生效）；下载带 sha256 校验。官网由 `pnpm run site:build` 从同一份
+  `catalog.json` 生成，卡片直接链到 Release 资产。
 
 ## 一期不做、留座位的
 
 权限执行层（manifest 已声明+安装展示，未拦截）、tool 层规范缝（第三个
-工具出现时再抽象）、i18n、遥测、npm 分发源、deep link 唤起
-安装、snap-rail-market 社区仓的独立 CI、完整开发者文档站、web/头部双入口
-profile、as 化部署、套件热激活（当前重启生效）、套件内条目级裁剪。
+工具出现时再抽象）、i18n、遥测、deep link 唤起安装、完整开发者文档站、
+web/头部双入口 profile、as 化部署、套件热激活（当前重启生效）、套件内
+条目级裁剪。
 # Plugin platform direction
 
 The runtime is split into an Electron shell, a Node Host and a Renderer. The
@@ -509,12 +516,15 @@ only mounts the selected UI framework and consumes contracts over the typed
 bridge. A plugin package may ship a Host face, a Renderer face, or both, but it
 cannot cross the boundary with private imports.
 
-Plugin manifests declare versioned capabilities in addition to package
-requirements. A provider publishes `capabilities.provides`, a consumer uses
-`capabilities.requires`, and enable/install/uninstall checks resolve those
-capabilities before composition. `engines` records the supported snap-rail,
+Plugin manifests declare compatibility through one vocabulary: `requires`
+entries are a package name, a `name@range` version-constrained package (the
+framework binding IS such an entry; range semantics live in
+`@snap-rail/util/semver`), or a `service:` id — enable/install/uninstall
+resolve them before composition. `engines` records the supported snap-rail,
 Host protocol and Renderer ranges so an incompatible artifact is rejected at
-the install boundary.
+the install boundary, and the pack-stamped `client.seedAbi` gates the
+renderer seed contract. (The retired `framework`/`capabilities` fields strip
+off legacy zips at manifest validation and are never read.)
 
 The UI framework exposes a semantic contract (`@snap-rail/framework-shadcn/semantic`)
 on top of the slot registry. Layouts register which semantic slots they render;
@@ -527,19 +537,39 @@ therefore do not own component packages, and a component can move between
 layouts without changing its implementation.
 
 Independent plugin repositories use `@snap-rail/plugin-sdk` and the
-`snap-rail-plugin` CLI. Each generated repository contains its own `AGENTS.md`,
-manifest schema, build preset and release inspection commands. The release
-packer emits only built faces and the trimmed manifest; source files never enter
-the plugin pool.
+`snap-rail-plugin` CLI from public npm. Each generated repository contains its
+own `AGENTS.md`, manifest schema, build preset and release inspection commands.
+The release packer emits only built faces and the trimmed manifest; source files
+never enter the plugin pool. Authors publish their own rolling `feed` release
+and tag the repository `snap-rail-plugin`; there is no central market repo, no
+PR gate and no official aggregation of community bytes.
 
 Installable releases are signed with Ed25519. `META-INF/release.json` contains
 canonical metadata and SHA-256 digests for every payload file;
 `META-INF/signature.json` contains the publisher key id and detached signature.
 The Host loads public keys from the host-owned `trusted-release-keys.json`
-outside the plugin pool and verifies the archive before extraction. A missing
-or unknown key fails closed.
+outside the plugin pool. The install gate is three-state: a signature whose
+key is registered verifies hard (any failure — digest, identity, publisher —
+refuses, it is tamper evidence), an unsigned archive or an unregistered key
+reads as `unverified` and installs under the default `open` policy behind an
+explicit risk confirmation the UI must surface. `plugins.signaturePolicy:
+'strict'` restores the closed-fleet behavior; the `@snap-rail/*` namespace
+refuses unless verified whatever the policy. The trust file is only ever
+edited by a human — an install never writes to it. Update anchoring rides the
+installed envelope's key id: a feed entry signed by a different key is
+flagged `keyChanged`, skipped by the auto-apply sweep, and confirmed by hand.
+Community plugins publish from their own repositories with their own keys;
+discovery is a GitHub topic plus user-added static feeds, and federated catalog
+entries point at the author's release by absolute `url`.
+
+Offline combo packages are plain zips: `recipe.yml` at the root plus one
+signed member zip per referenced package under `plugins/`. The archive carries
+no signature of its own — every member keeps its release envelope, and the
+install transaction lands all missing/outdated members before writing the
+combo preset. Inspection reports the member verdicts and the aggregate missing
+requirements; content (not the URL) decides plugin vs combo.
 
 The Host exposes `plugins.diagnostics` for recovery and support tooling. It
 reports the Host/Renderer protocol versions, enabled packages, unsatisfied
-package or capability requirements, the key ids observed in installed release
+package or service requirements, the key ids observed in installed release
 envelopes, and the latest failed layer refresh.

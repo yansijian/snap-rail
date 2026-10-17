@@ -5,7 +5,8 @@
  * `clientOnly` packages, the client bundle), the built faces themselves, and
  * an `exports` map covering the subpaths pool-resident importers resolve
  * (`./contract` and friends). The settings page's 安装插件, the CLI packer,
- * and the future marketplace all consume the same shape.
+ * the feed publishers, and the offline combo assembler all consume the same
+ * shape.
  *
  * @module @snap-rail/plugin-kit/pack
  */

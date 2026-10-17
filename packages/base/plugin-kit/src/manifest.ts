@@ -39,10 +39,12 @@ export const clientFaceSchema = z.object({
   /**
    * Contributed seed ids (`<package>/<subpath>`) this client face requires
    * from other installed plugins (a framework's primitives, an extension
-   * pack's components). clientBundle externalizes exactly these ids — they
-   * resolve from the shell's seed table at runtime instead of being inlined
-   * as private copies — and enabling the package verifies each provider is
-   * installed and declares the id.
+   * pack's components). Build-time plumbing: `clientBundle` externalizes
+   * exactly these ids so they resolve from the shell's seed table at
+   * runtime instead of being inlined as private copies; the enable precheck
+   * verifies each provider is installed and declares the id. It is not a
+   * compatibility declaration — package/version compatibility rides
+   * `requires`.
    */
   externalSeeds: z.array(z.string().min(1)).optional(),
   /**
@@ -53,6 +55,27 @@ export const clientFaceSchema = z.object({
    */
   seedAbi: seedAbiSchema.optional(),
 }).strict()
+
+/**
+ * Declared dependencies — the single compatibility declaration a plugin
+ * makes, checked before an enable/disable/uninstall lands. Three entry
+ * forms:
+ *
+ * - `name` — a package requirement (`@snap-rail/equipment`): satisfied when
+ *   that package is installed and enabled.
+ * - `name@range` — the same, with a version range on the resolved versions
+ *   (`@snap-rail/framework-shadcn@^0.1`): also requires the installed
+ *   version to satisfy the range (`@snap-rail/util/semver` semantics).
+ *   A renderer face's ecosystem binding IS this form: requiring the
+ *   framework package is what binds a component to it — there is no
+ *   separate framework field.
+ * - `service:id` — a live cordis service (`service:store`), checked
+ *   against the running service table.
+ *
+ * An unmet requirement refuses the write instead of leaving the next boot
+ * to fail.
+ */
+const requiresSchema = z.array(z.string().min(1)).optional()
 
 /** The `snapRail` manifest field's schema. */
 export const snapRailManifestSchema = z.object({
@@ -80,19 +103,7 @@ export const snapRailManifestSchema = z.object({
    * to `'suite'`, frameworks to `'framework'`.
    */
   exclusive: z.string().min(1).optional(),
-  /**
-   * The framework package this renderer face binds to (`@snap-rail/framework-shadcn`).
-   * Component plugins whose binding does not match the active framework do
-   * not mount — replacing a framework is an ecosystem switch, not a hot swap.
-   */
-  framework: z.string().min(1).optional(),
-  /**
-   * Declared dependencies, checked before an enable/disable/uninstall lands:
-   * a plain entry names a package (`@snap-rail/equipment`); a `service:`
-   * prefix names a cordis service (`service:store`). An unmet requirement
-   * refuses the write instead of leaving the next boot to fail.
-   */
-  requires: z.array(z.string().min(1)).optional(),
+  requires: requiresSchema,
   /**
    * True for packages with no host face at all (frameworks, renderer
    * stations): their rows are config-only — never mounted into the host
@@ -103,22 +114,19 @@ export const snapRailManifestSchema = z.object({
   client: clientFaceSchema.optional(),
   /** Permission declarations — shown at install time, enforced later. */
   permissions: z.array(z.string()).optional(),
-  /** Capabilities this plugin provides and requires at runtime. */
-  capabilities: z.object({
-    provides: z.array(z.object({ id: z.string().min(1), version: z.string().min(1) }).strict()).optional(),
-    requires: z.array(z.object({
-      id: z.string().min(1),
-      range: z.string().min(1),
-      optional: z.boolean().optional(),
-    }).strict()).optional(),
-  }).strict().optional(),
   /** Host and renderer versions the built faces support. */
   engines: z.object({
     snapRail: z.string().min(1).optional(),
     hostProtocol: z.string().min(1).optional(),
     renderer: z.string().min(1).optional(),
   }).strict().optional(),
-}).strict()
+})
+// Not `.strict()` on purpose: retired vocabulary in already-published zips
+// (the pre-consolidation `framework` binding and `capabilities` blocks) is
+// stripped at validation and never checked — the same forward tolerance the
+// seedAbi grace uses. New manifests simply stop declaring them; zips
+// carrying them install untouched.
+
 
 /** The validated manifest field. */
 export type SnapRailManifestInput = z.input<typeof snapRailManifestSchema>

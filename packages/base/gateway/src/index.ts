@@ -41,6 +41,19 @@ import {
   type ServerResponse,
 } from '@snap-rail/protocol'
 
+/**
+ * Structural check for a business error: same shape as
+ * `RpcBusinessError` (`name` + the wire `error` payload), so the mapping
+ * survives duplicate protocol module instances between the handler and the
+ * gateway (src/lib mixed graphs).
+ */
+function isBusinessError(cause: unknown): cause is RpcBusinessError {
+  return cause instanceof RpcBusinessError
+    || (cause instanceof Error && cause.name === 'RpcBusinessError'
+      && typeof (cause as { error?: unknown }).error === 'object'
+      && (cause as { error?: unknown }).error !== null)
+}
+
 declare module '@snap-rail/cordis' {
   interface Context {
     rpc: GatewayService
@@ -364,7 +377,11 @@ class GatewayServiceImpl extends Service {
     try {
       value = await route.handler(typedPayload as never, rpcId)
     } catch (cause) {
-      if (cause instanceof RpcBusinessError) {
+      // instanceof alone breaks when handler and gateway load different
+      // copies of the protocol module (the test graph maps @snap-rail/* to
+      // src while the booted stack runs lib) — the name+shape brand keeps
+      // the mapping stable across duplicate module instances.
+      if (isBusinessError(cause)) {
         return respond(rpcId, { ok: false, error: cause.error })
       }
       this.ctx.logger('rpc').error?.(cause)

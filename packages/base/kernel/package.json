@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/client-kernel",
   "description": "Renderer spine: host-link bootstrap, startup page, React root handover",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@snap-rail/gateway": "workspace:^",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "happy-dom": "^20.0.11",

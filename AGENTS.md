@@ -6,14 +6,27 @@ snap-rail 是基于 vendored Cordis 的插件化工业终端：**一切皆插件
 ## 命令
 
 ```sh
+node scripts/setup-external.mjs   # 首次/CI：拆分仓拉到 external/（不要用 pnpm run，依赖自检会先跑）
+                                  # feed 作业用 SNAP_RAIL_EXTERNAL_REPOS 追加 enip/suite 一并打包
 pnpm install
 pnpm run build            # tsc -b (lib/types) + tsdown (lib)；测试前必须构建
 pnpm run typecheck
-pnpm test                 # vitest 全量 + 层依赖门禁
+pnpm test                 # vitest 全量 + 层依赖门禁 + wire-catalog 门禁
 pnpm run verify-vendor-names   # vendored 树无 @deepseek-ai/ 残留
 pnpm app:dev              # Vite dev server + Electron 实机开发
-pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
+pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）；尾接 verify:packaged-app
+                          # 产物门禁——缺运行时包直接红。打包只走这两条单命令串行跑，
+                          # 禁止并发第二个 electron-builder（交错归档会产出缺包安装器）
 ```
+
+主仓对两个拆分仓（framework / driver-modbus）的构建期依赖以 **workspace
+链接** 提供：`external/` gitignored，由 `node scripts/setup-external.mjs`
+克隆（CI 用 `SNAP_RAIL_EXTERNAL_REF` 固定 ref；本地无 GitHub 访问时用
+`SNAP_RAIL_EXTERNAL_LOCAL=1` 从同级目录拷贝工作树）；公开构建因此不需要
+任何私有 registry。`external/` 缺失时 `pnpm install` 会解析不到这两个
+包——先跑 setup。feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到四个仓
+（再加 enip / suite），从源码构建并签名全部一方插件，不依赖拆分仓自己的
+Release 节奏。
 
 ## 分层模型（无脊柱名单）
 
@@ -39,9 +52,12 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   `apps/desktop/dev/builtins.dev.cordis.yml`
   覆盖 base 行（永不随包发布）；可安装插件（框架/驱动/套件）dev 与生产
   同路——经 `install-dev-plugins` 把 zip 装进 dev home 的插件池。
-- **依赖预检（`snapRail.requires`）**：包名条目（`@snap-rail/equipment`）
-  或服务名条目（`service:store`）；启用正向校验（缺 → 拒绝）、禁用/卸载
-  反向校验（有依赖方 → 拒绝），`snapRail.framework` 绑定视同依赖——
+- **依赖预检（`snapRail.requires`，唯一兼容声明）**：三种条目——包名
+  （`@snap-rail/equipment`）、带版本范围的包名（`name@range`，如
+  `@snap-rail/framework-shadcn@^0.2`，语义单源
+  `@snap-rail/util/semver`）、服务名（`service:store`）；启用正向校验
+  （缺/版本不合 → 拒绝）、禁用/卸载反向校验（有依赖方 → 拒绝）。
+  **框架绑定就是一条 requires 条目**——没有独立的 framework 字段；
   错序安装不再变成下次开机失败。
 - **分类与显示名（`snapRail.category` / `snapRail.title`）**：开放字符串、
   插件作者随意命名（中文可用）；管理页按标记原文动态分组——声明即归组、
@@ -68,7 +84,7 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   zip 安装、`requires: ['service:store']`；`./rpc` 桥以子路径行
   （`@snap-rail/equipment/rpc`）一并启用，`./contract` 是随应用发布的
   base 种子。驱动（modbus/…）是实例插件，**多活并存**，零渲染端代码、
-  零自有存储，住独立仓（org `snap-rail`；新驱动照抄
+  零自有存储，住独立仓（GitHub `yansijian`；新驱动照抄
   `snap-rail-driver-modbus`，见 docs/split-runbook.md）。统一「设备管理」设置页在
   `@snap-rail/equipment-station`（ui 层）。点位地址 = (device, group, name)
   三元组；wire 名 `equipment.*`、帧 `equipment/*`。
@@ -76,12 +92,15 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   `snap-rail-framework-shadcn`，zip 安装、clientOnly、单活，`snapRail.exclusive: 'framework'`），接管全套 UI
   栈——槽位词汇（`ctx.uiSlots`）、renderer runtime + Shell、shadcn 共享
   原语 + 主题令牌（预编译 tailwind 输出随 zip 内联）、settings/session/
-  variables/workflows 服务、fallback 布局；client 面把全部面贡献为共享
-  种子（`client.seeds`）。**没有框架面启用时，kernel 的引导安装页**
-  （拖拽 zip → 确认 → 安装 → 启用 → 重启）就是全部界面。**生态断裂是
-  已接受的决策**：Component 插件在 manifest 声明
-  `snapRail.framework: '@snap-rail/framework-shadcn'`，框架不匹配不挂载
-  （fail-loud）；换框架 = 换生态。Component 永不互相 import，只占槽。
+  variables/workflows 服务、**设置外壳（对话框 occupant + 主题热应用 +
+  一方「插件/主题/软件更新」三页，原 `ui/settings-station` 包已退役并入
+  ——只装框架即得完整管理界面）**、fallback 布局；client 面把全部面贡献为共享
+  种子（`client.seeds`）。**没有框架面启用时，kernel 的朴素插件页**
+  （三合一输入：地址/拖拽/搜索 + 已安装列表 + 红色异常提示条）就是全部
+  界面。**生态断裂是已接受的决策**：Component 插件在 manifest 的
+  `requires` 里声明框架包（`'@snap-rail/framework-shadcn@^0.2'`，绑定即
+  依赖），框架不匹配装不上/启不了；换框架 = 换生态。Component 永不互相
+  import，只占槽。
 - **tool 层**：暂无规范缝，工具互不依赖（门禁强制）。暂无住户——场景私有
   逻辑收进套件（见 suite 层），不再拆跨包场景工具。
 - **suite 层**：单包单行、可双面（宿主面 + 渲染面）、单活（`snapRail.exclusive: 'suite'`
@@ -146,18 +165,38 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
   文件：推送 v2 预设不动用户手编。预设引用的池包拒绝卸载（行会悬空，
   组合即失败）；仅被预设引用的行在管理页显示「预设」来源，可被用户行
   覆盖开关。
-- **插件市场与组合（纯静态 feed + 本地强校验）**：线上三件套（官网/
-  插件源/更新源）零服务器逻辑，基准内网 `http://192.168.1.10/`；发布
-  `pnpm run publish` 装配并同步（deploy.config.json 配目标，`--skip-sync`
-  只装配）。市场 = feed 静态目录（`index.json` + zip，条目从发行 manifest
-  回读并带 sha256/size，下载先验哈希；wire 只传插件名，`file` 强制纯
-  文件名）。**组合（recipe）** = `recipes.json`（id/version/title/kind
-  base|scenario/file）+ 每组合一份 yml（strict，与 plugins.yml 完全
-  同形）；一键安装 = 缺失插件逐个走标准安装管线 → 全部成功才原子写
-  `<home>/presets/recipe-<id>.yml`（预设层热生效、卸载保护自动覆盖），
-  「移除」只删预设文件；主仓 `recipes/<id>/` 是一方首发（standard-base、
-  production-board），社区组合与插件住 snap-rail-market 仓 PR 上架
-  （包名禁 `@snap-rail/*`，publish `--market` 合流）。
+- **插件源与离线组合包（纯静态 feed + 去中心化社区分发，滚动 Release 托管）**：
+  发布形态是固定 tag（默认 `feed`）的滚动 Release——资产平铺（index.json、
+  catalog.json、插件 zip、组合 `<id>.zip`、latest.yml、setup.exe 同级），
+  **一个基址同时服务插件源与应用更新源**；目标两类同机制（deploy.config.json
+  `targets[]`：gitea 内网基准 / github 公网），`pnpm run publish` 装配并删旧
+  建新（`--skip-sync` 只装配；`--collect <dir>` 只合并**一方**拆分仓产物）。
+  源 = Release 静态资产（`index.json` + zip，条目从发行 manifest 回读并带
+  sha256/size/signature.keyId，下载先验哈希；wire 只传插件名）。**多源**：
+  `plugins.feedUrls` 是源列表（旧单键 `plugins.feedUrl` 读作单元素过渡；
+  出厂默认经 `apps/desktop/resources/defaults.json`，CI 打包前
+  `scripts/stamp-feed-default.ts` 盖章；用户在插件页 ⚙ 编辑的列表存
+  settings.json、优先于默认）——搜索合并各源、条目带来源标签、同名取最高
+  版本。**联邦条目**：index.json 条目可用绝对 `url` 替代同场 `file`——聚合者
+  只收一行元数据、zip 留在作者自己的 Release，下载仍按条目 sha256 硬校验。
+  **指定地址直装**：`plugins.inspect-from-url` 是唯一接受客户端自选 URL 的
+  面——有界（仅 http(s)、超时、大小上限）。**组合包（combo）**：根目录
+  `recipe.yml`（`id`/`version`/`title`/`kind`/`description`/`plugins`，行与
+  `plugins.yml` 同形）+ `plugins/*.zip`（每个被引用真实包名一个**已签名**
+  成员 zip，子路径行归其包）+ 可选 `readme.md`；没有 `bundle.json`，组合包
+  本身**不签名**（信任随成员走）。客户端按内容识别——根目录 `package.json`
+  且无 `recipe.yml` = 插件；`recipe.yml` 且无 `package.json` = 组合；两者都
+  有/都没有 = 报错。`plugins.inspect` 返回 plugin/combo 联合预览；安装走
+  `plugins.install-combo`：一个池事务里安装缺失或需更新的成员（同版本/本机
+  更新版本保留），全部成功后原子写 `<home>/presets/recipe-<id>.yml` 并热
+  应用；任何失败恢复池与旧预设。**没有组合管理 UI**——删预设文件即停用。
+  主仓 `recipes/<id>/` 是一方首发，官网从 `catalog.json` 生成组合卡并直接
+  下载 `<id>.zip`。**社区发布模型（去中心化）**：插件住作者自己的仓库、用
+  作者自己的 Ed25519 密钥签名、发布为自仓滚动 Release（工作流模板
+  `docs/plugin-publish-ci.yml`）；发现 = GitHub topic `snap-rail-plugin` +
+  任意用户自加静态源；**不存在集中市场仓、没有 PR 上架、官方不转存社区
+  字节**。公开 SDK 闭包（plugin-sdk/plugin-kit/util/protocol/store/
+  equipment/cordis）发布到公共 npm。
 - **简单持久化配置走 settings.json**：键 `域.名`，经 `settings.get/set`
   RPC 存取宿主原子 JSON；写后 `settings/changed` 帧广播，消费方当场热
   应用。要即时生效的渲染端配置走这条路，不要改 plugins.yml 行（那要
@@ -227,15 +266,29 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）
 
 - Host 是唯一执行插件安装、签名验证、存储、设备通讯和 RPC 的进程面；
   Electron 只做窗口、IPC 和崩溃恢复，Renderer 只消费契约和挂载 UI。
-- 能力是版本化插件接口。manifest 必须声明
-  `snapRail.capabilities.provides/requires` 和支持的 `snapRail.engines`；
-  安装、启用、禁用、卸载都要经过能力解析，不能把缺依赖留给下次启动。
+- 兼容声明只有一套：`snapRail.requires`（包名 / `name@range` /
+  `service:`）加 `snapRail.engines`（宿主/协议/渲染端版本范围）与
+  `snapRail.client.seedAbi`（渲染端 ABI 章，pack 自动盖章）。历史的
+  `snapRail.framework`/`snapRail.capabilities` 词汇已退役——旧 zip 里
+  残留的这类字段在 manifest 校验时被剥离（非 strict 放行，与 seedAbi
+  宽限同策略），宿主永不再读它们。安装、启用、禁用、卸载都过 requires
+  解析，不能把缺依赖留给下次启动。
 - UI 插件按 `@snap-rail/framework-shadcn/semantic` 的语义契约注册
   view、layout、navigation；槽位使用 `UI_SLOT_IDS` 的稳定命名，禁止把
   某个布局包名当作组件依赖。
 - 独立插件仓库使用 `@snap-rail/plugin-sdk` 和 `snap-rail-plugin` CLI，
   仓库根部必须有自己的 `AGENTS.md`。插件 Agent 只读 SDK 类型和该指南，
   不需要进入本仓库或复制 `packages/*/src`。
-- 发布包必须带 Ed25519 `META-INF/release.json`、`META-INF/signature.json`；
-  Host 只信任 `<home>/trusted-release-keys.json` 中的公钥，缺少签名、摘要
-  不匹配或 key id 未登记都拒绝安装。
+- **签名是身份锚与防篡改，不是准入门槛**：发行 zip 携带 Ed25519
+  `META-INF/release.json`、`META-INF/signature.json`（一方发布链强制签名；
+  社区作者自持钥签名）。Host 信任 `<home>/trusted-release-keys.json` ∪
+  出厂 `resources/trusted-release-keys.json`（本机按 keyId 覆盖；文件住池外
+  ——插件永不给自己授权；安装流程**永不自动写信任文件**）。安装门三态：
+  受信 key → verified（验证失败=篡改证据，硬拒）；无签名或 key 未登记 →
+  unverified（默认 open 策略放行，预览显著警告 + 额外一步风险确认）；
+  `plugins.signaturePolicy: 'strict'` 恢复只认受信签名。`@snap-rail/*`
+  命名空间无论策略必须 verified（防冒名）。**更新 keyId 锚定**：feed 条目
+  签名 key 与已装包携带的不同（`keyChanged`）→ 后台自动更新跳过，手动更新
+  先弹密钥变更确认。签名的诚实价值 = 完整性（直链唯一防篡改锚）+ 更新链
+  锚定 + 可追责的发布者身份；恶意但签名合法的插件靠预览的权限/来源展示 +
+  客户自验。

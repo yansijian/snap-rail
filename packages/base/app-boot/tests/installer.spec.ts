@@ -1,9 +1,12 @@
+import { generateKeyPairSync } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
+import { signReleaseFiles, type TrustedReleaseKey } from '@snap-rail/plugin-kit/sign'
 import { compareVersions, InstallError, installPluginFromZip, installedVersionOf, inspectPluginZip, pluginDataFile, uninstallPlugin } from '../src/installer.ts'
+import { loadTrustedReleaseKeys } from '../src/trust.ts'
 
 function makeZip(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'snap-rail-zip-'))
@@ -290,6 +293,165 @@ describe('seed ABI precheck', () => {
     })
     const updated = installPluginFromZip(plain, pool, { seedAbi: hostAbi })
     expect(updated.updated).toBe(true)
+    rmSync(base, { recursive: true, force: true })
+  })
+})
+
+describe('signature gate (three-state open policy)', () => {
+  /** A fresh throwaway pool per call — installs never collide across tests. */
+  function pool(): string {
+    return join(mkdtempSync(join(tmpdir(), 'snap-rail-gate-')), 'plugins')
+  }
+  /** An Ed25519 key pair plus the trust-store row that trusts its public half. */
+  function makeKey(keyId: string, publisher?: string): { row: TrustedReleaseKey, privateKeyPem: string } {
+    const { publicKey, privateKey } = generateKeyPairSync('ed25519')
+    return {
+      row: {
+        keyId,
+        publicKey: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+        ...(publisher !== undefined ? { publisher } : {}),
+      },
+      privateKeyPem: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
+    }
+  }
+
+  /** A plugin zip, Ed25519-signed when a key is given. */
+  function releaseZip(options: {
+    name?: string
+    version?: string
+    keyId?: string
+    privateKeyPem?: string
+    tamper?: boolean
+  }): string {
+    const name = options.name ?? '@scope/demo-plugin'
+    const version = options.version ?? '1.0.0'
+    let files: Record<string, Uint8Array> = {
+      'package.json': new TextEncoder().encode(JSON.stringify({
+        name, version, type: 'module', main: 'lib/index.js',
+      })),
+      'lib/index.js': new TextEncoder().encode('export default { apply() {} }\n'),
+    }
+    if (options.keyId !== undefined && options.privateKeyPem !== undefined) {
+      files = signReleaseFiles(files, {
+        name, version, keyId: options.keyId, privateKey: options.privateKeyPem,
+        // The trusted key's publisher check compares against this claim —
+        // the tests sign as the org they trust.
+        publisher: 'snap-rail-org',
+      })
+    }
+    // Tampering swaps bytes after signing — the digest table no longer
+    // matches, exactly what a modified-in-transit archive looks like.
+    if (options.tamper === true) {
+      files['lib/index.js'] = new TextEncoder().encode('export default { tampered: true }\n')
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'snap-rail-signed-'))
+    const path = join(dir, 'plugin.zip')
+    writeFileSync(path, zipSync(files))
+    return path
+  }
+
+  it('verifies a trusted-key signature and reports the publisher', () => {
+    const org = makeKey('org-2026', 'snap-rail-org')
+    const zip = releaseZip({ keyId: 'org-2026', privateKeyPem: org.privateKeyPem })
+    const plugin = inspectPluginZip(zip, { trustedKeys: [org.row] })
+    expect(plugin.signature).toEqual({ state: 'verified', keyId: 'org-2026', publisher: 'snap-rail-org' })
+    expect(installPluginFromZip(zip, pool(), { trustedKeys: [org.row] }).name).toBe('@scope/demo-plugin')
+  })
+
+  it('hard-refuses when a trusted key verifies against tampered bytes', () => {
+    const org = makeKey('org-2026', 'snap-rail-org')
+    const zip = releaseZip({ keyId: 'org-2026', privateKeyPem: org.privateKeyPem, tamper: true })
+    try {
+      inspectPluginZip(zip, { trustedKeys: [org.row] })
+      expect.unreachable()
+    } catch (cause) {
+      expect((cause as InstallError).kind).toBe('bad-signature')
+    }
+  })
+
+  it('unsigned archives read unverified: open installs, inspect surfaces the verdict', () => {
+    const org = makeKey('org-2026', 'snap-rail-org')
+    const zip = releaseZip({})
+    const plugin = inspectPluginZip(zip, { trustedKeys: [org.row] })
+    expect(plugin.signature).toEqual({ state: 'unverified', reason: 'unsigned' })
+    // Open policy (the default) lets it through…
+    expect(installPluginFromZip(zip, pool(), { trustedKeys: [org.row] }).name).toBe('@scope/demo-plugin')
+    // …and strict refuses.
+    try {
+      installPluginFromZip(zip, pool(), { trustedKeys: [org.row], signaturePolicy: 'strict' })
+      expect.unreachable()
+    } catch (cause) {
+      expect((cause as InstallError).kind).toBe('bad-signature')
+      expect((cause as InstallError).message).toContain('严格签名策略')
+    }
+  })
+
+  it('an unregistered key reads unverified: open installs, strict refuses', () => {
+    const org = makeKey('org-2026', 'snap-rail-org')
+    const author = makeKey('author-2026')
+    const zip = releaseZip({ keyId: 'author-2026', privateKeyPem: author.privateKeyPem })
+    const plugin = inspectPluginZip(zip, { trustedKeys: [org.row] })
+    expect(plugin.signature).toEqual({ state: 'unverified', keyId: 'author-2026', reason: 'unknown-key' })
+    expect(installPluginFromZip(zip, pool(), { trustedKeys: [org.row] }).name).toBe('@scope/demo-plugin')
+    expect(() => installPluginFromZip(zip, pool(), { trustedKeys: [org.row], signaturePolicy: 'strict' }))
+      .toThrow(/author-2026/)
+  })
+
+  it('the @snap-rail/* namespace refuses unless verified, whatever the policy', () => {
+    const org = makeKey('org-2026', 'snap-rail-org')
+    const zip = releaseZip({ name: '@snap-rail/rogue' })
+    try {
+      installPluginFromZip(zip, pool(), { trustedKeys: [org.row] })
+      expect.unreachable()
+    } catch (cause) {
+      expect((cause as InstallError).kind).toBe('bad-signature')
+      expect((cause as InstallError).message).toContain('@snap-rail/*')
+    }
+    // The dev path (no trust store) stays ungated.
+    expect(installPluginFromZip(zip, pool()).name).toBe('@snap-rail/rogue')
+    // The org's own signature satisfies the namespace under the open policy.
+    const signed = releaseZip({ name: '@snap-rail/official-ext', keyId: 'org-2026', privateKeyPem: org.privateKeyPem })
+    expect(installPluginFromZip(signed, pool(), { trustedKeys: [org.row] }).name).toBe('@snap-rail/official-ext')
+  })
+})
+
+describe('loadTrustedReleaseKeys (factory ∪ home)', () => {
+  /** A throwaway home + resources pair with an Ed25519 public key each. */
+  function keyDoc(kid: string, publisher: string): string {
+    const { publicKey } = require('node:crypto').generateKeyPairSync('ed25519')
+    return JSON.stringify({ keys: [{ keyId: kid, publisher, publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString() }] })
+  }
+
+  it('merges the factory layer with the home layer; home wins on keyId', () => {
+    const base = mkdtempSync(join(tmpdir(), 'snap-rail-trust-'))
+    const home = join(base, 'home')
+    const resources = join(base, 'resources')
+    mkdirSync(home, { recursive: true })
+    mkdirSync(resources, { recursive: true })
+    // Neither layer: the empty store still fails closed.
+    expect(loadTrustedReleaseKeys(home, resources)).toEqual([])
+    // Factory alone.
+    writeFileSync(join(resources, 'trusted-release-keys.json'), keyDoc('org', 'snap-rail'))
+    let keys = loadTrustedReleaseKeys(home, resources)
+    expect(keys.map(key => key.keyId)).toEqual(['org'])
+    // Home adds one and overrides the factory publisher remap for another.
+    writeFileSync(join(home, 'trusted-release-keys.json'), JSON.stringify({
+      keys: [
+        { keyId: 'org', publisher: 'site-remap', publicKeyPem: JSON.parse(keyDoc('org', 'x')).keys[0].publicKeyPem },
+        { keyId: 'site', publisher: 'site', publicKeyPem: JSON.parse(keyDoc('site', 'x')).keys[0].publicKeyPem },
+      ],
+    }))
+    keys = loadTrustedReleaseKeys(home, resources)
+    expect(keys.map(key => key.keyId).sort()).toEqual(['org', 'site'])
+    expect(keys.find(key => key.keyId === 'org')?.publisher).toBe('site-remap')
+    rmSync(base, { recursive: true, force: true })
+  })
+
+  it('skips the factory layer when no resources dir is given', () => {
+    const base = mkdtempSync(join(tmpdir(), 'snap-rail-trust-'))
+    writeFileSync(join(base, 'trusted-release-keys.json'), keyDoc('only', 'home'))
+    const keys = loadTrustedReleaseKeys(base)
+    expect(keys.map(key => key.keyId)).toEqual(['only'])
     rmSync(base, { recursive: true, force: true })
   })
 })

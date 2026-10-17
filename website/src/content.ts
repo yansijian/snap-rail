@@ -7,13 +7,16 @@
  * Future i18n: translate the HTML sections and this file as one unit.
  */
 
-/** Canonical project links (Gitee is the source home; mirrors may exist). */
+/** Canonical project links (GitHub is the public source home; the intranet
+ * Gitea continues as a mirror/build host). */
 export const SITE = {
-  repo: 'https://gitee.com/yansijian/snap-rail',
-  repoPush: 'https://gitee.com/yansijian/snap-rail.git',
-  docs: 'https://gitee.com/yansijian/snap-rail/blob/master/docs/architecture.md',
-  readme: 'https://gitee.com/yansijian/snap-rail#readme',
-  releases: 'https://gitee.com/yansijian/snap-rail/releases',
+  repo: 'https://github.com/yansijian/snap-rail',
+  repoPush: 'https://github.com/yansijian/snap-rail.git',
+  docs: 'https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md',
+  readme: 'https://github.com/yansijian/snap-rail#readme',
+  releases: 'https://github.com/yansijian/snap-rail/releases',
+  /** The discovery marker every community plugin repo carries. */
+  topic: 'https://github.com/topics/snap-rail-plugin',
   license: 'Apache-2.0',
 } as const;
 
@@ -21,23 +24,24 @@ export const SITE = {
 export const KIND_META: Record<string, { label: string }> = {
   suite: { label: '业务套件' },
   driver: { label: '通讯驱动' },
+  framework: { label: '界面框架' },
   tool: { label: '工具插件' },
   plugin: { label: '插件' },
 };
 
-/** The three-step hands-on shown on the plugins page (mirrors the real
- * settings page and the recipes page's per-combination guides). */
+/** The offline-first hands-on shown on the plugins page. An industrial
+ * intranet PC downloads here; the terminal itself may never see the web. */
 export const INSTALL_STEPS: { title: string; detail: string }[] = [
   {
-    title: '下载安装终端',
-    detail: '从下方下载 Windows 安装包并安装；已有终端可跳过这一步。',
+    title: '在联网 PC 下载',
+    detail: '下载 Windows 安装包，以及要装的组合包或单插件 zip；组合包已带上全部成员插件。',
   },
   {
-    title: '配置插件源',
-    detail: '设置 → 插件市场，填入插件源地址（内网如 http://192.168.1.10/snap-rail/plugins/），保存即生效。',
+    title: '拷进离线现场',
+    detail: '用 U 盘/堡垒机把 zip 与安装包带进内网。终端不需要访问任何插件服务器。',
   },
   {
-    title: '装组合或挑插件',
-    detail: '「组合」区一键安装基座/场景组合；「插件」区按分类浏览，逐个安装。',
+    title: '拖入终端安装',
+    detail: '装好终端后把 .zip 拖进「插件」页（或引导页）：单插件走预览确认；组合包自动批量安装成员并写入组合预设。',
   },
 ];

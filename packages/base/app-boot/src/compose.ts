@@ -146,37 +146,16 @@ export function mergeLayers(layers: readonly UserLayer[]): UserLayer {
 }
 
 /**
- * The preset file name a feed-served combination (recipe) lands as. The
- * `recipe-` prefix keeps recipe files from ever colliding with the numbered
- * factory presets (`10-xxx.preset.yml`); both live in the same stacked
- * preset directories and both hot-apply on write.
+ * The preset file name an installed combo lands as. The `recipe-` prefix
+ * keeps combo files from ever colliding with the numbered factory presets
+ * (`10-xxx.preset.yml`); both live in the same stacked preset directories
+ * and both hot-apply on write.
  *
- * @param id - the recipe's stable id (`standard-base`, …).
+ * @param id - the combo's stable id (`standard-base`, …).
  * @returns the preset file name carrying the combination.
  */
 export function recipePresetFileName(id: string): string {
   return `recipe-${id}.yml`
-}
-
-/**
- * The recipe ids already landed as preset files under the given directories:
- * every `recipe-<id>.yml`/`.yaml` file names its recipe. This — not any
- * in-memory state — is the truth of "which combinations are installed", so
- * a hand-deleted preset file also reads as removed.
- *
- * @param dirs - preset directories; missing ones contribute nothing.
- * @returns the applied recipe ids.
- */
-export function appliedRecipeIds(dirs: readonly string[]): Set<string> {
-  const ids = new Set<string>()
-  for (const dir of dirs) {
-    if (!existsSync(dir)) continue
-    for (const file of readdirSync(dir)) {
-      const match = /^recipe-([a-z0-9-]+)\.ya?ml$/.exec(file)
-      if (match !== null) ids.add(match[1]!)
-    }
-  }
-  return ids
 }
 
 /**
@@ -374,7 +353,6 @@ export function packageManifestOf(
     if (descriptor.title !== undefined) manifest.title = descriptor.title
     if (descriptor.category !== undefined) manifest.category = descriptor.category
     if (descriptor.exclusive !== undefined) manifest.exclusive = descriptor.exclusive
-    if (descriptor.framework !== undefined) manifest.framework = descriptor.framework
     if (descriptor.requires !== undefined) manifest.requires = descriptor.requires
     if (descriptor.clientOnly === true) manifest.clientOnly = true
     if (descriptor.clientEntry !== undefined || descriptor.clientSeeds !== undefined || descriptor.externalSeeds !== undefined) {
@@ -384,7 +362,6 @@ export function packageManifestOf(
         ...descriptor.externalSeeds !== undefined ? { externalSeeds: descriptor.externalSeeds } : {},
       }
     }
-    if (descriptor.capabilities !== undefined) manifest.capabilities = descriptor.capabilities
     if (descriptor.engines !== undefined) manifest.engines = descriptor.engines
     return Object.keys(manifest).length > 0 ? manifest : undefined
   }

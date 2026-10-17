@@ -20,6 +20,10 @@ function basePackageOf(seedId: string): string {
   return seedId.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0]!
 }
 
+/** Resolved tables by app root — the tree's versions are immutable for the
+ * app's lifetime, so every `client-config.list` shares one resolution. */
+const resolved = new Map<string, Promise<SeedAbi>>()
+
 /**
  * Resolve the live seed table from `appRoot`'s dependency tree: one version
  * per seed id whose base package resolves from there (dev = the workspace,
@@ -27,11 +31,23 @@ function basePackageOf(seedId: string): string {
  * absent — the comparison covers the declared∩live intersection, so an
  * absent host version never fails a face by itself. A missing appRoot (test
  * worlds, odd hosts) yields the revision with an empty table — the
- * handshake degrades to revision-equality only.
+ * handshake degrades to revision-equality only. Results are memoized per
+ * appRoot: resolution is fs-bound and the table cannot change while the
+ * process lives.
  *
  * @param appRoot - the application root directory (`app.getAppPath()`).
  */
-export async function resolveSeedAbi(appRoot: string | undefined): Promise<SeedAbi> {
+export function resolveSeedAbi(appRoot: string | undefined): Promise<SeedAbi> {
+  const key = appRoot === undefined || appRoot === '' ? '' : appRoot
+  let table = resolved.get(key)
+  if (table === undefined) {
+    table = resolveSeedAbiUncached(appRoot)
+    resolved.set(key, table)
+  }
+  return table
+}
+
+async function resolveSeedAbiUncached(appRoot: string | undefined): Promise<SeedAbi> {
   if (appRoot === undefined || appRoot === '') return { revision: SEED_ABI_REVISION, versions: {} }
   const versions: Record<string, string> = {}
   try {

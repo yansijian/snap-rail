@@ -12,6 +12,9 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 describe('equipment built host entries', () => {
+  // The child boots the real host stack; under the full suite's parallel
+  // load that easily passes vitest's 5s default — the probe's own spawn
+  // timeout (30s) stays the honest bound, this only stops vitest racing it.
   it('maps seam failures to readable wire errors across the entry boundary', () => {
     const run = spawnSync(process.execPath,
       [fileURLToPath(new URL('./built-entries.probe.mjs', import.meta.url))],
@@ -20,5 +23,5 @@ describe('equipment built host entries', () => {
       throw new Error(`probe failed (${run.status}):\n${run.stderr || run.stdout}`)
     }
     expect(run.stdout).toContain('BUILT-ENTRIES-OK')
-  })
+  }, 60_000)
 })

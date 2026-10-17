@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/app-boot",
-  "description": "Host boot glue: plugin pool scan, two-layer composition, boot tree, layer admin; ./contract is the plugins+update wire contract; ./invariant the layer-check sidecar",
-  "version": "0.1.0",
+  "description": "Host boot glue: plugin pool scan, two-layer composition, boot tree, layer admin, offline combo install; ./contract is the plugins+update wire contract; ./invariant the layer-check sidecar",
+  "version": "0.1.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -49,6 +49,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@snap-rail/plugin-kit": "workspace:^",
+    "@snap-rail/util": "workspace:^",
     "fflate": "^0.8.3",
     "js-yaml": "^4.2.0"
   },

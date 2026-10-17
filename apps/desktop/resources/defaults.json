@@ -1,0 +1,5 @@
+{
+  "plugins.feedUrls": [
+    "https://github.com/yansijian/snap-rail/releases/download/feed/"
+  ]
+}

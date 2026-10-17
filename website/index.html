@@ -29,16 +29,16 @@
         <div class="ml-auto flex items-center gap-1">
           <a data-nav="index" class="nav-link hidden sm:inline-flex" href="./index.html">主页</a>
           <a data-nav="plugins" class="nav-link hidden whitespace-nowrap sm:inline-flex" href="./plugins.html">插件生态</a>
-          <a data-nav="recipes" class="nav-link whitespace-nowrap" href="./recipes.html">组合示例</a>
+          <a data-nav="recipes" class="nav-link whitespace-nowrap" href="./recipes.html">组合套件</a>
           <a
             class="nav-link hidden sm:inline-flex"
-            href="https://gitee.com/yansijian/snap-rail/blob/master/docs/architecture.md"
+            href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md"
             target="_blank"
             rel="noopener"
             >文档</a
           >
-          <a class="btn btn-ghost ml-2 whitespace-nowrap px-3 py-2 text-sm sm:px-3.5" href="https://gitee.com/yansijian/snap-rail" target="_blank" rel="noopener">
-            ⭐ Gitee</a
+          <a class="btn btn-ghost ml-2 whitespace-nowrap px-3 py-2 text-sm sm:px-3.5" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">
+            ⭐ GitHub</a
           >
         </div>
       </nav>
@@ -57,7 +57,7 @@
             </p>
             <div class="mt-6 flex flex-wrap items-center justify-center gap-4">
               <a class="btn btn-primary" href="./plugins.html#download"> 下载 Windows 安装包</a>
-              <a class="btn btn-ghost" href="./recipes.html"> 看组合示例 →</a>
+              <a class="btn btn-ghost" href="./recipes.html"> 看组合套件 →</a>
             </div>
             <p class="mt-4 font-mono text-xs text-muted-foreground/60">向下滚动，看数据从电柜走向终端 ↓</p>
           </div>
@@ -176,8 +176,8 @@
                         <g data-module style="--from-dx: -74px; --from-dy: -183px">
                           <rect width="64" height="96" rx="5" fill="url(#modGrad)" stroke="#3d5189" stroke-width="1.5" />
                           <circle class="led" cx="10" cy="11" r="3.5" fill="#d29922" />
-                          <text x="56" y="14" text-anchor="end" font-size="6.5" fill="#8b949e" font-family="Consolas, monospace">AI</text>
-                          <text x="32" y="36" text-anchor="middle" font-size="9" fill="#ced8e3" font-family="Consolas, monospace">forge</text>
+                          <text x="56" y="14" text-anchor="end" font-size="6.5" fill="#8b949e" font-family="Consolas, monospace">APP</text>
+                          <text x="32" y="36" text-anchor="middle" font-size="9" fill="#ced8e3" font-family="Consolas, monospace">suite</text>
                           <rect x="12" y="46" width="40" height="2.5" fill="#223046" />
                           <rect x="12" y="54" width="40" height="2.5" fill="#223046" />
                           <rect x="12" y="62" width="40" height="2.5" fill="#223046" />
@@ -428,7 +428,7 @@
                   <span class="badge text-primary">snap-rail</span>
                   <h3 class="mt-3 font-semibold">文件即接口 + AI</h3>
                   <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    plugins.yml 可被页面、手编、Agent 编辑；forge 让 AI 当场生成插件。
+                    plugins.yml 可被页面、手编、Agent 编辑；驱动、套件、组合包都是同一种签名 zip。
                   </p>
                 </div>
               </div>
@@ -506,7 +506,7 @@
                 <circle cx="16" cy="18" r="4" fill="#3fb950" />
                 <text x="164" y="22" text-anchor="end" font-size="10" fill="#8b949e" font-family="Consolas, monospace">SLOT-3</text>
                 <text x="90" y="48" text-anchor="middle" fill="#ced8e3" font-size="16" font-weight="600">工具插件</text>
-                <text x="90" y="66" text-anchor="middle" font-size="10.5" fill="#8b949e" font-family="Consolas, monospace">forge · AI 创造</text>
+                <text x="90" y="66" text-anchor="middle" font-size="10.5" fill="#8b949e" font-family="Consolas, monospace">combo · 离线安装</text>
                 <g fill="#223046">
                   <rect x="30" y="98" width="120" height="3" />
                   <rect x="30" y="110" width="120" height="3" />
@@ -606,43 +606,27 @@
 
           <div class="grid items-center gap-10 md:grid-cols-2">
             <div class="reveal">
-              <p class="kicker">工具 · forge</p>
-              <h3 class="mt-3 text-2xl font-bold">跟 AI 说一句话，插件当场跑起来</h3>
+              <p class="kicker">离线交付 · 组合包</p>
+              <h3 class="mt-3 text-2xl font-bold">一个 zip 带齐整个场景，拖进内网终端就装完</h3>
               <p class="mt-4 leading-relaxed text-muted-foreground">
-                AI 创造工作室把需求直接变成运行时插件：流式对话、五件工具读写宿主、版本化存于独立分库；不满意当场改，满意一键导出可安装
-                zip。network / eval-code / store 权限安装时明示。
+                组合包是普通 zip：根目录 <code class="font-mono text-xs">recipe.yml</code> 写清场景与插件行，
+                <code class="font-mono text-xs">plugins/</code> 下逐个签名的一方差件包随包携带。终端按内容识别组合形式，
+                批量安装缺失或需更新的成员（本机更新的版本保留），最后原子写入组合预设——全程不需要访问任何插件服务器。
+                内网 PC 只需在联网侧下载这一个文件。
               </p>
             </div>
-            <div class="reveal section-card relative overflow-hidden" data-video="show-forge">
-              <div class="slot-fallback grid aspect-16/10 content-center grid-cols-[1.2fr_1fr] gap-4 p-5">
-                <div class="flex flex-col justify-end gap-3">
-                  <div class="ml-auto w-3/4 rounded-lg rounded-br-none bg-primary/25 px-3.5 py-2.5 text-xs leading-relaxed">
-                    给 3 号机加一个点检倒计时卡
-                  </div>
-                  <div class="w-full rounded-lg rounded-bl-none border border-border bg-secondary/50 px-3.5 py-2.5">
-                    <div class="flex gap-1.5">
-                      <span class="typing-dot h-1.5 w-1.5 rounded-full bg-primary"></span>
-                      <span class="typing-dot h-1.5 w-1.5 rounded-full bg-primary" style="animation-delay: 0.2s"></span>
-                      <span class="typing-dot h-1.5 w-1.5 rounded-full bg-primary" style="animation-delay: 0.4s"></span>
-                    </div>
-                    <div class="mt-2.5 space-y-1.5">
-                      <div class="h-1.5 w-5/6 rounded bg-muted"></div>
-                      <div class="h-1.5 w-3/4 rounded bg-muted"></div>
-                    </div>
-                  </div>
-                </div>
-                <div class="flex flex-col gap-2.5 border border-border/70 rounded-lg bg-background/60 p-3.5">
-                  <p class="text-xs text-muted-foreground">我的插件</p>
-                  <div class="forge-chip rounded-lg border border-primary/40 bg-primary/10 p-3">
-                    <p class="font-mono text-xs">@forge/点检倒计时</p>
-                    <p class="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <span class="breathe h-1.5 w-1.5 rounded-full bg-success"></span>
-                      v2 · 已挂载
-                    </p>
-                  </div>
-                  <div class="h-8 rounded-lg border border-dashed border-border/80"></div>
-                </div>
-              </div>
+            <div class="reveal section-card overflow-hidden p-5">
+              <pre class="code-block"><code>my-line-board.zip
+├── recipe.yml            # id / title / kind / plugins[]
+├── plugins/
+│   ├── @snap-rail__store-sqlite.zip
+│   ├── @snap-rail__equipment.zip
+│   ├── @snap-rail__framework-shadcn.zip
+│   └── @my-scope__my-driver.zip
+└── readme.md             # 现场操作指引
+
+# 每个成员保留自己的 Ed25519 发布签名
+# 组合包本身不签名：信任随成员走</code></pre>
             </div>
           </div>
         </div>
@@ -652,7 +636,7 @@
       <section id="ecosystem" class="border-y border-border/60 bg-card/30 py-24">
         <div class="mx-auto max-w-6xl px-6">
           <p class="kicker reveal">ecosystem</p>
-          <h2 class="reveal mt-3 text-3xl font-bold">三种插件，一个生态</h2>
+          <h2 class="reveal mt-3 text-3xl font-bold">插件与组合，一个生态</h2>
           <p class="reveal mt-4 max-w-2xl leading-relaxed text-muted-foreground">
             snap-rail 得名于 DIN 导轨上的 snap-on 卡装——模块化是工业百年的智慧，我们把它带进软件。
           </p>
@@ -668,19 +652,20 @@
               <span class="badge text-success">驱动 · 可并存</span>
               <h3 class="mt-3 font-semibold">通讯驱动</h3>
               <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-                只上交 schema 与连接适配，方言表单由底座渲染——新协议照抄 driver-mock 即可。
+                只上交 schema 与连接适配，方言表单由底座渲染——新协议照抄 driver-modbus 即可。
               </p>
             </div>
             <div class="section-card reveal p-6">
-              <span class="badge text-chart-3">工具</span>
-              <h3 class="mt-3 font-semibold">工具插件</h3>
+              <span class="badge text-chart-3">组合 · 离线</span>
+              <h3 class="mt-3 font-semibold">组合套件</h3>
               <p class="mt-2 text-sm leading-relaxed text-muted-foreground">
-                往宿主塞新能力的工具，AI 创造工作室 forge 就是这么一号住户。
+                基座与场景组合打包成 zip：联网侧下载一个文件，拖进内网终端即批量安装成员并启用预设。
               </p>
             </div>
           </div>
-          <div class="reveal mt-10 text-center">
+          <div class="reveal mt-10 flex flex-wrap justify-center gap-3">
             <a class="btn btn-primary" href="./plugins.html">浏览插件生态 →</a>
+            <a class="btn btn-ghost" href="./recipes.html">看组合套件 →</a>
           </div>
         </div>
       </section>
@@ -695,10 +680,10 @@
             <span class="badge">vendored Cordis · 上游 MIT</span>
             <a
               class="btn btn-ghost px-3.5 py-2 text-sm"
-              href="https://gitee.com/yansijian/snap-rail"
+              href="https://github.com/yansijian/snap-rail"
               target="_blank"
               rel="noopener"
-              >在 Gitee 上阅读源码</a
+              >在 GitHub 上阅读源码</a
             >
           </div>
           <div class="mt-10 grid gap-6 md:grid-cols-3">
@@ -738,9 +723,9 @@
                 <li>✓ Cordis 宿主树 + 两层清单合成（内置只读 + 用户层热重载）</li>
                 <li>✓ 四象限类型化 RPC 协议（BigInt 走结构化克隆）</li>
                 <li>✓ terminal-ops 套件 · ModbusTCP/EtherNet/IP 驱动</li>
-                <li>✓ forge AI 创造工作室（生成 → 挂载 → 导出 zip）</li>
                 <li>✓ store 分库持久化 + append-only 审计</li>
-                <li>✓ 插件市场 + 组合一键安装 · 应用自更新通道</li>
+                <li>✓ 静态插件源 + 离线组合包 · 应用自更新通道</li>
+                <li>✓ Ed25519 发布签名 · 多源搜索 · 信任策略</li>
               </ul>
             </div>
             <div class="section-card reveal p-7">
@@ -749,10 +734,10 @@
               </h3>
               <ul class="mt-4 space-y-3 text-sm leading-relaxed text-muted-foreground">
                 <li>○ 权限强制执行（现在安装时明示，将来运行时拦截）</li>
-                <li>○ snap-rail-market 社区仓（三方插件 PR 上架）</li>
-                <li>○ 发布签名 · deep link 唤起安装</li>
-                <li>○ npm 分发 · 套件免重启热切换</li>
+                <li>○ deep link 唤起安装 · 组合依赖自动解析</li>
+                <li>○ 套件免重启热切换</li>
                 <li>○ i18n · 遥测</li>
+                <li>○ 社区插件目录页（GitHub topic 聚合，不由官方策展）</li>
               </ul>
             </div>
           </div>
@@ -773,14 +758,14 @@
           </p>
           <ul class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
             <li>
-              <a class="text-muted-foreground hover:text-foreground" href="https://gitee.com/yansijian/snap-rail" target="_blank" rel="noopener"
-                >Gitee</a
+              <a class="text-muted-foreground hover:text-foreground" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener"
+                >GitHub</a
               >
             </li>
             <li>
               <a
                 class="text-muted-foreground hover:text-foreground"
-                href="https://gitee.com/yansijian/snap-rail/blob/master/docs/architecture.md"
+                href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md"
                 target="_blank"
                 rel="noopener"
                 >architecture.md</a
@@ -789,11 +774,14 @@
             <li>
               <a class="text-muted-foreground hover:text-foreground" href="./plugins.html">插件生态</a>
             </li>
+            <li>
+              <a class="text-muted-foreground hover:text-foreground" href="./recipes.html">组合套件</a>
+            </li>
           </ul>
         </div>
         <div>
           <p class="text-sm font-semibold">快速开始</p>
-          <pre class="code-block mt-3"><code>git clone https://gitee.com/yansijian/snap-rail.git
+          <pre class="code-block mt-3"><code>git clone https://github.com/yansijian/snap-rail.git
 cd snap-rail
 pnpm install
 pnpm run build

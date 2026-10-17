@@ -31,10 +31,11 @@ nsis:
 # Update channel seat: electron-updater reads the publish provider at
 # runtime (this config packs into app-update.yml as the built-in default);
 # a deployment overrides it per terminal with the `update.feedUrl` settings
-# key — no repack needed. Point the URL at the desktop release directory.
-# The default is the intranet Gitea raw feed (the client repo's dedicated
-# `feed` branch); a deployment that still serves plain nginx files only
-# changes this line or the per-terminal settings key.
+# key — no repack needed. Point the URL at the rolling release's `feed` tag
+# (the same base serves plugins.feedUrl). The repo default is the public
+# GitHub release; the intranet CI stamps the Gitea address at packaging time
+# (build-desktop.yml) and the factory `defaults.json` names the matching
+# plugin feed.
 publish:
   - provider: generic
-    url: http://192.168.1.9:3000/snap-rail/snap-rail/raw/branch/feed/desktop/
+    url: https://github.com/yansijian/snap-rail/releases/download/feed/

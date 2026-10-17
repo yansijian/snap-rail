@@ -2,7 +2,7 @@
  * Pack the installable plugin zips for a release: each listed package
  * becomes one final-format zip (release manifest + built faces, never
  * sources) plus an `index.json` catalog — exactly what the settings page's
- * 安装插件 consumes locally and what the 插件市场 feed serves remotely.
+ * 安装插件 consumes locally and what a static plugin feed serves remotely.
  * The assembly rules live in `@snap-rail/plugin-kit/pack`; this is only the
  * repo's shipment list. Run a build first, then provide the publisher key:
  * `pnpm run build && pnpm run pack:plugins -- --sign-key .keys/release.private.pem --key-id release-2026`.
@@ -13,14 +13,15 @@
  * @module snap-rail/scripts/pack-plugins
  */
 
-import { createHash, createPrivateKey } from 'node:crypto'
+import { createPrivateKey } from 'node:crypto'
 import { createWriteStream, readFileSync } from 'node:fs'
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { zipSync } from 'fflate'
 import { releaseFiles, zipFileName, type ReleaseSpec } from '@snap-rail/plugin-kit/pack'
-import { signReleaseFiles, type ReleaseSignature } from '@snap-rail/plugin-kit/sign'
+import { signReleaseFiles } from '@snap-rail/plugin-kit/sign'
+import { catalogEntryFromZip } from './lib/catalog-entry.ts'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -47,13 +48,7 @@ export const PLUGIN_PACKAGES: readonly ReleaseSpec[] = [
     hostFace: 'lib/index.js',
     exports: { './rpc': 'lib/rpc.js', './contract': 'lib/contract.js' },
   },
-  // 界面住户：设置页外壳（clientOnly）。
-  {
-    name: '@snap-rail/settings-station',
-    dir: join(repoRoot, 'packages/ui/settings-station'),
-    clientFace: 'lib-client',
-  },
-  // 统一设备管理页（clientOnly）。
+  // 统一设备管理页（clientOnly）；设置外壳与一方三页随框架包发布。
   {
     name: '@snap-rail/equipment-station',
     dir: join(repoRoot, 'packages/ui/equipment-station'),
@@ -134,43 +129,10 @@ async function main(): Promise<void> {
       stream.on('finish', resolve)
       stream.end(zipped)
     })
-    // The catalog entry reads back out of the shipped release manifest, so
-    // the feed can never advertise something the zip does not carry. The
-    // digest covers the exact zip bytes — the client verifies the download
-    // against it before the installer ever sees the file.
-    const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!)) as {
-      version?: string
-      description?: string
-      snapRail?: {
-        kind?: string
-        title?: string
-        category?: string
-        requires?: string[]
-        framework?: string
-        permissions?: string[]
-        capabilities?: { provides?: { id: string, version: string }[], requires?: { id: string, range: string, optional?: boolean }[] }
-        engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
-      }
-    }
-    const signature = files['META-INF/signature.json']
-    const signatureInfo = signature === undefined ? undefined : JSON.parse(new TextDecoder().decode(signature)) as ReleaseSignature
-    entries.push({
-      name: spec.name,
-      version: manifest.version ?? '0.0.0',
-      ...(manifest.description !== undefined && manifest.description !== '' ? { description: manifest.description } : {}),
-      ...(manifest.snapRail?.kind !== undefined ? { kind: manifest.snapRail.kind } : {}),
-      ...(manifest.snapRail?.title !== undefined ? { title: manifest.snapRail.title } : {}),
-      ...(manifest.snapRail?.category !== undefined ? { category: manifest.snapRail.category } : {}),
-      ...(manifest.snapRail?.requires !== undefined ? { requires: manifest.snapRail.requires } : {}),
-      ...(manifest.snapRail?.framework !== undefined ? { framework: manifest.snapRail.framework } : {}),
-      ...(manifest.snapRail?.permissions !== undefined ? { permissions: manifest.snapRail.permissions } : {}),
-      ...(manifest.snapRail?.capabilities !== undefined ? { capabilities: manifest.snapRail.capabilities } : {}),
-      ...(manifest.snapRail?.engines !== undefined ? { engines: manifest.snapRail.engines } : {}),
-      file: zipFileName(spec.name),
-      sha256: createHash('sha256').update(zipped).digest('hex'),
-      size: zipped.length,
-      ...(signatureInfo === undefined ? {} : { signature: { algorithm: signatureInfo.algorithm, keyId: signatureInfo.keyId } }),
-    })
+    // The catalog entry reads back out of the shipped zip bytes — the one
+    // emitter shared with the collect pipeline; the digest covers the exact
+    // bytes the client downloads and verifies before the installer runs.
+    entries.push(catalogEntryFromZip(zipped, zipFileName(spec.name), spec.name, { requireSignature: true }))
     console.log(`packed ${zipFileName(spec.name)} (${(zipped.length / 1024).toFixed(0)} KiB, ${Object.keys(files).length} files)`)
   }
   const catalog = `${JSON.stringify({ plugins: entries }, null, 2)}\n`

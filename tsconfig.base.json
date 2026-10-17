@@ -46,6 +46,7 @@
       "@snap-rail/plugin-kit/build": ["./packages/base/plugin-kit/src/build.ts"],
       "@snap-rail/plugin-kit/pack": ["./packages/base/plugin-kit/src/pack.ts"],
       "@snap-rail/plugin-kit/sign": ["./packages/base/plugin-kit/src/sign.ts"],
+      "@snap-rail/plugin-kit/recipe": ["./packages/base/plugin-kit/src/recipe.ts"],
       "@snap-rail/plugin-sdk": ["./packages/base/plugin-sdk/src"],
       "@snap-rail/settings": ["./packages/base/settings/src"],
       "@snap-rail/store": ["./packages/store/store/src"],
@@ -66,7 +67,6 @@
       "@snap-rail/equipment-station": ["./packages/ui/equipment-station/src/index.tsx"],
       "@snap-rail/client-kernel": ["./packages/base/kernel/src"],
       "@snap-rail/client-modules": ["./packages/base/modules/src"],
-      "@snap-rail/settings-station": ["./packages/ui/settings-station/src"],
       "@snap-rail/station-rpc": ["./packages/base/station-rpc/src"],
       "@snap-rail/station-rpc/contract": ["./packages/base/station-rpc/src/contract.ts"]
     }

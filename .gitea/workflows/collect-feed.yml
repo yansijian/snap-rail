@@ -9,6 +9,8 @@ on:
 
 # 国内 runner 不走 marketplace（与 admin 仓 CI 同策略）：git clone 检出、
 # npmmirror 装 pnpm；@snap-rail scope 走本机 Gitea npm（凭据注入 ~/.npmrc）。
+# 这把采集的是 org 自己拆分仓的发布产物（`--collect`）——社区插件不在
+# 这里聚合，作者在自己的 Release 发布、用户自行添加插件源。
 jobs:
   collect:
     runs-on: ubuntu-latest
@@ -79,6 +81,12 @@ jobs:
               }
             })();
           '
+      - name: stage split plugin repos (workspace deps)
+        env:
+          FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
+        run: |
+          git config --global credential.helper '!f() { echo "username=${{ github.actor }}"; echo "password=$FEED_TOKEN"; }; f'
+          SNAP_RAIL_EXTERNAL_BASE=http://192.168.1.9:3000/snap-rail node scripts/setup-external.mjs
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm run build
       - name: collect + publish feed (base + collected)
@@ -87,19 +95,19 @@ jobs:
           SIGN_KEY: ${{ secrets.RELEASE_PRIVATE_PEM }}
           KEY_ID: ${{ secrets.RELEASE_KEY_ID }}
         run: |
-          # deploy.config.json 现场文件不进仓——CI 里按本机 Gitea 现场生成
-          # （remote 段是 schema 必填，gitea 同步路径不使用它）。
-          # release:false —— 桌面三件套已由 build-desktop 工作流挂到 Release，
-          # 这里从 Release 取件进 feed 分支即可，不重复上传。
+          # deploy.config.json 现场文件不进仓——CI 里按本机 Gitea 现场生成。
+          # 滚动 Release(feed tag):插件源与应用更新源同址平铺。
           cat > deploy.config.json <<'JSON'
           {
-            "gitea": { "url": "http://192.168.1.9:3000", "owner": "snap-rail", "repo": "snap-rail", "feedBranch": "feed", "release": false },
-            "remote": { "site": "/var/www/html", "plugins": "/var/www/html/snap-rail/plugins", "desktop": "/var/www/html/snap-rail/desktop" }
+            "targets": [
+              { "kind": "gitea", "url": "http://192.168.1.9:3000", "owner": "snap-rail", "repo": "snap-rail" }
+            ],
+            "feedTag": "feed"
           }
           JSON
           printf '%s' "$SIGN_KEY" | base64 -d > release.private.pem
-          pnpm exec tsx scripts/collect-feed.ts --from collect-dl
-          pnpm run publish -- --sign-key release.private.pem --key-id "$KEY_ID" --publisher snap-rail --market collect-out
+          pnpm exec tsx scripts/collect-feed.ts --from collect-dl --provider gitea
+          pnpm run publish -- --sign-key release.private.pem --key-id "$KEY_ID" --publisher snap-rail --collect collect-out
           rm release.private.pem
       - name: verify assembled feed
-        run: pnpm run verify:market -- --feed dist-publish/plugins --trust keys/gitea-main-2026.trust.json
+        run: pnpm run verify:feed -- --feed dist-publish/plugins --trust keys/gitea-main-2026.trust.json

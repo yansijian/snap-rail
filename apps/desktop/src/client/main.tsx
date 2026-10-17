@@ -174,11 +174,11 @@ async function runPoolRenderer(options: {
     await runtime.createClientRuntime(handle, { plugins: seats })
   } catch (cause) {
     const detail = cause instanceof Error ? cause.message : String(cause)
-    console.error('client: the framework runtime failed — falling back to the bootstrap console', cause)
+    console.error('client: the framework runtime failed — falling back to the plain plugin page', cause)
     showBootstrapAfterFailure(
       handle,
-      `界面框架启动失败，已回退到引导页：\n${detail}\n\n`
-      + '可在下方列表中禁用或卸载出问题的插件后重启；引导页其余功能不受影响。',
+      `插件异常：界面框架启动失败\n${detail}\n\n`
+      + '可在下方禁用或卸载出问题的插件后重启；插件管理、搜索与安装不受影响。',
     )
   }
 }

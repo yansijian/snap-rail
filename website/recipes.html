@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>组合示例 · snap-rail</title>
+    <title>组合套件 · snap-rail</title>
     <meta
       name="description"
-      content="snap-rail 组合示例：基座组合一键装成可用终端，场景组合下载即可复现完整效果——产线看板、终端作业一条链。"
+      content="snap-rail 组合套件：基座组合一次装成可用终端，场景组合在基座之上复现完整效果——下载一个 zip，拖进离线终端即可批量安装成员插件并启用组合预设。"
     />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
     <link rel="stylesheet" href="/src/styles.css" />
@@ -23,10 +23,10 @@
         <div class="ml-auto flex items-center gap-1">
           <a data-nav="index" class="nav-link hidden sm:inline-flex" href="./index.html">主页</a>
           <a data-nav="plugins" class="nav-link hidden whitespace-nowrap sm:inline-flex" href="./plugins.html">插件生态</a>
-          <a data-nav="recipes" class="nav-link whitespace-nowrap" href="./recipes.html">组合示例</a>
+          <a data-nav="recipes" class="nav-link whitespace-nowrap" href="./recipes.html">组合套件</a>
           <a
             class="nav-link hidden sm:inline-flex"
-            href="https://gitee.com/yansijian/snap-rail/blob/master/docs/architecture.md"
+            href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md"
             target="_blank"
             rel="noopener"
             >文档</a
@@ -40,41 +40,41 @@
       <!-- 页头 -->
       <section class="cabinet-grid relative overflow-hidden py-20">
         <div class="mx-auto max-w-6xl px-6">
-          <p class="kicker">recipes</p>
-          <h1 class="glow-number mt-4 text-4xl font-bold md:text-5xl">组合示例</h1>
+          <p class="kicker">combos</p>
+          <h1 class="glow-number mt-4 text-4xl font-bold md:text-5xl">组合套件</h1>
           <p class="mt-4 max-w-2xl leading-relaxed text-muted-foreground">
-            组合（recipe）是随插件源分发的预设文档：基座组合一键装成可用终端，场景组合在基座之上叠加场景插件——看中哪个效果，装上就能复现。
+            组合是一份随组合包分发的预设文档（<code class="font-mono text-xs">recipe.yml</code>）：基座组合一次装成可用终端，
+            场景组合在基座之上叠加场景插件。每个组合包就是一个 zip——联网 PC 下载，拷进内网，拖入终端即批量安装。
           </p>
         </div>
       </section>
 
-      <!-- 组合卡片（#recipes 由 recipes.ts 从生成的目录数据注入） -->
+      <!-- 组合卡片（#combos 由 recipes.ts 从生成的目录数据注入） -->
       <section class="pb-8 pt-4">
-        <div class="mx-auto max-w-6xl px-6" id="recipes"></div>
+        <div class="mx-auto max-w-6xl px-6" id="combos"></div>
       </section>
 
       <!-- 三步复现 -->
       <section class="border-y border-border/60 bg-card/30 py-20">
         <div class="mx-auto max-w-6xl px-6">
           <p class="kicker reveal">reproduce</p>
-          <h2 class="reveal mt-3 text-2xl font-bold">三步复现任意组合</h2>
+          <h2 class="reveal mt-3 text-2xl font-bold">离线三步复现任意组合</h2>
           <div class="mt-10 grid gap-5 md:grid-cols-3">
             <div class="section-card reveal flex gap-4 p-5">
               <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/50 bg-primary/10 font-mono text-sm text-primary">1</span>
               <div>
-                <h3 class="font-semibold">下载并安装终端</h3>
+                <h3 class="font-semibold">联网 PC 下载</h3>
                 <p class="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  从<a class="underline underline-offset-2" href="./plugins.html#download">插件生态页</a>下载 Windows 安装包。
+                  下载终端安装包与组合包（<code class="font-mono text-xs">.zip</code>）。组合包已带齐全部成员插件，现场无需再找依赖。
                 </p>
               </div>
             </div>
             <div class="section-card reveal flex gap-4 p-5">
               <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/50 bg-primary/10 font-mono text-sm text-primary">2</span>
               <div>
-                <h3 class="font-semibold">填插件源，一键装组合</h3>
+                <h3 class="font-semibold">拷进内网终端</h3>
                 <p class="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  设置 → 插件市场，填入源地址（内网如
-                  <code class="font-mono text-xs">http://192.168.1.10/snap-rail/plugins/</code>），在组合区点「一键安装」——缺失插件自动补齐，组合预设随之生效。
+                  安装终端后，把组合包拖进「插件」页：客户端按内容识别组合形式，逐个安装成员（同名保留本机更新版本），最后原子写入组合预设。
                 </p>
               </div>
             </div>
@@ -83,7 +83,8 @@
               <div>
                 <h3 class="font-semibold">按指引看效果</h3>
                 <p class="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  场景组合卡片自带操作指引（如手动建一组演示设备），照做即可看到完整效果；「移除」即恢复干净。
+                  场景组合卡片自带操作指引（如手动建一组演示设备），照做即可看到完整效果。组合的启用方式是
+                  <code class="font-mono text-xs">&lt;home&gt;/presets/recipe-&lt;id&gt;.yml</code>，删除预设文件即恢复干净。
                 </p>
               </div>
             </div>
@@ -97,30 +98,32 @@
           <div class="reveal grid items-center gap-10 md:grid-cols-2">
             <div>
               <p class="kicker">publish your own</p>
-              <h2 class="mt-3 text-2xl font-bold">发布你自己的插件与组合</h2>
+              <h2 class="mt-3 text-2xl font-bold">自己发布插件与组合</h2>
               <p class="mt-4 leading-relaxed text-muted-foreground">
-                插件以源码形式提交到 snap-rail-market 社区仓，PR 合入即上架；组合是一份与 plugins.yml
-                同形状的 yml——在标准基座之上挑好插件、写清效果说明，提交即进入组合目录。插件按
-                <code class="font-mono text-xs">requires</code> 自动归入基座生态（命名不得占用
-                <code class="font-mono text-xs">@snap-rail/*</code>）。
+                没有集中市场上架流程：插件住在你自己的 GitHub 仓库，用你自己的 Ed25519 密钥签名，发布成自仓滚动
+                Release（<code class="font-mono text-xs">feed</code> 标签）。在仓库打上
+                <code class="font-mono text-xs">snap-rail-plugin</code> topic，用户就能在 GitHub 发现你，并把你的
+                Release 地址加为插件源。组合包也是你自己的 zip：根目录 <code class="font-mono text-xs">recipe.yml</code> +
+                <code class="font-mono text-xs">plugins/*.zip</code>，成员保留各自签名。
               </p>
-              <a
-                class="btn btn-ghost mt-6"
-                href="https://gitee.com/yansijian/snap-rail/blob/master/docs/architecture.md"
-                target="_blank"
-                rel="noopener"
-                >阅读 architecture.md →</a
-              >
+              <div class="mt-6 flex flex-wrap gap-3">
+                <a class="btn btn-ghost" href="https://github.com/topics/snap-rail-plugin" target="_blank" rel="noopener">浏览社区插件 →</a>
+                <a class="btn btn-ghost" href="https://github.com/yansijian/snap-rail/blob/master/docs/plugin-development.md" target="_blank" rel="noopener">插件开发指南 →</a>
+              </div>
             </div>
-            <pre class="code-block"><code># 组合 = 一份预设文档（recipes/&lt;id&gt;/recipe.yml）
+            <pre class="code-block"><code># 组合包（&lt;id&gt;.zip）的唯一清单
+id: my-line-board
 version: 1.0.0
 title: 我的产线看板
 kind: scenario
 plugins:
   - name: '@snap-rail/store-sqlite'
   - name: '@snap-rail/equipment'
-  - name: '@myScope/my-driver'
-  # …与 plugins.yml 完全同形</code></pre>
+  - name: '@my-scope/my-driver'
+  # …与 plugins.yml 完全同形
+
+# zip 内容：recipe.yml + plugins/*.zip
+# 成员 = 逐个签名的一方/三方插件 zip</code></pre>
           </div>
         </div>
       </section>
@@ -130,8 +133,8 @@ plugins:
     <footer class="border-t border-border/60 py-10">
       <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-6 text-sm">
         <a class="font-semibold" href="./index.html">snap-rail</a>
-        <a class="text-muted-foreground hover:text-foreground" href="https://gitee.com/yansijian/snap-rail" target="_blank" rel="noopener"
-          >Gitee</a
+        <a class="text-muted-foreground hover:text-foreground" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener"
+          >GitHub</a
         >
         <a class="text-muted-foreground hover:text-foreground" href="./plugins.html">插件生态</a>
         <span class="ml-auto text-xs text-muted-foreground/70">Apache-2.0 · © 2026 snap-rail contributors</span>

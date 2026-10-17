@@ -14,7 +14,7 @@ This vendored tree was copied from the [deepseek-harness](../..) repository's
 `vendor/` directory at commit `141eb6fef8` and rescoped from `@deepseek-ai/` to
 `@snap-rail/` (a delimited token rewrite over package names, dependency
 entries, and import specifiers; `pnpm run verify-vendor-names` asserts zero
-residue). The sources therefore carry **all 18 local hardening modifications**
+residue). The sources therefore carry the full local hardening modification set
 documented in the origin repo's `vendor/README.md` local-modification log —
 fiber lifecycle hardening, transactional Loader/Include config reconciliation,
 durable debounced writes (Windows rename races), lazy config resolution, and

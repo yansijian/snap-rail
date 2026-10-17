@@ -17,10 +17,13 @@ import { dump, load } from 'js-yaml'
 import { installPluginFromZip, uninstallPlugin } from '../packages/base/app-boot/src/installer.ts'
 
 /** Subpath rows a package needs beyond its plain name (the pool resolves
- * them through the package's exports voice). */
+ * them through the package's exports voice). Only genuinely separate
+ * modules belong here: the terminal-ops suite's `./stats` resolves to the
+ * same module as its main entry (the whole host face of the suite IS the
+ * stats counter), so a second row would mount the same plugin name twice
+ * and fail the boot. */
 const SUBPATH_ROWS: Readonly<Record<string, readonly string[]>> = {
   '@snap-rail/equipment': ['@snap-rail/equipment/rpc'],
-  '@snap-rail/suite-terminal-ops': ['@snap-rail/suite-terminal-ops/stats'],
 }
 
 /** Sibling standalone plugin repos whose dist zips join the catalog when built. */

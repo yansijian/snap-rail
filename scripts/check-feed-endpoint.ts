@@ -2,7 +2,7 @@
  * deployment depends on (docs/deploy.md「本地 Gitea 验证」):
  *
  * 1. The feed files arrive byte-identical (index.json digest, zip sha256/size).
- * 2. The responses carry usable headers for electron-updater and the market
+ * 2. The responses carry usable headers for electron-updater and the feed
  *    fetch (content-type, content-length, accept-ranges, cache hints).
  * 3. Which raw URL shape this Gitea serves (`/raw/branch/<ref>/` vs the legacy
  *    `/raw/<ref>/` vs `/media/<ref>/`) — a wrong guess looks like a dead feed.
@@ -160,7 +160,7 @@ async function main(): Promise<void> {
           }
         }
       }
-      await probeWithAlternatives('recipes.json（组合目录，可选）', joinUrl(plugins, 'recipes.json'))
+      await probeWithAlternatives('catalog.json（网站目录，可选）', joinUrl(plugins, 'catalog.json'))
     }
   }
 

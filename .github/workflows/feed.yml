@@ -1,0 +1,135 @@
+name: feed
+
+# The single writer of the rolling `feed` release (plugins + combo packages +
+# app auto-update trio) and the GitHub Pages site. Triggered by schedule,
+# manual dispatch, relevant pushes, and explicitly by the versioned release so
+# the feed immediately carries the new installer.
+on:
+  schedule:
+    - cron: '0 20 * * *' # 04:00 Asia/Shanghai
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'feed-sources.json'
+      - 'recipes/**'
+      - 'scripts/**'
+      - 'packages/**'
+      - 'website/**'
+      - '.github/workflows/feed.yml'
+
+# One feed writer at a time: the rolling release is delete-and-recreate.
+concurrency:
+  group: feed
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  FEED_BASE: https://github.com/yansijian/snap-rail/releases/download/feed/
+  SNAP_RAIL_REPO_URL: https://github.com/yansijian/snap-rail
+
+jobs:
+  feed:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_PRIVATE_PEM: ${{ secrets.RELEASE_PRIVATE_PEM }}
+      RELEASE_KEY_ID: ${{ secrets.RELEASE_KEY_ID }}
+      RELEASE_PUBLISHER: ${{ secrets.RELEASE_PUBLISHER }}
+      # The feed packs every first-party plugin from source: the framework and
+      # modbus are already needed by the app build, the suite and enip driver
+      # join here so the feed never depends on their own release cadence.
+      SNAP_RAIL_EXTERNAL_REPOS: snap-rail-framework-shadcn,snap-rail-driver-modbus,snap-rail-driver-enip,snap-rail-suite-terminal-ops
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: ./.github/actions/prepare-workspace
+
+      - name: build the feed-only split plugin faces
+        run: |
+          pnpm --filter @snap-rail/driver-enip run build
+          pnpm --filter @snap-rail/suite-terminal-ops run build
+
+      - name: download the latest versioned installer trio
+        run: |
+          mkdir -p apps/desktop/release-out
+          node -e '
+            const fs = require("node:fs");
+            const headers = { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json" };
+            (async () => {
+              const list = await fetch("https://api.github.com/repos/yansijian/snap-rail/releases?per_page=30", { headers });
+              if (!list.ok) { console.error(`skip desktop: release lookup ${list.status}`); return; }
+              const releases = await list.json();
+              const release = releases.find(r => /^v\d/.test(r.tag_name) && (r.assets ?? []).some(a => a.name === "latest.yml"));
+              if (!release) { console.error("skip desktop: no versioned release with an installer"); return; }
+              const trio = (release.assets ?? []).filter(a => a.name === "latest.yml" || a.name.endsWith(".exe") || a.name.endsWith(".exe.blockmap"));
+              for (const asset of trio) {
+                const res = await fetch(asset.browser_download_url, { headers });
+                if (!res.ok) { console.error(`skip desktop asset ${asset.name}: ${res.status}`); continue; }
+                fs.writeFileSync(`apps/desktop/release-out/${asset.name}`, Buffer.from(await res.arrayBuffer()));
+                console.log(`downloaded ${asset.name} from release ${release.tag_name}`);
+              }
+            })();
+          '
+
+      - run: pnpm run build
+
+      - name: pack the first-party split plugins (signed)
+        run: |
+          printf '%s' "$RELEASE_PRIVATE_PEM" | base64 -d > release.private.pem
+          mkdir -p collect-dl
+          for repo in snap-rail-framework-shadcn snap-rail-driver-modbus snap-rail-driver-enip snap-rail-suite-terminal-ops; do
+            node packages/base/plugin-sdk/lib/cli.js pack "external/$repo" \
+              --out "external/$repo/dist" \
+              --sign-key release.private.pem \
+              --key-id "$RELEASE_KEY_ID" \
+              --publisher "${RELEASE_PUBLISHER:-snap-rail}"
+            cp "external/$repo"/dist/*.zip collect-dl/
+          done
+
+      - name: collect first-party feeds + publish the rolling release
+        run: |
+          cat > deploy.config.json <<'JSON'
+          {
+            "targets": [
+              { "kind": "github", "owner": "yansijian", "repo": "snap-rail" }
+            ],
+            "feedTag": "feed"
+          }
+          JSON
+          pnpm run collect:feed -- --from collect-dl --provider github
+          pnpm run publish -- --collect collect-out --sign-key release.private.pem --key-id "$RELEASE_KEY_ID" --publisher "${RELEASE_PUBLISHER:-snap-rail}"
+          rm release.private.pem
+
+      - name: verify the assembled feed (plugins + combo packages)
+        run: pnpm run verify:feed -- --feed dist-publish/plugins --trust apps/desktop/resources/trusted-release-keys.json
+
+      - name: build the site against the public feed
+        env:
+          SNAP_RAIL_FEED_BASE: ${{ env.FEED_BASE }}
+        run: pnpm run site:build
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: website/dist
+      - id: deploy
+        uses: actions/deploy-pages@v4
