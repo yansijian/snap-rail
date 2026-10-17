@@ -1,0 +1,41 @@
+{
+  // Bootstrap build for the split plugin repos: the framework's TypeScript
+  // program resolves the main packages through their published declarations,
+  // so those declarations (and the JS the framework's tsdown config imports)
+  // must exist before `external/` is built. This graph stops at the UI layer:
+  // equipment-station imports the framework, so the full host project (which
+  // includes it) can only build after the framework face exists.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rewriteRelativeImportExtensions": false
+  },
+  "files": [],
+  "references": [
+    { "path": "./vendor/cosmokit" },
+    { "path": "./vendor/schemastery" },
+    { "path": "./vendor/cordis" },
+    { "path": "./vendor/loader" },
+    { "path": "./vendor/include" },
+    { "path": "./vendor/group" },
+    { "path": "./vendor/timer" },
+    { "path": "./vendor/hmr" },
+    { "path": "./vendor/logger-console" },
+    { "path": "./packages/base/util" },
+    { "path": "./packages/base/scope" },
+    { "path": "./packages/base/plugin-kit" },
+    { "path": "./packages/base/plugin-sdk" },
+    { "path": "./packages/base/settings" },
+    { "path": "./packages/store/store" },
+    { "path": "./packages/store/store-sqlite" },
+    { "path": "./packages/base/audit" },
+    { "path": "./packages/base/app-boot" },
+    { "path": "./packages/base/station-rpc" },
+    { "path": "./packages/base/protocol" },
+    { "path": "./packages/base/gateway" },
+    { "path": "./packages/base/connection" },
+    { "path": "./packages/equipment/equipment" },
+    { "path": "./packages/base/kernel" },
+    { "path": "./packages/base/modules" }
+  ]
+}
