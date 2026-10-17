@@ -9,7 +9,7 @@ on:
 
 # 国内 runner 不走 marketplace（与 admin 仓 CI 同策略）：git clone 检出、
 # npmmirror 装 pnpm；@snap-rail scope 走本机 Gitea npm（凭据注入 ~/.npmrc）。
-# 这把采集的是 org 自己拆分仓的发布产物（`--collect`）——社区插件不在
+# 这把采集的是 org 自己拆分仓的源码产物（`--collect`）——社区插件不在
 # 这里聚合，作者在自己的 Release 发布、用户自行添加插件源。
 jobs:
   collect:
@@ -17,6 +17,7 @@ jobs:
     env:
       # 只装 electron 的 npm 包（类型），二进制不下载——本流水线不打包桌面应用
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      SNAP_RAIL_EXTERNAL_REPOS: snap-rail-framework-shadcn,snap-rail-driver-modbus,snap-rail-driver-enip,snap-rail-suite-terminal-ops
     steps:
       - name: Checkout
         # job 容器在默认桥接网络，解析不了 runner 的内网注册地址（gitea:3000），
@@ -36,28 +37,6 @@ jobs:
           npm install -g pnpm@11.22.0
           printf '//192.168.1.9:3000/api/packages/snap-rail/npm/:_authToken=%s\n' "$FEED_TOKEN" >> ~/.npmrc
           pnpm -v
-      - name: download latest release zips from the plugin repos
-        env:
-          FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
-        run: |
-          mkdir -p collect-dl
-          node -e '
-            const fs = require("node:fs");
-            const sources = JSON.parse(fs.readFileSync("feed-sources.json", "utf8")).sources;
-            (async () => {
-              for (const s of sources) {
-                const rel = await fetch(`http://192.168.1.9:3000/api/v1/repos/snap-rail/${s.repo}/releases/latest`, { headers: { Authorization: `token ${process.env.FEED_TOKEN}` } });
-                if (!rel.ok) { console.error(`skip ${s.repo}: release lookup ${rel.status}`); continue; }
-                const release = await rel.json();
-                const asset = (release.assets ?? []).find(a => a.name === s.asset);
-                if (!asset) { console.error(`skip ${s.repo}: no asset ${s.asset}`); continue; }
-                const zip = await fetch(asset.browser_download_url, { headers: { Authorization: `token ${process.env.FEED_TOKEN}` } });
-                if (!zip.ok) { console.error(`skip ${s.repo}: download ${zip.status}`); continue; }
-                fs.writeFileSync(`collect-dl/${s.asset}`, Buffer.from(await zip.arrayBuffer()));
-                console.log(`downloaded ${s.asset} from ${s.repo} (${release.tag_name})`);
-              }
-            })();
-          '
       - name: download desktop installer trio from the main repo release
         env:
           FEED_TOKEN: ${{ secrets.FEED_TOKEN }}
@@ -88,11 +67,33 @@ jobs:
           git config --global credential.helper '!f() { echo "username=${{ github.actor }}"; echo "password=$FEED_TOKEN"; }; f'
           SNAP_RAIL_EXTERNAL_BASE=http://192.168.1.9:3000/snap-rail node scripts/setup-external.mjs
       - run: pnpm install --no-frozen-lockfile
+      - name: bootstrap base declarations + split faces
+        run: |
+          pnpm exec tsc -b tsconfig.bootstrap.json
+          pnpm exec tsdown --config tsdown.bootstrap.config.ts
+          pnpm --filter @snap-rail/framework-shadcn run build
+          pnpm --filter @snap-rail/driver-modbus run build
+          pnpm --filter @snap-rail/driver-enip run build
+          pnpm --filter @snap-rail/suite-terminal-ops run build
       - run: pnpm run build
+      - name: pack first-party split plugins (signed)
+        env:
+          SIGN_KEY: ${{ secrets.RELEASE_PRIVATE_PEM }}
+          KEY_ID: ${{ secrets.RELEASE_KEY_ID }}
+        run: |
+          printf '%s' "$SIGN_KEY" | base64 -d > release.private.pem
+          mkdir -p collect-dl
+          for repo in snap-rail-framework-shadcn snap-rail-driver-modbus snap-rail-driver-enip snap-rail-suite-terminal-ops; do
+            node packages/base/plugin-sdk/lib/cli.js pack "external/$repo" \
+              --out "external/$repo/dist" \
+              --sign-key release.private.pem \
+              --key-id "$KEY_ID" \
+              --publisher snap-rail
+            cp "external/$repo"/dist/*.zip collect-dl/
+          done
       - name: collect + publish feed (base + collected)
         env:
           GITEA_TOKEN: ${{ secrets.FEED_TOKEN }}
-          SIGN_KEY: ${{ secrets.RELEASE_PRIVATE_PEM }}
           KEY_ID: ${{ secrets.RELEASE_KEY_ID }}
         run: |
           # deploy.config.json 现场文件不进仓——CI 里按本机 Gitea 现场生成。
@@ -105,9 +106,8 @@ jobs:
             "feedTag": "feed"
           }
           JSON
-          printf '%s' "$SIGN_KEY" | base64 -d > release.private.pem
           pnpm exec tsx scripts/collect-feed.ts --from collect-dl --provider gitea
           pnpm run publish -- --sign-key release.private.pem --key-id "$KEY_ID" --publisher snap-rail --collect collect-out
           rm release.private.pem
       - name: verify assembled feed
-        run: pnpm run verify:feed -- --feed dist-publish/plugins --trust keys/gitea-main-2026.trust.json
+        run: pnpm run verify:feed -- --feed dist-publish/plugins --trust apps/desktop/resources/trusted-release-keys.json

@@ -55,6 +55,15 @@ jobs:
         env:
           # 只装 electron 的 npm 包（类型），构建期由 electron-builder 按镜像自取 win32 zip
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: bootstrap base declarations + split faces
+        run: |
+          # equipment-station imports the framework, so the full host project
+          # cannot build first: base/store/equipment declarations + bundles,
+          # then the framework and modbus faces, then the full workspace.
+          pnpm exec tsc -b tsconfig.bootstrap.json
+          pnpm exec tsdown --config tsdown.bootstrap.config.ts
+          pnpm --filter @snap-rail/framework-shadcn run build
+          pnpm --filter @snap-rail/driver-modbus run build
       - run: pnpm run build
       - name: stamp the intranet feed + update source
         env:
