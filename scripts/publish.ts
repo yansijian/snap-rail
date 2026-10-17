@@ -235,8 +235,8 @@ function hostOf(target: ReleaseTarget): ReleaseHost {
   }
 }
 
-async function apiRequest<T>(host: ReleaseHost, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${host.apiBase}${path}`, { ...init, headers: host.headers(init) })
+async function apiRequest<T>(host: ReleaseHost, path: string, init?: RequestInit, base = host.apiBase): Promise<T> {
+  const response = await fetch(`${base}${path}`, { ...init, headers: host.headers(init) })
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 300)
     throw new Error(`${host.kind}: ${response.status} ${response.statusText} — ${path}${detail === '' ? '' : `：${detail}`}`)
@@ -305,7 +305,7 @@ export async function syncRollingRelease(target: ReleaseTarget, stage: string, t
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream' },
       body: bytes,
-    })
+    }, host.uploadBase)
     console.log(`${host.kind}: asset uploaded: ${asset.name} (${(bytes.length / 1024 / 1024).toFixed(1)} MiB)`)
   }
   console.log(`${host.kind}: rolling release ${tag} → ${host.downloadBase}/${tag}/`)
