@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/cordis",
   "description": "Meta-Framework for Modern JavaScript Applications",
-  "version": "4.0.2",
+  "version": "4.0.3",
   "publishConfig": {
     "access": "public"
   },
@@ -32,23 +32,6 @@
   ],
   "author": "Shigma <shigma10826@gmail.com>",
   "license": "MIT",
-  "peerDependencies": {
-    "@snap-rail/cordis-plugin-include": "workspace:^",
-    "@snap-rail/cordis-plugin-loader": "workspace:^"
-  },
-  "peerDependenciesMeta": {
-    "@snap-rail/cordis-plugin-include": {
-      "optional": true
-    },
-    "@snap-rail/cordis-plugin-loader": {
-      "optional": true
-    }
-  },
-  "publishConfig": {
-    "access": "public",
-    "peerDependencies": {},
-    "peerDependenciesMeta": {}
-  },
   "dependencies": {
     "@standard-schema/spec": "^1.1.0",
     "@snap-rail/cosmokit": "workspace:^"

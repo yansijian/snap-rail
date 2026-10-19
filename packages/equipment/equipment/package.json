@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/equipment",
   "description": "The equipment seam: configuration tables (devices/groups/points), the live point table, and the driver registry — the unified 设备管理 page lives in @snap-rail/equipment-station",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -37,21 +37,8 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "@snap-rail/audit": "workspace:^",
-    "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
-    "@snap-rail/gateway": "workspace:^",
     "@snap-rail/store": "workspace:^"
-  },
-  "peerDependenciesMeta": {
-    "@snap-rail/audit": { "optional": true },
-    "@snap-rail/connection": { "optional": true },
-    "@snap-rail/gateway": { "optional": true }
-  },
-  "publishConfig": {
-    "access": "public",
-    "peerDependencies": {},
-    "peerDependenciesMeta": {}
   },
   "devDependencies": {
     "@snap-rail/audit": "workspace:^",
