@@ -11,6 +11,10 @@ on:
 
 permissions:
   contents: read
+  # Trusted publishing (OIDC): pnpm presents a short-lived workflow identity to
+  # npm instead of a long-lived NPM_TOKEN. NPM_TOKEN stays as an optional
+  # fallback for as long as it exists.
+  id-token: write
 
 jobs:
   publish:
