@@ -11,8 +11,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { join } from 'node:path'
+import { createRequire } from 'node:module'
 import { unzipSync, zipSync } from 'fflate'
 import { definePluginManifest, PLUGIN_TEMPLATES, releaseFiles, signReleaseFiles, verifyReleaseFiles, zipFileName, type PluginTemplate, type ReleaseSpec, type TrustedReleaseKey } from './index.ts'
+
+/** The SDK's own published version — generated repos pin this as `^<version>`. */
+const sdkVersion = createRequire(import.meta.url)('../package.json').version as string
 
 const usage = `snap-rail-plugin <command>
 
@@ -201,7 +205,7 @@ async function initPlugin(directory: string | undefined, template: PluginTemplat
     ...(client ? {} : { main: 'lib-host/host.js' }),
     scripts: { build: 'tsdown', test: 'vitest run', inspect: 'snap-rail-plugin inspect dist/*.zip' },
     devDependencies: {
-      '@snap-rail/plugin-sdk': '^0.1.0',
+      '@snap-rail/plugin-sdk': `^${sdkVersion}`,
       '@snap-rail/cordis': '^4.0.1',
       tsdown: '^0.22.2',
       vitest: '^3.2.4',
