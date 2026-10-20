@@ -39,3 +39,4 @@ deploy.config.json
 .pnpm-store/
 website/public/site-assets/
 website/public/plugin-development.md
+collect-local/

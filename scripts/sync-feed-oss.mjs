@@ -53,7 +53,7 @@ if (bucket === undefined || bucket === '') {
 }
 /** Destination prefix: `oss://<bucket>/<prefix>/` — never the bare root
  * (the website lives there; `--delete` against the root would erase it). */
-function destinationBase(): string {
+function destinationBase() {
   const trimmed = bucket.replace(/\/+$/, '')
   const withoutScheme = trimmed.replace(/^oss:\/\//, '')
   if (withoutScheme.includes('/')) return `${trimmed}/`
