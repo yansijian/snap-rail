@@ -43,7 +43,9 @@ import {
   type PointValue,
 } from './model.ts'
 import { EQUIPMENT_SCHEMA, equipmentDevices, equipmentGroups, equipmentPoints } from './schema.ts'
-import type { ConfigDevice, ConfigGroup, ConfigPoint, DialectSchema, DriverInfo } from './wire.ts'
+import type {
+  ConfigDevice, ConfigGroup, ConfigPoint, DeviceProbeRead, DeviceProbeResult, DialectSchema, DriverInfo,
+} from './wire.ts'
 
 export { ConnectionId, pointKey, pointRefSchema }
 export type {
@@ -58,7 +60,7 @@ export type EquipmentErrorKind =
   | 'duplicate-connection' | 'duplicate-point' | 'duplicate-driver'
   | 'unknown-point' | 'unknown-driver' | 'unknown-device' | 'unknown-group'
   | 'driver-conflict' | 'type-conflict' | 'type-mismatch' | 'invalid-config'
-  | 'no-write-handler'
+  | 'no-write-handler' | 'no-probe'
 
 /** A equipment-seam failure carrying a machine-readable kind. */
 export class EquipmentError extends Error {
@@ -137,6 +139,11 @@ export interface DriverRegistration {
   /** Build the connection for a configured device. Called whenever the
    * device (re)enters the desired state under this driver. */
   createConnection: (device: DriverDevice, points: readonly DriverPoint[], handle: DriverHandle) => DriverConnection
+  /** Optional one-shot connection test for the settings page's "测试连接"
+   * action. `config` is already validated by the driver's device schema;
+   * `read` is an optional driver-specific read (register/tag). Implementations
+   * own their socket and must clean up on every path. */
+  probe?: (config: DialectConfig, read?: DeviceProbeRead) => Promise<DeviceProbeResult>
 }
 
 /** The provider-side handle returned by connection registration. */
@@ -167,6 +174,7 @@ interface DriverEntry {
   deviceSchema: z.ZodType<DialectConfig>
   pointSchema: z.ZodType<DialectConfig>
   createConnection: DriverRegistration['createConnection']
+  probe?: DriverRegistration['probe']
 }
 
 interface ControllerEntry {
@@ -262,6 +270,9 @@ export interface EquipmentService {
    * (and the connections it served — configured devices stay, just lifeless).
    */
   registerDriver(caller: Context, desc: DriverRegistration): () => void
+  /** One-shot connection test with the driver's device schema; never
+   * persists a device or opens a live connection in the base. */
+  testDevice(input: { driver: string, config: DialectConfig, read?: DeviceProbeRead }): Promise<DeviceProbeResult>
   /** Create or update a device (config validated by the driver's schema). */
   upsertDevice(input: DeviceUpsert): ConfigDevice
   /** Remove a device and everything under it. */
@@ -353,6 +364,7 @@ class EquipmentCore {
       deviceSchema: desc.schemas.device,
       pointSchema: desc.schemas.point,
       createConnection: desc.createConnection,
+      ...(desc.probe !== undefined ? { probe: desc.probe } : {}),
     }
     // A same-id registration replaces (hot-reload semantics): the old
     // controllers die first, the new ones rise in the reconcile below.
@@ -370,6 +382,55 @@ class EquipmentCore {
     }
     caller.effect(() => dispose)
     return dispose
+  }
+
+  /** Run one driver probe without touching the configuration tables. The
+   * config is re-validated here so the wire surface cannot smuggle an
+   * unvalidated blob past the form. A hung driver is bounded by a hard
+   * timeout; the probe's own socket cleanup remains its responsibility. */
+  async testDevice(input: { driver: string, config: DialectConfig, read?: DeviceProbeRead }): Promise<DeviceProbeResult> {
+    const entry = this.drivers.get(input.driver)
+    if (entry === undefined) {
+      throw new EquipmentError('unknown-driver', `driver "${input.driver}" is not loaded`)
+    }
+    if (entry.probe === undefined) {
+      throw new EquipmentError('no-probe', `driver "${input.driver}" does not support connection tests`)
+    }
+    const parsed = entry.deviceSchema.safeParse(input.config)
+    if (!parsed.success) {
+      throw new EquipmentError('invalid-config', `device config rejected: ${issuesOf(parsed.error)}`)
+    }
+    const startedAt = Date.now()
+    const timeoutMs = 10_000
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<DeviceProbeResult>(resolve => {
+      timer = setTimeout(() => resolve({
+        ok: false,
+        latencyMs: Date.now() - startedAt,
+        error: {
+          code: 'timeout',
+          message: `连接测试超时（${timeoutMs} ms）`,
+          hint: '检查 IP、端口、网线和防火墙；设备也可能只允许一个连接',
+        },
+      }), timeoutMs)
+    })
+    try {
+      return await Promise.race([
+        entry.probe(parsed.data, input.read),
+        timeout,
+      ])
+    } catch (cause) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - startedAt,
+        error: {
+          code: 'probe-failed',
+          message: cause instanceof Error ? cause.message : String(cause),
+        },
+      }
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
+    }
   }
 
   // ---- configuration tables ----
@@ -889,6 +950,10 @@ class EquipmentServiceImpl extends Service {
 
   registerDriver(caller: Context, desc: DriverRegistration): () => void {
     return this.core.registerDriver(caller, desc)
+  }
+
+  testDevice(input: { driver: string, config: DialectConfig, read?: DeviceProbeRead }): Promise<DeviceProbeResult> {
+    return this.core.testDevice(input)
   }
 
   upsertDevice(input: DeviceUpsert): ConfigDevice {

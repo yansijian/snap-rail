@@ -113,6 +113,14 @@ const equipmentRpcPlugin: Plugin.Object = {
         return { device: saved }
       },
 
+      'equipment.devices.test': async ({ driver, config, read }) => {
+        try {
+          return { result: await equipment.testDevice({ driver, config, ...(read !== undefined ? { read } : {}) }) }
+        } catch (cause) {
+          throw mapConfigError('device test', cause)
+        }
+      },
+
       'equipment.devices.remove': ({ id }) => {
         attempt('device remove', () => equipment.removeDevice(id))
         audit.record({ actor: 'client', action: 'equipment.device.remove', subject: id })
@@ -208,6 +216,8 @@ function mapConfigError(what: string, cause: unknown): RpcBusinessError {
         return new RpcBusinessError({ code: 'not-found', details: { what: cause.message } })
       case 'invalid-config':
         return new RpcBusinessError({ code: 'bad-request', details: { issues: [cause.message] } })
+      case 'no-probe':
+        return new RpcBusinessError({ code: 'unavailable', details: { what: cause.message } })
       case 'type-conflict':
       case 'driver-conflict':
       // Registry collisions (a live connection/point re-registering) are

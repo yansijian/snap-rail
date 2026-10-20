@@ -67,6 +67,9 @@ async function makeWorld(): Promise<World> {
           world.rig = handle
           return { update: () => undefined, dispose: () => undefined }
         },
+        probe: async config => config['rate'] === 1
+          ? { ok: false, latencyMs: 2, error: { code: 'refused', message: '模拟拒绝', hint: '检查端口' } }
+          : { ok: true, latencyMs: 3, detail: 'Rig 会话已建立', sample: { label: 'rig.value', value: 42 } },
       })
     },
     { inject: ['equipment'] },
@@ -150,6 +153,27 @@ describe('设备管理 page', () => {
     const config = world.host.equipment.config()
     // Devices read back in id order (digits sort before letters).
     expect(config.devices.map(device => device.name)).toEqual(['2号炉', 'plc1'])
+    await flush(2)
+  })
+
+  it('tests the connection before saving and shows the probe result', async () => {
+    const world = await makeWorld()
+    world.open()
+    await waitFor(() => expect(screen.getByRole('tab', { name: '＋' })).not.toBeNull())
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: '＋' }), { button: 0 })
+    const nameField = await screen.findByLabelText(/设备名称/)
+    fireEvent.change(nameField, { target: { value: 'probe-plc' } })
+    fireEvent.click(screen.getByRole('button', { name: '测试连接' }))
+
+    const result = await waitFor(() => {
+      const node = document.querySelector<HTMLElement>('[data-probe-result="ok"]')
+      expect(node).not.toBeNull()
+      return node!
+    })
+    expect(result.textContent).toContain('连接成功')
+    expect(result.textContent).toContain('Rig 会话已建立')
+    expect(result.textContent).toContain('42')
     await flush(2)
   })
 

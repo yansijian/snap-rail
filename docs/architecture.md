@@ -109,7 +109,7 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
 | 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架朴素插件页**（三合一输入：地址/拖拽/搜索安装 + 已安装列表 + 红色异常提示条；`droppedZipPath` 路径桥；`showBootstrapAfterFailure` 崩溃回退——框架运行时抛异常时重植 root 并把错误带上提示条回到此页）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
 | 持久化规范 | `store/store` | `ctx.store` 的 Service Definition：`register(caller, ns, drizzle表)`；**drizzle 查询构建器即规范**（无裸 SQL/CTE/窗口函数）；命名空间 = 隔离边界；注册即建表 + append-only 加列 |
 | 持久化实现 | `store/store-sqlite` | 参考实现（zip 安装；互斥组 `store-backend`，单活）：node:sqlite + 自写 drizzle 适配器（零原生模块），`data/<ns>.db`，WAL；换后端 = 新实现包替换单活 |
-| 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection}`——驱动是纯协议适配器（零存储、零渲染端）；底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。zip 声明 `requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影（消费方零改动）。`./contract` 是随应用发布的渲染契约（base 种子），`./driver` 是独立驱动仓库只读的纯类型面 |
+| 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection, probe?}`——驱动是纯协议适配器（零存储、零渲染端）；`probe` 驱动一次性只读连接测试，`equipment.devices.test` 是其 wire 面。底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。zip 声明 `requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影（消费方零改动）。`./contract` 是随应用发布的渲染契约（base 种子），`./driver` 是独立驱动仓库只读的纯类型面 |
 | ModbusTCP 驱动 | 独立仓 `snap-rail-driver-modbus` | 范本驱动（新驱动作者的活文档）：纯协议适配器，块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema）；无存储无渲染端；`requires: ['@snap-rail/equipment']` |
 | EtherNet/IP 驱动 | 独立仓 `snap-rail-driver-enip` | 照 modbus 范本的第二个驱动（首期对接 OMRON NX1P2）：自研轻量 ENIP/CIP 编解码（RegisterSession + SendRRData + Read/Write Tag 符号寻址，无第三方协议库），按已发布全局变量名轮询读写；变量级 CIP 失败只 null 单点（设备保持在线），写前经首读自学类型字；`slot>0` 发背板路由段（留 Logix 兼容门） |
 | UI 框架 | 独立仓 `snap-rail-framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、**设置外壳（对话框 occupant + 主题热应用 + 一方「插件/主题/软件更新」三页——原 `ui/settings-station` 包已退役并入，只装框架即得完整管理界面）**、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 经 `requires` 里的框架条目绑定（绑定即依赖）；换框架 = 换生态 |
@@ -357,10 +357,14 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
 ### 三、新增一个现场驱动（工业协议实现）
 
 1. 驱动 = 纯协议适配器：`ctx.equipment.registerDriver(ctx, { id, title,
-   schemas, createConnection })`。schemas 是 device/point 两个
+   schemas, createConnection, probe? })`。schemas 是 device/point 两个
    zod object（point 校验 `{type, ...config}`；`.meta({title})` 给统一
    表单中文标签）；照抄 `driver-modbus`（范本，`requires:
-   ['@snap-rail/equipment']`）。驱动多活并存。
+   ['@snap-rail/equipment']`）。驱动多活并存。`probe` 是可选的
+   **一次性只读连接测试**（设置页「测试连接」）：底座用驱动 schema
+   校验 config 后调用它，返回 `{ ok, latencyMs, detail?, sample?,
+   error? }`；`equipment.devices.test` 是它唯一的 wire 面，不落库、
+   不创建连接。没有 `probe` 的驱动仍可正常收发，只是不提供测试按钮。
 2. `createConnection(device, points, handle)` 返回
    `{ update(config, points), dispose() }`——底座决定何时调，驱动决定
    怎么落地（热调 vs 重连）。handle 上报 `status` / `sample` / `onWrite`；

@@ -51,6 +51,7 @@ import {
   equipmentFrameSchemas,
   type ConfigDevice,
   type ConfigGroup,
+  type DeviceProbeResult,
   type DriverInfo,
 } from '@snap-rail/equipment/contract'
 import type { ConnectionSnapshot, PointRef, PointSample } from '@snap-rail/equipment/contract'
@@ -75,6 +76,7 @@ type DialogState =
   | { kind: 'device-create' }
   | { kind: 'device-edit', device: ConfigDevice }
   | { kind: 'group-create', deviceId: string }
+  | { kind: 'point-template', deviceId: string }
   | { kind: 'point-create', deviceId: string, group: ConfigGroup }
   | { kind: 'point-edit', deviceId: string, group: ConfigGroup, name: string, config: Record<string, unknown> }
   | { kind: 'confirm', title: string, message: string, danger: () => Promise<void> | void }
@@ -89,6 +91,39 @@ function groupTypesOf(driver: DriverInfo | undefined): string[] {
     if (values.length > 0) return values
   }
   return ['bool', 'int', 'float', 'string']
+}
+
+/** One row of the built-in first-run point template for a driver. */
+interface PointTemplateRow {
+  group: string
+  type: 'bool' | 'int' | 'float'
+  name: string
+  config: Record<string, unknown>
+}
+
+/** Built-in templates are examples, not device catalogs: the addresses and
+ * tags are placeholders the operator edits in the point table after creation. */
+const POINT_TEMPLATES: Record<string, readonly PointTemplateRow[]> = {
+  modbus: [
+    { group: 'line', type: 'int', name: 'count', config: { fc: 3, address: 0, encoding: 'u16', writable: false } },
+    { group: 'line', type: 'int', name: 'rate', config: { fc: 3, address: 1, encoding: 'u16', writable: false } },
+    { group: 'status', type: 'bool', name: 'running', config: { fc: 1, address: 0, encoding: 'coil', writable: false } },
+  ],
+  enip: [
+    { group: 'line', type: 'int', name: 'ProductionCount', config: { tag: 'ProductionCount', writable: false } },
+    { group: 'line', type: 'int', name: 'Rate', config: { tag: 'Rate', writable: false } },
+    { group: 'status', type: 'bool', name: 'MachineRunning', config: { tag: 'MachineRunning', writable: false } },
+  ],
+}
+
+/** The address/tag summary a template row shows before creation. */
+function templateRowDetail(row: PointTemplateRow): string {
+  const fc = row.config['fc']
+  const address = row.config['address']
+  const tag = row.config['tag']
+  if (typeof tag === 'string') return `标签 ${tag}`
+  if (typeof fc === 'number' && typeof address === 'number') return `FC${fc} @ ${address}`
+  return '按驱动 schema 填写'
 }
 
 /** One planned dialect column (the same planner the settings form uses). */
@@ -378,9 +413,12 @@ function DevicePanel(props: {
               onDialog={onDialog}
             />
           ))}
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" size="sm" onClick={() => { onDialog({ kind: 'group-create', deviceId: device.id }) }}>
           新建分组
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => { onDialog({ kind: 'point-template', deviceId: device.id }) }} data-point-template>
+          从模板添加点位
         </Button>
       </div>
     </div>
@@ -421,6 +459,12 @@ function StationDialog(props: {
   // Group and point dialogs need the owning device's driver (its schemas).
   const ownerDriver = drivers.find(driver => driver.id === devices.find(device => device.id === dialog.deviceId)?.driver)
 
+  if (dialog.kind === 'point-template') {
+    const device = devices.find(entry => entry.id === dialog.deviceId)
+    if (device === undefined) return null
+    return <PointTemplateDialog link={link} device={device} driver={ownerDriver} onClose={onClose} />
+  }
+
   if (dialog.kind === 'group-create') {
     return <GroupDialog link={link} deviceId={dialog.deviceId} types={groupTypesOf(ownerDriver)} onClose={onClose} />
   }
@@ -444,11 +488,31 @@ function DeviceDialog(props: {
     editing ? dialog.device.config as SchemaFormValue : driver !== undefined ? schemaDefaults(driver.schemas.device) : {},
   )
   const [error, setError] = useState<string | undefined>(undefined)
+  const [probe, setProbe] = useState<DeviceProbeResult | undefined>(undefined)
+  const [testing, setTesting] = useState(false)
 
   const switchDriver = (next: string): void => {
     setDriverId(next)
     const nextDriver = drivers.find(entry => entry.id === next)
     setValue(nextDriver !== undefined ? schemaDefaults(nextDriver.schemas.device) : {})
+    setProbe(undefined)
+    setError(undefined)
+  }
+
+  /** One-shot read-only probe; a failure stays a diagnosis, not a save gate. */
+  const test = (): void => {
+    if (driver === undefined) return
+    setTesting(true)
+    setProbe(undefined)
+    setError(undefined)
+    void link.call('equipment.devices.test', {
+      driver: driverId,
+      config: compactSchemaValue(value),
+    }).then(result => {
+      setTesting(false)
+      if (result.ok) setProbe(result.value.result)
+      else setError(rpcErrorText(result.error))
+    })
   }
 
   const submit = (): void => {
@@ -494,6 +558,45 @@ function DeviceDialog(props: {
           )}
           {driver !== undefined && (
             <SchemaForm schema={driver.schemas.device} value={value} onChange={setValue} />
+          )}
+          {driver !== undefined && (
+            <div className="grid gap-2 rounded-md border border-border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Label>连接测试</Label>
+                  <p className="text-xs leading-relaxed text-muted-foreground">只读探测，不保存设备；失败也可以先保存，稍后再试。</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={testing}
+                  onClick={test}
+                  data-device-test
+                >
+                  {testing ? '测试中…' : '测试连接'}
+                </Button>
+              </div>
+              {probe !== undefined && (
+                <div className="grid gap-1 text-sm" data-probe-result={probe.ok ? 'ok' : 'error'}>
+                  <span className="flex items-center gap-2">
+                    <Led tone={probe.ok ? 'green' : 'red'} />
+                    {probe.ok ? `连接成功 · ${probe.latencyMs} ms` : (probe.error?.message ?? '连接失败')}
+                  </span>
+                  {probe.ok && probe.detail !== undefined && (
+                    <span className="text-xs text-muted-foreground">{probe.detail}</span>
+                  )}
+                  {probe.ok && probe.sample !== undefined && (
+                    <span className="font-mono text-xs text-foreground">
+                      {probe.sample.label} = {String(probe.sample.value)}
+                    </span>
+                  )}
+                  {!probe.ok && probe.error?.hint !== undefined && (
+                    <span className="text-xs text-muted-foreground">{probe.error.hint}</span>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           {error !== undefined && <p className="text-sm text-destructive" data-dialog-error>{error}</p>}
         </div>
@@ -557,6 +660,103 @@ function GroupDialog(props: {
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>取消</Button>
           <Button type="button" disabled={name.trim() === ''} onClick={submit} data-dialog-submit>保存</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** 从驱动的内置示例模板批量建组/建点；地址与标签只是起点。 */
+function PointTemplateDialog(props: {
+  link: HostLink
+  device: ConfigDevice
+  driver: DriverInfo | undefined
+  onClose: () => void
+}): ReactNode {
+  const rows = props.driver !== undefined ? POINT_TEMPLATES[props.driver.id] : undefined
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | undefined>(undefined)
+
+  const submit = (): void => {
+    if (rows === undefined || rows.length === 0) return
+    setBusy(true)
+    setError(undefined)
+    void (async () => {
+      const groups = new Map<string, 'bool' | 'int' | 'float'>()
+      for (const row of rows) groups.set(row.group, row.type)
+      for (const [name, type] of groups) {
+        const result = await props.link.call('equipment.groups.upsert', {
+          device: props.device.id,
+          group: { name, type },
+        })
+        if (!result.ok) {
+          setError(rpcErrorText(result.error))
+          setBusy(false)
+          return
+        }
+      }
+      for (const row of rows) {
+        const result = await props.link.call('equipment.points.upsert', {
+          device: props.device.id,
+          group: row.group,
+          point: { name: row.name, config: row.config },
+        })
+        if (!result.ok) {
+          setError(rpcErrorText(result.error))
+          setBusy(false)
+          return
+        }
+      }
+      setBusy(false)
+      props.onClose()
+    })()
+  }
+
+  return (
+    <Dialog open onOpenChange={open => { if (!open) props.onClose() }}>
+      <DialogContent aria-describedby={undefined} className="max-w-lg">
+        <DialogTitle className="text-base font-medium">从模板添加点位</DialogTitle>
+        {rows === undefined || rows.length === 0
+          ? <p className="text-sm leading-relaxed text-muted-foreground">该驱动还没有内置模板；请先在设备下手动新建分组和点位。</p>
+          : (
+              <div className="grid gap-4">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  下面是 <span className="font-medium text-foreground">{props.driver?.title ?? props.device.driver}</span> 的示例点位。
+                  地址/标签是占位值，创建后请在点位表里按设备手册修改。
+                </p>
+                <div className="overflow-hidden rounded-md border border-border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>分组</TableHead>
+                        <TableHead>点位</TableHead>
+                        <TableHead>示例地址</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map(row => (
+                        <TableRow key={`${row.group}/${row.name}`}>
+                          <TableCell className="font-mono text-xs">{row.group}</TableCell>
+                          <TableCell>{row.name}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">{templateRowDetail(row)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {error !== undefined && <p className="text-sm text-destructive" data-dialog-error>{error}</p>}
+              </div>
+            )}
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={props.onClose}>取消</Button>
+          <Button
+            type="button"
+            disabled={busy || rows === undefined || rows.length === 0}
+            onClick={submit}
+            data-dialog-submit
+          >
+            {busy ? '创建中…' : '创建这些点位'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -22,11 +22,28 @@ import type {
   PointDescriptor,
   PointSample,
   PointType,
+  PointValue,
 } from './model.ts'
 import { pointRefSchema } from './model.ts'
 
 /** A dialect config blob as it crosses the wire (driver-defined shape). */
 export type DialectConfig = Record<string, unknown>
+
+/** One optional driver-specific read the connection test performs once the
+ * link is up (e.g. a Modbus register or a CIP tag). Drivers parse it. */
+export type DeviceProbeRead = Record<string, unknown>
+
+/** The outcome of a driver's one-shot connection test. Expected connection
+ * failures are data (so the settings page can render a diagnosis), not
+ * thrown wire errors; the base only throws for an unknown driver, an
+ * unsupported probe, or an invalid config. */
+export interface DeviceProbeResult {
+  ok: boolean
+  latencyMs: number
+  detail?: string
+  sample?: { label: string, value: Exclude<PointValue, null> }
+  error?: { code: string, message: string, hint?: string }
+}
 
 /** A JSON Schema document projected from a driver's zod schema (form-facing). */
 export type DialectSchema = Record<string, unknown>
@@ -127,6 +144,13 @@ export const equipmentContract = defineContract('equipment', {
         config: dialectConfig,
       }).strict(),
     }).strict()).ret<{ device: ConfigDevice }>(),
+    /** One-shot connection test: validate a device config with the driver's
+     * schema and run its probe. Never persists a device. */
+    'equipment.devices.test': method(z.object({
+      driver: driverId,
+      config: dialectConfig,
+      read: z.record(z.string(), z.unknown()).optional(),
+    }).strict()).ret<{ result: DeviceProbeResult }>(),
     /** Remove one device. */
     'equipment.devices.remove': method(z.object({ id: configName }).strict()).ret<{ removed: true }>(),
     /** Create or update one group; type is immutable once the group has points. */

@@ -18,7 +18,7 @@
   name: '@snap-rail/gateway'
   config:
     name: snap-rail
-    version: 0.2.0
+    version: 0.3.0
     bin: desktop
 - id: equipment
   name: '@snap-rail/equipment'
