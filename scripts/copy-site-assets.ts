@@ -5,6 +5,13 @@
  * staged tree into the website's static public dir so Vite ships it beside
  * the pages. A missing source (no screenshots yet) is a no-op.
  *
+ * It also ships the plugin-development doc itself as a public file
+ * (`/plugin-development.md`): before the 备案'd domain is bound, the OSS
+ * default domain forces HTML downloads and `dev.html` needs its asset
+ * siblings, so the raw markdown is the only doc URL that works as a direct
+ * download. Single source stays `docs/plugin-development.md` — this is a
+ * build-time copy, gitignored in `public/`.
+ *
  * @module snap-rail/scripts/copy-site-assets
  */
 
@@ -15,6 +22,8 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const source = join(repoRoot, 'dist-publish', 'plugins', 'assets')
 const target = join(repoRoot, 'website', 'public', 'site-assets')
+const docSource = join(repoRoot, 'docs', 'plugin-development.md')
+const docTarget = join(repoRoot, 'website', 'public', 'plugin-development.md')
 
 function dirname(path: string): string {
   const index = path.replaceAll('\\', '/').lastIndexOf('/')
@@ -27,4 +36,9 @@ if (!existsSync(source)) {
   rmSync(target, { recursive: true, force: true })
   cpSync(source, target, { recursive: true })
   console.log(`copy-site-assets: ${source} → ${target}`)
+}
+
+if (existsSync(docSource)) {
+  cpSync(docSource, docTarget)
+  console.log(`copy-site-assets: ${docSource} → ${docTarget}`)
 }

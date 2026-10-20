@@ -38,3 +38,4 @@ deploy.config.json
 .keys/
 .pnpm-store/
 website/public/site-assets/
+website/public/plugin-development.md
