@@ -86,7 +86,11 @@ if (existsSync(join(stageDir, 'desktop'))) {
 }
 
 /** ossutil auth/endpoint flags; empty when the tool's own config is used. */
-const ossutil = process.env.SNAP_RAIL_OSSUTIL ?? 'ossutil'
+/** ossutil auth/endpoint flags; empty when the tool's own config is used.
+ * Windows defaults to `ossutil64.exe`: the `ossutil` name often resolves to a
+ * `.bat` wrapper that exits 0 without uploading — a silent no-op is the
+ * worst possible failure for a deploy script. */
+const ossutil = process.env.SNAP_RAIL_OSSUTIL ?? (process.platform === 'win32' ? 'ossutil64.exe' : 'ossutil')
 const args = []
 if (process.env.SNAP_RAIL_OSS_CONFIG !== undefined && process.env.SNAP_RAIL_OSS_CONFIG !== '') {
   args.push('-c', process.env.SNAP_RAIL_OSS_CONFIG)
