@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>插件开发 · snap-rail</title>
+    <meta
+      name="description"
+      content="snap-rail 插件开发指南：一条命令初始化插件仓库，manifest 与 requires 兼容声明，宿主/渲染双面构建，Ed25519 签名与滚动 Release 自发布——不依赖 snap-rail 源码，只需要 Node 22+ 与 pnpm。"
+    />
+    <meta property="og:title" content="插件开发 · snap-rail" />
+    <meta property="og:description" content="从空目录到一个可安装的 zip：SDK 脚手架、双面构建、签名与自持源发布。" />
+    <meta property="og:type" content="article" />
+    <meta property="og:image" content="https://www.snap-rail.top/og.png" />
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/dev.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a>
+
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="./index.html" aria-label="snap-rail 首页">
+          <img src="./logo.svg" alt="" />
+          <span class="brand-word">snap<span>-</span>rail</span>
+        </a>
+        <nav class="nav" aria-label="主导航">
+          <a data-nav="scenarios" href="./scenarios.html">场景</a>
+          <a data-nav="plugins" href="./plugins.html">插件生态</a>
+          <a data-nav="dev" href="./dev.html">插件开发</a>
+          <a data-nav="start" href="./start.html">快速上手</a>
+          <a href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">GitHub</a>
+        </nav>
+        <div class="header-actions">
+          <a class="btn btn-secondary" href="./start.html">第一次用？</a>
+          <a class="btn btn-primary" data-download="installer" href="./start.html#download">下载客户端</a>
+        </div>
+        <button class="menu-toggle" type="button" aria-label="打开导航" aria-expanded="false" data-menu-toggle>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+      <div class="mobile-menu" data-mobile-menu>
+        <a data-nav="scenarios" href="./scenarios.html">场景</a>
+        <a data-nav="plugins" href="./plugins.html">插件生态</a>
+        <a data-nav="dev" href="./dev.html">插件开发</a>
+        <a data-nav="start" href="./start.html">快速上手</a>
+        <a href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn btn-primary" data-download="installer" href="./start.html#download">下载 Windows 客户端</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-head surface-dark cabinet-grid">
+        <div class="wrap">
+          <p class="kicker">plugin authoring</p>
+          <h1>从空目录，<br />到一个可安装的 zip。</h1>
+          <p>
+            独立仓库 + 公共 npm SDK：一条命令脚手架，manifest 声明兼容，
+            双面构建，自己的密钥签名，自己的仓库发布。不需要 snap-rail 源码，
+            只需要 Node 22+ 与 pnpm。
+          </p>
+          <div class="page-actions">
+            <a class="btn btn-primary" href="#quickstart">30 秒开始</a>
+            <a class="btn btn-secondary" data-download="installer" href="./start.html#download">下载客户端</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section surface-paper">
+        <div class="wrap doc-layout">
+          <nav class="doc-toc" id="doc-toc" aria-label="本页目录"></nav>
+          <article class="doc-body" id="dev-doc"></article>
+        </div>
+      </section>
+
+      <section class="section surface-dark">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div>
+              <p class="kicker">next steps</p>
+              <h2>读完之后。</h2>
+            </div>
+            <p>把你的 Release 地址交给用户，或先看看别人怎么装。</p>
+          </div>
+          <div class="role-grid">
+            <article class="role reveal">
+              <span class="tag">DISCOVER</span>
+              <h3>被用户发现</h3>
+              <p>发布后给仓库打 topic <code style="font-family:var(--font-mono)">snap-rail-plugin</code>，官方不维护名单、不做 PR 上架。</p>
+              <a class="link-arrow" href="https://github.com/topics/snap-rail-plugin" target="_blank" rel="noopener">GitHub topic</a>
+            </article>
+            <article class="role reveal">
+              <span class="tag">ECOSYSTEM</span>
+              <h3>看看插件生态</h3>
+              <p>一方驱动、框架、套件都在滚动 feed 里；你的插件与它们同一种 zip。</p>
+              <a class="link-arrow" href="./plugins.html">插件生态</a>
+            </article>
+            <article class="role reveal">
+              <span class="tag">RUN IT</span>
+              <h3>先装一个终端</h3>
+              <p>下载客户端，把你的插件源加进去，搜索安装走一遍完整链路。</p>
+              <a class="link-arrow" href="./start.html#download">下载客户端</a>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer surface-dark">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a class="brand" href="./index.html">
+              <img src="./logo.svg" alt="" />
+              <span class="brand-word">snap<span>-</span>rail</span>
+            </a>
+            <p>可组装的工业终端 / HMI。插件化、可定制、数据留在本机。Apache-2.0。</p>
+          </div>
+          <div class="footer-col">
+            <h3>产品</h3>
+            <ul>
+              <li><a href="./index.html">首页</a></li>
+              <li><a href="./scenarios.html">场景</a></li>
+              <li><a href="./start.html">快速上手</a></li>
+              <li><a href="./start.html#download">下载</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h3>开发</h3>
+            <ul>
+              <li><a href="./dev.html">插件开发</a></li>
+              <li><a href="./plugins.html">插件生态</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">GitHub</a></li>
+              <li><a href="https://github.com/topics/snap-rail-plugin" target="_blank" rel="noopener">社区 topic</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h3>关于</h3>
+            <ul>
+              <li><a href="https://github.com/yansijian/snap-rail/releases" target="_blank" rel="noopener">Release</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail/issues" target="_blank" rel="noopener">问题反馈</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail/blob/master/LICENSE" target="_blank" rel="noopener">Apache-2.0</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 snap-rail contributors</span>
+          <span>Windows 10/11 x64</span>
+          <span>数据留在本机 · 当前版本不含遥测</span>
+        </div>
+      </div>
+    </footer>
+
+    <div class="download-bar" data-download-bar>
+      <div>
+        <strong>snap-rail</strong>
+        <span data-version-label>Windows 客户端</span>
+      </div>
+      <a class="btn btn-primary btn-sm" data-download="installer" href="./start.html#download">下载客户端</a>
+    </div>
+  </body>
+</html>

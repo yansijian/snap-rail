@@ -26,3 +26,7 @@ jobs:
       - uses: ./.github/actions/prepare-workspace
       # build → vitest → layer gate → wire-catalog gate
       - run: pnpm test
+      # The site is a build product; its tracked catalog is enough for a
+      # standalone typecheck+build, and the gate catches lost CTAs/assets.
+      - run: pnpm --filter @snap-rail/website run build
+      - run: pnpm run verify:website

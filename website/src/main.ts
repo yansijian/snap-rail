@@ -1,11 +1,9 @@
 /**
- * Landing page entry: shared site behavior plus the hero scroll-story
- * engine (three acts — cabinet, rail bus, terminal — driven by scroll
- * progress; see hero.ts).
+ * Landing page entry: the shared site behavior. The hero's test dialog and
+ * shell rail are part of the page composition; `site.ts` upgrades the shell
+ * chooser, downloads and media slots.
  */
-import './styles.css';
-import { initSite } from './site';
-import { initHeroStory } from './hero';
+import './styles.css'
+import { initSite } from './site'
 
-initSite('index');
-initHeroStory();
+initSite('index')

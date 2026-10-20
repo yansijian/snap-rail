@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>快速上手 · snap-rail</title>
+    <meta
+      name="description"
+      content="snap-rail 快速上手：装客户端、装标准基座、建设备、测试连接、套模板建点。Windows 10/11，离线可装，数据留在本机。"
+    />
+    <meta property="og:title" content="快速上手 · snap-rail" />
+    <meta property="og:description" content="从下载到第一个点：装客户端、装标准基座、测连接、建点。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://www.snap-rail.top/og.png" />
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/start.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a>
+
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="./index.html" aria-label="snap-rail 首页">
+          <img src="./logo.svg" alt="" />
+          <span class="brand-word">snap<span>-</span>rail</span>
+        </a>
+        <nav class="nav" aria-label="主导航">
+          <a data-nav="scenarios" href="./scenarios.html">场景</a>
+          <a data-nav="plugins" href="./plugins.html">插件生态</a>
+          <a data-nav="dev" href="./dev.html">插件开发</a>
+          <a data-nav="start" href="./start.html">快速上手</a>
+          <a href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md" target="_blank" rel="noopener">文档</a>
+          <a class="github" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">GitHub</a>
+        </nav>
+        <div class="header-actions">
+          <a class="btn btn-secondary" href="./scenarios.html">看场景</a>
+          <a class="btn btn-primary" data-download="installer" href="#download">下载客户端</a>
+        </div>
+        <button class="menu-toggle" type="button" aria-label="打开导航" aria-expanded="false" data-menu-toggle>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+      <div class="mobile-menu" data-mobile-menu>
+        <a data-nav="scenarios" href="./scenarios.html">场景</a>
+        <a data-nav="plugins" href="./plugins.html">插件生态</a>
+        <a data-nav="dev" href="./dev.html">插件开发</a>
+        <a data-nav="start" href="./start.html">快速上手</a>
+        <a href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md" target="_blank" rel="noopener">文档</a>
+        <a class="btn btn-primary" data-download="installer" href="#download">下载 Windows 客户端</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-head surface-dark cabinet-grid">
+        <div class="wrap">
+          <p class="kicker">quick start</p>
+          <h1>从下载到第一个点。</h1>
+          <p>
+            两步安装，一个测试。先确认“通不通、值是多少”，再决定要不要装场景、接更多设备。
+            全程离线可做；终端不需要访问 GitHub。
+          </p>
+          <div class="page-actions">
+            <a class="btn btn-primary" data-download="installer" href="#download">下载 Windows 客户端</a>
+            <a class="btn btn-secondary" href="#steps">按步骤走</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="download" class="section surface-paper">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div>
+              <p class="kicker">downloads</p>
+              <h2>先下这两个。</h2>
+            </div>
+            <p>客户端 + 标准基座是第一次的最小组合。想看完整画面，再加一个产线看板场景包。</p>
+          </div>
+
+          <div class="download-grid">
+            <article class="download-card reveal">
+              <span class="badge badge--amber">01 · 必装</span>
+              <h3>Windows 客户端</h3>
+              <p class="download-meta" data-version-label>Windows 10/11 x64</p>
+              <p>安装包，装好打开。未做商业代码签名，SmartScreen 可能提示“未知发布者”。</p>
+              <a class="btn btn-primary" data-download="installer" href="https://github.com/yansijian/snap-rail/releases">下载安装包</a>
+            </article>
+            <article class="download-card reveal">
+              <span class="badge badge--amber">02 · 第一次必装</span>
+              <h3>标准基座</h3>
+              <p class="download-meta">standard-base · v1.1.0 · 约 450 KB</p>
+              <p>存储、设备底座、界面框架、设备管理页。拖进客户端，重启一次。</p>
+              <a class="btn btn-secondary" data-download="combo" data-combo="standard-base" href="https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/standard-base.zip">下载标准基座（.zip）</a>
+            </article>
+            <article class="download-card reveal">
+              <span class="badge badge--green">03 · 想看完整场景</span>
+              <h3>产线看板场景包</h3>
+              <p class="download-meta">production-board · v1.1.0 · 约 2.9 MB</p>
+              <p>在标准基座上加 ModbusTCP 采集与生产作业套件；装完按第 5 步建演示设备。</p>
+              <a class="btn btn-secondary" data-download="combo" data-combo="production-board" href="https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/production-board.zip">下载产线看板（.zip）</a>
+            </article>
+          </div>
+
+          <p class="download-foot reveal">
+            安装包未做商业代码签名；企业可自行签名。安装包与场景包都可以离线拷贝；
+            feed 同源，客户端内“软件更新”走同一目录。
+          </p>
+        </div>
+      </section>
+
+      <section id="steps" class="section surface-dark">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div>
+              <p class="kicker">the first run</p>
+              <h2>五步，跑通一个点。</h2>
+            </div>
+            <p>前两步是安装；后三步是“建设备 → 测连接 → 建点”。每一步都可在车间离线完成。</p>
+          </div>
+
+          <div class="runbook">
+            <article class="runbook-step reveal">
+              <div class="runbook-index">01</div>
+              <div>
+                <h3>装客户端</h3>
+                <p>双击安装包。SmartScreen 提示时点“更多信息 → 仍要运行”。装完打开，先看到内核引导页。</p>
+                <div class="mini"><b>首次启动</b><br />引导页 = 拖入 zip / 搜索插件源的入口</div>
+              </div>
+            </article>
+            <article class="runbook-step reveal">
+              <div class="runbook-index">02</div>
+              <div>
+                <h3>装标准基座</h3>
+                <p>把 <code>standard-base.zip</code> 拖进引导页（或「插件」页），确认安装；装完重启客户端一次。</p>
+                <div class="mini"><b>重启后</b><br />设置 → 设备管理 出现</div>
+              </div>
+            </article>
+            <article class="runbook-step reveal">
+              <div class="runbook-index">03</div>
+              <div>
+                <h3>新建设备，点“测试连接”</h3>
+                <p>设置 → 设备管理 → 新建设备。选 ModbusTCP，填 IP、端口、单元号，点“测试连接”。</p>
+                <div class="mini"><span class="ok">✓ 连接成功 · 12 ms</span><br />Unit 1 · FC3 @ 0 = 1843</div>
+                <p class="runbook-note">失败也能先保存；按提示检查 IP、端口、防火墙、单元号。部分 PLC 只允许单连接，测试前先停用已有设备。</p>
+              </div>
+            </article>
+            <article class="runbook-step reveal">
+              <div class="runbook-index">04</div>
+              <div>
+                <h3>套模板，建点</h3>
+                <p>保存设备后，点“从模板添加点位”。示例给 count / rate / running；地址按设备手册改。</p>
+                <div class="mini"><b>line / count</b><br />FC3 @ 0 · int · 实时刷新</div>
+                <p class="runbook-note">没有模板的驱动，也可以手动新建分组和点位；点位地址 = (设备, 组, 点) 三元组。</p>
+              </div>
+            </article>
+            <article class="runbook-step reveal">
+              <div class="runbook-index">05</div>
+              <div>
+                <h3>装场景包，看完整画面</h3>
+                <p>把 <code>production-board.zip</code> 拖进「插件」页，确认安装，重启一次。按场景页的指引建一组演示设备即可看到班产看板。</p>
+                <div class="mini"><b>重启后</b><br />生产作业页 · 班产统计 · 设备管理</div>
+                <p class="runbook-note">组合包本身不签名，成员 zip 各自保留发布签名；安装预览逐成员显示验证结果。</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="plugins" class="section surface-paper">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div>
+              <p class="kicker">where things live</p>
+              <h2>东西都在哪。</h2>
+            </div>
+            <p>现场排查时，先知道文件在哪、状态从哪看。</p>
+          </div>
+          <div class="table-wrap reveal">
+            <table class="data">
+              <thead>
+                <tr><th>要找什么</th><th>在哪</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>数据 / 配置</strong></td><td><code>%APPDATA%\snap-rail</code></td><td>SQLite 库、settings.json、presets、插件池；可用 <code>SNAP_RAIL_HOME</code> 改。</td></tr>
+                <tr><td><strong>插件池</strong></td><td><code>%APPDATA%\snap-rail\plugins</code></td><td>每个插件一个目录；安装/卸载走客户端，不建议手改。</td></tr>
+                <tr><td><strong>场景预设</strong></td><td><code>%APPDATA%\snap-rail\presets</code></td><td>组合包安装后写入 <code>recipe-&lt;id&gt;.yml</code>；删除即停用。</td></tr>
+                <tr><td><strong>插件源</strong></td><td>设置 → 插件 → ⚙</td><td>静态目录/Release 地址，可加多个；没网就留空，用 zip。</td></tr>
+                <tr><td><strong>连接状态</strong></td><td>设置 → 设备管理</td><td>设备在线灯、组健康灯、点位实时值；驱动未加载会显示“驱动未加载”。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="section surface-dark">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div>
+              <p class="kicker">troubleshooting</p>
+              <h2>连不上时，先看这四行。</h2>
+            </div>
+            <p>错误文案按“人话 + 下一步”写；先排除最常见的原因，再动设备。</p>
+          </div>
+          <div class="table-wrap reveal">
+            <table class="data">
+              <thead>
+                <tr><th>现象</th><th>先检查</th><th>下一步</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>连接超时</strong></td><td>IP、端口、网线、防火墙；PLC 是否只允许一个连接</td><td>先在 PC 上 ping 通，再用测试连接</td></tr>
+                <tr><td><strong>连接被拒绝</strong></td><td>端口是否开在 PLC 上；ModbusTCP 默认 502，EtherNet/IP 默认 44818</td><td>核对设备手册 / PLC 以太网设置</td></tr>
+                <tr><td><strong>Modbus 异常码</strong></td><td>地址是否存在、功能码是否匹配、单元号是否正确</td><td>按异常码查地址表；先用一个已知寄存器试</td></tr>
+                <tr><td><strong>“驱动未加载”</strong></td><td>驱动插件是否安装/启用；设备页是否已重启</td><td>插件页启用驱动，重启一次</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="reveal" style="margin-top:22px">
+            <a class="link-arrow" href="https://github.com/yansijian/snap-rail/issues" target="_blank" rel="noopener">还卡住？到 GitHub Issues 描述现场</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section surface-paper">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div>
+              <p class="kicker">next</p>
+              <h2>跑通一个点之后。</h2>
+            </div>
+            <p>你可以继续接更多设备、装场景包，或者开始做自己的插件。</p>
+          </div>
+          <div class="role-grid">
+            <article class="role reveal">
+              <span class="tag">MORE DEVICES</span>
+              <h3>接第二条线</h3>
+              <p>复制设备结构，改地址/单元号；组和点可以按工艺重命名。一个终端可以管多台设备。</p>
+              <a class="link-arrow" href="./scenarios.html">看场景怎么组织</a>
+            </article>
+            <article class="role reveal">
+              <span class="tag">SCENE PACK</span>
+              <h3>装一个场景包</h3>
+              <p>产线看板把设备管理、采集、班产统计和作业流程串起来，装完重启一次。</p>
+              <a class="link-arrow" href="./scenarios.html">看场景包</a>
+            </article>
+            <article class="role reveal">
+              <span class="tag">BUILD YOUR OWN</span>
+              <h3>做自己的插件</h3>
+              <p>驱动、界面、套件都可以独立发布；用你自己的密钥签名，自己的插件源分发。</p>
+              <a class="link-arrow" href="./plugins.html">看插件开发</a>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer surface-dark">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a class="brand" href="./index.html">
+              <img src="./logo.svg" alt="" />
+              <span class="brand-word">snap<span>-</span>rail</span>
+            </a>
+            <p>可组装的工业终端 / HMI。插件化、可定制、数据留在本机。Apache-2.0。</p>
+          </div>
+          <div class="footer-col">
+            <h3>产品</h3>
+            <ul>
+              <li><a href="./index.html">首页</a></li>
+              <li><a href="./scenarios.html">场景</a></li>
+              <li><a href="./plugins.html">插件生态</a></li>
+              <li><a href="#download">下载</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h3>开发</h3>
+            <ul>
+              <li><a href="./dev.html">插件开发</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">GitHub</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail/blob/master/docs/plugin-development.md" target="_blank" rel="noopener">插件开发</a></li>
+              <li><a href="https://github.com/topics/snap-rail-plugin" target="_blank" rel="noopener">社区 topic</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h3>关于</h3>
+            <ul>
+              <li><a href="https://github.com/yansijian/snap-rail/releases" target="_blank" rel="noopener">Release</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail/issues" target="_blank" rel="noopener">问题反馈</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail/blob/master/LICENSE" target="_blank" rel="noopener">Apache-2.0</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 snap-rail contributors</span>
+          <span>Windows 10/11 x64</span>
+          <span>数据留在本机 · 当前版本不含遥测</span>
+        </div>
+      </div>
+    </footer>
+
+    <div class="download-bar" data-download-bar>
+      <div>
+        <strong>snap-rail</strong>
+        <span data-version-label>Windows 客户端</span>
+      </div>
+      <a class="btn btn-primary btn-sm" data-download="installer" href="#download">下载客户端</a>
+    </div>
+  </body>
+</html>
+
+

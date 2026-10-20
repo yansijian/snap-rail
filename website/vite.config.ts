@@ -15,8 +15,10 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
+        scenarios: 'scenarios.html',
         plugins: 'plugins.html',
-        recipes: 'recipes.html',
+        dev: 'dev.html',
+        start: 'start.html',
       },
     },
   },

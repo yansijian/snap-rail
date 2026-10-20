@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>场景包 · snap-rail</title>
+    <meta
+      name="description"
+      content="snap-rail 场景包：一组插件 + 一份预设。下载一个 zip，拖进客户端，重启一次，终端就变成那个工位。产线看板、标准基座，离线也能装。"
+    />
+    <meta property="og:title" content="场景包 · snap-rail" />
+    <meta property="og:description" content="装一个场景包，终端就变成那个工位。产线看板、标准基座，离线也能装。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://www.snap-rail.top/og.png" />
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/scenarios.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a>
+
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="./index.html" aria-label="snap-rail 首页">
+          <img src="./logo.svg" alt="" />
+          <span class="brand-word">snap<span>-</span>rail</span>
+        </a>
+        <nav class="nav" aria-label="主导航">
+          <a data-nav="scenarios" href="./scenarios.html">场景</a>
+          <a data-nav="plugins" href="./plugins.html">插件生态</a>
+          <a data-nav="dev" href="./dev.html">插件开发</a>
+          <a data-nav="start" href="./start.html">快速上手</a>
+          <a href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md" target="_blank" rel="noopener">文档</a>
+          <a class="github" href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">GitHub</a>
+        </nav>
+        <div class="header-actions">
+          <a class="btn btn-secondary" href="./start.html">第一次用？</a>
+          <a class="btn btn-primary" data-download="installer" href="./start.html#download">下载客户端</a>
+        </div>
+        <button class="menu-toggle" type="button" aria-label="打开导航" aria-expanded="false" data-menu-toggle>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+      <div class="mobile-menu" data-mobile-menu>
+        <a data-nav="scenarios" href="./scenarios.html">场景</a>
+        <a data-nav="plugins" href="./plugins.html">插件生态</a>
+        <a data-nav="dev" href="./dev.html">插件开发</a>
+        <a data-nav="start" href="./start.html">快速上手</a>
+        <a href="https://github.com/yansijian/snap-rail/blob/master/docs/architecture.md" target="_blank" rel="noopener">文档</a>
+        <a class="btn btn-primary" data-download="installer" href="./start.html#download">下载 Windows 客户端</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-head surface-dark cabinet-grid">
+        <div class="wrap">
+          <p class="kicker">scene packs</p>
+          <h1>装一个场景包，<br />终端就变成那个工位。</h1>
+          <p>
+            场景包是普通 zip：一组插件 + 一份预设。联网 PC 下载，拷进内网，拖进客户端，
+            重启一次就位。成员各自带发布签名；组合包本身只是容器。
+          </p>
+          <div class="page-actions">
+            <a class="btn btn-primary" data-download="installer" href="./start.html#download">下载客户端</a>
+            <a class="btn btn-secondary" href="./start.html#scene">看安装步骤</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section surface-paper">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div>
+              <p class="kicker">available now</p>
+              <h2>现在能装的场景。</h2>
+            </div>
+            <p>先装标准基座，再叠加场景包。每个 zip 都带齐成员插件，现场不需要再找依赖。</p>
+          </div>
+          <div id="combos" class="scenario-grid"></div>
+        </div>
+      </section>
+
+      <section id="scene" class="section surface-dark">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div>
+              <p class="kicker">offline install</p>
+              <h2>三步，进内网。</h2>
+            </div>
+            <p>现场不一定有网，甚至不应该有网。安装路径按“离线优先”设计。</p>
+          </div>
+          <div class="steps reveal">
+            <article class="step">
+              <div class="step-index"><span>STEP 01</span><b>01</b></div>
+              <h3>联网 PC 下载</h3>
+              <p>下载客户端和场景包 zip（标准基座 + 你要的场景）。</p>
+              <div class="mini"><b>snap-rail-setup.exe</b><br />standard-base.zip<br />production-board.zip</div>
+            </article>
+            <article class="step">
+              <div class="step-index"><span>STEP 02</span><b>02</b></div>
+              <h3>拷进内网</h3>
+              <p>U 盘、堡垒机、文件摆渡都行。终端不需要访问 GitHub 或任何插件服务器。</p>
+              <div class="mini">车间网络<br /><span class="ok">→ 只读本地 zip</span></div>
+            </article>
+            <article class="step">
+              <div class="step-index"><span>STEP 03</span><b>03</b></div>
+              <h3>拖入，重启</h3>
+              <p>先装标准基座，再装场景包；重启一次，终端就停在那个工位的画面。</p>
+              <div class="mini"><b>插件页 → 拖入 zip</b><br />重启 · 生效</div>
+            </article>
+          </div>
+          <div class="reveal" style="margin-top:24px">
+            <a class="link-arrow" href="./start.html">打开完整快速上手</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section surface-paper">
+        <div class="wrap">
+          <div class="section-head reveal">
+            <div>
+              <p class="kicker">your own scene</p>
+              <h2>你的场景，也可以是一个场景包。</h2>
+            </div>
+            <p>
+              设备协议、工艺画面、报表格式不在现成场景里？用 plugin SDK 做自己的驱动、界面或套件，
+              打包成 zip，用你自己的密钥签名，发布到你自己的插件源。
+            </p>
+          </div>
+          <div class="role-grid">
+            <article class="role reveal">
+              <span class="tag">DRIVER</span>
+              <h3>接一种新设备</h3>
+              <p>照抄 driver-modbus：上交 schema + createConnection，设备/组/点仍然住在底座表里。</p>
+              <a class="link-arrow" href="https://github.com/yansijian/snap-rail/blob/master/docs/plugin-development.md" target="_blank" rel="noopener">插件开发指南</a>
+            </article>
+            <article class="role reveal">
+              <span class="tag">UI / SUITE</span>
+              <h3>做一个专用画面</h3>
+              <p>用界面框架的共享原语做页面，把场景逻辑和界面收进一个套件包，单活切换。</p>
+              <a class="link-arrow" href="./plugins.html">看插件类型</a>
+            </article>
+            <article class="role reveal">
+              <span class="tag">PACK</span>
+              <h3>打成一个场景包</h3>
+              <p>根目录 recipe.yml + plugins/*.zip；成员各自签名，客户端按内容识别、批量安装、写预设。</p>
+              <a class="link-arrow" href="https://github.com/yansijian/snap-rail/blob/master/docs/deploy.md" target="_blank" rel="noopener">组合包格式</a>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer surface-dark">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a class="brand" href="./index.html">
+              <img src="./logo.svg" alt="" />
+              <span class="brand-word">snap<span>-</span>rail</span>
+            </a>
+            <p>可组装的工业终端 / HMI。插件化、可定制、数据留在本机。Apache-2.0。</p>
+          </div>
+          <div class="footer-col">
+            <h3>产品</h3>
+            <ul>
+              <li><a href="./index.html">首页</a></li>
+              <li><a href="./plugins.html">插件生态</a></li>
+              <li><a href="./start.html">快速上手</a></li>
+              <li><a href="./start.html#download">下载</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h3>开发</h3>
+            <ul>
+              <li><a href="./dev.html">插件开发</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail" target="_blank" rel="noopener">GitHub</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail/blob/master/docs/plugin-development.md" target="_blank" rel="noopener">插件开发</a></li>
+              <li><a href="https://github.com/topics/snap-rail-plugin" target="_blank" rel="noopener">社区 topic</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h3>关于</h3>
+            <ul>
+              <li><a href="https://github.com/yansijian/snap-rail/releases" target="_blank" rel="noopener">Release</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail/issues" target="_blank" rel="noopener">问题反馈</a></li>
+              <li><a href="https://github.com/yansijian/snap-rail/blob/master/LICENSE" target="_blank" rel="noopener">Apache-2.0</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 snap-rail contributors</span>
+          <span>Windows 10/11 x64</span>
+          <span>数据留在本机 · 当前版本不含遥测</span>
+        </div>
+      </div>
+    </footer>
+
+    <div class="download-bar" data-download-bar>
+      <div>
+        <strong>snap-rail</strong>
+        <span data-version-label>Windows 客户端</span>
+      </div>
+      <a class="btn btn-primary btn-sm" data-download="installer" href="./start.html#download">下载客户端</a>
+    </div>
+  </body>
+</html>
+
