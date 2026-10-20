@@ -174,8 +174,10 @@ Release 节奏。
   源 = Release 静态资产（`index.json` + zip，条目从发行 manifest 回读并带
   sha256/size/signature.keyId，下载先验哈希；wire 只传插件名）。**多源**：
   `plugins.feedUrls` 是源列表（旧单键 `plugins.feedUrl` 读作单元素过渡；
-  出厂默认经 `apps/desktop/resources/defaults.json`，CI 打包前
-  `scripts/stamp-feed-default.ts` 盖章；用户在插件页 ⚙ 编辑的列表存
+  出厂默认经 `apps/desktop/resources/defaults.json`，单一事实源是根
+  `feed-base.json`——`scripts/stamp-feed-default.ts` 无参盖章/`--check`
+  校验 defaults + electron-builder publish.url + 官网 catalog 三处一致；
+  用户在插件页 ⚙ 编辑的列表存
   settings.json、优先于默认）——搜索合并各源、条目带来源标签、同名取最高
   版本。**联邦条目**：index.json 条目可用绝对 `url` 替代同场 `file`——聚合者
   只收一行元数据、zip 留在作者自己的 Release，下载仍按条目 sha256 硬校验。
@@ -196,7 +198,9 @@ Release 节奏。
   `docs/plugin-publish-ci.yml`）；发现 = GitHub topic `snap-rail-plugin` +
   任意用户自加静态源；**不存在集中市场仓、没有 PR 上架、官方不转存社区
   字节**。公开 SDK 闭包（plugin-sdk/plugin-kit/util/protocol/store/
-  equipment/cordis）发布到公共 npm。
+  equipment/cordis/cosmokit + 拆分仓 framework-shadcn）发布到公共 npm
+  （`scripts/publish-npm.mjs`：闭包清单单源 + 发布期过滤未发布 peer，
+  `npm.yml` 手动触发）。
 - **简单持久化配置走 settings.json**：键 `域.名`，经 `settings.get/set`
   RPC 存取宿主原子 JSON；写后 `settings/changed` 帧广播，消费方当场热
   应用。要即时生效的渲染端配置走这条路，不要改 plugins.yml 行（那要

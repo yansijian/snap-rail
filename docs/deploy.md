@@ -75,15 +75,16 @@ publish 依次：构建 → 打包一方插件 zip（Ed25519 签名）→ 合并
   Release 发布，用户自行添加源；
 - `--feed-tag <t>`：覆盖滚动 tag（默认 `feed`）。
 
-### 出厂默认源（CI 盖章）
+### 出厂默认源（feed-base.json 单源）
 
-`apps/desktop/resources/defaults.json` 携带 `plugins.feedUrls` 出厂默认
-（仓库里的默认值是公网 GitHub 滚动 Release；内网构建现场盖章）。CI 打包
-桌面应用前执行：
+`apps/desktop/resources/defaults.json` 携带 `plugins.feedUrls` 出厂默认，
+单一事实源是根 `feed-base.json`（当前指向国内可达的 OSS 滚动源）；换基址
+或核对一致性用：
 
 ```sh
-pnpm exec tsx scripts/stamp-feed-default.ts https://github.com/<owner>/<repo>/releases/download/feed/
-# 内网 CI 同时把 electron-builder.yml 的 publish.url 改成同一基址
+pnpm exec tsx scripts/stamp-feed-default.ts            # 按 feed-base.json 盖章
+pnpm exec tsx scripts/stamp-feed-default.ts <新基址>    # 换基址并盖章
+pnpm run verify:feed-base                              # 三处一致性门禁
 ```
 
 新装机零配置即可搜索安装插件（用户后续在「插件页 → ⚙」编辑的源列表存本机
@@ -93,14 +94,16 @@ pnpm exec tsx scripts/stamp-feed-default.ts https://github.com/<owner>/<repo>/re
 
 ```sh
 pnpm exec tsx scripts/check-feed-endpoint.ts \
-  --update <基址>/releases/download/feed/ \
-  --plugins <基址>/releases/download/feed/
+  --update <基址> \
+  --plugins <基址> \
+  --site <官网基址>
 pnpm run verify:feed -- --feed dist-publish/plugins --trust apps/desktop/resources/trusted-release-keys.json
 ```
 
 `check-feed-endpoint` 核对 feed 文件字节一致（zip 的 sha256/size 对清单）、
 latest.yml 是 electron-builder 清单而非错误页伪装 200、安装包支持 Range（决定
-blockmap 差量下载可用性）。`verify:feed` 逐个校验插件 zip 的摘要/大小/签名；
+blockmap 差量下载可用性）；`--site` 另行探测官网页面（200 + text/html，
+无强制下载头）。`verify:feed` 逐个校验插件 zip 的摘要/大小/签名；
 当 feed 同时带 `catalog.json` 时，也会逐个校验组合包：`recipe.yml` 严格可解析、
 成员 zip 与 feed 发布的同名 zip 字节一致。通过后把终端的插件源设置键指过来
 （应用更新键同址），走一次「检查更新」「搜索安装一个插件」「拖入一个组合包」
@@ -110,15 +113,119 @@ blockmap 差量下载可用性）。`verify:feed` 逐个校验插件 zip 的摘�
 
 ```sh
 pnpm run site:build
-# = gen-website-catalog → copy-site-assets → vite build（产物 website/dist）
+# = gen-website-catalog（feed 事实 + feed-base 基址）→ copy-site-assets
+#   → gen-website-dev-page（docs/plugin-development.md 渲染成页面正文）
+#   → vite build（产物 website/dist）
 ```
 
-- `SNAP_RAIL_FEED_BASE`、`SNAP_RAIL_REPO_URL` 覆盖生成数据里的下载基址与源码
-  地址（默认公网 GitHub）；内网构建可指向 Gitea 镜像；
+- 五个页面：`index.html`（结果 + 测试连接 + 形态 + 场景 + FAQ）、
+  `scenarios.html`（场景包）、`plugins.html`（目录/搜索/社区/开发）、
+  `dev.html`（《插件开发》文档页，正文由 `docs/plugin-development.md`
+  生成，`pnpm run verify:website` 带 `--check` 漂移门禁）、
+  `start.html`（下载到第一个点）；`recipes.html` 是旧链接跳转；
+- 下载基址默认取根 `feed-base.json`（与出厂插件源/更新源同源）；
+  `SNAP_RAIL_FEED_BASE`、`SNAP_RAIL_REPO_URL` 覆盖生成数据里的下载基址与
+  源码地址（内网构建可指向 Gitea 镜像）；`VITE_SITE_URL` 覆盖
+  canonical/sitemap 的站点基址（默认正式域名 `https://www.snap-rail.top/`）；
+- 首屏「测试连接」截图来自真实客户端；**上线门禁**：安装包版本必须包含
+  `equipment.devices.test`（0.3.0+），否则用旧版自动连接截图，不出现“测试”
+  承诺。当前 `latest.yml` 仍是 0.2.0 时，`website/dist` 只作本地预览，不要部署；
 - GitHub Pages 由 `feed.yml` 在每次滚动发布后自动部署（artifact =
-  `website/dist`），资源路径全是相对路径，项目页子路径也能直接用；
+  `website/dist`，feed 作业内以 GitHub 基址构建），作为公网镜像；对内
+  部署用 `site:build`（feed-base 基址）+ `site:sync-oss` 传 OSS 桶根
+  （资源路径全是相对路径，任意静态托管可用）；
 - 页面上的插件卡片下载 `FEED_BASE + <zip 文件名>`，组合卡片下载
-  `FEED_BASE + <id>.zip`——官网只做下载入口，不代理安装。
+  `FEED_BASE + <id>.zip`——官网只做下载入口，不代理安装；
+- `pnpm run verify:website` 是站点门禁（五页、CTA、dev 导航、生成文档
+  内容、OG/robots/sitemap 域名一致性），已在 `ci.yml` 里跑；`pnpm run
+  site:build` 仍要求
+  `dist-publish/plugins/catalog.json`。
+
+### 云基址（阿里云 OSS + CDN，国内可达）
+
+GitHub 在国内制造业现场不可达/极慢时，把滚动 Release 镜像到 OSS：发布形态
+不变（平铺静态文件），基址换成桶域名，客户端只改设置键，零代码改动。
+**桶布局**：滚动 Release 在桶的 `feed/` 前缀下，官网静态文件在桶根——一个
+桶同时托管插件源、应用更新源与官网。
+
+一次准备：
+
+1. 开通 OSS，建 Bucket（标准存储、本地冗余、**公共读**；地域按用户分布选）；
+2. 装 [ossutil](https://help.aliyun.com/zh/oss/manual-of-ossutil) 并配好
+   AccessKey（或经环境变量提供给脚本，见下）；
+3. 可选：自定义域名 + ICP 备案 + CDN 加速（未备案先用桶默认域名过渡）。
+
+### feed 基址单源（feed-base.json）
+
+根目录 `feed-base.json` 是插件源 / 应用更新源 / 官网下载基址的**唯一事实
+源**。`scripts/stamp-feed-default.ts` 把它应用到三个必须一致的地方：
+
+- `apps/desktop/resources/defaults.json` → `plugins.feedUrls`（出厂插件源）；
+- `apps/desktop/electron-builder.yml` → `publish.url`（应用更新源）;
+- `website/src/generated/catalog.ts` → `FEED_BASE`（官网下载基址）。
+
+```sh
+pnpm exec tsx scripts/stamp-feed-default.ts              # 按 feed-base.json 盖章
+pnpm exec tsx scripts/stamp-feed-default.ts <新基址>      # 换基址（写回 feed-base.json）并盖章
+pnpm run verify:feed-base                                # 一致性门禁（--check，已接入 pnpm test）
+```
+
+注意：换基址不是一条命令就完——官网要重建重传，安装包内置更新源要**重出
+一版安装包**才会跟随；旧安装包继续指向旧基址，所以旧基址的桶/前缀要继续
+服务到所有客户端轮换完。
+
+### 发布到 OSS：装配 + 两条同步
+
+```sh
+pnpm run publish:local -- --sign-key .keys/<key-id>.private.pem --key-id <key-id> --publisher snap-rail
+SNAP_RAIL_OSS_BUCKET=oss://<bucket> pnpm run feed:sync-oss     # → <bucket>/feed/
+pnpm run site:build                                            # 官网（基址自动取 feed-base.json）
+SNAP_RAIL_OSS_BUCKET=oss://<bucket> pnpm run site:sync-oss     # → <bucket>/（官网）
+```
+
+- `feed:sync-oss`（`scripts/sync-feed-oss.mjs`）把 `dist-publish/` 的
+  `plugins/`（除 `assets/` 截图）与 `desktop/` 三件套拍平，`ossutil sync
+  --delete` 全量镜像到 `<bucket>/<prefix>/`。前缀默认 `feed`
+  （`SNAP_RAIL_OSS_PREFIX` 可改）；**拒绝裸桶根 + `--delete`**（会连官网
+  一起清掉），确需同步根要显式 `SNAP_RAIL_OSS_ALLOW_ROOT=1`；
+- `site:sync-oss`（`scripts/sync-site-oss.mjs`）把 `website/dist` 同步到桶
+  根，**永不 delete**（`--delete` 打在桶根会把 `feed/` 当多余对象删掉——
+  这是硬设计），残留的哈希旧资源可手动清理；
+- 认证优先用 ossutil 自身配置（`~/.ossutilconfig`），也可用环境变量：
+  `SNAP_RAIL_OSS_BUCKET`（必填）、`SNAP_RAIL_OSS_ENDPOINT`、
+  `SNAP_RAIL_OSS_AK_ID`/`SNAP_RAIL_OSS_AK_SECRET`、`SNAP_RAIL_OSS_CONFIG`、
+  `SNAP_RAIL_OSSUTIL`（Windows 下常为 `ossutil64.exe`）。
+
+发布后验证同下节（`check-feed-endpoint` 会实测 Range，blockmap 差量更新
+依赖它；OSS 默认支持）。
+
+计费与选型（量级参考，以官网报价为准）：存储 < 2GB 忽略不计；成本全在
+下行流量——验证期纯按量（外网流出 ≈ ¥0.5/GB）即可；月流量过 50GB 后买
+OSS 下行流量包（约 5–6 折）；上 CDN 后改买 CDN 流量包（≈ ¥0.2/GB 起）+
+小额回源流量。不需要传输加速/低频归档/请求包。缓存规则：`index.json`、
+`catalog.json`、`latest.yml` 短 TTL（≈ 5 分钟，保证新版本及时可见），
+zip/exe/blockmap 长缓存（内容寻址，换文件名发布）。
+
+### 备案与域名绑定（上线运行手册）
+
+OSS 桶默认域名对 HTML 强制 `Content-Disposition: attachment`（ICP 政策）
+——**备案前官网无法公开浏览**（feed 文件不受影响，终端与直链下载照常）。
+备案通过后的完整切换序列：
+
+1. **绑定域名**：OSS 控制台 → Bucket → 域名管理 → 绑定 `www.snap-rail.top`
+   （DNS 的 CNAME + `_dnsauth` TXT 校验记录已提前配好，备案同步后验证即过）；
+2. **HTTPS**：给域名挂证书（OSS 可绑定证书，或直接上 CDN 用免费证书一键
+   签发）；推荐 CDN（境内加速 + 流量单价减半）：
+   新建加速域名 `www.snap-rail.top` → 源站选本 Bucket → 回源 Host =
+   `<bucket>.oss-<region>-*.aliyuncs.com` → 缓存规则按上节 → 强制 HTTPS 跳转；
+3. **验证**：
+   `pnpm exec tsx scripts/check-feed-endpoint.ts --update https://www.snap-rail.top/feed/ --plugins https://www.snap-rail.top/feed/ --site https://www.snap-rail.top/`
+   —— 页面 200 且无强制下载（WARN 消失）、feed 摘要一致、exe 支持 Range；
+4. **切基址**：`pnpm exec tsx scripts/stamp-feed-default.ts https://www.snap-rail.top/feed/`
+   → `pnpm run site:build && SNAP_RAIL_OSS_BUCKET=oss://<bucket> pnpm run site:sync-oss`
+   → 重出一版安装包（release workflow 打 tag），让新装机内置域名基址；
+5. **收尾**：桶根里 GitHub Pages 时代的旧资源可清；确认 robots/sitemap
+   已指向正式域名（已随仓库更新）。
 
 ### 应用更新（不跑 publish 时）
 

@@ -26,9 +26,14 @@ Electron 宿主。基于 vendored Cordis 元框架；一期交付核心 + 插件
 - **独立插件开发**：插件仓库使用公共 npm 的 `@snap-rail/plugin-sdk` 和
   `snap-rail-plugin` CLI，不需要放进本仓库；manifest 依赖声明、Host/Renderer
   面、语义 UI 槽位和 Ed25519 发布签名见
-  [docs/plugin-development.md](docs/plugin-development.md)。发布是去中心化
+  [docs/plugin-development.md](docs/plugin-development.md)（官网版：
+  [www.snap-rail.top/dev.html](https://www.snap-rail.top/dev.html)）。发布是去中心化
   的：作者自持钥、发自己的滚动 Release，仓库打 GitHub topic
-  `snap-rail-plugin` 即可被发现；没有集中市场仓、没有 PR 上架。
+  `snap-rail-plugin` 即可被发现；没有集中市场仓、没有 PR 上架。一条命令开始：
+
+  ```sh
+  pnpm dlx @snap-rail/plugin-sdk init my-driver --template driver
+  ```
 
 ## 布局
 
@@ -63,7 +68,10 @@ pnpm run plugin:generate-key -- .keys gitea-main-2026 --publisher snap-rail
 pnpm run collect:feed -- --provider gitea
 pnpm run publish:local -- --collect collect-out --sign-key .keys/gitea-main-2026.private.pem --key-id gitea-main-2026 --publisher snap-rail
 pnpm run verify:feed -- --feed dist-publish/plugins --trust apps/desktop/resources/trusted-release-keys.json
-pnpm run site:build   # 官网：从 dist-publish 的 catalog.json 生成并构建
+pnpm exec tsx scripts/stamp-feed-default.ts   # feed 基址单源（feed-base.json）盖章；--check 进 pnpm test
+pnpm run feed:sync-oss  # dist-publish → OSS <bucket>/feed/（SNAP_RAIL_OSS_BUCKET 环境变量）
+pnpm run site:build   # 官网：catalog + 开发文档页 + vite build（产物 website/dist）
+pnpm run site:sync-oss  # website/dist → OSS 桶根（官网；永不 delete，不碰 feed/）
 pnpm app:dev          # Vite dev server + Electron（全量 overlay），热重载开发
 pnpm app:pack         # win-unpacked 目录形态（release-out/）
 pnpm app:dist         # NSIS 安装包 + blockmap
