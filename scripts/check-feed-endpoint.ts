@@ -6,9 +6,13 @@
  *    fetch (content-type, content-length, accept-ranges, cache hints).
  * 3. Which raw URL shape this Gitea serves (`/raw/branch/<ref>/` vs the legacy
  *    `/raw/<ref>/` vs `/media/<ref>/`) — a wrong guess looks like a dead feed.
+ * 4. `--site <base>`: the website pages render (`text/html`, no forced
+ *    download). OSS's default domain stamps HTML with
+ *    `Content-Disposition: attachment` (ICP policy) — reported as a WARN,
+ *    resolved only by the 备案'd custom domain.
  *
  * Usage:
- *   pnpm exec tsx scripts/check-feed-endpoint.ts --update <desktop-feed-url> [--plugins <plugins-feed-url>]
+ *   pnpm exec tsx scripts/check-feed-endpoint.ts --update <desktop-feed-url> [--plugins <plugins-feed-url>] [--site <site-base-url>]
  *
  * Exit code is non-zero only on hard failures (feed unreachable, digest
  * mismatch); header warnings are reported but do not fail.
@@ -95,8 +99,9 @@ async function probeWithAlternatives(label: string, url: string): Promise<ProbeR
 async function main(): Promise<void> {
   const update = option('--update')
   const plugins = option('--plugins')
-  if (update === undefined && plugins === undefined) {
-    throw new Error('usage: check-feed-endpoint --update <desktop-feed-url> [--plugins <plugins-feed-url>]')
+  const site = option('--site')
+  if (update === undefined && plugins === undefined && site === undefined) {
+    throw new Error('usage: check-feed-endpoint --update <desktop-feed-url> [--plugins <plugins-feed-url>] [--site <site-base-url>]')
   }
   let hardFailure = false
 
@@ -161,6 +166,26 @@ async function main(): Promise<void> {
         }
       }
       await probeWithAlternatives('catalog.json（网站目录，可选）', joinUrl(plugins, 'catalog.json'))
+    }
+  }
+
+  if (site !== undefined) {
+    for (const page of ['', 'dev.html']) {
+      const label = page === '' ? '首页 index.html' : '开发文档页 dev.html'
+      const url = joinUrl(site, page)
+      const result = await probe(url)
+      report(label, url, result)
+      if (!result.ok) {
+        hardFailure = true
+        continue
+      }
+      if (!result.contentType.includes('text/html')) {
+        console.log('  [WARN] content-type 不是 text/html —— 静态托管配置可能未生效。')
+      }
+      if (result.headers['content-disposition'] !== undefined) {
+        console.log('  [WARN] 带 Content-Disposition —— OSS 默认域名对 HTML 强制下载（ICP 策略）。')
+        console.log('         备案通过并在 OSS 控制台绑定自定义域名后才会内联浏览（docs/deploy.md「备案与域名绑定」）。')
+      }
     }
   }
 

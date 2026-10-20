@@ -8,26 +8,44 @@
  *
  * The generated module also carries the two URLs every card needs:
  * `FEED_BASE` (download the zips / combo packages / installer) and
- * `REPO_URL` (source home). `SNAP_RAIL_FEED_BASE` and `SNAP_RAIL_REPO_URL`
- * override them for an intranet build; the defaults point at the public
- * GitHub rolling release.
+ * `REPO_URL` (source home). `FEED_BASE` defaults to the shared base in
+ * `feed-base.json` (the same one `stamp-feed-default.ts` stamps into the
+ * app); `SNAP_RAIL_FEED_BASE` and `SNAP_RAIL_REPO_URL` override them for an
+ * intranet build.
  *
  * @module snap-rail/scripts/gen-website-catalog
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { load } from 'js-yaml'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const catalogFile = join(repoRoot, 'dist-publish', 'plugins', 'catalog.json')
-const latestYml = join(repoRoot, 'apps', 'desktop', 'release-out', 'latest.yml')
 const outFile = join(repoRoot, 'website', 'src', 'generated', 'catalog.ts')
+/** The desktop release trio: the packaging output when present, else the
+ * staged copy the publish pipeline assembled (site builds from staging). */
+const latestYml = [
+  join(repoRoot, 'apps', 'desktop', 'release-out', 'latest.yml'),
+  join(repoRoot, 'dist-publish', 'desktop', 'latest.yml'),
+].find(path => existsSync(path))
 
-/** The public feed (the GitHub rolling release), overridable for intranet
- * builds; always ends with `/` so cards can concatenate the file name. */
-const FEED_BASE = (process.env.SNAP_RAIL_FEED_BASE ?? 'https://github.com/yansijian/snap-rail/releases/download/feed/').replace(/\/*$/, '/')
+/** The feed base every channel shares — `feed-base.json` at the repo root
+ * (stamped by scripts/stamp-feed-default.ts); the environment overrides for
+ * an intranet/preview build. Always ends with `/` so cards can concatenate
+ * the file name. */
+function defaultFeedBase(): string {
+  const baseFile = join(repoRoot, 'feed-base.json')
+  if (existsSync(baseFile)) {
+    const parsed = JSON.parse(readFileSync(baseFile, 'utf8')) as { feedBase?: unknown }
+    if (typeof parsed.feedBase === 'string' && /^https?:\/\//.test(parsed.feedBase)) return parsed.feedBase
+  }
+  return 'https://github.com/yansijian/snap-rail/releases/download/feed/'
+}
+
+/** The public feed base, overridable for intranet builds. */
+const FEED_BASE = (process.env.SNAP_RAIL_FEED_BASE ?? defaultFeedBase()).replace(/\/*$/, '/')
 const REPO_URL = (process.env.SNAP_RAIL_REPO_URL ?? 'https://github.com/yansijian/snap-rail').replace(/\/*$/, '')
 
 function dirname(path: string): string {
@@ -48,13 +66,36 @@ function main(): void {
     throw new Error('gen-website-catalog: catalog.json 需要 plugins 与 combos 数组')
   }
 
+  // The combo zip size is a file fact, not a hand-written label; the website
+  // shows it beside the version so "2.9 MB" can never drift from the asset.
+  const combos = catalog.combos.map(entry => {
+    if (typeof entry !== 'object' || entry === null) return entry
+    const combo = entry as { file?: unknown }
+    if (typeof combo.file !== 'string') return entry
+    const zip = join(repoRoot, 'dist-publish', 'plugins', combo.file)
+    if (!existsSync(zip)) return entry
+    return { ...entry, size: statSync(zip).size }
+  })
+
   // The desktop release trio, when a packaged build exists: latest.yml's
-  // version + installer file name become the site's download button.
-  let desktop: { version: string, setupFile: string } | null = null
-  if (existsSync(latestYml)) {
-    const latest = load(readFileSync(latestYml, 'utf8')) as { version?: unknown, path?: unknown }
+  // version, installer file name, size and build date become the site's
+  // download button and the "v0.3.0 · 110 MB" line.
+  let desktop: { version: string, setupFile: string, size?: number, releaseDate?: string } | null = null
+  if (latestYml !== undefined) {
+    const latest = load(readFileSync(latestYml, 'utf8')) as {
+      version?: unknown
+      path?: unknown
+      files?: Array<{ size?: unknown }>
+      releaseDate?: unknown
+    }
     if (typeof latest.version === 'string' && typeof latest.path === 'string') {
-      desktop = { version: latest.version, setupFile: latest.path }
+      const size = latest.files?.[0]?.size
+      desktop = {
+        version: latest.version,
+        setupFile: latest.path,
+        ...(typeof size === 'number' ? { size } : {}),
+        ...(typeof latest.releaseDate === 'string' ? { releaseDate: latest.releaseDate } : {}),
+      }
     }
   }
 
@@ -97,6 +138,7 @@ function main(): void {
     '  kind: \'base\' | \'scenario\'',
     '  file: string',
     '  plugins: string[]',
+    '  size?: number',
     '  readme?: string',
     '  screenshots?: string[]',
     '}',
@@ -104,6 +146,8 @@ function main(): void {
     'export interface DesktopRelease {',
     '  version: string',
     '  setupFile: string',
+    '  size?: number',
+    '  releaseDate?: string',
     '}',
     '',
     '/** The rolling release serving plugin zips, combo packages, and the installer. */',
@@ -113,7 +157,7 @@ function main(): void {
     `export const REPO_URL = ${JSON.stringify(REPO_URL)}`,
     '',
     '/** The feed catalog the site renders (same release as FEED_BASE). */',
-    `export const CATALOG: { generatedAt: string, plugins: CatalogPlugin[], combos: CatalogCombo[], desktop: DesktopRelease | null } = ${JSON.stringify({ generatedAt: catalog.generatedAt, plugins: catalog.plugins, combos: catalog.combos, desktop }, null, 2)}`,
+    `export const CATALOG: { generatedAt: string, plugins: CatalogPlugin[], combos: CatalogCombo[], desktop: DesktopRelease | null } = ${JSON.stringify({ generatedAt: catalog.generatedAt, plugins: catalog.plugins, combos, desktop }, null, 2)}`,
     '',
   ].join('\n')
 

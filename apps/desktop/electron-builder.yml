@@ -38,4 +38,4 @@ nsis:
 # plugin feed.
 publish:
   - provider: generic
-    url: https://github.com/yansijian/snap-rail/releases/download/feed/
+    url: https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/

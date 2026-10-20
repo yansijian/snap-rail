@@ -1,5 +1,5 @@
 {
   "plugins.feedUrls": [
-    "https://github.com/yansijian/snap-rail/releases/download/feed/"
+    "https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/"
   ]
 }
