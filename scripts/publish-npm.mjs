@@ -16,11 +16,16 @@
  * manifest in CI's disposable workspace; the source repositories keep their
  * in-workspace declarations.
  *
+ * Registry isolation: split plugin repos (external/*) carry a repo-level
+ * `.npmrc` pinning `@snap-rail:*` to the owner's intranet npm registry. That
+ * config is neutralized for the publish call — this closure always publishes
+ * to registry.npmjs.org.
+ *
  * @module snap-rail/scripts/publish-npm
  */
 
 import { spawnSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -115,8 +120,25 @@ for (const dir of closure) {
 
   console.log(`publishing ${name}@${version}`)
   if (dryRun) continue
-  if (!run('pnpm', ['publish', '--access', 'public', '--no-git-checks'], { cwd: join(repoRoot, dir) })) {
-    throw new Error(`publish-npm: ${name}@${version} 发布失败`)
+  // The split plugin repos carry a repo-level `.npmrc` pinning `@snap-rail:*`
+  // to the owner's intranet npm registry (their own publishing model). A
+  // `pnpm publish` inside such a directory inherits the scoped mapping and
+  // would post the package to an address a CI runner cannot reach — this
+  // closure publishes to public npm only. Neutralize the dir-local config
+  // for the publish call (the clone is disposable; restored afterwards).
+  const localNpmrc = join(repoRoot, dir, '.npmrc')
+  const standbyNpmrc = `${localNpmrc}.publish-standby`
+  const npmrcHidden = existsSync(localNpmrc)
+  if (npmrcHidden) {
+    renameSync(localNpmrc, standbyNpmrc)
+    console.log(`neutralize ${name}: repo .npmrc pinned a private registry — publishing to public npm instead`)
+  }
+  try {
+    if (!run('pnpm', ['publish', '--access', 'public', '--no-git-checks', '--registry', 'https://registry.npmjs.org/'], { cwd: join(repoRoot, dir) })) {
+      throw new Error(`publish-npm: ${name}@${version} 发布失败`)
+    }
+  } finally {
+    if (npmrcHidden) renameSync(standbyNpmrc, localNpmrc)
   }
 }
 
