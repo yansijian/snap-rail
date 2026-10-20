@@ -1,7 +1,13 @@
+#!/usr/bin/env node
 /**
  * Standalone plugin authoring CLI. It intentionally depends only on the
  * public SDK and release format, so an external plugin repository can use it
  * without checking out snap-rail.
+ *
+ * The shebang is load-bearing: npm writes POSIX/Windows bin shims that call
+ * `node <entry>` only when the built file starts with `#!`; without it the
+ * shim hands the `.js` to the OS as a document — Windows opens the
+ * "choose an app" dialog and exits 0 without running the CLI.
  *
  * @module @snap-rail/plugin-sdk/cli
  */
@@ -124,7 +130,12 @@ function doctorPlugin(directory: string): void {
   if (typeof clientEntry === 'string' && !existsSync(join(root, clientEntry))) {
     warnings.push(`渲染入口尚未构建：${clientEntry} 不存在（先 pnpm run build，否则 pack 会拒绝）`)
   }
-  if (snapRail.client !== undefined && !(snapRail.requires ?? []).some(entry => entry.includes('@'))) {
+  // A scoped package *name* starts with `@` too; a version binding is the
+  // only form with an `@` after the first character (`pkg@^1`,
+  // `@scope/pkg@^1`). `requires: ['@snap-rail/equipment']` is a name, not a
+  // framework binding, and must not silence this warning.
+  const versionBound = (snapRail.requires ?? []).some(entry => entry.lastIndexOf('@') > 0)
+  if (snapRail.client !== undefined && !versionBound) {
     warnings.push('渲染面插件应声明框架绑定（requires: <framework>@<range>）——绑定即生态依赖')
   }
   if (manifest.name.startsWith('@snap-rail/')) {
@@ -343,6 +354,9 @@ async function initPlugin(directory: string | undefined, template: PluginTemplat
     devDependencies: {
       '@snap-rail/plugin-sdk': `^${sdkVersion}`,
       '@snap-rail/cordis': '^4.0.1',
+      // `tsconfig.plugin.json` sets `types: ["node"]`; without this the
+      // generated repo's editor/tsc cannot resolve node builtins.
+      '@types/node': '^22.20.0',
       tsdown: '^0.22.2',
       vitest: '^3.2.4',
       ...(template === 'driver' ? { '@snap-rail/equipment': '^0.1.0' } : {}),

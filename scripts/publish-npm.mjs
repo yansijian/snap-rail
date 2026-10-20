@@ -48,24 +48,16 @@ const closure = [
   'external/snap-rail-framework-shadcn',
 ]
 
-/** Peers the published closure itself satisfies, plus third-party packages
- * that are public on npm. Anything else is stripped at publish time. */
-const publicPeers = new Set([
-  '@snap-rail/cosmokit',
-  '@snap-rail/cordis',
-  '@snap-rail/util',
-  '@snap-rail/protocol',
-  '@snap-rail/plugin-kit',
-  '@snap-rail/plugin-sdk',
-  '@snap-rail/store',
-  '@snap-rail/equipment',
-  '@snap-rail/framework-shadcn',
+/** Third-party peers that are themselves public on npm. Closure package names
+ * are added from the manifests below — deriving them keeps the allowlist from
+ * drifting when the closure grows. Anything else is stripped at publish time. */
+const PUBLIC_THIRD_PARTY_PEERS = [
   'drizzle-orm',
   'react',
   'react-dom',
   'tsdown',
   'zod',
-])
+]
 
 function dirname(path) {
   const index = path.replaceAll('\\', '/').lastIndexOf('/')
@@ -84,14 +76,26 @@ function run(command, args, options = {}) {
 
 function npmView(pkg) {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-  const result = spawnSync(npm, ['view', pkg, 'version'], { encoding: 'utf8', shell: process.platform === 'win32' })
+  // The closure always publishes to public npm; existence checks must ask the
+  // same registry. A developer-local npmmirror would otherwise report a
+  // lagging package as missing (or a mirror-only version as present) and
+  // break idempotence.
+  const result = spawnSync(npm, ['view', pkg, 'version', '--registry', 'https://registry.npmjs.org/'], { encoding: 'utf8', shell: process.platform === 'win32' })
   return result.status === 0 ? result.stdout.trim() : undefined
 }
 
-for (const dir of closure) {
+const entries = closure.map(dir => {
   const manifestPath = join(repoRoot, dir, 'package.json')
+  if (!existsSync(manifestPath)) {
+    throw new Error(`publish-npm: 缺少 ${dir}/package.json —— 先跑 node scripts/setup-external.mjs`)
+  }
   const source = readFileSync(manifestPath, 'utf8')
-  const manifest = JSON.parse(source)
+  return { dir, manifestPath, source, manifest: JSON.parse(source) }
+})
+const publicPeers = new Set([...entries.map(entry => entry.manifest.name), ...PUBLIC_THIRD_PARTY_PEERS])
+
+for (const entry of entries) {
+  const { dir, manifestPath, source, manifest } = entry
   const { name, version } = manifest
   const existing = npmView(`${name}@${version}`)
   if (existing !== undefined) {
@@ -100,7 +104,10 @@ for (const dir of closure) {
   }
 
   // Publish-time peer filter (see module doc): drop peers nothing public
-  // satisfies, plus their peerDependenciesMeta leftovers.
+  // satisfies, plus their peerDependenciesMeta leftovers. The rewrite exists
+  // only for the publish call; the source file is restored in `finally` so a
+  // local (non-CI) run never leaves stripped peers in the working tree.
+  let manifestRewritten = false
   const peers = manifest.peerDependencies
   if (peers !== undefined && typeof peers === 'object') {
     const dropped = Object.keys(peers).filter(peer => !publicPeers.has(peer))
@@ -114,6 +121,7 @@ for (const dir of closure) {
       console.log(`filter ${name}: dropping unpublished peers (${dropped.join(', ')})`)
       if (!dryRun) {
         writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+        manifestRewritten = true
       }
     }
   }
@@ -138,6 +146,7 @@ for (const dir of closure) {
       throw new Error(`publish-npm: ${name}@${version} 发布失败`)
     }
   } finally {
+    if (manifestRewritten) writeFileSync(manifestPath, source)
     if (npmrcHidden) renameSync(standbyNpmrc, localNpmrc)
   }
 }

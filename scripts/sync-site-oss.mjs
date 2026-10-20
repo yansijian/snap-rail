@@ -27,7 +27,6 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(join(import.meta.dirname, '..'))
 const distDir = join(repoRoot, 'website', 'dist')

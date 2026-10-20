@@ -19,6 +19,9 @@ pnpm install
 pnpm build
 ```
 
+国内镜像（npmmirror）同步新版本有延迟；`pnpm dlx` 报 `404` / `ETARGET`
+时临时切公共 npm 重试：`npm config set registry https://registry.npmjs.org/`。
+
 生成的仓库自带：`package.json`（manifest + 依赖已配好）、`src/` 骨架、
 `tsdown.config.ts`、`tsconfig.json`、一个能通过的冒烟测试、`.gitignore`，
 以及最重要的 **`AGENTS.md`** —— 插件仓库的短规范，AI 辅助开发时喂给

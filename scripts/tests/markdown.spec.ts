@@ -45,6 +45,14 @@ describe('markdown subset renderer', () => {
     expect(html).toContain('<blockquote><p>引用一行</p></blockquote>')
   })
 
+  it('treats dash-led prose as a paragraph, not an unterminated block', () => {
+    const { html } = renderMarkdown('--help 是常用参数。\n\n- 列表项\n\n---\n\n后文')
+    expect(html).toContain('<p>--help 是常用参数。</p>')
+    expect(html).toContain('<ul><li>列表项</li></ul>')
+    expect(html).toContain('<hr>')
+    expect(html).toContain('<p>后文</p>')
+  })
+
   it('skips the leading h1 for page heroes when asked', () => {
     const { html, toc } = renderMarkdown('# 标题\n\n正文', { skipFirstHeading: true })
     expect(html).not.toContain('<h1')

@@ -183,6 +183,9 @@ pnpm run site:build                                            # 官网（基址
 SNAP_RAIL_OSS_BUCKET=oss://<bucket> pnpm run site:sync-oss     # → <bucket>/（官网）
 ```
 
+Windows PowerShell 没有行内环境变量前缀，先写
+`$env:SNAP_RAIL_OSS_BUCKET='oss://<bucket>'` 再跑命令（同一会话内有效）。
+
 - `feed:sync-oss`（`scripts/sync-feed-oss.mjs`）把 `dist-publish/` 的
   `plugins/`（除 `assets/` 截图）与 `desktop/` 三件套拍平，`ossutil sync
   --delete` 全量镜像到 `<bucket>/<prefix>/`。前缀默认 `feed`
@@ -224,7 +227,10 @@ OSS 桶默认域名对 HTML 强制 `Content-Disposition: attachment`（ICP 政�
 4. **切基址**：`pnpm exec tsx scripts/stamp-feed-default.ts https://www.snap-rail.top/feed/`
    → `pnpm run site:build && SNAP_RAIL_OSS_BUCKET=oss://<bucket> pnpm run site:sync-oss`
    → 重出一版安装包（release workflow 打 tag），让新装机内置域名基址；
-5. **收尾**：桶根里 GitHub Pages 时代的旧资源可清；确认 robots/sitemap
+5. **备案号展示（合规项）**：备案通过后把 ICP 备案号加到官网 5 页的
+   `footer-bottom`，并链接 `https://beian.miit.gov.cn/`——境内网站上线必须
+   展示备案号，不是可选项；公安备案（如需）另按属地要求办理；
+6. **收尾**：桶根里 GitHub Pages 时代的旧资源可清；确认 robots/sitemap
    已指向正式域名（已随仓库更新）。
 
 ### 应用更新（不跑 publish 时）
@@ -235,8 +241,9 @@ pnpm run build && pnpm app:dist
 # 手工发布则把 latest.yml + setup.exe + blockmap 作为 Release 资产上传。
 ```
 
-注意：`electron-builder.yml` 的 `publish.url` 是打包进终端的内置缺省更新源
-（仓库默认公网 GitHub；内网 CI 在打包前盖章为本机 Gitea）；部署现场随时可用
+注意：`electron-builder.yml` 的 `publish.url` 是打包进终端的内置缺省更新
+源，值由 `feed-base.json` 经 `stamp-feed-default.ts` 盖章（当前为国内 OSS
+基址；内网 CI 可在打包前改盖本机 Gitea）。部署现场随时可用
 `update.feedUrl` 覆盖，无需重打包。
 
 ## 信任模型（签名是身份锚与防篡改，不是准入门槛）

@@ -6,8 +6,8 @@
  *   node scripts/site-media/modbus-fixture.mjs [--port 1502]
  *
  * Registers: 0 = 1843 (count), 1 = 42 (rate), 2.. = 0. Coil 0 = on.
- * Function 17 (report server id) answers an exception; the probe then reads
- * holding register 0, exactly like a real device that does not implement fc17.
+ * Function 17 (report server id) answers a valid server id, so the
+ * connection probe and the holding-register read both succeed.
  */
 import { createServer } from 'node:net'
 

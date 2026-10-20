@@ -101,6 +101,12 @@ for (const asset of [
 // deploying a promise the download cannot keep.
 const catalogSource = read('src/generated/catalog.ts')
 const version = /"desktop":\s*\{[\s\S]*?"version":\s*"([^"]+)"/.exec(catalogSource)?.[1]
+// Structured data is static HTML; it must not advertise a version the feed
+// no longer serves (the download buttons follow the catalog automatically).
+const ldVersion = /"softwareVersion":\s*"([^"]+)"/.exec(read('index.html'))?.[1]
+if (version !== undefined && ldVersion !== undefined && ldVersion !== version) {
+  errors.push(`index.html: ld+json softwareVersion ${ldVersion} ≠ feed ${version}（下载按钮跟 feed，结构化数据会漂）`)
+}
 if (version !== undefined && version.localeCompare('0.3.0', undefined, { numeric: true }) < 0) {
   console.warn(`verify-website — RELEASE GATE: feed is ${version}, hero shows the 0.3.0 connection-test wizard; do not deploy until the installer is published`)
 }

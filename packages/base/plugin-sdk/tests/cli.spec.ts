@@ -46,6 +46,7 @@ describe('snap-rail-plugin init', () => {
       expect(source.dependencies?.zod).toBeDefined()
       expect(source.devDependencies['@snap-rail/plugin-sdk']).toMatch(/^\^0\.2\./)
       expect(source.devDependencies['@snap-rail/equipment']).toBeDefined()
+      expect(source.devDependencies['@types/node']).toBeDefined()
       expect(source.devDependencies.react).toBeUndefined()
       for (const file of ['tsconfig.json', 'tsdown.config.ts', 'AGENTS.md', '.gitignore', 'README.md', 'src/index.ts', 'tests/manifest.spec.ts']) {
         expect(existsSync(join(dir, file)), file).toBe(true)
@@ -242,6 +243,33 @@ describe('snap-rail-plugin pack / verify / feed', () => {
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('snap-rail-plugin doctor warnings', () => {
+  it('warns when a renderer plugin has only package-name requires', async () => {
+    const root = tempRoot('sdk-cli-doctor-fw')
+    try {
+      const dir = join(root, 'panel')
+      await main(['init', dir, '--template', 'ui-view'])
+      const manifestPath = join(dir, 'package.json')
+      const parsed = JSON.parse(readFileSync(manifestPath, 'utf8')) as { snapRail: { requires?: string[] } }
+      // A scoped package name contains `@` but binds no framework version.
+      parsed.snapRail.requires = ['@snap-rail/equipment']
+      writeFileSync(manifestPath, `${JSON.stringify(parsed, null, 2)}\n`)
+      await main(['doctor', dir])
+      const report = lastReport() as { warnings: string[] }
+      expect(report.warnings.join(' ')).toContain('框架绑定')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('snap-rail-plugin distribution', () => {
+  it('ships a bin entry with the shebang npm shims need', () => {
+    const built = readFileSync(new URL('../lib/cli.js', import.meta.url), 'utf8')
+    expect(built.split('\n')[0]).toBe('#!/usr/bin/env node')
   })
 })
 

@@ -181,10 +181,16 @@ export function renderMarkdown(source: string, options: RenderOptions = {}): Ren
       continue
     }
     const paragraph: string[] = []
-    while (index < lines.length && lines[index]!.trim() !== '' && !/^(?:#{1,4} |```|> |-|\* |\d+\. )/.test(lines[index]!)) {
+    // A bare `-` here would also match prose that merely starts with a dash
+    // (`--flag`), stopping the loop without consuming the line — an infinite
+    // loop in the generator. Only real list markers and rules end a paragraph.
+    while (index < lines.length && lines[index]!.trim() !== '' && !/^(?:#{1,4} |```|> |- |\* |\d+\. |-{3,}\s*$)/.test(lines[index]!)) {
       assertNoRawHtml(lines[index]!)
       paragraph.push(lines[index]!.trim())
       index += 1
+    }
+    if (paragraph.length === 0) {
+      throw new Error(`markdown: 这一行无法归入任何块（${line.trim().slice(0, 60)}）`)
     }
     out.push(`<p>${renderInline(paragraph.join(' '))}</p>`)
   }

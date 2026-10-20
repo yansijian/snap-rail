@@ -38,8 +38,17 @@ function joinUrl(base: string, file: string): string {
   return `${base.replace(/\/+$/, '')}/${file}`
 }
 
+/** No single endpoint may hang the runbook: DNS blackholes and stalled
+ * intranet proxies are exactly what this probe is meant to diagnose. */
+const REQUEST_TIMEOUT_MS = 15_000
+
 async function probe(url: string): Promise<ProbeResult> {
-  const response = await fetch(url, { redirect: 'follow' })
+  let response: Response
+  try {
+    response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+  } catch (cause) {
+    throw new Error(`check-feed-endpoint: 请求失败 ${url}（${cause instanceof Error ? cause.message : String(cause)}）`)
+  }
   const headers: Record<string, string> = {}
   for (const header of ['content-type', 'content-length', 'cache-control', 'etag', 'last-modified', 'accept-ranges', 'content-disposition']) {
     const value = response.headers.get(header)
@@ -119,7 +128,10 @@ async function main(): Promise<void> {
       if (pathMatch !== undefined) {
         const exeUrl = joinUrl(update, pathMatch[1]!)
         // Range 请求探测安装包，避免整包下载。
-        const response = await fetch(exeUrl, { headers: { Range: 'bytes=0-0' } })
+        const response = await fetch(exeUrl, {
+          headers: { Range: 'bytes=0-0' },
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
         await response.body?.cancel()
         const ranged = response.status === 206
         const full = response.status === 200

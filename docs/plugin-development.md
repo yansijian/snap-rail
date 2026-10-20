@@ -24,8 +24,14 @@ pnpm run doctor     # 发布前的仓库契约自检
 `tsdown.config.ts`、`tsconfig.json`、一个能通过的冒烟测试和 `.gitignore`。
 包名默认是 `@local/<目录名>`，发布前改成你自己的 scope。
 
-国内网络无需额外配置：npmmirror 自动同步公共 npm；`pnpm dlx` 偏慢时可以
-显式指定镜像源。
+国内一般用 npmmirror（多数环境已默认配置）。镜像同步有分钟级到小时级的
+延迟：遇到 `404` / `ETARGET`（新版本还没同步过去）时，把 registry 临时切
+到公共 npm 重试：
+
+```sh
+npm config set registry https://registry.npmjs.org/
+pnpm dlx @snap-rail/plugin-sdk init my-driver --template driver
+```
 
 ## 八种模板
 
@@ -124,9 +130,13 @@ verified——社区包请使用你自己的 scope，冒名官方命名空间装
 
 ```sh
 openssl genpkey -algorithm ed25519 -out release.private.pem
-# 或使用主仓脚本（一并写出公钥与 trust JSON）：
-pnpm run plugin:generate-key -- .keys my-key --publisher 你的发布者名
+openssl pkey -in release.private.pem -pubout -out release.public.pem
 ```
+
+没有 openssl 的 Windows 机器可以用 Node 生成同一对密钥：调用
+`crypto.generateKeyPairSync('ed25519')`，私钥导出为 `pkcs8` PEM、公钥导出
+为 `spki` PEM，分别存成 `release.private.pem` / `release.public.pem` 即可。
+不需要克隆 snap-rail 主仓。
 
 私钥只留在你的发布机与 CI secret；`.public.pem` 交给客户登记进终端：
 
@@ -199,9 +209,12 @@ snap-rail-plugin verify dist/@you__plugin.zip --public-key .keys/my-key.public.p
 - **构建期「种子默认导入」硬错**：把 `import x from 'seed'` 改成
   `import { … } from` 或 `import * as`——CJS interop 下 default 导入运行
   时即崩。
-- **install 报未发布包 E404**：升级到 SDK 0.2.2+ / 框架 0.2.0+（旧模板把
+- **install 报未发布包 E404**：升级到 SDK 0.2.3+ / 框架 0.2.0+（旧模板把
   未发布的内部包写进了 peer）；用 `pnpm dlx @snap-rail/plugin-sdk@latest
   init` 重新生成。
+- **运行 CLI 时弹「选择应用打开 .js」**：0.2.2 及更早的发行 `lib/cli.js`
+  缺少 shebang，npm 生成的 bin shim 会把 `.js` 当文档交给 Windows。
+  升级到 0.2.3+（或临时用 `node node_modules/@snap-rail/plugin-sdk/lib/cli.js`）。
 - **渲染面构建后无法 require 框架组件**：确认 manifest 的
   `client.externalSeeds` 声明了你 import 的每个 `框架包/子路径`。
 - **驱动表单没有字段**：给 zod schema 的字段加 `.meta({ title: '标签' })`，

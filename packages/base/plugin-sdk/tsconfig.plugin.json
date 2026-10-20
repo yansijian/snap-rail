@@ -16,6 +16,7 @@
     "noUnusedParameters": true,
     "verbatimModuleSyntax": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "types": ["node"]
   }
 }
