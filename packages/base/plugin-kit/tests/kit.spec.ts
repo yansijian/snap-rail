@@ -1,12 +1,15 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash, generateKeyPairSync } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { zipSync } from 'fflate'
 import { rolldown } from 'rolldown'
 import {
   clientBundle,
   hostBundle,
+  catalogEntryFromZip,
   CLIENT_EXTERNALS,
   CONTRIBUTED_SEED_MODULES,
   releaseFiles,
@@ -16,6 +19,7 @@ import {
   SEED_MODULES,
   checkSeedAbi,
   snapRailManifestSchema,
+  signReleaseFiles,
 } from '../src/index.ts'
 
 describe('snapRail manifest schema', () => {
@@ -50,6 +54,59 @@ describe('tsdown presets', () => {
     const config = hostBundle('src/host.ts')
     expect(config.format).toEqual(['esm'])
     expect(config.platform).toBe('node')
+  })
+
+  it('host face: plain .js output — the manifest main (lib-host/host.js) must name a real file', () => {
+    // tsdown's default esm renaming emits host.mjs, which the packer would
+    // then refuse as a missing host face. The preset pins the extension.
+    expect(hostBundle('src/host.ts').fixedExtension).toBe(false)
+  })
+})
+
+describe('feed catalog entries', () => {
+  async function signedFixtureZip(requireSignature: boolean): Promise<Uint8Array> {
+    const dir = mkdtempSync(join(tmpdir(), 'kit-catalog-'))
+    try {
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({
+        name: '@t/zip',
+        version: '1.0.0',
+        description: 'fixture',
+        snapRail: { kind: 'driver', title: 'Fixture driver', requires: ['@snap-rail/equipment'] },
+      }))
+      mkdirSync(join(dir, 'lib-host'), { recursive: true })
+      writeFileSync(join(dir, 'lib-host', 'host.js'), 'export default {}\n')
+      const unsigned = await releaseFiles({ name: '@t/zip', dir, hostDir: 'lib-host', hostFace: 'lib-host/host.js' })
+      if (!requireSignature) return zipSync(unsigned, { level: 9 })
+      const { privateKey } = generateKeyPairSync('ed25519')
+      return zipSync(signReleaseFiles(unsigned, { name: '@t/zip', version: '1.0.0', keyId: 'test-key', privateKey }), { level: 9 })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('derives the entry from the exact zip bytes', async () => {
+    const zipped = await signedFixtureZip(true)
+    const entry = catalogEntryFromZip(zipped, '@t__zip.zip', '@t/zip', { repository: 'https://github.com/t/zip' })
+    expect(entry).toMatchObject({
+      name: '@t/zip',
+      version: '1.0.0',
+      description: 'fixture',
+      kind: 'driver',
+      title: 'Fixture driver',
+      requires: ['@snap-rail/equipment'],
+      file: '@t__zip.zip',
+      size: zipped.length,
+      signature: { algorithm: 'Ed25519', keyId: 'test-key' },
+      repository: 'https://github.com/t/zip',
+    })
+    expect(entry.sha256).toBe(createHash('sha256').update(zipped).digest('hex'))
+  })
+
+  it('refuses unsigned archives under feed policy', async () => {
+    const zipped = await signedFixtureZip(false)
+    expect(() => catalogEntryFromZip(zipped, 'x.zip', 'x', { requireSignature: true })).toThrow(/签名/)
+    // Without the policy the entry simply omits the signature block.
+    expect(catalogEntryFromZip(zipped, 'x.zip', 'x').signature).toBeUndefined()
   })
 })
 

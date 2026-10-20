@@ -32,7 +32,7 @@ export {
   type SlotIdOf,
   type SlotVocabulary,
 } from './slot-vocabulary.ts'
-export { releaseFiles, releaseManifest, zipFileName, type ReleaseSpec } from './pack.ts'
+export { catalogEntryFromZip, releaseFiles, releaseManifest, zipFileName, type FeedEntry, type ReleaseSpec } from './pack.ts'
 export {
   packageNameOf,
   recipeDocumentSchema,

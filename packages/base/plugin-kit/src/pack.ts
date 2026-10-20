@@ -11,10 +11,13 @@
  * @module @snap-rail/plugin-kit/pack
  */
 
+import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { join, relative } from 'node:path'
+import { unzipSync } from 'fflate'
 import { CLIENT_EXTERNALS, SEED_ABI_REVISION, type SeedAbi } from './seeds.ts'
+import type { ReleaseSignature } from './sign.ts'
 
 /** The manifest fields the release manifest carries over from the source. */
 interface SourceManifest {
@@ -238,4 +241,90 @@ export async function releaseFiles(spec: ReleaseSpec): Promise<Record<string, Ui
 /** The zip file name a package's release takes under dist-plugins/. */
 export function zipFileName(packageName: string): string {
   return `${packageName.replaceAll('/', '__')}.zip`
+}
+
+/** The release manifest fields a feed entry carries when the zip declares them. */
+interface ReleaseManifestFacts {
+  name?: string
+  version?: string
+  description?: string
+  snapRail?: {
+    kind?: string
+    title?: string
+    category?: string
+    requires?: string[]
+    permissions?: string[]
+    engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
+  }
+}
+
+/** One plugin entry the feed's `index.json` carries (feed facts only). */
+export interface FeedEntry {
+  name: string
+  version: string
+  description?: string
+  kind?: string
+  title?: string
+  category?: string
+  requires?: string[]
+  permissions?: string[]
+  engines?: { snapRail?: string, hostProtocol?: string, renderer?: string }
+  /** The pure file name the entry advertises (no path). */
+  file: string
+  sha256: string
+  size: number
+  signature?: { algorithm: 'Ed25519', keyId: string }
+  repository?: string
+}
+
+/**
+ * The one feed-entry emitter every producer shares: read a plugin zip's own
+ * bytes back (release manifest + signature envelope), derive the
+ * `index.json` entry from exactly what the zip carries, and digest the exact
+ * bytes the client will download — the feed can never advertise something a
+ * zip does not. The repo's pack/collect pipeline and the standalone
+ * `snap-rail-plugin feed` command all converge here.
+ *
+ * @param zipped - the exact zip bytes the feed will serve.
+ * @param file - the pure file name the entry advertises (no path).
+ * @param fallbackName - the entry's name when the manifest carries none.
+ * @param options.requireSignature - refuse unsigned zips (feed policy).
+ * @param options.repository - an optional source-repository URL.
+ * @returns the entry, unknown fields stripped by construction.
+ * @throws when the zip has no readable manifest, or no signature while
+ *   `requireSignature` is set.
+ */
+export function catalogEntryFromZip(
+  zipped: Uint8Array,
+  file: string,
+  fallbackName: string,
+  options: { requireSignature?: boolean, repository?: string } = {},
+): FeedEntry {
+  const files = unzipSync(zipped)
+  const manifestFile = files['package.json']
+  if (manifestFile === undefined) throw new Error(`catalog: ${file} 缺少 package.json`)
+  const manifest = JSON.parse(new TextDecoder().decode(manifestFile)) as ReleaseManifestFacts
+  const signatureFile = files['META-INF/signature.json']
+  if (signatureFile === undefined && options.requireSignature === true) {
+    throw new Error(`catalog: ${file} 没有签名（META-INF/signature.json 缺失）`)
+  }
+  const signature = signatureFile === undefined
+    ? undefined
+    : JSON.parse(new TextDecoder().decode(signatureFile)) as ReleaseSignature
+  return {
+    name: manifest.name ?? fallbackName,
+    version: manifest.version ?? '0.0.0',
+    ...(manifest.description !== undefined && manifest.description !== '' ? { description: manifest.description } : {}),
+    ...(manifest.snapRail?.kind !== undefined ? { kind: manifest.snapRail.kind } : {}),
+    ...(manifest.snapRail?.title !== undefined ? { title: manifest.snapRail.title } : {}),
+    ...(manifest.snapRail?.category !== undefined ? { category: manifest.snapRail.category } : {}),
+    ...(manifest.snapRail?.requires !== undefined ? { requires: manifest.snapRail.requires } : {}),
+    ...(manifest.snapRail?.permissions !== undefined ? { permissions: manifest.snapRail.permissions } : {}),
+    ...(manifest.snapRail?.engines !== undefined ? { engines: manifest.snapRail.engines } : {}),
+    file,
+    sha256: createHash('sha256').update(zipped).digest('hex'),
+    size: zipped.length,
+    ...(signature === undefined ? {} : { signature: { algorithm: signature.algorithm, keyId: signature.keyId } }),
+    ...(options.repository === undefined ? {} : { repository: options.repository }),
+  }
 }

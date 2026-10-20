@@ -1,10 +1,23 @@
 {
   "name": "@snap-rail/plugin-kit",
-  "description": "The plugin author's kit: snapRail manifest vocabulary, the renderer seed whitelist, and tsdown presets for installable host + client faces",
-  "version": "0.2.0",
+  "description": "The plugin author's kit: snapRail manifest vocabulary, the renderer seed whitelist, tsdown presets for installable host + client faces, release signing, and the final-format packer",
+  "version": "0.2.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
+  "homepage": "https://www.snap-rail.top/dev.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yansijian/snap-rail.git",
+    "directory": "packages/base/plugin-kit"
+  },
+  "keywords": [
+    "snap-rail",
+    "plugin",
+    "cordis",
+    "industrial",
+    "electron"
+  ],
   "exports": {
     ".": {
       "types": "./lib/types/index.d.ts",
@@ -44,6 +57,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@snap-rail/util": "workspace:^",
+    "fflate": "^0.8.3",
     "zod": "^4.4.3"
   },
   "peerDependencies": {

@@ -2,8 +2,9 @@ name: npm
 
 # Publish the public authoring closure (@snap-rail/*) to npm after a versioned
 # release succeeds. plugin-kit/plugin-sdk/util/protocol/store/equipment plus
-# the vendored Cordis runtime are the packages an independent plugin repo
-# needs; everything else stays app-internal.
+# the vendored Cordis runtime and the UI framework (staged from its split
+# repo) are the packages an independent plugin repo needs; everything else
+# stays app-internal.
 on:
   # Manual until the repository owns an npm token: a tag push must not turn
   # the release run red just because the SDK registry credential is absent.
@@ -35,23 +36,7 @@ jobs:
       - uses: ./.github/actions/prepare-workspace
       - run: pnpm run build
       - name: publish the public closure (idempotent per version)
-        run: |
-          for dir in \
-            vendor/cosmokit \
-            vendor/cordis \
-            packages/base/util \
-            packages/base/protocol \
-            packages/base/plugin-kit \
-            packages/base/plugin-sdk \
-            packages/store/store \
-            packages/equipment/equipment
-          do
-            name=$(node -p "require('./$dir/package.json').name")
-            version=$(node -p "require('./$dir/package.json').version")
-            if npm view "$name@$version" version >/dev/null 2>&1; then
-              echo "skip $name@$version (already published)"
-              continue
-            fi
-            echo "publishing $name@$version"
-            (cd "$dir" && pnpm publish --access public --no-git-checks)
-          done
+        # The closure list (incl. the framework from its split repo) and the
+        # publish-time peer filter live in one script so external installs
+        # can never meet an unpublished peer again.
+        run: node scripts/publish-npm.mjs

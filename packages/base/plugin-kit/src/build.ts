@@ -177,6 +177,11 @@ export function hostBundle(entry: string): ReturnType<typeof defineConfig> {
     target: 'es2024',
     dts: false,
     clean: false,
+    // Keep the plain `.js` extension: the manifest `main` the packer stamps
+    // (and every generated template writes) names `lib-host/host.js` — tsdown's
+    // default esm renaming would emit `host.mjs` and pack would then refuse
+    // to ship a zip whose entry file does not exist.
+    fixedExtension: false,
   })
 }
 
