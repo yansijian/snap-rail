@@ -16,6 +16,7 @@
 
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { RpcBusinessError } from '@snap-rail/protocol'
+import type { AuxSurfaceId } from '@snap-rail/protocol'
 import type { GatewayService } from '@snap-rail/gateway'
 import type { AuditService } from '@snap-rail/audit'
 import type { SettingsService } from '@snap-rail/settings'
@@ -107,6 +108,7 @@ const stationRpcPlugin: Plugin.Object<void> = {
         const pool = scanPluginPool(layers.handles.poolDirs)
         interface ClientFace {
           clientUrl: string
+          surfaceUrls?: Readonly<Partial<Record<AuxSurfaceId, string>>>
           kind?: string
           category?: string
           seeds?: readonly string[]
@@ -115,8 +117,18 @@ const stationRpcPlugin: Plugin.Object<void> = {
         const clientFaces = new Map<string, ClientFace>()
         for (const [name, descriptor] of pool) {
           if (descriptor.clientEntry === undefined) continue
+          // The mounted directory name, not the package name: the scheme handler
+          // maps one path segment to one pool directory, and a hand-copied
+          // directory may not carry the name its manifest claims.
+          const poolDir = descriptor.dir.split(/[\\/]/).at(-1) ?? name
+          const urlOf = (entry: string): string => `snap-plugin://pool/${poolDir}/${entry}`
+          const surfaceUrls: Partial<Record<AuxSurfaceId, string>> = {}
+          for (const [surface, entry] of Object.entries(descriptor.clientSurfaces ?? {})) {
+            if (entry !== undefined) surfaceUrls[surface as AuxSurfaceId] = urlOf(entry)
+          }
           clientFaces.set(name, {
-            clientUrl: `snap-plugin://pool/${descriptor.dir.split(/[\\/]/).at(-1)}/${descriptor.clientEntry}`,
+            clientUrl: urlOf(descriptor.clientEntry),
+            ...Object.keys(surfaceUrls).length > 0 ? { surfaceUrls } : {},
             ...descriptor.kind !== undefined ? { kind: descriptor.kind } : {},
             ...descriptor.category !== undefined ? { category: descriptor.category } : {},
             ...descriptor.clientSeeds !== undefined && descriptor.clientSeeds.length > 0 ? { seeds: descriptor.clientSeeds } : {},
@@ -130,6 +142,7 @@ const stationRpcPlugin: Plugin.Object<void> = {
           enabled,
           ...config !== undefined ? { config } : {},
           ...face?.clientUrl !== undefined ? { clientUrl: face.clientUrl } : {},
+          ...face?.surfaceUrls !== undefined ? { surfaceUrls: face.surfaceUrls } : {},
           ...face?.kind !== undefined ? { kind: face.kind } : {},
           ...face?.category !== undefined ? { category: face.category } : {},
           ...face?.seeds !== undefined ? { seeds: face.seeds } : {},

@@ -12,6 +12,7 @@
   ],
   "references": [
     { "path": "../../base/protocol" },
+    { "path": "../../base/shell" },
     { "path": "../../base/connection" },
     { "path": "../../base/station-rpc" },
     { "path": "../../base/gateway" },

@@ -1,0 +1,40 @@
+{
+  "name": "@snap-rail/shell",
+  "description": "The OS integration seam (specification): ctx.shell for notifications, tray contributions, auxiliary surfaces and the ball state; ./contract is the pure wire contract",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./contract": {
+      "types": "./lib/types/contract.d.ts",
+      "default": "./lib/contract.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/contract.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "Apache-2.0",
+  "peerDependencies": {
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "zod": "^4.4.3"
+  },
+  "snapRail": {
+    "layer": "base",
+    "title": "系统外壳"
+  }
+}

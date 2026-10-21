@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { zipSync } from 'fflate'
 import { rolldown } from 'rolldown'
+import { AUX_SURFACE_IDS } from '@snap-rail/protocol'
 import {
   clientBundle,
   hostBundle,
@@ -171,6 +172,26 @@ describe('seed tiers', () => {
     const parsed = snapRailManifestSchema.parse({ client: { externalSeeds: ['@acme/framework-x/ui'] } })
     expect(parsed.client?.externalSeeds).toEqual(['@acme/framework-x/ui'])
     expect(snapRailManifestSchema.safeParse({ client: { externalSeeds: [''] } }).success).toBe(false)
+  })
+
+  it('manifest schema accepts one client entry per auxiliary surface', () => {
+    const parsed = snapRailManifestSchema.parse({
+      client: { entry: 'lib/client.js', surfaces: { ball: 'lib/ball.js', panel: 'lib/panel.js' } },
+    })
+    expect(parsed.client?.surfaces).toEqual({ ball: 'lib/ball.js', panel: 'lib/panel.js' })
+    // Every auxiliary surface is declarable — the schema is derived from the
+    // same vocabulary the windows are built from.
+    for (const surface of AUX_SURFACE_IDS) {
+      expect(snapRailManifestSchema.safeParse({ client: { surfaces: { [surface]: 'lib/x.js' } } }).success).toBe(true)
+    }
+  })
+
+  it('manifest schema refuses a main surface entry, an empty path, and a bad surface key', () => {
+    // `main` is `client.entry` — one entry per window, and the main window is
+    // never declared a second time.
+    expect(snapRailManifestSchema.safeParse({ client: { surfaces: { main: 'lib/x.js' } } }).success).toBe(false)
+    expect(snapRailManifestSchema.safeParse({ client: { surfaces: { ball: '' } } }).success).toBe(false)
+    expect(snapRailManifestSchema.safeParse({ client: { surfaces: { orb: 'lib/x.js' } } }).success).toBe(false)
   })
 })
 

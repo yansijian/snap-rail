@@ -8,6 +8,7 @@
 
 export * from './rpc.ts'
 export * from './methods.ts'
+export * from './surfaces.ts'
 export * from './frames.ts'
 export * from './contract.ts'
 export * from './schemas.ts'

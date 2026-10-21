@@ -36,6 +36,10 @@ export interface SnapRailManifest {
   /** The renderer face: the client bundle path inside the package. */
   client?: {
     entry: string
+    /** Auxiliary-surface client entries (`ball`, `panel`): one bundle per
+     * extra window this package renders in. `main` is never a key here — it
+     * is `entry`. */
+    surfaces?: Partial<Record<string, string>>
     /** Contributed seed subpaths this face provides to other plugins. */
     seeds?: readonly string[]
     /** Contributed seed ids this face requires from other installed plugins. */
@@ -84,6 +88,8 @@ export interface PluginDescriptor {
   clientSeeds?: readonly string[]
   /** Contributed seed ids required from other plugins (`snapRail.client.externalSeeds`), when declared. */
   externalSeeds?: readonly string[]
+  /** Auxiliary-surface client entries (`snapRail.client.surfaces`), when declared. */
+  clientSurfaces?: NonNullable<SnapRailManifest['client']>['surfaces']
   /** The pack-stamped seed contract (`snapRail.client.seedAbi`), when declared. */
   clientSeedAbi?: NonNullable<SnapRailManifest['client']>['seedAbi']
   /** Supported runtime versions. */
@@ -200,6 +206,7 @@ export function scanPluginPool(dirs: readonly string[]): Map<string, PluginDescr
       if (clientSeeds !== undefined) descriptor.clientSeeds = clientSeeds
       const externalSeeds = stringArrayOrUndefined(snapRail?.client?.externalSeeds)
       if (externalSeeds !== undefined) descriptor.externalSeeds = externalSeeds
+      if (snapRail?.client?.surfaces !== undefined) descriptor.clientSurfaces = snapRail.client.surfaces
       if (snapRail?.client?.seedAbi !== undefined) descriptor.clientSeedAbi = snapRail.client.seedAbi
       if (snapRail?.engines !== undefined) descriptor.engines = snapRail.engines
       try {

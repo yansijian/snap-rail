@@ -33,6 +33,24 @@ hand-written face and are documented statically here.
 | `settings/changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"key":{"type":"string","minLength":3,"maxLength":128,"pattern":"^[a-z0-9][a-z0-9-]*\\.[A-Za-z0-9_.-]+$"},"value":{}},"required":["key","value"],"additionalProperties":false} |
 | `client-config/changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} |
 
+## shell
+
+### Methods
+
+| method | request schema | response schema |
+|---|---|---|
+| `shell.toast` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"title":{"type":"string","minLength":1,"maxLength":120},"body":{"type":"string","minLength":1,"maxLength":512},"tag":{"type":"string","minLength":1,"maxLength":64},"silent":{"type":"boolean"}},"required":["title"],"additionalProperties":false} | — |
+| `shell.surface.present` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"surface":{"type":"string","enum":["main","ball","panel"]}},"required":["surface"],"additionalProperties":false} | — |
+| `shell.surface.hide` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"surface":{"type":"string","enum":["ball","panel"]}},"required":["surface"],"additionalProperties":false} | — |
+| `shell.ball.state` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+
+### Frames
+
+| frame | payload schema |
+|---|---|
+| `shell/surface-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"surface":{"type":"string","enum":["main","ball","panel"]},"available":{"type":"boolean"},"visible":{"type":"boolean"}},"required":["surface","available","visible"],"additionalProperties":false} |
+| `shell/ball-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"progress":{"anyOf":[{"type":"number","minimum":0,"maximum":1},{"type":"null"}]},"label":{"anyOf":[{"type":"string","maxLength":8},{"type":"null"}]},"tone":{"type":"string","enum":["neutral","accent","warning","danger"]}},"required":["progress","label","tone"],"additionalProperties":false} |
+
 ## plugins
 
 ### Methods

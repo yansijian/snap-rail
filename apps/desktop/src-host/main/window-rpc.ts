@@ -27,6 +27,12 @@ export function trackMainWindow(win: BrowserWindow): void {
   })
 }
 
+/** The operator window, once the app has opened it (the Shell adapter's
+ * window host reads it lazily — plugins may ask for surfaces during boot). */
+export function currentMainWindow(): BrowserWindow | undefined {
+  return mainWindow ?? undefined
+}
+
 /** The window-controls bridge plugin; consumes the rpc service. */
 const windowRpcPlugin: Plugin.Object<void> = {
   name: 'desktop-window-rpc',

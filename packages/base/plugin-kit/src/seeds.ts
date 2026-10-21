@@ -39,6 +39,7 @@ export const SEED_MODULES: readonly string[] = [
   '@snap-rail/client-modules',
   '@snap-rail/connection',
   '@snap-rail/protocol',
+  '@snap-rail/shell/contract',
   '@snap-rail/station-rpc/contract',
   '@snap-rail/app-boot/contract',
   '@snap-rail/equipment/contract',

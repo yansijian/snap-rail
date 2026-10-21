@@ -46,6 +46,9 @@ function snapRailSources(): Plugin {
   sourceOf.set('@snap-rail/station-rpc/contract', `${repoRoot}/packages/base/station-rpc/src/contract.ts`)
   sourceOf.set('@snap-rail/equipment/contract', `${repoRoot}/packages/equipment/equipment/src/contract.ts`)
   sourceOf.set('@snap-rail/plugin-kit/seeds', `${repoRoot}/packages/base/plugin-kit/src/seeds.ts`)
+  // The Shell seam's pure face: every surface's kernel code and every plugin
+  // face reads the wire rows and the ball/surface vocabulary from here.
+  sourceOf.set('@snap-rail/shell/contract', `${repoRoot}/packages/base/shell/src/contract.ts`)
 
   return {
     name: 'snap-rail-source-plane',
@@ -86,5 +89,14 @@ export default defineConfig({
   build: {
     outDir: join(import.meta.dirname, 'dist/client'),
     emptyOutDir: true,
+    rollupOptions: {
+      // Two pages, one per window kind: the operator window (`index.html`)
+      // and the auxiliary-surface window (`surface.html`, loaded with
+      // `?surface=ball|panel` into a transparent always-on-top window).
+      input: {
+        index: join(import.meta.dirname, 'src/client/index.html'),
+        surface: join(import.meta.dirname, 'src/client/surface.html'),
+      },
+    },
   },
 })

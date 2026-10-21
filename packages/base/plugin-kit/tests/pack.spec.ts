@@ -115,6 +115,85 @@ const equipmentSpec: ReleaseSpec = {
   exports: { './rpc': 'lib/rpc.js', './contract': 'lib/contract.js' },
 }
 
+/** A dual-face package shipping a main bundle plus a face per auxiliary
+ * surface — the multi-window shape (B1: one package, several client entries). */
+const multiSurfaceFixtureSpec: ReleaseSpec = {
+  ...fixturePackage('@fixture/multi', {
+    version: '1.1.0',
+    description: 'fixture multi-surface suite',
+    main: 'lib/stats.js',
+    type: 'module',
+    snapRail: {
+      kind: 'suite',
+      title: '夹具多面套件',
+      client: {
+        entry: 'lib-client/client.js',
+        surfaces: { ball: 'lib-client/ball.js', panel: 'lib-client/panel.js' },
+      },
+    },
+  }, {
+    'lib/stats.js': 'export const counter = 1\n',
+    'lib-client/client.js': 'module.exports = { name: "@fixture/multi", apply() {} }\n',
+    'lib-client/ball.js': 'module.exports = { name: "@fixture/multi/ball", apply() {} }\n',
+    'lib-client/panel.js': 'module.exports = { name: "@fixture/multi/panel", apply() {} }\n',
+  }),
+  hostDir: 'lib',
+  hostFace: 'lib/stats.js',
+  clientFace: 'lib-client',
+}
+
+/** A renderer-only package whose declared ball face never got built. */
+const missingSurfaceFixtureSpec: ReleaseSpec = {
+  ...fixturePackage('@fixture/missing-ball', {
+    version: '1.0.0',
+    description: 'fixture with an unbuilt ball face',
+    type: 'module',
+    snapRail: {
+      kind: 'framework',
+      clientOnly: true,
+      client: { entry: 'lib-client/client.js', surfaces: { ball: 'lib-client/ball.js' } },
+    },
+  }, {
+    'lib-client/client.js': 'module.exports = { seeds: { ui: {} } }\n',
+  }),
+  clientFace: 'lib-client',
+}
+
+/** A package pointing a surface at the main bundle — no window would own it. */
+const aliasedSurfaceFixtureSpec: ReleaseSpec = {
+  ...fixturePackage('@fixture/aliased-ball', {
+    version: '1.0.0',
+    description: 'fixture with an aliased ball face',
+    type: 'module',
+    snapRail: {
+      kind: 'framework',
+      clientOnly: true,
+      client: { entry: 'lib-client/client.js', surfaces: { ball: 'lib-client/client.js' } },
+    },
+  }, {
+    'lib-client/client.js': 'module.exports = { seeds: { ui: {} } }\n',
+  }),
+  clientFace: 'lib-client',
+}
+
+/** A package claiming the main surface as an auxiliary one. */
+const mainSurfaceFixtureSpec: ReleaseSpec = {
+  ...fixturePackage('@fixture/main-surface', {
+    version: '1.0.0',
+    description: 'fixture claiming a main surface entry',
+    type: 'module',
+    snapRail: {
+      kind: 'framework',
+      clientOnly: true,
+      client: { entry: 'lib-client/client.js', surfaces: { main: 'lib-client/main.js' } },
+    },
+  }, {
+    'lib-client/client.js': 'module.exports = { seeds: { ui: {} } }\n',
+    'lib-client/main.js': 'module.exports = { name: "@fixture/main-surface/main" }\n',
+  }),
+  clientFace: 'lib-client',
+}
+
 describe('release manifest derivation', () => {
   it('trims to npm identity + main + the exports voice and carries snapRail verbatim', () => {
     const source = {
@@ -222,6 +301,31 @@ describe('final-format assembly (built tree)', () => {
       './contract': 'lib/contract.js',
     })
   })
+
+  it('multi-surface zip: one client bundle per window, the surfaces map preserved', async () => {
+    const files = await releaseFiles(multiSurfaceFixtureSpec)
+    const paths = Object.keys(files)
+    expect(paths).toContain('lib-client/client.js')
+    expect(paths).toContain('lib-client/ball.js')
+    expect(paths).toContain('lib-client/panel.js')
+    const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!))
+    // The host face stays `main`; the client face keeps every surface entry
+    // so the host can hand the renderer one loader URL per window.
+    expect(manifest.main).toBe('lib/stats.js')
+    expect(manifest.snapRail.client).toEqual({
+      entry: 'lib-client/client.js',
+      surfaces: { ball: 'lib-client/ball.js', panel: 'lib-client/panel.js' },
+    })
+  })
+
+  it('fails loud when a declared surface entry does not ship', async () => {
+    await expect(releaseFiles(missingSurfaceFixtureSpec)).rejects.toThrow(/ball surface entry lib-client\/ball\.js/)
+  })
+
+  it('fails loud when a surface aliases the main bundle or claims `main`', async () => {
+    await expect(releaseFiles(aliasedSurfaceFixtureSpec)).rejects.toThrow(/needs its own bundle/)
+    await expect(releaseFiles(mainSurfaceFixtureSpec)).rejects.toThrow(/invalid snapRail\.client\.surfaces/)
+  })
 })
 
 describe('pool-anchor discipline (shipped host faces)', () => {
@@ -264,7 +368,7 @@ describe('install round-trip', () => {
     const base = mkdtempSync(join(tmpdir(), 'snap-rail-pack-'))
     scratch.push(base)
     const pool = join(base, 'plugins')
-    for (const spec of [dualFixtureSpec, hostFixtureSpecWithExports]) {
+    for (const spec of [dualFixtureSpec, multiSurfaceFixtureSpec, hostFixtureSpecWithExports]) {
       const zip = join(base, zipFileName(spec.name))
       writeFileSync(zip, zipSync(await releaseFiles(spec)))
       const installed = installPluginFromZip(zip, pool)
@@ -286,5 +390,12 @@ describe('install round-trip', () => {
     expect(driver?.category).toBe('设备')
     expect(driver?.title).toBe('夹具驱动')
     expect(driver?.requires).toEqual(['@snap-rail/equipment'])
+    // The multi-window face survives the round trip: the scan reports one
+    // entry per auxiliary surface, which is what the host resolves to loader
+    // URLs before the renderer asks for its rows.
+    const multi = scanned.get('@fixture/multi')
+    expect(multi?.clientEntry).toBe('lib-client/client.js')
+    expect(multi?.clientSurfaces).toEqual({ ball: 'lib-client/ball.js', panel: 'lib-client/panel.js' })
+    expect(suite?.clientSurfaces).toBeUndefined()
   })
 })

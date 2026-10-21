@@ -11,7 +11,7 @@
 
 import { z } from 'zod'
 import { defineContract, method } from '@snap-rail/protocol'
-import type { FrameRows, MethodRows } from '@snap-rail/protocol'
+import type { AuxSurfaceId, FrameRows, MethodRows } from '@snap-rail/protocol'
 import type { AuditEntry } from '@snap-rail/audit'
 
 /** One audit record on the wire; the audit service entry is the single
@@ -47,6 +47,13 @@ export interface ClientConfigRow {
    * fetches (`snap-plugin://pool/…`); shipped occupants mount from the app
    * bundle instead. */
   clientUrl?: string
+  /**
+   * Auxiliary-surface bundles the package ships, one loader URL per surface
+   * (`snapRail.client.surfaces` resolved like `clientUrl`). A surface absent
+   * here has no face of its own and shows the kernel's plain fallback page;
+   * an auxiliary surface is never loaded from the main bundle.
+   */
+  surfaceUrls?: Readonly<Partial<Record<AuxSurfaceId, string>>> | undefined
   /** The package's declared kind (`snapRail.kind`) — `framework` rows load
    * before every other face (they provide the contributed seeds). */
   kind?: string | undefined

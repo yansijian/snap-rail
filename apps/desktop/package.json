@@ -27,6 +27,7 @@
     "@snap-rail/protocol": "workspace:^",
     "@snap-rail/scope": "workspace:^",
     "@snap-rail/settings": "workspace:^",
+    "@snap-rail/shell": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^",
     "@snap-rail/store": "workspace:^",
     "@snap-rail/util": "workspace:^",

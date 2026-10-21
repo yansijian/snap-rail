@@ -29,6 +29,7 @@
     { "path": "./packages/base/app-boot" },
     { "path": "./packages/base/station-rpc" },
     { "path": "./packages/base/protocol" },
+    { "path": "./packages/base/shell" },
     { "path": "./packages/base/gateway" },
     { "path": "./packages/base/connection" },
     { "path": "./packages/equipment/equipment" },

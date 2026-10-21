@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod'
+import { AUX_SURFACE_IDS } from '@snap-rail/protocol'
 import { PLUGIN_LAYERS } from '@snap-rail/util/manifest'
 
 /** Plugin package kinds. `suite` and `framework` packages are single-active. */
@@ -26,10 +27,29 @@ export const seedAbiSchema = z.object({
   versions: z.record(z.string().min(1), z.string().min(1)),
 }).strict()
 
+/**
+ * The auxiliary-surface entry map: one client bundle per extra surface the
+ * package renders in. Keys are the auxiliary surface ids (`ball`, `panel`) —
+ * `main` is deliberately absent, since the main window's bundle is
+ * `client.entry` and a package gets exactly one entry per window. Every
+ * declared path is a CJS factory bundle inside the package, packed and
+ * validated like the main entry; the surfaces a package does not declare
+ * simply have no face and show the kernel's plain fallback.
+ */
+export const clientSurfacesSchema = z.partialRecord(z.enum(AUX_SURFACE_IDS), z.string().min(1))
+
 /** The renderer face declaration: where the client bundle lives. */
 export const clientFaceSchema = z.object({
-  /** Path of the CJS factory bundle inside the package (from its root). */
+  /** Path of the CJS factory bundle inside the package (from its root) —
+   * the **main** surface's entry. */
   entry: z.string().min(1).default('lib/client.js'),
+  /**
+   * Extra surfaces this package renders in: one client bundle per auxiliary
+   * window (`ball`, `panel`). Each bundle is loaded into that surface's own
+   * window with the same seed table, and its module id is
+   * `<package>/<surface>` (the main entry keeps the plain package name).
+   */
+  surfaces: clientSurfacesSchema.optional(),
   /**
    * Subpaths this client face registers as contributed seeds (e.g. framework
    * primitives like `./ui`): each becomes a `__ModuleLoader__` id other

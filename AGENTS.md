@@ -17,6 +17,11 @@ pnpm app:dev              # Vite dev server + Electron 实机开发
 pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）；尾接 verify:packaged-app
                           # 产物门禁——缺运行时包直接红。打包只走这两条单命令串行跑，
                           # 禁止并发第二个 electron-builder（交错归档会产出缺包安装器）
+                          # 离线/内网机器：electron-builder 会去 CDN 取 Electron 发行包，
+                          # 断网时用 apps/desktop/electron-builder.offline.yml
+                          # （`extends` 主配置 + electronDist 指 node_modules/electron/dist），
+                          # 命令：pnpm --filter @snap-rail/desktop run build:faces &&
+                          #       pnpm exec electron-builder --win --dir --config electron-builder.offline.yml
 ```
 
 主仓对两个拆分仓（framework / driver-modbus）的构建期依赖以 **workspace
@@ -113,6 +118,17 @@ Release 节奏。
 
 - **能力缝三件套齐备**：Service Definition / Provider / Consumer；
   角色不独立演化不拆包。新增能力先补缝，再补首方实现。
+- **OS 资源只走 Shell 缝**：通知、托盘、窗口（含悬浮球/小面板）一律经
+  `ctx.shell`（宿主面）或 `@snap-rail/shell/contract`（渲染面）。
+  **池插件永不 import `electron`**——Electron 只出现在首方 provider
+  `apps/desktop/src-host/main/shell/*`。可点回执（通知按钮、托盘项）只准
+  宿主面贡献：它活得比任何 renderer 都长；渲染面只有单向 toast 与窗口控制。
+  上限/节流单源在 `SHELL_LIMITS`，溢出回 `{applied:false, reason}` 不抛。
+- **辅助 surface 独立入口**：一个包可以给 `main`/`ball`/`panel` 各出一个
+  渲染面——`client.entry` 是主面、`client.surfaces` 每个辅助窗口一条（模块
+  id `<包名>/<surface>`，`clientBundle` 传 `outName`/`moduleId`）。`main`
+  不得出现在 `surfaces` 里；辅助面**不订阅工业点**（只消费宿主聚合帧）；
+  没有面时显示 kernel 回退页，不允许留空白窗。
 - **渲染面零宿主入口**：任何进浏览器图的代码禁止 import 双面包的宿主入口——
   node 侧实现（store-sqlite/drizzle/node:sqlite）永不进 client bundle；跨端消费
   类型/schema 走该包 `./contract` 纯面（equipment 的 contract 是随应用

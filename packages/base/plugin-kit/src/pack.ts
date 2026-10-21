@@ -17,6 +17,7 @@ import { createRequire } from 'node:module'
 import { join, relative } from 'node:path'
 import { unzipSync } from 'fflate'
 import { CLIENT_EXTERNALS, SEED_ABI_REVISION, type SeedAbi } from './seeds.ts'
+import { clientSurfacesSchema } from './manifest.ts'
 import type { ReleaseSignature } from './sign.ts'
 
 /** The manifest fields the release manifest carries over from the source. */
@@ -26,7 +27,7 @@ interface SourceManifest {
   description?: unknown
   snapRail?: {
     clientOnly?: unknown
-    client?: { entry?: unknown } | undefined
+    client?: { entry?: unknown, surfaces?: unknown } | undefined
   } & Record<string, unknown>
 }
 
@@ -110,24 +111,29 @@ function basePackageOf(seedId: string): string {
 }
 
 /**
- * Stamp the seed ABI a built client face was built against: the seeds its
- * bundle actually requires (a `require("…")` literal scan — externals are
- * the only bare requires the welded CJS output carries) plus each seed's
- * base-package version resolved from the package's own dependency tree.
- * Ids whose base package cannot be resolved here are omitted — the runtime
- * check compares only the intersection, so an omitted id is unchecked,
- * never failed. Returns `undefined` when the bundle requires no seeds or
- * none could be versioned (nothing to enforce).
+ * Stamp the seed ABI a set of built client faces were built against: the
+ * seeds their bundles actually require (a `require("…")` literal scan —
+ * externals are the only bare requires the welded CJS output carries) plus
+ * each seed's base-package version resolved from the package's own dependency
+ * tree. A multi-surface package stamps ONE declaration for all its entries
+ * (the union of their requires): every surface shares the shell's seed table,
+ * so a per-face stamp would only repeat the same verdict N times. Ids whose
+ * base package cannot be resolved here are omitted — the runtime check
+ * compares only the intersection, so an omitted id is unchecked, never
+ * failed. Returns `undefined` when the bundles require no seeds or none could
+ * be versioned (nothing to enforce).
  *
  * @param packageDir - the package being packed (version resolution root).
- * @param bundleCode - the built client bundle's source text.
+ * @param bundleCodes - the built client bundles' source texts, one per surface.
  */
-async function seedAbiStamp(packageDir: string, bundleCode: string): Promise<SeedAbi | undefined> {
+async function seedAbiStamp(packageDir: string, bundleCodes: readonly string[]): Promise<SeedAbi | undefined> {
   const seeds = new Set(CLIENT_EXTERNALS)
   const required = new Set<string>()
-  for (const match of bundleCode.matchAll(/require\(\s*(['"])([^'"\n]+)\1\s*\)/g)) {
-    const id = match[2]
-    if (id !== undefined && seeds.has(id)) required.add(id)
+  for (const bundleCode of bundleCodes) {
+    for (const match of bundleCode.matchAll(/require\(\s*(['"])([^'"\n]+)\1\s*\)/g)) {
+      const id = match[2]
+      if (id !== undefined && seeds.has(id)) required.add(id)
+    }
   }
   if (required.size === 0) return undefined
   const require = createRequire(join(packageDir, 'package.json'))
@@ -198,6 +204,17 @@ export async function releaseFiles(spec: ReleaseSpec): Promise<Record<string, Ui
     throw new Error(`pack: ${spec.name} ships neither a host face nor a client bundle`)
   }
   const clientEntry = typeof snapRail?.client?.entry === 'string' ? snapRail.client.entry : 'lib/client.js'
+  // Auxiliary surfaces are validated here rather than trusted: a typo'd key
+  // (`mian`) or a `main` override would silently ship a bundle no surface
+  // ever loads, and the installer's schema would accept it too.
+  let clientSurfaces: Readonly<Partial<Record<string, string>>> = {}
+  if (snapRail?.client?.surfaces !== undefined) {
+    const parsed = clientSurfacesSchema.safeParse(snapRail.client.surfaces)
+    if (!parsed.success) {
+      throw new Error(`pack: ${spec.name} declares an invalid snapRail.client.surfaces (${parsed.error.issues.map(issue => issue.message).join('; ')})`)
+    }
+    clientSurfaces = parsed.data
+  }
   const main = spec.hostFace ?? clientEntry
 
   const files: Record<string, Uint8Array> = {}
@@ -219,11 +236,23 @@ export async function releaseFiles(spec: ReleaseSpec): Promise<Record<string, Ui
   if (declaredClient && files[clientEntry] === undefined) {
     throw new Error(`pack: ${spec.name} declares client entry ${clientEntry} but the zip does not carry it`)
   }
+  for (const [surface, entry] of Object.entries(clientSurfaces)) {
+    if (entry === undefined) continue
+    if (files[entry] === undefined) {
+      throw new Error(`pack: ${spec.name} declares the ${surface} surface entry ${entry} but the zip does not carry it`)
+    }
+    if (entry === clientEntry) {
+      throw new Error(`pack: ${spec.name} points the ${surface} surface at the main client entry ${entry} — each surface needs its own bundle`)
+    }
+  }
   // The manifest lands last: a client face's seed ABI is stamped from the
-  // built bundle it ships (seed ids actually required + the versions this
-  // build tree resolved for them).
-  const seedAbi = declaredClient && files[clientEntry] !== undefined
-    ? await seedAbiStamp(spec.dir, new TextDecoder().decode(files[clientEntry]!))
+  // built bundles it ships (seed ids actually required across every surface +
+  // the versions this build tree resolved for them).
+  const clientBundles = [clientEntry, ...Object.values(clientSurfaces)]
+    .filter((entry): entry is string => typeof entry === 'string' && files[entry] !== undefined)
+    .map(entry => new TextDecoder().decode(files[entry]!))
+  const seedAbi = declaredClient && clientBundles.length > 0
+    ? await seedAbiStamp(spec.dir, clientBundles)
     : undefined
   files['package.json'] = new TextEncoder().encode(releaseManifest(source, main, spec.exports, seedAbi))
   for (const [subpath, target] of Object.entries(spec.exports ?? {})) {

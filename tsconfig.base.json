@@ -58,6 +58,8 @@
       "@snap-rail/app-boot/scan": ["./packages/base/app-boot/src/scan.ts"],
       "@snap-rail/app-boot/trust": ["./packages/base/app-boot/src/trust.ts"],
       "@snap-rail/protocol": ["./packages/base/protocol/src"],
+      "@snap-rail/shell": ["./packages/base/shell/src"],
+      "@snap-rail/shell/contract": ["./packages/base/shell/src/contract.ts"],
       "@snap-rail/gateway": ["./packages/base/gateway/src"],
       "@snap-rail/connection": ["./packages/base/connection/src"],
       "@snap-rail/equipment": ["./packages/equipment/equipment/src"],

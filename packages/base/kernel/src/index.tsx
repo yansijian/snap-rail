@@ -9,13 +9,17 @@
  */
 
 import { HostLink, subscribeFrame, type HostChannel } from '@snap-rail/connection'
+import { isAuxSurfaceId } from '@snap-rail/protocol'
+import type { AuxSurfaceId, SurfaceId } from '@snap-rail/protocol'
 import { RENDERER_AUTO_RELOAD_KEY, clientConfigChangedSchema, settingsChangedSchema } from '@snap-rail/station-rpc/contract'
 import { pluginDiagnosticsSchema, type PluginDiagnostics } from '@snap-rail/app-boot/contract'
 import { createRoot, type Root } from 'react-dom/client'
 import { BootstrapPage } from './BootstrapPage.tsx'
 import { StartupPage } from './StartupPage.tsx'
+import { SurfaceFallback } from './SurfaceFallback.tsx'
 
 export type { HostChannel }
+export { SurfaceFallback }
 
 /** Options for {@link bootClient}. */
 export interface ClientBootOptions {
@@ -23,6 +27,14 @@ export interface ClientBootOptions {
   element: HTMLElement
   /** Carrier override; defaults to the preload-exposed `window.snapRail`. */
   channel?: HostChannel
+  /**
+   * Which surface this window renders; defaults to `main`. An auxiliary
+   * surface boots headless — no connect page, no operator UI — because its
+   * window is created on demand and must never flash a full-page screen
+   * inside a 128px orb. Whoever loads the surface decides what to mount next
+   * (the framework runtime, or {@link showSurfaceFallback}).
+   */
+  surface?: SurfaceId
 }
 
 /** Everything bootstrap produced, for the runtime handover and diagnostics. */
@@ -33,6 +45,9 @@ export interface ClientHandle {
   root: Root
   /** The element the startup page mounted into (runtime re-roots here). */
   element: HTMLElement
+  /** Which surface this window renders — the renderer half of the Shell's
+   * window roles (`main`, `ball`, `panel`). */
+  surface: SurfaceId
 }
 
 async function describeDiagnostics(link: HostLink): Promise<PluginDiagnostics> {
@@ -85,13 +100,11 @@ export function showBootstrap(handle: ClientHandle, options: { notice?: string }
 }
 
 /**
- * The crash fallback: the framework's runtime failed after taking the boot
- * root over. Release whatever root state remains, re-root a fresh React
- * tree on the boot element (the old root may be unmounted or wedged), and
- * bring the recovery console up with the failure surfaced on the page —
- * the operator keeps plugin management instead of a dead splash.
+ * Release whatever root state remains and re-root a fresh React tree on the
+ * boot element. A framework that failed mid-takeover may have unmounted the
+ * boot root or wedged it; the fresh root is the authority either way.
  */
-export function showBootstrapAfterFailure(handle: ClientHandle, notice: string): void {
+function remountRoot(handle: ClientHandle): void {
   try {
     handle.root.unmount()
   } catch {
@@ -99,21 +112,65 @@ export function showBootstrapAfterFailure(handle: ClientHandle, notice: string):
     // fresh root below is the authority either way.
   }
   handle.root = createRoot(handle.element)
+}
+
+/**
+ * The crash fallback: the framework's runtime failed after taking the boot
+ * root over. Bring the recovery console up with the failure surfaced on the
+ * page — the operator keeps plugin management instead of a dead splash.
+ */
+export function showBootstrapAfterFailure(handle: ClientHandle, notice: string): void {
+  remountRoot(handle)
   showBootstrap(handle, { notice })
+}
+
+/**
+ * The auxiliary-surface fallback: the ball and panel windows always render
+ * something usable, even with no framework installed (a draggable orb that
+ * summons the operator window, a panel that explains what is missing). On the
+ * main surface this is the bootstrap page — the recovery console already is
+ * that surface's fallback.
+ *
+ * @param handle - the surface's boot handle.
+ * @param options - `notice` surfaces a failure on the fallback (red strip, red dot).
+ */
+export function showSurfaceFallback(handle: ClientHandle, options: { notice?: string } = {}): void {
+  if (!isAuxSurfaceId(handle.surface)) {
+    showBootstrap(handle, options)
+    return
+  }
+  const surface: AuxSurfaceId = handle.surface
+  handle.root.render(
+    <SurfaceFallback
+      link={handle.link}
+      surface={surface}
+      {...options.notice !== undefined ? { notice: options.notice } : {}}
+    />,
+  )
+}
+
+/** {@link showSurfaceFallback} after a runtime failure — the auxiliary twin of
+ * {@link showBootstrapAfterFailure}. */
+export function showSurfaceAfterFailure(handle: ClientHandle, notice: string): void {
+  remountRoot(handle)
+  showSurfaceFallback(handle, { notice })
 }
 
 /**
  * Bootstrap the renderer: open the typed host link and render the startup
  * page immediately; the page settles through the host handshake on its own.
+ * An auxiliary surface boots bare — its caller mounts the framework runtime
+ * or {@link showSurfaceFallback} as soon as the rows are known.
  *
  * @param options - see {@link ClientBootOptions}.
- * @returns the client handle (link plus live React root).
+ * @returns the client handle (link, live React root, and the surface it serves).
  */
 export async function bootClient(options: ClientBootOptions): Promise<ClientHandle> {
   const link = new HostLink(options.channel ?? windowChannel())
   const root = createRoot(options.element)
-  const handle: ClientHandle = { link, root, element: options.element }
-  showStartup(handle)
+  const surface = options.surface ?? 'main'
+  const handle: ClientHandle = { link, root, element: options.element, surface }
+  if (surface === 'main') showStartup(handle)
   return handle
 }
 

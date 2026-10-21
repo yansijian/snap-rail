@@ -67,15 +67,27 @@
 ## 进程模型
 
 ```
-Electron Shell + Node Host（当前同进程） renderer（每窗口）
+Electron Shell + Node Host（当前同进程）        renderer（每窗口一个）
 ┌───────────────────────────┐          ┌─────────────────────────┐
-│ Shell: 窗口/IPC             │  invoke  │ client Cordis 树         │
+│ Shell: 窗口/IPC/IPC carrier │  invoke  │ client Cordis 树         │
 │ Host: Cordis 宿主树         │ ───────▶ │  kernel → framework      │
 │  gateway ── 点表/管理方法    │ ◀─────── │   runtime → 住户(组件)   │
-│  equipment / driver-* …    │  帧流端口 │  React root（槽位驱动）   │
-└───────────────────────────┘          └─────────────────────────┘
+│  shell 缝 ── 通知/托盘/窗口   │  帧流端口 │  React root（槽位驱动）   │
+│  equipment / driver-* …    │          └─────────────────────────┘
+└───────────────────────────┘            main / ball / panel 三种窗口
 ```
 
+- **窗口即 surface**：`main`（操作员主窗口，唯一默认存在的窗口）、`ball`
+  （128×128 透明置顶悬浮球）、`panel`（360×480 透明置顶小面板）。三种窗口
+  跑同一份 renderer 代码、同一个 page 之外的两张 html（`index.html` /
+  `surface.html?surface=ball|panel`），差别只在**装哪些面**：主窗口装每行
+  的 `clientUrl`，辅助窗口装 `surfaceUrls[surface]`（模块 id
+  `<包名>/<surface>`），种子提供方（框架）在所有窗口都装——一个球面也需要
+  框架的原语与样式。承载者（`carrier`）按 WebContents 分流帧流，多窗口天然
+  支持。
+- **辅助窗口不订阅工业点**：球/面板只消费宿主聚合后的帧（如
+  `shell/ball-changed`、`production/stats-changed`），因此隐藏的球不保留
+  任何数据通路，显示的球也不需要第二套订阅图。
 - Electron Shell 只持有 Host 边界与 IPC carrier；当前 Host 与 Shell 同进程，
   后续可移到 utility process；一切能力插件跑在 Host，renderer 是纯投影客户端
   （contextIsolation 开、nodeIntegration 关、preload 只暴露三原语
@@ -99,14 +111,15 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
 | 缝 | 包（层） | 说明 |
 | --- | --- | --- |
 | 启动/组合 | `base/app-boot` | 两层合成、boot()、LayerAdmin 热重载、`./rpc` 管理桥（认领 `plugins` 域；互斥组、requires 正反向预检与按来源的内置保护在这里执行；`./contract` 是方法行与 schema 的家）；池扫描 `./scan`（含 clientOnly/subpath 声音）、解析钩子 `./resolve-hooks`（appRoot 优先、池内回退）；dev 静态住户经 `rendererPackages` 挡板（仅 dev） |
-| 工作站桥 | `base/station-rpc` | `session.*`/`settings.*`/`audit.*`/`client-config.list`（登录态落 settings + 审计；`./contract` 是方法/帧行与 schema 的家，渲染住户 import 它获得类型） |
+| 工作站桥 | `base/station-rpc` | `session.*`/`settings.*`/`audit.*`/`client-config.list`（登录态落 settings + 审计；`./contract` 是方法/帧行与 schema 的家，渲染住户 import 它获得类型；行携带 `clientUrl` 与该包**每个辅助 surface 的面 URL**（`surfaceUrls`），渲染端据此决定每个窗口装什么） |
+| 系统外壳 | `base/shell` | **OS 集成缝**：`ctx.shell`（宿主面）与 `./contract`（渲染面）两个面。宿主面 = 通知（含动作按钮与点击回执）、托盘菜单贡献、辅助 surface 的窗口生命周期、悬浮球状态；渲染面只有单向 `shell.toast`、`surface.present/hide`、`shell.ball.state` 与两个帧。**池插件永不 import Electron**，Electron 只出现在首方 provider（`apps/desktop/src-host/main/shell`） |
 | RPC 协议 | `base/protocol` | **信封封闭、内容开放**：四象限消息模型、RpcMethodMap/FrameMap 两个开放合并基座（只有平台行 `host.*`/`rpc.*`/`window.*` 留在这里）、zod 信封校验、AbstractApiClient 双 overload |
 | RPC 宿主侧 | `base/gateway` | `ctx.rpc`：域名认领（`claimDomain` 首认即得、冲突 fail-loud）、`method`（请求 schema 必须随注册）、`frame`（载荷 schema 注册）、`bridgeEvent`、`rpc.describe` 能力发现、帧泵 |
 | RPC 客户端侧 | `base/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势；`rpcErrorText` 统一错误文案 |
 | 设置持久化 | `base/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
 | 审计 | `base/audit` | 追加式 JSONL：启停/配置/控制写全记录；`list(filter)` 读回；wire 类型（`AuditEntryInfo`）由它导出 |
 | 工具 | `base/util`、`base/plugin-kit` | Branded、assertNever、`formatClock`/`formatDuration`；`util/manifest` 是层词汇与规则单源。plugin-kit：`snapRail` manifest 词汇表（zod：kind/layer/category/exclusive/framework/requires/clientOnly/client/permissions）、种子两层（`SEED_MODULES` 基础层 + `CONTRIBUTED_SEED_MODULES` 框架贡献层，并集 `CLIENT_EXTERNALS` 是 clientBundle external 面）、tsdown preset（含 CSS 内联、三方库全内联、**种子导入护栏**——种子只准 named/star 导入，default 经 rolldown CJS interop 会变成命名空间对象，构建期硬错）、最终格式打包器 `./pack`（含 exports 映射、clientOnly 形态、**pack 时盖 `snapRail.client.seedAbi` 章**——bundle 真实 require 到的种子 id + 本包解析到的版本 + `SEED_ABI_REVISION`） |
-| 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架朴素插件页**（三合一输入：地址/拖拽/搜索安装 + 已安装列表 + 红色异常提示条；`droppedZipPath` 路径桥；`showBootstrapAfterFailure` 崩溃回退——框架运行时抛异常时重植 root 并把错误带上提示条回到此页）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
+| 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架朴素插件页**（三合一输入：地址/拖拽/搜索安装 + 已安装列表 + 红色异常提示条；`droppedZipPath` 路径桥；`showBootstrapAfterFailure` 崩溃回退——框架运行时抛异常时重植 root 并把错误带上提示条回到此页）；**辅助 surface 回退**（`showSurfaceFallback`：球是没有框架时的可拖可点圆球、面板是说明卡；`ClientHandle.surface` 让每个窗口知道自己是哪个 surface）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
 | 持久化规范 | `store/store` | `ctx.store` 的 Service Definition：`register(caller, ns, drizzle表)`；**drizzle 查询构建器即规范**（无裸 SQL/CTE/窗口函数）；命名空间 = 隔离边界；注册即建表 + append-only 加列 |
 | 持久化实现 | `store/store-sqlite` | 参考实现（zip 安装；互斥组 `store-backend`，单活）：node:sqlite + 自写 drizzle 适配器（零原生模块），`data/<ns>.db`，WAL；换后端 = 新实现包替换单活 |
 | 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection, probe?}`——驱动是纯协议适配器（零存储、零渲染端）；`probe` 驱动一次性只读连接测试，`equipment.devices.test` 是其 wire 面。底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。zip 声明 `requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影（消费方零改动）。`./contract` 是随应用发布的渲染契约（base 种子），`./driver` 是独立驱动仓库只读的纯类型面 |
@@ -115,6 +128,57 @@ Electron Shell + Node Host（当前同进程） renderer（每窗口）
 | UI 框架 | 独立仓 `snap-rail-framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、**设置外壳（对话框 occupant + 主题热应用 + 一方「插件/主题/软件更新」三页——原 `ui/settings-station` 包已退役并入，只装框架即得完整管理界面）**、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 经 `requires` 里的框架条目绑定（绑定即依赖）；换框架 = 换生态 |
 | 统一设备管理页 | `ui/equipment-station` | equipment 缝的渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 equipment 语义节）；经 `ctx.settingsPages` 缝贡献设置页；clientOnly zip，`requires` 声明框架与 equipment |
 | 业务套件 | 独立仓 `snap-rail-suite-terminal-ops` | **套件 = 单包单行，可双面**（互斥组 `suite`，单活）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）；宿主面 `./stats` 是同一场景的持久班产计数（store 缝 + 登录锚定 + `production/stats-changed` 帧），契约面为包内私面——场景逻辑收在套件内，杜绝跨包场景工具；`requires` 声明框架、equipment、`service:store` |
+
+## 窗口与 surface（OS 集成）
+
+OS 资源只有一个入口：**`ctx.shell`（宿主面）与 `@snap-rail/shell/contract`
+（渲染面）**。池插件永不 import Electron；Electron 只出现在首方 provider
+（`apps/desktop/src-host/main/shell/*`），换实现（无头宿主、远程外壳）是换
+provider，消费方零改动。
+
+**所有权按点击寿命划分，不按调用点划分**：
+
+- **宿主面**（`ctx.shell`）：带动作按钮的通知、托盘菜单项、窗口本身。这些
+  活得比任何 renderer 都长——按钮点击可能在客户端面消失几分钟后才到，所以
+  只有宿主面 fiber（与应用同寿）能贡献它们；`shell/notification-clicked`、
+  `shell/notification-action`、`shell/tray-clicked` 是回执。
+- **渲染面**（`./contract`）：单向 `shell.toast`（无按钮、无回调，点击聚焦
+  主窗口）、`shell.surface.present/hide`、`shell.ball.state` 与两个帧
+  （`shell/surface-changed`、`shell/ball-changed`）。会消失的调用方不得留下
+  无法应答的按钮，也拿不到 OS 句柄。
+
+**窗口**：`main` 永远由 Shell 拥有；`ball`/`panel` **按需创建**、隐藏后保留
+（下次 present 不重载，订阅仍在）。面板失焦即隐藏、Esc 即隐藏（由窗口拦截，
+任何 renderer 都吃不到"关不掉"的浮窗）。悬浮球位置跨会话记忆；记忆位置不再
+落在任何显示器工作区内时丢弃并回到右下角。尺寸固定（球 128、面板 360×480），
+不接受任意 URL 或任意窗口——surface 白名单就是封闭的三元组。
+
+**通知**：宿主面 `ctx.shell.notify(caller, input)`，上限单源在
+`SHELL_LIMITS`（标题 120 / 正文 512 / 动作标题 20 / 动作 id 64 / 一条最多 3
+个按钮），全局节流 5 条 / 10 秒，保留 50 条记录用于点击关联；同一 `tag` 的
+后一条替换前一条（沿用同一 id，不占节流预算——否则屏幕上会留下过期的计数）。
+超限/节流一律回 `{applied:false, reason, message}`，不抛进调用方 fiber。
+**冷启动**（应用未运行时点通知启动）没有记录可查：`Notification.handleActivation`
+的落点是通用的"聚焦主窗口"，不做插件路由（将来若需要，走 `toastXml` 携令牌
+预留）。
+
+**托盘**：单例、**懒创建**（首个托盘项或首个辅助 surface 出现时才建图标——
+终端默认不在通知区占位）；固定行（显示主窗口 / 隐藏到托盘 / 退出）+ 贡献行。
+托盘项 id 按 `<插件>:<id>` 命名空间化，两个插件可以都叫 `pause` 而互不干扰；
+单插件 12 项、全体 24 项上限；贡献随**调用方 fiber** 回收（`caller.effect`），
+重载/禁用插件不会留下孤儿菜单项。`X = 关窗即退出` 保持不变；隐藏到托盘只能
+是托盘菜单里的显式动作——托盘建不起来时该动作回 `{applied:false}`，绝不把
+窗口藏进一个不存在的图标后面。
+
+**悬浮球状态**：`ctx.shell.ball.setState(caller, patch)` 是宿主聚合面——产量
+计数、连接健康这类宿主面插件不需要球窗口存在就能驱动它；`shell/ball-changed`
+帧把它推给球窗口，`shell.ball.state` 是读取面。越界值**夹取/截断**而非拒绝
+（显示值不值得让插件失败）：进度夹到 `0..1`、标签截到 8 字、未知 tone 保持
+原值。
+
+**权限词汇**：`shell:notify`、`shell:tray`、`shell:surface` 出现在 manifest
+的 `permissions` 里，**当前只做安装期展示、不做运行时强制**（与仓库其他权限
+一致）；强制点仍在进程/OS 层。
 
 ## 工作站语义（station 层）
 

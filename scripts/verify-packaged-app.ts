@@ -67,6 +67,36 @@ for (const name of required) {
   if (!shipped.has(name)) violations.push(`${name}: required by desktop dependencies / app-boot peers but not packaged`)
 }
 
+/**
+ * Static artifacts the app cannot boot a window without. Each one is a file
+ * that a packaging change silently drops (a page left out of the Vite inputs,
+ * a resource absent from electron-builder's `files`) and whose absence only
+ * shows as a blank window at runtime — never as a build error.
+ */
+const requiredArtifacts: ReadonlyArray<readonly [path: string, why: string]> = [
+  ['dist/main/index.js', 'the Electron main entry'],
+  ['dist/preload/index.cjs', 'the IPC carrier preload (every window mounts it)'],
+  ['dist/client/index.html', 'the operator window page'],
+  ['dist/client/surface.html', 'the ball/panel surface page'],
+  ['resources/builtins.cordis.yml', 'the built-in layer'],
+  ['resources/tray.png', 'the tray glyph'],
+]
+for (const [path, why] of requiredArtifacts) {
+  if (!existsSync(join(appDir, path))) violations.push(`${path}: missing from the packaged app (${why})`)
+}
+
+/** A loaded surface page must reach its bundle with a relative URL: the app is
+ * loaded over `file://`, where a root-absolute `/assets/...` lands on the
+ * drive root and the window stays blank forever. */
+for (const page of ['index.html', 'surface.html']) {
+  const file = join(appDir, 'dist', 'client', page)
+  if (!existsSync(file)) continue
+  const html = readFileSync(file, 'utf8')
+  if (!/<script[^>]+src="\.\/assets\//.test(html)) {
+    violations.push(`dist/client/${page}: no relative ./assets/ script — a file:// load would render nothing`)
+  }
+}
+
 /** Collect built .js faces under a directory. */
 function walkJs(dir: string): string[] {
   const files: string[] = []

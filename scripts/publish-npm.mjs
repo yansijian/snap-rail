@@ -38,6 +38,10 @@ const closure = [
   'vendor/cordis',
   'packages/base/util',
   'packages/base/protocol',
+  // The OS integration seam: the framework (and any UI package that drives the
+  // ball/panel surfaces) imports `@snap-rail/shell/contract`, so the spec
+  // package publishes before the kit that lists it as a seed.
+  'packages/base/shell',
   'packages/base/plugin-kit',
   'packages/base/plugin-sdk',
   'packages/store/store',

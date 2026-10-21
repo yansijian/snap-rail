@@ -194,6 +194,21 @@ export interface ClientBundleOptions {
    * by the entry, so the bundle carries its own styling.
    */
   css?: readonly string[] | undefined
+  /**
+   * The emitted file's base name inside `lib-client` (default `client`, so
+   * the file is `lib-client/client.js`). Auxiliary surfaces build one bundle
+   * per window and name them after the surface (`ball`, `panel`); the
+   * manifest's `client.surfaces` points at those files.
+   */
+  outName?: string | undefined
+  /**
+   * The module id the bundle registers under (default: the package name).
+   * A package's **main** surface registers as the package itself, so
+   * `createClientRuntime` can require it by row name; an auxiliary surface
+   * registers as `<package>/<surface>` — one package, several windows, no
+   * two bundles fighting over one id.
+   */
+  moduleId?: string | undefined
 }
 
 /**
@@ -209,7 +224,13 @@ export interface ClientBundleOptions {
  * subpath to its module namespace, and the shell seeds
  * `<package>/<subpath>` ids from that map after requiring the face.
  *
- * @param packageName - the plugin's npm name (the module id it registers as).
+ * A package that renders in more than one window calls this once per surface:
+ * the main surface keeps the package name as its module id and `client` as its
+ * file name, while an auxiliary surface passes `outName` and `moduleId` so its
+ * bundle lands beside the main one (`lib-client/ball.js`) and registers as
+ * `<package>/ball` — the id that surface's window requires.
+ *
+ * @param packageName - the plugin's npm name (asset URLs and the default module id).
  * @param entry - the renderer entry source file.
  * @param options - see {@link ClientBundleOptions}.
  */
@@ -233,7 +254,7 @@ export function clientBundle(packageName: string, entry: string, options: Client
     },
   }
   return defineConfig({
-    entry: { client: entry },
+    entry: { [options.outName ?? 'client']: entry },
     outDir: 'lib-client',
     format: ['cjs'],
     platform: 'browser',
@@ -257,7 +278,7 @@ export function clientBundle(packageName: string, entry: string, options: Client
       // module loader executes with its own `require` (seeds resolve there).
       // The footer unwraps the interop default — `require(name)` must hand
       // back the plugin object itself, never its CJS namespace envelope.
-      banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(packageName)}, factory: function (require, module, exports) {`,
+      banner: `window.__ModuleLoader__.load({ id: ${JSON.stringify(options.moduleId ?? packageName)}, factory: function (require, module, exports) {`,
       footer: 'return module.exports && module.exports.__esModule === true && "default" in module.exports ? module.exports.default : module.exports; } });',
     },
   })

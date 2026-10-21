@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>snap-rail</title>
+    <style>
+      /*
+        A surface window is transparent, fixed-size, always on top: the page
+        must never paint a background, scroll, or flash a white frame while the
+        bundle loads. `?surface=ball|panel` tells the entry which role it has.
+      */
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+      }
+      body {
+        -webkit-user-select: none;
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./surface.tsx"></script>
+  </body>
+</html>

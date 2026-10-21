@@ -56,7 +56,8 @@ UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`。`--framework` 接受
 `package.json` 的 `snapRail` 必须通过 `snapRailManifestSchema` 校验。作者
 声明的字段：`kind`（driver / plugin / framework / suite）、`layer`、
 `title`（管理页显示名，中文可用）、`category`（开放分类标记，声明即归
-组）、`clientOnly`、`client.entry`、`exclusive`（互斥组）、`permissions`
+组）、`clientOnly`、`client.entry`、`client.surfaces`（每个辅助窗口一个
+渲染面，见下节）、`exclusive`（互斥组）、`permissions`
 与 `engines`，以及**唯一兼容声明** `requires`：
 
 - 包名：`@snap-rail/equipment` —— 该包已安装并启用；
@@ -105,6 +106,85 @@ zip 里残留的字段在 manifest 校验时被剥离，宿主永不再读它们
 可选 `probe`（一次性只读连接测试，设置页的「测试连接」按钮）+
 `createConnection`（返回 `{ update, dispose }`，经 handle 上报
 status/sample/write）。设备/组/点住在底座表里，驱动零自有存储。
+
+## 多窗口：悬浮球、小面板、托盘与通知
+
+窗口有三种 **surface**：`main`（操作员主窗口）、`ball`（128×128 透明置顶
+悬浮球）、`panel`（360×480 透明置顶小面板）。一个插件包可以给任意多个
+surface 各出一个渲染面——**一个包、一个开关、每个窗口一个 bundle**：
+
+```json
+{
+  "snapRail": {
+    "client": {
+      "entry": "lib-client/client.js",
+      "surfaces": { "ball": "lib-client/ball.js", "panel": "lib-client/panel.js" }
+    }
+  }
+}
+```
+
+```ts
+// tsdown.config.ts —— 每个 surface 一次 clientBundle
+export default defineConfig([
+  clientBundle('@my-scope/my-suite', 'src/index.tsx'),                                  // lib-client/client.js
+  clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),         // lib-client/ball.js
+  clientBundle('@my-scope/my-suite/panel', 'src/panel.tsx', { outName: 'panel' }),      // lib-client/panel.js
+])
+```
+
+- 主面的模块 id 就是**包名**，辅助面是 **`<包名>/<surface>`**；`outName` 只
+  决定文件名，`moduleId` 决定注册 id（`clientBundle` 的第三个参数，默认
+  包名）。渲染端按行里的 `surfaceUrls` 装对应窗口的面，没声明的窗口显示
+  kernel 的朴素回退（球 = 可拖可点的圆球，面板 = 说明卡）。
+- **`main` 不能出现在 `surfaces` 里**：主窗口的面就是 `client.entry`。
+- 辅助面**不要订阅工业点**：球/面板隐藏时不该保留数据通路。要显示的信息
+  由宿主面聚合后推帧（如 `production/stats-changed`、`shell/ball-changed`）。
+
+### `ctx.shell`（宿主面）与 `./contract`（渲染面）
+
+OS 资源只走这条缝，插件**永不 import Electron**。所有权按点击寿命划分：
+
+| 能力 | 面 | 说明 |
+| --- | --- | --- |
+| `ctx.shell.notify(caller, {title, body, actions, tag, silent})` | 宿主面 | 带按钮的通知；返回 `{applied, id}` 或 `{applied:false, reason, message}` |
+| `ctx.shell.tray.addItem/updateItem/removeItem(caller, …)` | 宿主面 | 托盘菜单项（单插件 12、全体 24）；点击回执 `ctx.on('shell/tray-clicked', key)` |
+| `ctx.shell.surface.present/hide/state(caller, …)` | 宿主面 | 并按需创建/显示/隐藏辅助窗口（`main` = 显示并聚焦） |
+| `ctx.shell.ball.setState(caller, patch)` | 宿主面 | 宿主聚合的球状态：`{progress 0..1\|null, label ≤8字\|null, tone}` |
+| `shell.toast` | 渲染面 | 单向通知（无按钮、无回调，点击聚焦主窗口） |
+| `shell.surface.present/hide` | 渲染面 | 立起/收起窗口；`present('main')` 是回退圆球唯一的动作 |
+| `shell.ball.state` | 渲染面 | 读宿主聚合的球状态；帧 `shell/ball-changed` 负责推送 |
+
+```ts
+// 宿主面：一个托盘项 + 一条错误通知（登记即 effect，随 fiber 回收）
+ctx.effect(() => {
+  const added = ctx.shell.tray.addItem(ctx, { id: 'pause', label: '暂停采集', checked: false })
+  if (!added.applied) ctx.logger('stats').warn(added.message)
+  return () => void ctx.shell.tray.removeItem(ctx, 'pause')
+})
+
+ctx.on('shell/tray-clicked', key => {
+  if (key !== `${ctx.fiber.name}:pause`) return
+  // …翻转 checked、真正的业务动作
+})
+
+const raised = ctx.shell.notify(ctx, {
+  title: '采集失败',
+  body: '点位 PLC-1 超时',
+  tag: 'collect-error',                                  // 同 tag 替换，不会堆通知
+  actions: [{ id: 'retry', label: '重试' }],             // 最多 3 个按钮
+})
+ctx.on('shell/notification-action', (id, actionId) => {
+  if (id === (raised.applied ? raised.id : '') && actionId === 'retry') void retry()
+})
+```
+
+几条硬规则：上限单源在 `@snap-rail/shell` 的 `SHELL_LIMITS`（标题 120 /
+正文 512 / 动作标题 20 / 动作 id 64 / 一条最多 3 个按钮），全局节流 5 条
+/ 10 秒；超限与节流回 `{applied:false}` 而不是抛异常。托盘项按
+`<插件>:<id>` 命名空间化，两个插件同名互不干扰。冷启动（应用没运行、点通知
+启动它）没有记录可查，落点是通用的"聚焦主窗口"。权限词汇
+`shell:notify` / `shell:tray` / `shell:surface` 目前只做安装期展示。
 
 ## 本地命令
 

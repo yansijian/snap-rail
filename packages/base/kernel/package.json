@@ -21,6 +21,7 @@
   "dependencies": {
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/shell": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^"
   },
   "peerDependencies": {

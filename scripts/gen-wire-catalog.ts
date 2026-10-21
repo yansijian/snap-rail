@@ -18,6 +18,7 @@ import type { DomainContract, MethodRow } from '../packages/base/protocol/src/co
 import { pluginsContract, updateContract } from '../packages/base/app-boot/src/contract.ts'
 import { equipmentContract } from '../packages/equipment/equipment/src/wire.ts'
 import { stationContract } from '../packages/base/station-rpc/src/contract.ts'
+import { shellContract } from '../packages/base/shell/src/contract.ts'
 
 const root = join(import.meta.dirname, '..')
 const catalogPath = join(root, 'docs', 'wire-catalog.md')
@@ -28,6 +29,7 @@ const catalogPath = join(root, 'docs', 'wire-catalog.md')
  * contracts that ride the app. */
 const CONTRACTS: readonly DomainContract[] = [
   stationContract,
+  shellContract,
   pluginsContract,
   updateContract,
   equipmentContract,

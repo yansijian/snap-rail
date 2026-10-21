@@ -355,9 +355,11 @@ export function packageManifestOf(
     if (descriptor.exclusive !== undefined) manifest.exclusive = descriptor.exclusive
     if (descriptor.requires !== undefined) manifest.requires = descriptor.requires
     if (descriptor.clientOnly === true) manifest.clientOnly = true
-    if (descriptor.clientEntry !== undefined || descriptor.clientSeeds !== undefined || descriptor.externalSeeds !== undefined) {
+    if (descriptor.clientEntry !== undefined || descriptor.clientSeeds !== undefined || descriptor.externalSeeds !== undefined
+      || descriptor.clientSurfaces !== undefined) {
       manifest.client = {
         ...descriptor.clientEntry !== undefined ? { entry: descriptor.clientEntry } : {},
+        ...descriptor.clientSurfaces !== undefined ? { surfaces: descriptor.clientSurfaces } : {},
         ...descriptor.clientSeeds !== undefined ? { seeds: descriptor.clientSeeds } : {},
         ...descriptor.externalSeeds !== undefined ? { externalSeeds: descriptor.externalSeeds } : {},
       }
