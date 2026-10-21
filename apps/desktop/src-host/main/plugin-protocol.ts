@@ -42,7 +42,7 @@ export function registerPluginScheme(): void {
  */
 export function handlePluginScheme(poolDir: string): void {
   const poolRoot = `${pathToFileURL(join(poolDir, '.')).href}`
-  protocol.handle(PLUGIN_SCHEME, request => {
+  protocol.handle(PLUGIN_SCHEME, async request => {
     const url = new URL(request.url)
     if (url.hostname !== 'pool') {
       return new Response('not found', { status: 404 })
@@ -52,6 +52,16 @@ export function handlePluginScheme(poolDir: string): void {
     if (!pathToFileURL(target).href.startsWith(poolRoot)) {
       return new Response('forbidden', { status: 403 })
     }
-    return net.fetch(pathToFileURL(target).href, { bypassCustomProtocolHandlers: true })
+    const response = await net.fetch(pathToFileURL(target).href, { bypassCustomProtocolHandlers: true })
+    // The pool is mutable on disk — a reinstall rewrites it in place while
+    // every URL stays the same — and a standard privileged scheme rides
+    // Chromium's HTTP cache, so an unqualified response keeps serving the
+    // previous plugin build until the entry expires. Face bundles must always
+    // come off the disk.
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: { 'Cache-Control': 'no-store' },
+    })
   })
 }
