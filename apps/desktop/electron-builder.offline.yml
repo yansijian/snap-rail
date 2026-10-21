@@ -1,0 +1,12 @@
+# Offline packaging overlay: an air-gapped machine (or a CI runner behind a
+# proxy) has no route to the Electron release CDN, and electron-builder would
+# otherwise download the distribution even though `node_modules/electron/dist`
+# is already installed. `electronDist` packages that installed tree instead —
+# the same bytes the devDependency pins, so the artifact stays reproducible.
+#
+#   pnpm --filter @snap-rail/desktop run build:faces
+#   pnpm exec electron-builder --win --dir --config electron-builder.offline.yml
+#
+# The default `pnpm app:pack` (electron-builder.yml) remains the networked path.
+extends: ./electron-builder.yml
+electronDist: node_modules/electron/dist
