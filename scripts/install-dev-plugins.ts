@@ -48,10 +48,17 @@ function main(): void {
     return
   }
   const repoRoot = join(import.meta.dirname, '..')
-  const distDirs = [join(repoRoot, 'dist-plugins'),
-    ...SIBLING_DISTS
-      .map(name => join(repoRoot, '..', name, 'dist'))
-      .filter(dir => existsSync(dir)),
+  // Split repos live in one of two places: the workspace checkout keeps them
+  // under `external/` (scripts/setup-external.mjs), a LOCAL-mode checkout keeps
+  // them next to this repo. Prefer the workspace copy when both exist — its
+  // dist is what this checkout just built; a stale sibling dist once silently
+  // shipped an old framework into a fresh pool.
+  const distDirs = [
+    join(repoRoot, 'dist-plugins'),
+    ...SIBLING_DISTS.flatMap(name =>
+      [join(repoRoot, 'external', name, 'dist'), join(repoRoot, '..', name, 'dist')]
+        .filter(dir => existsSync(dir))
+        .slice(0, 1)),
   ]
   const poolDir = join(home, 'plugins')
   const userLayerPath = join(home, 'plugins.yml')
