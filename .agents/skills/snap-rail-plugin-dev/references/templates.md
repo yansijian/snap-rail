@@ -98,9 +98,10 @@ export default {
 骨架是空 `apply()`。宿主服务 = `ctx.provide('<服务名>', 实现)` +
 `inject: ['<依赖服务>']`；wire 方法/帧用 `@snap-rail/protocol` 的
 `defineContract` 单源声明，挂载用 `ctx.rpc`（类型从
-`@snap-rail/plugin-sdk/api` 导入，`inject: ['rpc']`）。工具与宿主服务同层
-（tool），**工具互不依赖**（门禁强制）；跨包场景逻辑请做 suite，不要拆成
-工具。
+`@snap-rail/plugin-sdk/api` 导入，`inject: ['rpc']`）。契约模块 import
+`zod`：`@snap-rail/protocol` 与 `zod` 都放 `dependencies`（host value
+import）。工具与宿主服务同层（tool），**工具互不依赖**（门禁强制）；跨包
+场景逻辑请做 suite，不要拆成工具。
 
 ### suite（双面、单活）
 
@@ -112,7 +113,10 @@ export default {
   挂进框架槽位；`ctx.client.link` + `subscribeFrame`（SDK `/api/client`）
   消费宿主帧；只组合框架原语。
 - 场景契约（跨面类型/帧载荷）住套件包自己的 `./<子路径>` 导出（如首方
-  `terminal-ops` 的 `./stats`），别外置。
+  `terminal-ops` 的 `./stats`），别外置。契约模块 import `zod`；
+  `dependencies` 至少 `@snap-rail/protocol` + `zod`（host value import，
+  `hostBundle` 才会外部化）。UI 用 `formatClock`/`formatDuration` 时把
+  `@snap-rail/util` 加 devDependency。
 - 要悬浮球就加 `surfaces.ball` + 对应 `clientBundle`；要用通知/托盘/退出
   策略就 `requires: ['service:shell']`。
 - 双面最小通道完整代码见 [faces-and-wire.md](faces-and-wire.md)。

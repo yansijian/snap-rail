@@ -283,7 +283,8 @@ export default {
 - `@snap-rail/connection` 是渲染面 base 种子：**不要**写进
   `client.externalSeeds`；只有框架/其他插件贡献的种子才写。
 - wire 契约的 `defineContract` / `method` / `RpcBusinessError` 来自
-  `@snap-rail/protocol`；宿主面 value 用，放 `dependencies`。
+  `@snap-rail/protocol`；契约 schema 用 `zod`。两者都是宿主面 value import，
+  放 `dependencies`（app 的 resolve-hooks 会外部化 zod）。
 - 完整骨架（contract、宿主、渲染面、manifest）见仓库 skill：
   `.agents/skills/snap-rail-plugin-dev/references/faces-and-wire.md`。
 
@@ -411,8 +412,16 @@ SDK 的传递依赖与 base 运行时包：不需要单独安装，也不要写�
 - **`Property 'client' does not exist on type 'Context'`**：
   `import type {} from '@snap-rail/framework-shadcn/runtime'` 引入框架
   runtime 的 Context 增强（type-only，不产生运行时代码）。
+- **`ctx.client.surface` 不存在**：framework-shadcn `0.2.0` 的
+  `ClientServices` 只有 `link`；`surface` 是 `0.2.2+`。pnpm 11 的
+  `minimumReleaseAge` 可能把刚发布的 0.2.2 压回 0.2.0——用
+  `pnpm why @snap-rail/framework-shadcn` 查看，必要时显式装 `^0.2.2`。
 - **`Cannot find module '@snap-rail/connection'`**：改用
   `@snap-rail/plugin-sdk/api/client`；它经 SDK 传递安装。
+- **`pnpm install` 报 `ERR_PNPM_IGNORED_BUILDS`**：把 `pnpm-workspace.yaml`
+  里的 `allowBuilds.esbuild` 改成 `true`（或跑 `pnpm approve-builds`）。
+- **`pnpm exec tsc` 报 not found**：模板不带 typescript；`pnpm add -D
+  typescript` 后再 `pnpm exec tsc --noEmit`（tsdown 只转译不检查类型）。
 - **启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方未安装）`**：
   把 base 种子从 `client.externalSeeds` 删掉。
 - **驱动表单没有字段**：给 zod schema 的字段加 `.meta({ title: '标签' })`，

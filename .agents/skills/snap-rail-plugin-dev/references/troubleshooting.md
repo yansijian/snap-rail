@@ -23,6 +23,7 @@ warning = 建议（放行但要逐条确认）。
 | pack 报 missing its host face | 先 build 后 pack 的顺序反了，或 `main` 与产物不一致 | `pnpm run build`；确认 `main` = `lib-host/host.js`（模板默认） |
 | 渲染面构建后无法 require 框架组件 | import 到的**框架/其他插件贡献**种子没进 manifest `externalSeeds` | 每个贡献子路径（`/slots` `/semantic` `/ui`…）都要在 `client.externalSeeds` 里声明；base 种子（connection/protocol/util/shell-contract）不写 |
 | `clientBundle` 打进 node 侧代码报错 | client bundle 里 import 了宿主入口 / node-only 模块 | 跨端消费类型/schema 走 `./contract` 纯面；宿主实现永不进渲染图 |
+| 构建警告 `Could not resolve 'zod'`（契约模块） | 契约 import 了 zod，但没放 `dependencies` | `pnpm add zod`；契约是 host value import，app 的 resolve-hooks 会外部化 zod |
 | `Cannot find module '@snap-rail/plugin-sdk/api'` | SDK 低于 0.2.5，没有作者 API 门面 | 升级 `@snap-rail/plugin-sdk` 到 `^0.2.5`；宿主类型从 `/api`、渲染 link/帧从 `/api/client` 取 |
 | `Property 'rpc' does not exist on type 'Context'` | 没引入 gateway 类型增强 | `import type { GatewayService } from '@snap-rail/plugin-sdk/api'`；不要直接 import gateway |
 | `Property 'client' does not exist on type 'Context'` | 没引入框架 runtime 的 `Context` 增强 | `import type {} from '@snap-rail/framework-shadcn/runtime'`（type-only，不产生运行时代码） |
@@ -39,7 +40,8 @@ warning = 建议（放行但要逐条确认）。
 | `init: --framework applies to …` | 对非 UI 模板传了 `--framework` | 该参数只对 `ui-view` / `ui-layout` / `ui-extension` / `suite` 生效 |
 | install 报未发布包 E404 | 旧模板把未发布的内部包写进了 peer | 升级 SDK：`pnpm dlx @snap-rail/plugin-sdk@latest init` 重新生成 |
 | 运行 CLI 弹「选择应用打开 .js」 | SDK 0.2.2 及更早缺 shebang | 升级到 0.2.3+；临时用 `node node_modules/@snap-rail/plugin-sdk/lib/cli.js` |
-| `pnpm install` 报 `ERR_PNPM_IGNORED_BUILDS`（pnpm ≥10） | 依赖的构建脚本默认不跑（esbuild 等） | 按 pnpm 提示 `pnpm approve-builds` 放行（或 workspace 配置 `onlyBuiltDependencies`）；批准列表在 pnpm-workspace.yaml |
+| `pnpm install` 报 `ERR_PNPM_IGNORED_BUILDS`（pnpm ≥10） | 依赖的构建脚本默认不跑（esbuild 等） | 按提示把 `pnpm-workspace.yaml` 的 `allowBuilds.<pkg>` 改成 `true`（pnpm 10 用 `onlyBuiltDependencies`），或跑 `pnpm approve-builds` |
+| `pnpm exec tsc` 报 not found | 模板只带 tsdown，不带 typescript | `pnpm add -D typescript` 后再 `pnpm exec tsc --noEmit`；tsdown 只转译不检查类型 |
 | 改 package.json 依赖段后 install 挂死 | 弱网/受限环境下 lockfile 重解析的元数据请求超时 | 避免频繁动依赖段；离线机器用 `--offline` 与本地 registry 镜像 |
 
 ## 构建产物

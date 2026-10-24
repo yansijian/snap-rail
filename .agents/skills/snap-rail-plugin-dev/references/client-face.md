@@ -43,15 +43,16 @@ Button / Card / Dialog / Table / Tabs / Collapsible / SchemaForm…
 | --- | --- |
 | `useRefresh(ctx, events)` / `SchemaForm` / 框架组件 | `@snap-rail/framework-shadcn/ui` |
 | `rpcErrorText` / `subscribeFrame` / `HostLink` | `@snap-rail/plugin-sdk/api/client` |
-| `formatClock` / `formatDuration` | `@snap-rail/util` |
+| `formatClock` / `formatDuration` | `@snap-rail/util`（模板未带则 `pnpm add -D @snap-rail/util`） |
 
 色值一律 theme 令牌（明暗由 `html[data-mode]` 切换，禁止硬编码色值和
 `dark:` 变体；图表系列只用 `--chart-1…6`，红/黄/绿是状态语义不进数据系列）。
 
 ## link 与帧
 
-- `ctx.client` 由框架 runtime 提供（`{ link, surface }`）；
-  `inject: ['client']`。
+- `ctx.client` 由框架 runtime 提供（至少 `{ link }`；`surface` 从
+  framework-shadcn `0.2.2` 起才有）；`inject: ['client']`。以安装的框架
+  d.ts 为准——`0.2.0` 只有 `link`，不要写 `ctx.client.surface`。
 - 类型增强：`import type {} from '@snap-rail/framework-shadcn/runtime'`——只为
   把 `ctx.client` 的 `Context` 增强带进程序，不产生运行时代码，不写
   `externalSeeds`。

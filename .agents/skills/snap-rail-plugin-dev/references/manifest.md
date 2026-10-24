@@ -15,7 +15,7 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
 | `exclusive` | string | 互斥组：启用本包自动停用同组其他已启用包。`suite` 默认 `'suite'`，`framework` 默认 `'framework'`，store 后端必须 `'store-backend'`。 |
 | `requires` | string[] | **唯一兼容声明**，见下节。 |
 | `clientOnly` | boolean | 纯渲染包（无宿主面）：行不进宿主树，经 `client-config.list` 下发给渲染端。必须声明 `client.entry`。 |
-| `client` | object | 渲染面声明：`entry`（CJS 工厂包路径，默认 `lib/client.js`）、`surfaces`（辅助面映射）、`seeds`（贡献的种子子路径）、`externalSeeds`（消费的外部种子 id）。`seedAbi` 由 pack 盖章，**永不手写**。 |
+| `client` | object | 渲染面声明：`entry`（CJS 工厂包路径；schema 默认 `lib/client.js`，init 模板显式写 `lib-client/client.js`，以模板/doctor 为准）、`surfaces`（辅助面映射）、`seeds`（贡献的种子子路径）、`externalSeeds`（消费的贡献种子 id）。`seedAbi` 由 pack 盖章，**永不手写**。 |
 | `permissions` | string[] | 安装期展示用（如 `shell:notify` / `shell:tray` / `shell:surface`），暂不强制。 |
 | `engines` | object | 兼容的宿主/协议/渲染端版本范围：`snapRail` / `hostProtocol` / `renderer`。 |
 

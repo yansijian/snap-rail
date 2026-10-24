@@ -40,7 +40,7 @@
 | --- | --- | --- | --- |
 | 拿宿主链接 | `ctx.client.link`；`inject: ['client']`；`import type {} from '@snap-rail/framework-shadcn/runtime'` 引入 `ctx.client` 增强 | 框架 runtime `ctx.provide('client', { link, surface })` | 不写（type-only） |
 | 订阅宿主帧 | `import { subscribeFrame, rpcErrorText } from '@snap-rail/plugin-sdk/api/client'`；`import type { HostLink } from '@snap-rail/plugin-sdk/api/client'` | base 种子 `@snap-rail/connection` | **不写**（base 种子） |
-| 时间/时长格式化 | `import { formatClock, formatDuration } from '@snap-rail/util'` | base 种子 `@snap-rail/util` | **不写**（base 种子） |
+| 时间/时长格式化 | `import { formatClock, formatDuration } from '@snap-rail/util'`（模板未带则 `pnpm add -D @snap-rail/util`） | base 种子 `@snap-rail/util` | **不写**（base 种子） |
 | 框架原语/槽位/语义契约 | `import … from '@snap-rail/framework-shadcn/ui'` / `/slots` / `/semantic` | 框架贡献种子 | 写对应子路径 |
 | 重渲染 tick | `import { useRefresh } from '@snap-rail/framework-shadcn/ui'` | 框架贡献种子 | 写 `/ui` |
 | 消费其他插件的组件 | `import … from '<包名>/<子路径>'` | 对方贡献种子 | 写 `<包名>/<子路径>` |
@@ -49,12 +49,17 @@
   它们**不属于** `externalSeeds`。
 - **贡献种子**是框架或其他插件经 `client.seeds` 贡献的；只有值导入才需要写
   `externalSeeds`。`import type {}` 被擦除，不产生运行时 require，不用写。
+- `ctx.client.surface` 只有 framework-shadcn `0.2.2+` 才有；`0.2.0` 的
+  `ClientServices` 只有 `link`。以安装的框架 d.ts 为准，不要写不存在的字段。
+- init 模板默认不带 `@snap-rail/protocol` / `zod` / `@snap-rail/util`；写
+  wire 或使用 format 助手时按上表补到对应的 `dependencies` / `devDependencies`。
 
 ## 2. 依赖放哪张表
 
 | 你的代码 | `package.json` | 原因 |
 | --- | --- | --- |
 | 宿主面 value import（`@snap-rail/protocol` / equipment / store / shell） | `dependencies` | `hostBundle` 只外部化 `dependencies`；运行时由终端按 appRoot 优先、池内回退解析 |
+| 宿主契约模块的 `zod`（`z.object` / `method`） | `dependencies` | 契约是 host value import；app 的 resolve-hooks 会外部化 zod，避免把 zod 内联 |
 | 宿主面 type-only import（`GatewayService` / `SettingsService` / 框架类型） | `devDependencies`（通常 SDK/框架已在） | 编译后擦除，不产生宿主运行时 import |
 | 渲染面种子 import（SDK `/api/client`、framework 子路径、util） | `devDependencies` | `clientBundle` 统一把种子外部化；运行时从种子表取单实例 |
 | 渲染面第三方库（非种子） | `dependencies` 或 `devDependencies` | 会被内联进 client bundle；zip 不带 node_modules |
@@ -174,7 +179,8 @@ export default {
 
 `@snap-rail/connection` / `@snap-rail/protocol` / `@snap-rail/shell/contract`
 都是 base 种子，**不要**出现在 `externalSeeds`。wire 作者只需要在
-`dependencies` 里放 `@snap-rail/protocol`。
+`dependencies` 里放 `@snap-rail/protocol` 与 `zod`：前者是 wire 单源，后者是
+契约 schema 的运行时值。
 
 ## 4. base 种子清单
 

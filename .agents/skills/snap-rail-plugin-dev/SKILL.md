@@ -110,11 +110,18 @@ pnpm install
 #    - 渲染 link/帧：`import { subscribeFrame, rpcErrorText } from
 #      '@snap-rail/plugin-sdk/api/client'`；`ctx.client` 由框架 runtime 提供，
 #      用 `import type {} from '@snap-rail/framework-shadcn/runtime'` 引入增强。
+#    - wire 契约模块 import zod：`@snap-rail/protocol` 与 `zod` 都放
+#      dependencies（host value import；zod 由 app 的 resolve-hooks 外部化）。
+#    - UI 用 `formatClock`/`formatDuration` 时把 `@snap-rail/util` 加
+#      devDependency（base 种子；模板默认不带）。
 #    - 完整骨架见 references/faces-and-wire.md。
 
 # 2. 实现（按模板读 references/ 对应文件），然后：
 pnpm run build      # 宿主面 → lib-host/，渲染面 → lib-client/
 pnpm run test
+
+# 2.1 建议加一次类型检查（模板不带 typescript；tsdown 只转译不检查类型）：
+pnpm add -D typescript && pnpm exec tsc --noEmit
 
 # 3. 快速反馈环（写循环里随时跑；红 = 契约违约，warning = 建议）：
 pnpm run doctor
@@ -189,6 +196,11 @@ UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`；`--framework
     `0.2.2` 已支持；但 `plugin-sdk@0.2.3` 的 d.ts 按旧 schema 内联生成，
     manifest 字面量里写 `surfaces` 会被 excess property check 拒——
     `0.2.4` 起恢复；
+  - framework-shadcn `0.2.0` 的 `ClientServices` 只有 `link`；`surface`
+    从 `0.2.2+` 才有。pnpm 11 的 `minimumReleaseAge` 可能把刚发布的
+    `0.2.2` 继续压到 `0.2.0`（官方 registry 也会）——用
+    `pnpm why @snap-rail/framework-shadcn` 查看，必要时把版本加进
+    `minimumReleaseAgeExclude` 或显式装 `@snap-rail/framework-shadcn@^0.2.2`；
   - npmmirror 元数据同步滞后还可能让 `^0.2.1` 这类范围解析到旧版本
     （实测装出 0.2.1）——遇到「文档说有、类型说没有」，先切官方
     registry 重装再判断；

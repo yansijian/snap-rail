@@ -35,21 +35,32 @@
       "id": 2,
       "name": "suite-wire-and-frame",
       "prompt": "做一个 snap-rail 双面套件：宿主面暴露 demo.ping 方法，调用时广播 demo/pinged 帧；渲染面订阅该帧并把时间显示在页面上。用独立插件仓，最后 build + doctor 通过。",
-      "expected_output": "suite 模板；contract.ts 用 defineContract 单源声明；宿主 ctx.rpc claimDomain/serveContract；渲染 ctx.client.link + subscribeFrame；类型从 SDK /api 门面取；package.json 不直接依赖 gateway/connection/settings；externalSeeds 只含框架贡献种子；build/doctor 绿",
+      "expected_output": "suite 模板；contract.ts 用 defineContract 单源声明；宿主 ctx.rpc claimDomain/serveContract；渲染 ctx.client.link + subscribeFrame；类型从 SDK /api 门面取；package.json dependencies 含 protocol 与 zod、不含 gateway/connection/settings；externalSeeds 只含框架贡献种子；build/doctor 绿",
       "files": [],
       "assertions": [
-        { "text": "宿主 import type GatewayService from '@snap-rail/plugin-sdk/api'，inject 含 rpc", "passed": false },
-        { "text": "宿主 claimDomain('demo') + serveContract(...)，帧由 contract 注册", "passed": false },
-        { "text": "渲染 import { subscribeFrame } from '@snap-rail/plugin-sdk/api/client'，用 ctx.client.link 且包在 ctx.effect 里", "passed": false },
-        { "text": "渲染用 import type {} from '@snap-rail/framework-shadcn/runtime' 引入 ctx.client 增强", "passed": false },
-        { "text": "package.json 不含 gateway/connection/settings 直接依赖；protocol 在 dependencies（宿主 value 用）", "passed": false },
-        { "text": "externalSeeds 只含 framework 贡献种子，不含 connection/protocol/shell/contract 等 base 种子", "passed": false },
-        { "text": "pnpm run build 产出 lib-host/host.js 与 lib-client/client.js；host.js 无 plugin-sdk；client bundle 无 node 内置", "passed": false },
-        { "text": "pnpm run doctor 全绿", "passed": false },
-        { "text": "transcript 未读取 node_modules/@snap-rail/framework-shadcn/lib 或 apps/desktop 反推 API", "passed": false }
+        { "text": "宿主 import type GatewayService from '@snap-rail/plugin-sdk/api'，inject 含 rpc", "passed": true },
+        { "text": "宿主 claimDomain('demo') + serveContract(...)，帧由 contract 注册", "passed": true },
+        { "text": "渲染 import { subscribeFrame } from '@snap-rail/plugin-sdk/api/client'，用 ctx.client.link 且包在 ctx.effect 或 useEffect 里", "passed": true },
+        { "text": "渲染用 import type {} from '@snap-rail/framework-shadcn/runtime' 引入 ctx.client 增强", "passed": true },
+        { "text": "package.json dependencies 含 @snap-rail/protocol 与 zod；不含 gateway/connection/settings 直接依赖", "passed": true },
+        { "text": "externalSeeds 只含 framework 贡献种子，不含 connection/protocol/shell/contract 等 base 种子", "passed": true },
+        { "text": "pnpm install 不被 ERR_PNPM_IGNORED_BUILDS 卡住（allowBuilds/esbuild 已处理）", "passed": true },
+        { "text": "pnpm run build 产出 lib-host/host.js 与 lib-client/client.js；host.js 无 plugin-sdk；client bundle 无 node 内置", "passed": true },
+        { "text": "pnpm exec tsc --noEmit 通过（ctx.rpc / ctx.client 无类型错误，无 as any）", "passed": true },
+        { "text": "pnpm run doctor 全绿", "passed": true },
+        { "text": "transcript 未读取 node_modules/@snap-rail/framework-shadcn/lib 或 apps/desktop 反推 API", "passed": true }
       ],
-      "result": "待发布 plugin-sdk 0.2.5 后实跑",
-      "findings_applied": []
+      "result": "11/11 断言通过（两次独立实跑：父 agent 直接跑 published plugin-sdk@0.2.5，以及子代理只读 skill 从零建仓；两次都 init → install → build → doctor → test → tsc → pack → verify → feed 全绿。父跑 host 624 B / client 2367 B；子代理 host 942 B / client 3605 B；两边 client 都只 require 种子、无 plugin-sdk/node 内置；seedAbi 含 connection 0.1.0）",
+      "findings_applied": [
+        "pnpm 11 首次 install 会写 allowBuilds: esbuild: set this to true or false 并拒绝安装——skill 的 ERR_PNPM_IGNORED_BUILDS 行改为把 allowBuilds.<pkg> 设为 true",
+        "契约模块 import zod 必须把 zod 放 dependencies（host value import；resolve-hooks 外部化）；skill 的 faces-and-wire/templates 已补",
+        "模板不带 typescript；tsdown 只转译不检查类型——skill 标准工作流补 pnpm add -D typescript && pnpm exec tsc --noEmit，实跑通过",
+        "模板默认不带 @snap-rail/util；用 formatClock/formatDuration 时要加 devDependency——client-face/faces-and-wire/SKILL 已补",
+        "framework-shadcn 0.2.0 的 ClientServices 只有 link；surface 是 0.2.2+——skill 补版本说明，避免按 0.2.2 文档写 0.2.0 代码",
+        "pnpm 11 minimumReleaseAge 会把刚发布的 framework 0.2.2 压回 0.2.0（官方 registry 也会）——skill 版本陷阱补 pnpm why / exclude / 显式 ^0.2.2",
+        "manifest.md 的 client.entry 默认值易与模板的 lib-client/client.js 混淆——已注明 schema 默认 vs 模板显式值",
+        "tsdown 的 Detected dependencies 提示会列出 @snap-rail/plugin-sdk，但 client bundle 只有几 kB 且无 plugin-sdk/node 内置，属 shim 名字提示，不是内联"
+      ]
     },
     {
       "id": 3,
@@ -58,11 +69,11 @@
       "expected_output": "只写 @snap-rail/framework-shadcn/ui；connection/protocol/util 是 base 种子，由 shell 自动播种，写了会被启用预检拒绝",
       "files": [],
       "assertions": [
-        { "text": "externalSeeds 只包含 @snap-rail/framework-shadcn/ui（或按实际 import 的框架子路径）", "passed": false },
-        { "text": "明确不写 @snap-rail/connection / @snap-rail/util / @snap-rail/protocol 等 base 种子", "passed": false },
-        { "text": "解释 base 种子自动播种、贡献种子才写 externalSeeds；写 base 种子会报“提供方未安装”", "passed": false }
+        { "text": "externalSeeds 只包含 @snap-rail/framework-shadcn/ui（或按实际 import 的框架子路径）", "passed": true },
+        { "text": "明确不写 @snap-rail/connection / @snap-rail/util / @snap-rail/protocol 等 base 种子", "passed": true },
+        { "text": "解释 base 种子自动播种、贡献种子才写 externalSeeds；写 base 种子会报“提供方未安装”", "passed": true }
       ],
-      "result": "待实跑",
+      "result": "3/3 断言通过（子代理基于 skill 回答：externalSeeds 只写 @snap-rail/framework-shadcn/ui；connection/util 是 base 种子，不写；写 base 种子会报提供方未安装；externalSeeds 不是版本兼容声明）",
       "findings_applied": []
     }
   ]
