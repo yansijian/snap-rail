@@ -132,7 +132,8 @@ export default defineConfig([
 ])
 ```
 
-- 主面的模块 id 就是**包名**，辅助面是 **`<包名>/<surface>`**；`outName` 只
+- 主面的模块 id 就是**包名**，辅助面是 **包名/surface**（如
+  `@my-scope/my-suite/ball`）；`outName` 只
   决定文件名，`moduleId` 决定注册 id（`clientBundle` 的第三个参数，默认
   包名）。渲染端按行里的 `surfaceUrls` 装对应窗口的面，没声明的窗口显示
   kernel 的朴素回退（球 = 可拖可点、可贴边收起的圆球）。
@@ -190,7 +191,7 @@ OS 资源只走这条缝，插件**永不 import Electron**。所有权按点击
 | `ctx.shell.notify(caller, {title, body, actions, tag, silent})` | 宿主面 | 带按钮的通知；返回 `{applied, id}` 或 `{applied:false, reason, message}` |
 | `ctx.shell.tray.addItem/updateItem/removeItem(caller, …)` | 宿主面 | 托盘菜单项（单插件 12、全体 24）；点击回执 `ctx.on('shell/tray-clicked', key)` |
 | `ctx.shell.surface.present/hide/state(caller, …)` | 宿主面 | 并按需创建/显示/隐藏辅助窗口（`main` = 显示并聚焦；互斥由底座保证） |
-| `ctx.shell.ball.setState(caller, patch)` | 宿主面 | 宿主聚合的球状态：`{progress 0..1\|null, label ≤8字\|null, tone}` |
+| `ctx.shell.ball.setState(caller, patch)` | 宿主面 | 宿主聚合的球状态：`{progress 0..1 或 null, label ≤8字 或 null, tone}` |
 | `ctx.shell.window.setExitPolicy/exitPolicy/resolve(caller, …)` | 宿主面 | 关窗/托盘退出的行为声明与挂起应答 |
 | `shell.toast` | 渲染面 | 单向通知（无按钮、无回调，点击聚焦主窗口） |
 | `shell.surface.present/hide/state` | 渲染面 | 立起/收起窗口；`state` 读当前可见面（球在主窗隐藏时出生，必须先读再画）；`present('main')` 是回退圆球唯一的动作 |
@@ -223,8 +224,9 @@ ctx.on('shell/notification-action', (id, actionId) => {
 
 几条硬规则：上限单源在 `@snap-rail/shell` 的 `SHELL_LIMITS`（标题 120 /
 正文 512 / 动作标题 20 / 动作 id 64 / 一条最多 3 个按钮），全局节流 5 条
-/ 10 秒；超限与节流回 `{applied:false}` 而不是抛异常。托盘项按
-`<插件>:<id>` 命名空间化，两个插件同名互不干扰。冷启动（应用没运行、点通知
+/ 10 秒；超限与节流回 `{applied:false}` 而不是抛异常。托盘项 key 按
+**插件名:id** 命名空间化（如 `@my-scope/my-driver:pause`），两个插件同名
+互不干扰。冷启动（应用没运行、点通知
 启动它）没有记录可查，落点是通用的"聚焦主窗口"。权限词汇
 `shell:notify` / `shell:tray` / `shell:surface` 目前只做安装期展示。
 
