@@ -391,7 +391,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/equipment/equipment
       '@snap-rail/framework-shadcn':
-        specifier: ^0.2.0
+        specifier: ^0.2.2
         version: link:../snap-rail-framework-shadcn
       '@snap-rail/gateway':
         specifier: workspace:*
