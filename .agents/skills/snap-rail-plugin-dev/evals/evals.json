@@ -1,0 +1,35 @@
+{
+  "skill_name": "snap-rail-plugin-dev",
+  "note": "轻量实测记录（2026-10-24，plugin-sdk 0.2.3 / plugin-kit 0.2.1 / equipment 0.1.4 锚点）。完整产物在评测 TEMP（未入库）。",
+  "evals": [
+    {
+      "id": 1,
+      "name": "driver-from-init-to-signed-zip",
+      "prompt": "帮我做一个 snap-rail 设备驱动插件：模拟温度采集器（TCP 假连接，返回几个固定点值即可，不用真连设备），做好后发布——我要一个可以直接拖进 snap-rail 终端安装的签名 zip。",
+      "expected_output": "独立插件仓：driver 模板、非 @local/@snap-rail 的 scope、签名 zip + index.json，构建/测试/doctor 全绿",
+      "files": [],
+      "assertions": [
+        { "text": "pnpm run doctor 输出 ok:true 且 warnings 为空", "passed": true },
+        { "text": "pnpm run build 产出 lib-host/host.js，且 host.js ≤ 50 kB（无底座/打包机器内联）", "passed": true },
+        { "text": "vitest 全绿（manifest 校验 + 装配链路用例）", "passed": true },
+        { "text": "manifest：kind=driver、layer=equipment、requires=[\"@snap-rail/equipment\"]、包名为自己的 scope", "passed": true },
+        { "text": "驱动契约：DriverRegistration 形状正确；zod 字段带 .meta({title}) 中文标签；写路径 await I/O；永不注册点表", "passed": true },
+        { "text": "src 无 electron 导入；宿主面无 @snap-rail/plugin-sdk value 导入（type-only/satisfies Plugin）", "passed": true },
+        { "text": "Ed25519 密钥生成（Windows 无 openssl 时走 node:crypto 兜底）", "passed": true },
+        { "text": "pack 产出签名 zip（sha256/size 打印；zip 内含 META-INF/release.json + signature.json，无 src）", "passed": true },
+        { "text": "inspect 显示 signed:true / Ed25519 / 正确 requires；verify 用公钥验签 verified:true", "passed": true },
+        { "text": "feed 产出 dist/index.json，条目含 sha256/size/signature.keyId", "passed": true }
+      ],
+      "result": "10/10 断言通过（父 agent 独立抽查 zip 条目/签名/host.js 导入复核一致）",
+      "findings_applied": [
+        "probe：主仓已实现但 npm equipment@0.1.4 类型缺失——skill 加「版本陷阱」与先查 d.ts 的对策；主仓随后升 equipment 0.1.5 待发布",
+        "client.surfaces：根因修正——官方 npm 的 plugin-kit 0.2.2 已支持；实测装到 0.2.1 是 npmmirror 元数据滞后，且 plugin-sdk@0.2.3 的内联类型按旧 schema 生成也会拒字面量。skill 三处改为「版本陷阱」表述；主仓随后升 plugin-sdk 0.2.4 待发布",
+        "铁律4 改写：缝方法自带 fiber 回收，裸调用即完整写法；ctx.effect 用于非缝副作用",
+        "hostBundle 只外部化 dependencies：模板 devDependencies 的契约包要先挪；入口 type-only 导入 SDK（satisfies Plugin）",
+        "重发布前清空 lib-host/lib-client/dist（hostBundle clean:false + pack 整目录收编）",
+        "改名四处清单补全（含 tests/manifest.spec.ts；注明哪些模板的 tsdown 才有包名字符串）",
+        "排错表补 pnpm≥10 构建脚本审批、镜像解析旧版本、弱网 lockfile 挂死、host.js 体积超标、脏 chunk、schema 拒新字段"
+      ]
+    }
+  ]
+}
