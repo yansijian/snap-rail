@@ -585,9 +585,18 @@ importers:
 
   packages/base/plugin-sdk:
     dependencies:
+      '@snap-rail/connection':
+        specifier: workspace:^
+        version: link:../connection
+      '@snap-rail/gateway':
+        specifier: workspace:^
+        version: link:../gateway
       '@snap-rail/plugin-kit':
         specifier: workspace:^
         version: link:../plugin-kit
+      '@snap-rail/settings':
+        specifier: workspace:^
+        version: link:../settings
       fflate:
         specifier: ^0.8.3
         version: 0.8.3

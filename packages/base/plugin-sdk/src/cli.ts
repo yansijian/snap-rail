@@ -483,19 +483,47 @@ snap-rail checkout or copy host internals.
 - Keep the \`snapRail\` manifest complete and validate it with
   \`definePluginManifest\`. \`title\`/\`category\` are free vocabulary (Chinese
   included); the management page groups by the raw marker.
-- Declare every dependency once in \`requires\` — package names
+- Declare every plugin dependency once in \`requires\` — package names
   (\`@snap-rail/equipment\`), version-constrained packages
   (\`${framework.name}@${framework.range}\` — the framework binding IS this
-  entry), or \`service:\` ids.
+  entry), or \`service:\` ids. npm type packages (the SDK's \`/api\` facade,
+  \`@snap-rail/protocol\`) are not plugins: put them in
+  \`dependencies\`/\`devDependencies\`, never in \`requires\`.
 - Host faces build with \`hostBundle\` → \`lib-host/host.js\` (the manifest
   \`main\`); renderer faces build with \`clientBundle\` →
   \`lib-client/client.js\` (a CJS factory package the module loader executes).
-- Renderer code may \`require\` only the framework seeds and base wire
-  contracts, via **named or star imports** (a default import breaks CJS
-  interop at runtime — the build fails it on purpose). UI pages compose the
-  framework primitives (\`${framework.name}/ui\`), never hand-rolled widgets.
+- Renderer code may \`require\` only base seeds plus the framework-contributed
+  seeds declared in \`client.externalSeeds\`, via **named or star imports** (a
+  default import breaks CJS interop at runtime — the build fails it on
+  purpose). Base seeds (connection/protocol/util/shell-contract/
+  equipment-contract/react/zod) are always seeded — never declare them in
+  \`externalSeeds\`. UI pages compose the framework primitives
+  (\`${framework.name}/ui\`), never hand-rolled widgets.
 - Release archives contain the trimmed manifest and built faces only —
   never \`src/\`. \`pack\` refuses to ship one.
+
+## Face capabilities
+
+- Host wire/RPC: \`inject: ['rpc']\`; register with
+  \`ctx.rpc.claimDomain(ctx, domain)\` and
+  \`ctx.rpc.serveContract(ctx, contract, handlers)\`. Type it with
+  \`import type { GatewayService } from '@snap-rail/plugin-sdk/api'\` — the
+  gateway service is built into the terminal; never add it to \`requires\` or
+  \`package.json\`.
+- Host settings: \`inject: ['settings']\`; type it with
+  \`import type { SettingsService } from '@snap-rail/plugin-sdk/api'\`.
+- Renderer link/frames: the framework runtime provides \`ctx.client\`
+  (\`{ link, surface }\`); subscribe with
+  \`subscribeFrame(ctx.client.link, name, schema, cb)\` imported from
+  \`@snap-rail/plugin-sdk/api/client\` (also \`rpcErrorText\`, \`HostLink\`). The
+  underlying \`@snap-rail/connection\` is a base seed and an SDK dependency —
+  never list it in \`client.externalSeeds\`.
+- Wire contracts: \`defineContract\` / \`method\` / \`RpcBusinessError\` come from
+  \`@snap-rail/protocol\`; import them as values in the host face and keep
+  \`@snap-rail/protocol\` in \`dependencies\`.
+- Entries use \`satisfies Plugin\` (type-only import from
+  \`@snap-rail/cordis\`); never value-import \`@snap-rail/plugin-sdk\` in an
+  entry — it drags the build/pack barrel into the bundle.
 
 ## Local workflow
 
@@ -527,7 +555,7 @@ function hostSource(template: PluginTemplate, packageName: string): string {
     return `import '@snap-rail/equipment'
 import { z } from 'zod'
 import type { DriverRegistration } from '@snap-rail/equipment/driver'
-import { definePlugin } from '@snap-rail/plugin-sdk'
+import type { Plugin } from '@snap-rail/cordis'
 
 const driver: DriverRegistration = {
   id: 'generated-driver',
@@ -536,55 +564,55 @@ const driver: DriverRegistration = {
   createConnection: () => ({ update() {}, dispose() {} }),
 }
 
-export default definePlugin({
+export default {
   name: 'generated-driver',
   inject: ['equipment'],
   apply(ctx) { ctx.equipment.registerDriver(ctx, driver) },
-})
+} satisfies Plugin
 `
   }
   if (template === 'store-provider') {
     return `import '@snap-rail/store'
 import type { StoreService } from '@snap-rail/store'
-import { definePlugin } from '@snap-rail/plugin-sdk'
+import type { Plugin } from '@snap-rail/cordis'
 
 const store: StoreService = {
   register() { throw new Error('implement the store backend') },
 }
 
-export default definePlugin({
+export default {
   name: 'generated-store-provider',
   apply(ctx) { ctx.provide('store', store) },
-})
+} satisfies Plugin
 `
   }
   if (template === 'suite') {
-    return `import { definePlugin } from '@snap-rail/plugin-sdk'
+    return `import type { Plugin } from '@snap-rail/cordis'
 
 /** 套件的宿主面：场景私有宿主逻辑住这里——服务、wire 方法/帧、store
  * 命名空间。渲染面（src/client.tsx）通过协作服务与这里通信，永不 import
  * 宿主代码。 */
-export default definePlugin({
+export default {
   name: ${JSON.stringify(packageName)},
   apply() {
     // 在这里注册套件的服务与 store 命名空间（ctx.store.register / ctx.provide）。
   },
-})
+} satisfies Plugin
 `
   }
   if (template === 'tool') {
-    return `import { definePlugin } from '@snap-rail/plugin-sdk'
+    return `import type { Plugin } from '@snap-rail/cordis'
 
 /** 工具插件：工具之间互不依赖（层门禁强制）；跨包的场景私有逻辑请收进
  * 套件，不要拆成跨包工具。 */
-export default definePlugin({ name: ${JSON.stringify(packageName)}, apply() {} })
+export default { name: ${JSON.stringify(packageName)}, apply() {} } satisfies Plugin
 `
   }
-  return `import { definePlugin } from '@snap-rail/plugin-sdk'
+  return `import type { Plugin } from '@snap-rail/cordis'
 
 /** 宿主服务插件：在宿主进程贡献一个能力——ctx.provide 注册 cordis 服务、
  * ./contract 声明 wire 方法/帧后 claimDomain/serveContract 挂载。 */
-export default definePlugin({ name: ${JSON.stringify(packageName)}, apply() {} })
+export default { name: ${JSON.stringify(packageName)}, apply() {} } satisfies Plugin
 `
 }
 
@@ -610,9 +638,9 @@ export default {
   if (template === 'ui-layout') {
     return `import '${fw}/semantic'
 import { UI_SLOT_IDS } from '${fw}/slots'
-import { definePlugin } from '@snap-rail/plugin-sdk'
+import type { Plugin } from '@snap-rail/cordis'
 
-export default definePlugin({
+export default {
   name: ${JSON.stringify(packageName)},
   inject: ['uiContract'],
   apply(ctx) {
@@ -623,7 +651,7 @@ export default definePlugin({
       render: () => null,
     })
   },
-})
+} satisfies Plugin
 `
   }
   // ui-view and the suite's renderer face: a real view on the framework
@@ -638,10 +666,10 @@ export default definePlugin({
   return `import '${fw}/semantic'
 import { UI_SLOT_IDS } from '${fw}/slots'
 import { Card, CardContent, CardHeader, CardTitle } from '${fw}/ui'
-import { definePlugin } from '@snap-rail/plugin-sdk'
+import type { Plugin } from '@snap-rail/cordis'
 
 ${note}
-export default definePlugin({
+export default {
   name: ${JSON.stringify(packageName)},
   inject: ['uiContract'],
   apply(ctx) {
@@ -660,7 +688,7 @@ export default definePlugin({
       ),
     })
   },
-})
+} satisfies Plugin
 `
 }
 

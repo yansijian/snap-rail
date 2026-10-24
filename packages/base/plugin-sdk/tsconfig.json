@@ -7,6 +7,9 @@
   "include": ["src"],
   "references": [
     { "path": "../plugin-kit" },
+    { "path": "../connection" },
+    { "path": "../gateway" },
+    { "path": "../settings" },
     { "path": "../../../vendor/cordis" }
   ]
 }

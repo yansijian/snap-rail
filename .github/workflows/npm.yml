@@ -2,9 +2,10 @@ name: npm
 
 # Publish the public authoring closure (@snap-rail/*) to npm after a versioned
 # release succeeds. plugin-kit/plugin-sdk/util/protocol/store/equipment plus
-# the vendored Cordis runtime and the UI framework (staged from its split
-# repo) are the packages an independent plugin repo needs; everything else
-# stays app-internal.
+# the vendored Cordis runtime, the base service/type packages plugin-sdk's
+# ./api facade re-exports (gateway/connection/settings), and the UI framework
+# (staged from its split repo) are the packages an independent plugin repo
+# needs; everything else stays app-internal.
 on:
   # Manual until the repository owns an npm token: a tag push must not turn
   # the release run red just because the SDK registry credential is absent.

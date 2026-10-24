@@ -230,6 +230,63 @@ ctx.on('shell/notification-action', (id, actionId) => {
 启动它）没有记录可查，落点是通用的"聚焦主窗口"。权限词汇
 `shell:notify` / `shell:tray` / `shell:surface` 目前只做安装期展示。
 
+## 宿主 RPC 与渲染面帧
+
+双面套件的跨面通信只有 wire 一条路：宿主面在 `ctx.rpc` 上声明/服务方法与
+帧，渲染面用 `ctx.client.link` + `subscribeFrame` 消费。两边都从
+`@snap-rail/plugin-sdk` 的作者门面取类型/值，不需要单独安装
+`@snap-rail/gateway` / `@snap-rail/connection` / `@snap-rail/settings`。
+
+```ts
+// 宿主面：先声明 contract（defineContract + declare module 合并
+// RpcMethodMap/FrameMap），再 claimDomain + serveContract。
+import type { Plugin } from '@snap-rail/cordis'
+import type { GatewayService } from '@snap-rail/plugin-sdk/api'
+
+export default {
+  name: '@my-scope/my-service',
+  inject: ['rpc'],
+  apply(ctx) {
+    const rpc: GatewayService = ctx.rpc
+    rpc.claimDomain(ctx, 'demo')
+    rpc.serveContract(ctx, demoContract, {
+      'demo.ping': () => ({ pong: Date.now() }),
+    })
+  },
+} satisfies Plugin
+```
+
+```tsx
+// 渲染面：ctx.client 由框架 runtime 提供；type-only 导入只为引入增强。
+import type {} from '@snap-rail/framework-shadcn/runtime'
+import { subscribeFrame } from '@snap-rail/plugin-sdk/api/client'
+
+export default {
+  name: '@my-scope/my-view',
+  inject: ['client', 'uiContract'],
+  apply(ctx) {
+    ctx.effect(() => subscribeFrame(
+      ctx.client.link,
+      'demo/pinged',
+      demoContract.frames['demo/pinged'],
+      frame => { /* frame 已按 schema 解析 */ },
+    ))
+    ctx.uiContract.registerView(ctx, { /* … */ })
+  },
+} satisfies Plugin
+```
+
+几条规则：
+
+- `ctx.rpc` / `ctx.settings` 是 base 内置服务：`inject` 即可，不要写进
+  `requires`，也不要单独安装 gateway/settings。
+- `@snap-rail/connection` 是渲染面 base 种子：**不要**写进
+  `client.externalSeeds`；只有框架/其他插件贡献的种子才写。
+- wire 契约的 `defineContract` / `method` / `RpcBusinessError` 来自
+  `@snap-rail/protocol`；宿主面 value 用，放 `dependencies`。
+- 完整骨架（contract、宿主、渲染面、manifest）见仓库 skill：
+  `.agents/skills/snap-rail-plugin-dev/references/faces-and-wire.md`。
+
 ## 本地命令
 
 | 命令 | 作用 |
@@ -319,12 +376,16 @@ snap-rail-plugin verify dist/@you__plugin.zip --public-key .keys/my-key.public.p
 
 ## 公共 npm 闭包
 
-独立插件仓库只依赖这些公共 npm 包：`@snap-rail/plugin-sdk`（含
-`snap-rail-plugin` CLI）、`plugin-kit`、`util`、`protocol`、`store`、
-`equipment`、`cordis`、`cosmokit`，UI 模板另需
-`@snap-rail/framework-shadcn`。发行 zip 的运行时依赖由终端提供
-（`@snap-rail/*` 经 resolve-hooks 按 appRoot 优先、池内回退解析），不随包
-分发。
+独立插件仓库的直接作者依赖：`@snap-rail/plugin-sdk`（含 `/api` 宿主类型
+门面与 `/api/client` 渲染面门面）、`@snap-rail/protocol`（wire 契约）、
+`@snap-rail/store`、`@snap-rail/equipment`、`@snap-rail/cordis`、
+`@snap-rail/cosmokit`；UI 模板另需 `@snap-rail/framework-shadcn`。发行 zip 的
+运行时依赖由终端提供（`@snap-rail/*` 经 resolve-hooks 按 appRoot 优先、池内
+回退解析），不随包分发。
+
+`@snap-rail/gateway` / `@snap-rail/connection` / `@snap-rail/settings` 是
+SDK 的传递依赖与 base 运行时包：不需要单独安装，也不要写进 manifest 的
+`requires` 或 `client.externalSeeds`。它们不是可安装插件。
 
 ## 排错
 
@@ -333,14 +394,27 @@ snap-rail-plugin verify dist/@you__plugin.zip --public-key .keys/my-key.public.p
 - **构建期「种子默认导入」硬错**：把 `import x from 'seed'` 改成
   `import { … } from` 或 `import * as`——CJS interop 下 default 导入运行
   时即崩。
-- **install 报未发布包 E404**：升级到 SDK 0.2.3+ / 框架 0.2.0+（旧模板把
+- **install 报未发布包 E404**：升级到 SDK 0.2.5+ / 框架 0.2.x（旧模板把
   未发布的内部包写进了 peer）；用 `pnpm dlx @snap-rail/plugin-sdk@latest
   init` 重新生成。
 - **运行 CLI 时弹「选择应用打开 .js」**：0.2.2 及更早的发行 `lib/cli.js`
   缺少 shebang，npm 生成的 bin shim 会把 `.js` 当文档交给 Windows。
   升级到 0.2.3+（或临时用 `node node_modules/@snap-rail/plugin-sdk/lib/cli.js`）。
 - **渲染面构建后无法 require 框架组件**：确认 manifest 的
-  `client.externalSeeds` 声明了你 import 的每个 `框架包/子路径`。
+  `client.externalSeeds` 声明了你 import 的每个**框架/其他插件贡献**的
+  `包/子路径`；base 种子（connection/protocol/util/shell-contract）不写。
+- **`Cannot find module '@snap-rail/plugin-sdk/api'`**：SDK 低于 0.2.5，
+  升级 `@snap-rail/plugin-sdk`。
+- **`Property 'rpc' does not exist on type 'Context'`**：宿主类型从
+  `import type { GatewayService } from '@snap-rail/plugin-sdk/api'` 取；不要
+  直接 import gateway。
+- **`Property 'client' does not exist on type 'Context'`**：
+  `import type {} from '@snap-rail/framework-shadcn/runtime'` 引入框架
+  runtime 的 Context 增强（type-only，不产生运行时代码）。
+- **`Cannot find module '@snap-rail/connection'`**：改用
+  `@snap-rail/plugin-sdk/api/client`；它经 SDK 传递安装。
+- **启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方未安装）`**：
+  把 base 种子从 `client.externalSeeds` 删掉。
 - **驱动表单没有字段**：给 zod schema 的字段加 `.meta({ title: '标签' })`，
   设置页的 SchemaForm 按 JSON Schema 投影渲染。
 
@@ -351,3 +425,4 @@ snap-rail-plugin verify dist/@you__plugin.zip --public-key .keys/my-key.public.p
 - [snap-rail 官网](https://www.snap-rail.top/) ·
   [插件生态](https://www.snap-rail.top/plugins.html) ·
   [社区 topic](https://github.com/topics/snap-rail-plugin)
+- AI 插件开发 skill：`npx skills add yansijian/snap-rail --skill snap-rail-plugin-dev`

@@ -1,6 +1,6 @@
 {
   "name": "@snap-rail/gateway",
-  "description": "Host-side RPC dispatch service (ctx.gateway): method registry, boundary validation, frame pump",
+  "description": "Host-side RPC dispatch service (ctx.rpc): method registry, boundary validation, frame pump",
   "version": "0.1.1",
   "type": "module",
   "main": "lib/index.js",

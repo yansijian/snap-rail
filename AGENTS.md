@@ -222,8 +222,10 @@ Release 节奏。
   作者自己的 Ed25519 密钥签名、发布为自仓滚动 Release（工作流模板
   `docs/plugin-publish-ci.yml`）；发现 = GitHub topic `snap-rail-plugin` +
   任意用户自加静态源；**不存在集中市场仓、没有 PR 上架、官方不转存社区
-  字节**。公开 SDK 闭包（plugin-sdk/plugin-kit/util/protocol/store/
-  equipment/cordis/cosmokit + 拆分仓 framework-shadcn）发布到公共 npm
+  字节**。公开 SDK 闭包（plugin-sdk 含 `/api` 宿主类型门面与 `/api/client`
+  渲染面门面；plugin-kit/util/protocol/store/equipment/cordis/cosmokit +
+  拆分仓 framework-shadcn；base 服务类型包 shell/gateway/connection/settings
+  作为 SDK 依赖/闭包成员）发布到公共 npm
   （`scripts/publish-npm.mjs`：闭包清单单源 + 发布期过滤未发布 peer，
   `npm.yml` 手动触发）。
 - **简单持久化配置走 settings.json**：键 `域.名`，经 `settings.get/set`

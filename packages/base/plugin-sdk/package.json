@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/plugin-sdk",
   "description": "Public SDK for developing, validating, building, signing, and publishing snap-rail plugins outside the monorepo — init templates, a doctor, the release packer, and the snap-rail-plugin CLI",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -27,17 +27,30 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./api": {
+      "types": "./lib/types/api.d.ts",
+      "default": "./lib/types/api.js"
+    },
+    "./api/client": {
+      "types": "./lib/types/api/client.d.ts",
+      "default": "./lib/types/api/client.js"
+    },
     "./tsconfig.plugin.json": "./tsconfig.plugin.json",
     "./package.json": "./package.json"
   },
   "files": [
     "lib/*.js",
     "lib/types/**/*.d.ts",
+    "lib/types/api.js",
+    "lib/types/api/client.js",
     "tsconfig.plugin.json"
   ],
   "license": "Apache-2.0",
   "dependencies": {
+    "@snap-rail/connection": "workspace:^",
+    "@snap-rail/gateway": "workspace:^",
     "@snap-rail/plugin-kit": "workspace:^",
+    "@snap-rail/settings": "workspace:^",
     "fflate": "^0.8.3",
     "zod": "^4.4.3"
   },

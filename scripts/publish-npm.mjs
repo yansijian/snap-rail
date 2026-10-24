@@ -16,6 +16,13 @@
  * manifest in CI's disposable workspace; the source repositories keep their
  * in-workspace declarations.
  *
+ * Base authoring surface: the closure also publishes the base service/type
+ * packages an external plugin face imports through plugin-sdk's `./api` facade
+ * (gateway for `ctx.rpc`, settings for `ctx.settings`) and the renderer carrier
+ * it consumes through `./api/client` (connection). Their runtime ships with
+ * the app; these entries make the declarations installable for external
+ * builds.
+ *
  * Registry isolation: split plugin repos (external/*) carry a repo-level
  * `.npmrc` pinning `@snap-rail:*` to the owner's intranet npm registry. That
  * config is neutralized for the publish call — this closure always publishes
@@ -38,6 +45,14 @@ const closure = [
   'vendor/cordis',
   'packages/base/util',
   'packages/base/protocol',
+  // Base service/type packages an external plugin face types against. The
+  // runtime implementations ship with the app (gateway/settings are builtins;
+  // connection is a renderer seed), but the declarations must be installable:
+  // plugin-sdk's ./api facade re-exports them, and the plugin's client bundle
+  // resolves the connection seed by the same package id at build time.
+  'packages/base/connection',
+  'packages/base/gateway',
+  'packages/base/settings',
   // The OS integration seam: the framework (and any UI package that drives the
   // ball/panel surfaces) imports `@snap-rail/shell/contract`, so the spec
   // package publishes before the kit that lists it as a seed.

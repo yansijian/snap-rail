@@ -52,6 +52,16 @@ describe('snap-rail-plugin init', () => {
         expect(existsSync(join(dir, file)), file).toBe(true)
       }
       expect(readFileSync(join(dir, 'tsdown.config.ts'), 'utf8')).toContain('hostBundle')
+      const hostEntry = readFileSync(join(dir, 'src', 'index.ts'), 'utf8')
+      expect(hostEntry).toContain('satisfies Plugin')
+      expect(hostEntry).not.toContain("from '@snap-rail/plugin-sdk'")
+      const guide = readFileSync(join(dir, 'AGENTS.md'), 'utf8')
+      expect(guide).toContain('@snap-rail/plugin-sdk/api')
+      expect(guide).toContain('@snap-rail/plugin-sdk/api/client')
+      // Base service types ride the SDK's /api facade; no direct packages.
+      expect(source.devDependencies['@snap-rail/gateway']).toBeUndefined()
+      expect(source.devDependencies['@snap-rail/connection']).toBeUndefined()
+      expect(source.devDependencies['@snap-rail/settings']).toBeUndefined()
       // The generated smoke test must reference the real package name.
       expect(readFileSync(join(dir, 'tests', 'manifest.spec.ts'), 'utf8')).toContain('"@local/my-driver"')
     } finally {
@@ -80,6 +90,10 @@ describe('snap-rail-plugin init', () => {
       expect(config).not.toContain('hostBundle')
       // The view builds on the framework primitives, not a hand-rolled stub.
       expect(readFileSync(join(dir, 'src', 'client.tsx'), 'utf8')).toContain('Card')
+      const clientEntry = readFileSync(join(dir, 'src', 'client.tsx'), 'utf8')
+      expect(clientEntry).toContain('satisfies Plugin')
+      expect(clientEntry).not.toContain("from '@snap-rail/plugin-sdk'")
+      expect(source.devDependencies['@snap-rail/connection']).toBeUndefined()
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -109,21 +123,39 @@ describe('snap-rail-plugin init', () => {
       await main(['init', dir, '--template', 'suite'])
       const source = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
         main?: string
-        snapRail: { kind?: string, clientOnly?: boolean, client?: { entry?: string } }
+        devDependencies: Record<string, string>
+        snapRail: { kind?: string, clientOnly?: boolean, client?: { entry?: string, externalSeeds?: string[] } }
       }
       expect(source.main).toBe('lib-host/host.js')
       expect(source.snapRail.kind).toBe('suite')
       // Dual-face: NOT clientOnly, yet a client entry exists beside the host.
       expect(source.snapRail.clientOnly).toBeUndefined()
       expect(source.snapRail.client?.entry).toBe('lib-client/client.js')
+      expect(source.devDependencies['@snap-rail/gateway']).toBeUndefined()
+      expect(source.devDependencies['@snap-rail/connection']).toBeUndefined()
+      expect(source.snapRail.client?.externalSeeds).not.toContain('@snap-rail/connection')
+      expect(source.snapRail.client?.externalSeeds).not.toContain('@snap-rail/shell/contract')
       const config = readFileSync(join(dir, 'tsdown.config.ts'), 'utf8')
       expect(config).toContain('hostBundle')
       expect(config).toContain('clientBundle')
       expect(existsSync(join(dir, 'src', 'index.ts'))).toBe(true)
       expect(existsSync(join(dir, 'src', 'client.tsx'))).toBe(true)
+      expect(readFileSync(join(dir, 'src', 'index.ts'), 'utf8')).toContain('satisfies Plugin')
+      expect(readFileSync(join(dir, 'src', 'client.tsx'), 'utf8')).toContain('satisfies Plugin')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
+  })
+
+  it('exposes the authoring API facade subpaths', () => {
+    const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      exports: Record<string, unknown>
+      files: string[]
+    }
+    expect(manifest.exports['./api']).toBeDefined()
+    expect(manifest.exports['./api/client']).toBeDefined()
+    expect(manifest.files).toContain('lib/types/api.js')
+    expect(manifest.files).toContain('lib/types/api/client.js')
   })
 
   it('refuses a non-empty target without --force', async () => {

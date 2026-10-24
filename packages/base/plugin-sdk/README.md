@@ -59,13 +59,30 @@ snap-rail-plugin verify <zip> --public-key pub.pem --key-id my-key
 （tag `feed`），仓库打上 GitHub topic `snap-rail-plugin` 即被发现——
 没有集中市场、没有 PR 上架，你的 Release 就是你的插件源。
 
+## 作者 API 门面 / Authoring API
+
+宿主面服务类型与渲染面 link/帧助手都从 SDK 子路径导入，不需要单独安装底层包：
+
+```ts
+import type { GatewayService, SettingsService } from '@snap-rail/plugin-sdk/api'
+import { subscribeFrame, rpcErrorText } from '@snap-rail/plugin-sdk/api/client'
+```
+
+底层 `@snap-rail/gateway` / `@snap-rail/connection` / `@snap-rail/settings` 是
+SDK 的 dependencies 与终端 base 运行时，不是可安装插件：不要写进
+`requires` 或 `client.externalSeeds`。
+
 ## 公共闭包 / The public closure
 
-独立插件仓库只依赖这些公共 npm 包：
+独立插件仓库的直接作者依赖：
 
-`@snap-rail/plugin-sdk`、`@snap-rail/plugin-kit`、`@snap-rail/util`、
-`@snap-rail/protocol`、`@snap-rail/store`、`@snap-rail/equipment`、
-`@snap-rail/cordis`、`@snap-rail/cosmokit`、`@snap-rail/framework-shadcn`（UI 模板）。
+`@snap-rail/plugin-sdk`（含 `/api` 与 `/api/client`）、`@snap-rail/protocol`
+（wire 契约）、`@snap-rail/store`、`@snap-rail/equipment`、
+`@snap-rail/cordis`、`@snap-rail/cosmokit`；UI 模板另需
+`@snap-rail/framework-shadcn`。
+
+`@snap-rail/gateway` / `@snap-rail/connection` / `@snap-rail/settings` 由
+SDK 传递安装，作者不需要在 `package.json` 里单列。
 
 ## 签名与信任 / Signing & trust
 

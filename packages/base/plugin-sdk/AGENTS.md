@@ -5,11 +5,18 @@ independent plugin repository needs; never solve a missing contract by copying
 files from the snap-rail workspace.
 
 - Validate `package.json.snapRail` with `definePluginManifest` and declare
-  every dependency once in `requires` — package names, `name@range`
+  every *plugin* dependency once in `requires` — package names, `name@range`
   version-constrained packages (the framework binding is such an entry), or
-  `service:` ids. `snapRail.framework` / `snapRail.capabilities` are retired.
+  `service:` ids. npm type packages (the SDK's `./api` facade,
+  `@snap-rail/protocol`) belong in `dependencies`/`devDependencies`, never in
+  `requires`. `snapRail.framework` / `snapRail.capabilities` are retired.
 - Depend on published SDK and contract packages from public npm. Do not import
   `apps/desktop` or `packages/*/src` from an external plugin.
+- Base service authoring APIs are the SDK's `./api` (host types:
+  `GatewayService`, `SettingsService`) and `./api/client` (renderer:
+  `HostLink`, `subscribeFrame`, `rpcErrorText`). The underlying
+  gateway/connection/settings packages are SDK dependencies; external plugins
+  must not install or import them directly.
 - Drivers import the pure `@snap-rail/equipment/driver` registration contract
   and do not own equipment storage. UI plugins register semantic
   views/layouts/navigation through the
