@@ -29,7 +29,7 @@ export const seedAbiSchema = z.object({
 
 /**
  * The auxiliary-surface entry map: one client bundle per extra surface the
- * package renders in. Keys are the auxiliary surface ids (`ball`, `panel`) —
+ * package renders in. Keys are the auxiliary surface ids (`ball`) —
  * `main` is deliberately absent, since the main window's bundle is
  * `client.entry` and a package gets exactly one entry per window. Every
  * declared path is a CJS factory bundle inside the package, packed and
@@ -45,7 +45,7 @@ export const clientFaceSchema = z.object({
   entry: z.string().min(1).default('lib/client.js'),
   /**
    * Extra surfaces this package renders in: one client bundle per auxiliary
-   * window (`ball`, `panel`). Each bundle is loaded into that surface's own
+   * window (`ball`). Each bundle is loaded into that surface's own
    * window with the same seed table, and its module id is
    * `<package>/<surface>` (the main entry keeps the plain package name).
    */

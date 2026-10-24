@@ -197,7 +197,7 @@ export interface ClientBundleOptions {
   /**
    * The emitted file's base name inside `lib-client` (default `client`, so
    * the file is `lib-client/client.js`). Auxiliary surfaces build one bundle
-   * per window and name them after the surface (`ball`, `panel`); the
+   * per window and name them after the surface (`ball`); the
    * manifest's `client.surfaces` points at those files.
    */
   outName?: string | undefined

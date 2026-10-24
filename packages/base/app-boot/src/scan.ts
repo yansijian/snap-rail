@@ -36,7 +36,7 @@ export interface SnapRailManifest {
   /** The renderer face: the client bundle path inside the package. */
   client?: {
     entry: string
-    /** Auxiliary-surface client entries (`ball`, `panel`): one bundle per
+    /** Auxiliary-surface client entries (`ball`): one bundle per
      * extra window this package renders in. `main` is never a key here — it
      * is `entry`. */
     surfaces?: Partial<Record<string, string>>

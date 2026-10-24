@@ -5,8 +5,9 @@ import { createShellMachine } from '../src-host/main/shell/machine.ts'
 /**
  * The Shell adapter's rules, driven without a window: the tray contribution
  * caps and ownership model, the notification ledger (throttle, coalescing,
- * eviction), and the ball state merge. The Electron glue is deliberately out
- * of scope — everything decidable is decided here.
+ * eviction), the ball state merge, the exit policy fold with its hold
+ * ledger, and the main-window/ball exclusivity rule. The Electron glue is
+ * deliberately out of scope — everything decidable is decided here.
  */
 
 /** A machine with a controllable clock. */
@@ -165,5 +166,88 @@ describe('ball state', () => {
     // An unknown tone keeps the previous one (the host face is trusted, but a
     // typo must not paint a transparent ring).
     expect(machine.setBallState({ tone: 'loud' as never }).tone).toBe('neutral')
+  })
+})
+
+describe('exit policy', () => {
+  it('defaults to quit for both sources — the pre-policy behavior', () => {
+    const { machine } = machineAt()
+    expect(machine.exitPolicy()).toEqual({ close: 'quit', quit: 'quit' })
+    expect(machine.exitDecision('window')).toBe('quit')
+    expect(machine.exitDecision('tray')).toBe('quit')
+  })
+
+  it('accepts a partial declaration and folds the rest from the defaults', () => {
+    const { machine } = machineAt()
+    expect(machine.setExitPolicy('suite', { close: 'ball' })).toEqual({ applied: true })
+    expect(machine.exitPolicy()).toEqual({ close: 'ball', quit: 'quit' })
+  })
+
+  it('lets the newest declaration win, per field, across plugins', () => {
+    const { machine } = machineAt()
+    machine.setExitPolicy('suite-a', { close: 'ball', quit: 'hold' })
+    machine.setExitPolicy('suite-b', { close: 'tray' })
+    expect(machine.exitPolicy()).toEqual({ close: 'tray', quit: 'hold' })
+    // A re-declaration replaces its author's whole patch and moves to the
+    // back of the line: the suite always declares the pair it means.
+    machine.setExitPolicy('suite-a', { close: 'quit' })
+    expect(machine.exitPolicy()).toEqual({ close: 'quit', quit: 'quit' })
+  })
+
+  it('reverts the fields of a plugin whose fiber goes away', () => {
+    const { machine } = machineAt()
+    machine.setExitPolicy('suite', { close: 'ball', quit: 'hold' })
+    machine.removeExitPolicyOwner('suite')
+    expect(machine.exitPolicy()).toEqual({ close: 'quit', quit: 'quit' })
+  })
+
+  it('refuses unknown decisions and an empty declaration', () => {
+    const { machine } = machineAt()
+    expect(machine.setExitPolicy('suite', { close: 'explode' as never })).toMatchObject({ applied: false, reason: 'limit-reached' })
+    expect(machine.setExitPolicy('suite', {})).toMatchObject({ applied: false, reason: 'limit-reached' })
+    expect(machine.exitPolicy()).toEqual({ close: 'quit', quit: 'quit' })
+  })
+})
+
+describe('exit hold', () => {
+  it('holds one request and answers it', () => {
+    const { machine } = machineAt()
+    expect(machine.holdExit('tray')).toEqual({ applied: true })
+    expect(machine.pendingExit()).toBe('tray')
+    expect(machine.resolveExit('cancel')).toEqual({ source: 'tray', action: 'cancel' })
+    expect(machine.pendingExit()).toBeUndefined()
+  })
+
+  it('refuses a second request while one is on the table', () => {
+    const { machine } = machineAt()
+    machine.holdExit('window')
+    expect(machine.holdExit('tray')).toMatchObject({ applied: false, reason: 'duplicate' })
+    expect(machine.pendingExit()).toBe('window')
+  })
+
+  it('expires only the request that is actually held', () => {
+    const { machine } = machineAt()
+    machine.holdExit('window')
+    expect(machine.expireExit('tray')).toBe(false)
+    expect(machine.pendingExit()).toBe('window')
+    expect(machine.expireExit('window')).toBe(true)
+    expect(machine.pendingExit()).toBeUndefined()
+    // Answered holds do not resurrect.
+    machine.holdExit('window')
+    machine.resolveExit('quit')
+    expect(machine.expireExit('window')).toBe(false)
+  })
+
+  it('answers nothing when no request is held', () => {
+    const { machine } = machineAt()
+    expect(machine.resolveExit('quit')).toBeUndefined()
+  })
+})
+
+describe('surface exclusivity', () => {
+  it('hides the ball when the operator window is presented, and vice versa', () => {
+    const { machine } = machineAt()
+    expect(machine.exclusivityHides('main')).toEqual(['ball'])
+    expect(machine.exclusivityHides('ball')).toEqual(['main'])
   })
 })

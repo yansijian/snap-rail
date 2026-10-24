@@ -46,7 +46,7 @@ export interface ClientHandle {
   /** The element the startup page mounted into (runtime re-roots here). */
   element: HTMLElement
   /** Which surface this window renders — the renderer half of the Shell's
-   * window roles (`main`, `ball`, `panel`). */
+   * window roles (`main`, `ball`). */
   surface: SurfaceId
 }
 
@@ -125,9 +125,9 @@ export function showBootstrapAfterFailure(handle: ClientHandle, notice: string):
 }
 
 /**
- * The auxiliary-surface fallback: the ball and panel windows always render
+ * The auxiliary-surface fallback: the ball window always renders
  * something usable, even with no framework installed (a draggable orb that
- * summons the operator window, a panel that explains what is missing). On the
+ * summons the operator window). On the
  * main surface this is the bootstrap page — the recovery console already is
  * that surface's fallback.
  *

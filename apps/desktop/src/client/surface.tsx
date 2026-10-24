@@ -28,7 +28,7 @@ function requestedSurface(): AuxSurfaceId | undefined {
 
 const surface = requestedSurface()
 if (surface === undefined) {
-  throw new Error('client: surface.html was loaded without ?surface=ball|panel')
+  throw new Error('client: surface.html was loaded without ?surface=ball')
 }
 
 await bootRenderer({ element, surface })

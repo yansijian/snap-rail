@@ -1,7 +1,8 @@
 /**
  * The Shell adapter's Electron-free core: the tray contribution registry, the
- * notification ledger (caps, coalescing, throttling), and the host-aggregated
- * ball state. Everything here is plain data and decisions, so the tests drive
+ * notification ledger (caps, coalescing, throttling), the host-aggregated
+ * ball state, the exit policy fold, and the main-window/ball exclusivity rule.
+ * Everything here is plain data and decisions, so the tests drive
  * the exact rules the adapter enforces without ever opening a window — the
  * same split `update-machine.ts` uses for the update channel.
  *
@@ -14,16 +15,22 @@
  * - **A contribution is owned by the plugin that made it.** Tray ids are
  *   namespaced `<plugin>:<id>` and the click event carries that key, so two
  *   plugins may both contribute `pause` and neither can update or remove the
- *   other's row.
+ *   other's row; an exit policy declaration reverts to the defaults when its
+ *   declaring fiber goes away.
  *
  * @module @snap-rail/desktop/main/shell/machine
  */
 
 import {
   BALL_TONES,
+  EXIT_DECISIONS,
   SHELL_LIMITS,
   type BallPatch,
   type BallState,
+  type ShellExitAction,
+  type ShellExitDecision,
+  type ShellExitPolicy,
+  type ShellExitSource,
   type ShellNotificationInput,
   type ShellRefusalReason,
   type ShellResult,
@@ -31,6 +38,7 @@ import {
   type ShellTrayItem,
   type ShellTrayItemPatch,
 } from '@snap-rail/shell'
+import { AUX_SURFACE_IDS, type SurfaceId } from '@snap-rail/protocol'
 
 /** One accepted notification, kept until the record cap evicts it. */
 export interface NotificationRecord {
@@ -54,6 +62,14 @@ export interface ShellMachineOptions {
   /** Clock override for the throttle window (tests drive it). */
   now?: (() => number) | undefined
 }
+
+/**
+ * The exit policy every installation starts with: closing the operator window
+ * and quitting from the tray both end the app — exactly the pre-policy
+ * behavior, so a base upgrade never changes what an operator's X does until a
+ * plugin declares otherwise.
+ */
+export const DEFAULT_EXIT_POLICY: Readonly<ShellExitPolicy> = { close: 'quit', quit: 'quit' }
 
 /** The Shell adapter's state, minus the OS. */
 export interface ShellMachine {
@@ -79,6 +95,39 @@ export interface ShellMachine {
   ballState(): BallState
   /** Merge a patch into the ball state; out-of-range values are clamped. */
   setBallState(patch: BallPatch): BallState
+  /**
+   * Declare (part of) the exit policy. A plugin's later declaration replaces
+   * its earlier one and moves to the back of the line (last declaration wins
+   * per field); an unknown decision value is refused.
+   */
+  setExitPolicy(plugin: string, policy: Partial<ShellExitPolicy>): ShellResult
+  /** The folded policy in force (defaults underneath every declaration). */
+  exitPolicy(): Readonly<ShellExitPolicy>
+  /** Drop one plugin's declaration (its fiber went away). */
+  removeExitPolicyOwner(plugin: string): void
+  /** The decision the live policy makes for one exit source. */
+  exitDecision(source: ShellExitSource): ShellExitDecision
+  /**
+   * Hold the one open exit request (`hold` in the policy). A second request
+   * while one is pending is refused — the declaring plugin's dialog is already
+   * on the table.
+   */
+  holdExit(source: ShellExitSource): ShellResult
+  /** The source whose exit request is being held, when one is. */
+  pendingExit(): ShellExitSource | undefined
+  /**
+   * Answer the held request; `undefined` when nothing is held (the caller
+   * turns that into a `not-found` refusal).
+   */
+  resolveExit(action: ShellExitAction): { source: ShellExitSource, action: ShellExitAction } | undefined
+  /** Drop a stale hold (the hold timeout fired); false when it was already answered. */
+  expireExit(source: ShellExitSource): boolean
+  /**
+   * Which surfaces a `present` must hide first: the operator window and the
+   * floating ball exclude each other, and the rule lives here so tests — not
+   * the Electron glue — own it.
+   */
+  exclusivityHides(target: SurfaceId): readonly SurfaceId[]
 }
 
 /** A refusal answer. */
@@ -112,6 +161,10 @@ export function createShellMachine(options: ShellMachineOptions = {}): ShellMach
   const tagIndex = new Map<string, string>()
   let notificationCounter = 0
   let ball: BallState = { progress: null, label: null, tone: 'neutral' }
+  /** Exit policy declarations by plugin, in declaration order (later wins per field). */
+  const exitPolicies = new Map<string, Partial<ShellExitPolicy>>()
+  /** The exit request currently on hold, when one is. */
+  let heldExit: ShellExitSource | undefined
 
   const keyOf = (plugin: string, id: string): string => `${plugin}:${id}`
 
@@ -137,6 +190,19 @@ export function createShellMachine(options: ShellMachineOptions = {}): ShellMach
 
   function pruneThrottle(at: number): void {
     while (recent.length > 0 && at - recent[0]! >= SHELL_LIMITS.notificationWindowMs) recent.shift()
+  }
+
+  /** Fold every live declaration over the defaults, in declaration order. */
+  function foldExitPolicy(): ShellExitPolicy {
+    const folded: Partial<ShellExitPolicy> = {}
+    for (const patch of exitPolicies.values()) {
+      if (patch.close !== undefined) folded.close = patch.close
+      if (patch.quit !== undefined) folded.quit = patch.quit
+    }
+    return {
+      close: folded.close ?? DEFAULT_EXIT_POLICY.close,
+      quit: folded.quit ?? DEFAULT_EXIT_POLICY.quit,
+    }
   }
 
   return {
@@ -254,6 +320,59 @@ export function createShellMachine(options: ShellMachineOptions = {}): ShellMach
       if (patch.tone !== undefined && BALL_TONES.includes(patch.tone)) next.tone = patch.tone
       ball = next
       return next
+    },
+
+    setExitPolicy(plugin, policy) {
+      const patch: Partial<ShellExitPolicy> = {}
+      for (const key of ['close', 'quit'] as const) {
+        const value = policy[key]
+        if (value === undefined) continue
+        if (!EXIT_DECISIONS.includes(value)) {
+          return refuse('limit-reached', `退出策略 ${key} 不合法：${String(value)}`)
+        }
+        patch[key] = value
+      }
+      if (patch.close === undefined && patch.quit === undefined) {
+        return refuse('limit-reached', '退出策略声明为空')
+      }
+      // Re-insert so the newest declaration of a returning plugin wins the fold.
+      exitPolicies.delete(plugin)
+      exitPolicies.set(plugin, patch)
+      return APPLIED
+    },
+
+    exitPolicy: () => foldExitPolicy(),
+
+    removeExitPolicyOwner(plugin) {
+      exitPolicies.delete(plugin)
+    },
+
+    exitDecision: source => foldExitPolicy()[source === 'window' ? 'close' : 'quit'],
+
+    holdExit(source) {
+      if (heldExit !== undefined) return refuse('duplicate', '已有一个挂起的退出请求')
+      heldExit = source
+      return APPLIED
+    },
+
+    pendingExit: () => heldExit,
+
+    resolveExit(action) {
+      const source = heldExit
+      heldExit = undefined
+      return source === undefined ? undefined : { source, action }
+    },
+
+    expireExit(source) {
+      if (heldExit !== source) return false
+      heldExit = undefined
+      return true
+    },
+
+    exclusivityHides(target) {
+      // The operator window and the ball exclude each other, whatever path
+      // made one of them visible.
+      return target === 'main' ? [...AUX_SURFACE_IDS] : ['main']
     },
   }
 }

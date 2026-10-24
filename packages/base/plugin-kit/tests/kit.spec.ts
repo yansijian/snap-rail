@@ -176,14 +176,17 @@ describe('seed tiers', () => {
 
   it('manifest schema accepts one client entry per auxiliary surface', () => {
     const parsed = snapRailManifestSchema.parse({
-      client: { entry: 'lib/client.js', surfaces: { ball: 'lib/ball.js', panel: 'lib/panel.js' } },
+      client: { entry: 'lib/client.js', surfaces: { ball: 'lib/ball.js' } },
     })
-    expect(parsed.client?.surfaces).toEqual({ ball: 'lib/ball.js', panel: 'lib/panel.js' })
+    expect(parsed.client?.surfaces).toEqual({ ball: 'lib/ball.js' })
     // Every auxiliary surface is declarable — the schema is derived from the
     // same vocabulary the windows are built from.
     for (const surface of AUX_SURFACE_IDS) {
       expect(snapRailManifestSchema.safeParse({ client: { surfaces: { [surface]: 'lib/x.js' } } }).success).toBe(true)
     }
+    // A removed surface id (`panel`) is refused: an old zip must be rebuilt,
+    // not silently accepted with a bundle no window will ever load.
+    expect(snapRailManifestSchema.safeParse({ client: { surfaces: { panel: 'lib/panel.js' } } }).success).toBe(false)
   })
 
   it('manifest schema refuses a main surface entry, an empty path, and a bad surface key', () => {

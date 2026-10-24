@@ -7,7 +7,7 @@
  * The only thing that differs between surfaces is *which* faces load:
  *
  * - The operator window (`main`) loads each row's main bundle (`clientUrl`).
- * - An auxiliary window (`ball`, `panel`) loads its own bundle from the row's
+ * - The auxiliary window (`ball`) loads its own bundle from the row's
  *   `surfaceUrls[surface]` (module id `<package>/<surface>`), plus every
  *   **seed provider** (the framework and other `client.seeds` rows) from its
  *   main bundle — a face needs the framework's primitives and its own CSS

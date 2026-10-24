@@ -40,16 +40,21 @@ hand-written face and are documented statically here.
 | method | request schema | response schema |
 |---|---|---|
 | `shell.toast` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"title":{"type":"string","minLength":1,"maxLength":120},"body":{"type":"string","minLength":1,"maxLength":512},"tag":{"type":"string","minLength":1,"maxLength":64},"silent":{"type":"boolean"}},"required":["title"],"additionalProperties":false} | — |
-| `shell.surface.present` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"surface":{"type":"string","enum":["main","ball","panel"]}},"required":["surface"],"additionalProperties":false} | — |
-| `shell.surface.hide` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"surface":{"type":"string","enum":["ball","panel"]}},"required":["surface"],"additionalProperties":false} | — |
+| `shell.surface.present` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"surface":{"type":"string","enum":["main","ball"]}},"required":["surface"],"additionalProperties":false} | — |
+| `shell.surface.hide` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"surface":{"type":"string","enum":["ball"]}},"required":["surface"],"additionalProperties":false} | — |
+| `shell.surface.state` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
 | `shell.ball.state` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `shell.ball.dock` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `shell.exit.resolve` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"action":{"type":"string","enum":["ball","tray","quit","cancel"]}},"required":["action"],"additionalProperties":false} | — |
 
 ### Frames
 
 | frame | payload schema |
 |---|---|
-| `shell/surface-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"surface":{"type":"string","enum":["main","ball","panel"]},"available":{"type":"boolean"},"visible":{"type":"boolean"}},"required":["surface","available","visible"],"additionalProperties":false} |
+| `shell/surface-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"surface":{"type":"string","enum":["main","ball"]},"available":{"type":"boolean"},"visible":{"type":"boolean"}},"required":["surface","available","visible"],"additionalProperties":false} |
 | `shell/ball-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"progress":{"anyOf":[{"type":"number","minimum":0,"maximum":1},{"type":"null"}]},"label":{"anyOf":[{"type":"string","maxLength":8},{"type":"null"}]},"tone":{"type":"string","enum":["neutral","accent","warning","danger"]}},"required":["progress","label","tone"],"additionalProperties":false} |
+| `shell/ball-dock-changed` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"edge":{"anyOf":[{"type":"string","enum":["left","right","top","bottom"]},{"type":"null"}]},"collapsed":{"type":"boolean"},"visiblePx":{"type":"integer","minimum":1,"maximum":128}},"required":["edge","collapsed","visiblePx"],"additionalProperties":false} |
+| `shell/exit-requested` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"source":{"type":"string","enum":["window","tray"]}},"required":["source"],"additionalProperties":false} |
 
 ## plugins
 

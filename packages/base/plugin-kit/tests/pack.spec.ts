@@ -128,14 +128,14 @@ const multiSurfaceFixtureSpec: ReleaseSpec = {
       title: '夹具多面套件',
       client: {
         entry: 'lib-client/client.js',
-        surfaces: { ball: 'lib-client/ball.js', panel: 'lib-client/panel.js' },
+        surfaces: { ball: 'lib-client/ball.js' },
       },
     },
   }, {
     'lib/stats.js': 'export const counter = 1\n',
     'lib-client/client.js': 'module.exports = { name: "@fixture/multi", apply() {} }\n',
     'lib-client/ball.js': 'module.exports = { name: "@fixture/multi/ball", apply() {} }\n',
-    'lib-client/panel.js': 'module.exports = { name: "@fixture/multi/panel", apply() {} }\n',
+
   }),
   hostDir: 'lib',
   hostFace: 'lib/stats.js',
@@ -307,14 +307,14 @@ describe('final-format assembly (built tree)', () => {
     const paths = Object.keys(files)
     expect(paths).toContain('lib-client/client.js')
     expect(paths).toContain('lib-client/ball.js')
-    expect(paths).toContain('lib-client/panel.js')
+
     const manifest = JSON.parse(new TextDecoder().decode(files['package.json']!))
     // The host face stays `main`; the client face keeps every surface entry
     // so the host can hand the renderer one loader URL per window.
     expect(manifest.main).toBe('lib/stats.js')
     expect(manifest.snapRail.client).toEqual({
       entry: 'lib-client/client.js',
-      surfaces: { ball: 'lib-client/ball.js', panel: 'lib-client/panel.js' },
+      surfaces: { ball: 'lib-client/ball.js' },
     })
   })
 
@@ -395,7 +395,7 @@ describe('install round-trip', () => {
     // URLs before the renderer asks for its rows.
     const multi = scanned.get('@fixture/multi')
     expect(multi?.clientEntry).toBe('lib-client/client.js')
-    expect(multi?.clientSurfaces).toEqual({ ball: 'lib-client/ball.js', panel: 'lib-client/panel.js' })
+    expect(multi?.clientSurfaces).toEqual({ ball: 'lib-client/ball.js' })
     expect(suite?.clientSurfaces).toBeUndefined()
   })
 })

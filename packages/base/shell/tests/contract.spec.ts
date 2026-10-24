@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { AUX_SURFACE_IDS, SURFACE_IDS, isAuxSurfaceId, isSurfaceId } from '@snap-rail/protocol'
+import { EXIT_DECISIONS } from '../src/index.ts'
 import {
+  BALL_SURFACE,
   BALL_TONES,
+  EXIT_ACTIONS,
   SHELL_LIMITS,
+  ballDockStateSchema,
   ballStateSchema,
   shellContract,
   surfaceStateSchema,
@@ -16,31 +20,51 @@ function requestOf(name: keyof typeof shellContract.methods) {
 }
 
 describe('surface vocabulary', () => {
-  it('whitelists exactly main, ball and panel — main first', () => {
-    expect(SURFACE_IDS).toEqual(['main', 'ball', 'panel'])
-    expect(AUX_SURFACE_IDS).toEqual(['ball', 'panel'])
+  it('whitelists exactly main and ball — main first', () => {
+    expect(SURFACE_IDS).toEqual(['main', 'ball'])
+    expect(AUX_SURFACE_IDS).toEqual(['ball'])
   })
 
   it('recognises surface ids and rejects everything else', () => {
     for (const id of SURFACE_IDS) expect(isSurfaceId(id)).toBe(true)
     expect(isSurfaceId('tray')).toBe(false)
+    expect(isSurfaceId('panel')).toBe(false)
     expect(isSurfaceId(undefined)).toBe(false)
     // `main` is a surface but never an auxiliary one — the Shell owns it.
     expect(isAuxSurfaceId('main')).toBe(false)
-    expect(isAuxSurfaceId('panel')).toBe(true)
+  })
+})
+
+describe('ball geometry', () => {
+  it('keeps the orb and its shadow rim inside the window', () => {
+    // The single source the host's window bounds and every face's layout
+    // derive from: the orb plus two insets must exactly fill the window, so a
+    // face painting a contained shadow can never spill past the edge.
+    expect(BALL_SURFACE.orb + 2 * BALL_SURFACE.inset).toBe(BALL_SURFACE.size)
+    expect(BALL_SURFACE.dockVisibleRatio).toBeGreaterThan(0)
+    expect(BALL_SURFACE.dockVisibleRatio).toBeLessThan(1)
+  })
+
+  it('documents the hold timeout as a positive cap', () => {
+    expect(SHELL_LIMITS.exitHoldMs).toBeGreaterThan(0)
   })
 })
 
 describe('shell contract', () => {
   it('declares the client-facing rows and frames', () => {
     expect(Object.keys(shellContract.methods).sort()).toEqual([
+      'shell.ball.dock',
       'shell.ball.state',
+      'shell.exit.resolve',
       'shell.surface.hide',
       'shell.surface.present',
+      'shell.surface.state',
       'shell.toast',
     ])
     expect(Object.keys(shellContract.frames).sort()).toEqual([
       'shell/ball-changed',
+      'shell/ball-dock-changed',
+      'shell/exit-requested',
       'shell/surface-changed',
     ])
     expect(shellContract.domain).toBe('shell')
@@ -86,6 +110,26 @@ describe('shell contract', () => {
     expect(surfaceStateSchema.safeParse({ surface: 'ball', available: false, visible: false }).success).toBe(true)
     expect(surfaceStateSchema.safeParse({ surface: 'tray', available: true, visible: true }).success).toBe(false)
     expect(surfaceStateSchema.safeParse({ surface: 'ball', visible: true }).success).toBe(false)
+  })
+
+  it('validates dock state: a parked edge, the tucked flag, and a sane visible strip', () => {
+    expect(ballDockStateSchema.safeParse({ edge: null, collapsed: false, visiblePx: 43 }).success).toBe(true)
+    expect(ballDockStateSchema.safeParse({ edge: 'left', collapsed: true, visiblePx: 43 }).success).toBe(true)
+    expect(ballDockStateSchema.safeParse({ edge: 'top', collapsed: false, visiblePx: 43 }).success).toBe(true)
+    expect(ballDockStateSchema.safeParse({ edge: 'diagonal', collapsed: false, visiblePx: 43 }).success).toBe(false)
+    expect(ballDockStateSchema.safeParse({ edge: 'left', collapsed: true, visiblePx: BALL_SURFACE.size + 1 }).success).toBe(false)
+    expect(ballDockStateSchema.safeParse({ edge: 'left', collapsed: true, visiblePx: 0 }).success).toBe(false)
+  })
+
+  it('accepts exit resolutions and request sources from the closed vocabularies', () => {
+    const resolve = requestOf('shell.exit.resolve')
+    for (const action of EXIT_ACTIONS) expect(resolve.safeParse({ action }).success).toBe(true)
+    expect(resolve.safeParse({ action: 'hold' }).success).toBe(false)
+    expect(resolve.safeParse({}).success).toBe(false)
+    // `hold` is a policy decision, never a resolution: a renderer answers,
+    // it does not defer again.
+    expect(EXIT_ACTIONS).not.toContain('hold')
+    expect(EXIT_DECISIONS).toContain('hold')
   })
 
   it('keeps the tray caps consistent with the notification caps', () => {

@@ -92,7 +92,7 @@ export default defineConfig({
     rollupOptions: {
       // Two pages, one per window kind: the operator window (`index.html`)
       // and the auxiliary-surface window (`surface.html`, loaded with
-      // `?surface=ball|panel` into a transparent always-on-top window).
+      // `?surface=ball` into a transparent always-on-top window).
       input: {
         index: join(import.meta.dirname, 'src/client/index.html'),
         surface: join(import.meta.dirname, 'src/client/surface.html'),

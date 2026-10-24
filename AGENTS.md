@@ -118,13 +118,22 @@ Release 节奏。
 
 - **能力缝三件套齐备**：Service Definition / Provider / Consumer；
   角色不独立演化不拆包。新增能力先补缝，再补首方实现。
-- **OS 资源只走 Shell 缝**：通知、托盘、窗口（含悬浮球/小面板）一律经
+- **OS 资源只走 Shell 缝**：通知、托盘、窗口（含悬浮球及其贴边停靠）、
+  操作员窗口的退出策略一律经
   `ctx.shell`（宿主面）或 `@snap-rail/shell/contract`（渲染面）。
   **池插件永不 import `electron`**——Electron 只出现在首方 provider
-  `apps/desktop/src-host/main/shell/*`。可点回执（通知按钮、托盘项）只准
-  宿主面贡献：它活得比任何 renderer 都长；渲染面只有单向 toast 与窗口控制。
-  上限/节流单源在 `SHELL_LIMITS`，溢出回 `{applied:false, reason}` 不抛。
-- **辅助 surface 独立入口**：一个包可以给 `main`/`ball`/`panel` 各出一个
+  `apps/desktop/src-host/main/shell/*`。可点回执（通知按钮、托盘项、退出
+  请求）只准宿主面贡献：它活得比任何 renderer 都长；渲染面只有单向 toast、
+  窗口控制与挂起退出的应答。主窗口与球**互斥**、贴边收起（左右收 1/3、上下
+  只吸附、悬停滑出）都是底座不变式，插件只画两种形态。球的几何单源
+  `BALL_SURFACE`（128 窗/112 球/8px 余量）：**阴影必须画在余量内**
+  （径向渐变衰减到零；`box-shadow` 会被窗口边界切成灰边）。退出策略是宿主面
+  的数据声明（`close/quit: 'ball'|'tray'|'quit'|'hold'`，最后声明且存活者
+  生效，fiber 回收即回退默认 quit）；`'hold'` 把请求挂起交回插件——确认框
+  **永远由插件的渲染面自己画**（底座不画任何 UI），经 `shell.exit.resolve`
+  应答，10s 未应答按 `quit` 兜底。上限/节流单源在 `SHELL_LIMITS`，溢出回
+  `{applied:false, reason}` 不抛。
+- **辅助 surface 独立入口**：一个包可以给 `main`/`ball` 各出一个
   渲染面——`client.entry` 是主面、`client.surfaces` 每个辅助窗口一条（模块
   id `<包名>/<surface>`，`clientBundle` 传 `outName`/`moduleId`）。`main`
   不得出现在 `surfaces` 里；辅助面**不订阅工业点**（只消费宿主聚合帧）；

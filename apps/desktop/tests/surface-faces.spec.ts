@@ -37,7 +37,7 @@ describe('face selection', () => {
   })
 
   it('contributes nothing to a surface the package ships no bundle for', () => {
-    expect(faceFor(row(), 'panel')).toBeUndefined()
+    expect(faceFor(row({ surfaceUrls: undefined }), 'ball')).toBeUndefined()
     // And a row without a renderer bundle at all is invisible everywhere.
     expect(faceFor(row({ clientUrl: undefined }), 'main')).toBeUndefined()
   })

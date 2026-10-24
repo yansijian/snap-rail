@@ -3,11 +3,12 @@
  * process, mount the IPC carrier during preparation, then open the operator
  * window whose renderer is a pure projection client.
  *
- * The window is the app's only *default* surface — the floating ball and its
- * panel are created on demand by the Shell adapter (`./shell`), which also
- * owns the tray icon and OS notifications. Closing the operator window still
- * quits (X = quit, unchanged); hiding it into the tray is an explicit tray
- * action, never a side effect of a close.
+ * The window is the app's only *default* surface — the floating ball is
+ * created on demand by the Shell adapter (`./shell`), which also owns the tray
+ * icon, OS notifications, the ball's docking, and what closing this window
+ * means (the exit policy; with no plugin declaration, X still quits). The app
+ * entry creates the window — boot ordering and the no-shell fallback stay
+ * here — and hands it to the Shell as soon as it exists.
  *
  * @module @snap-rail/desktop/main
  */
@@ -69,6 +70,11 @@ async function start(): Promise<void> {
     return
   }
   app.on('second-instance', () => {
+    // Route through the Shell so the ball docks, the state frames broadcast,
+    // and exclusivity holds; the direct show below is only the no-shell
+    // fallback.
+    const shell = host?.ctx.get('shell')
+    if (shell !== undefined && shell.surface.present(host!.ctx, 'main').applied) return
     const win = currentMainWindow()
     if (win === undefined || win.isDestroyed()) return
     if (win.isMinimized()) win.restore()
@@ -94,6 +100,12 @@ async function start(): Promise<void> {
     quitting = true
     void (host === undefined ? Promise.resolve() : host.dispose()).finally(() => app.quit())
   }
+  // The Shell adapter resolves this once the window below exists; it owns the
+  // close policy, so it must have the window the moment it is created.
+  let resolveOperatorWindow!: (win: BrowserWindow) => void
+  const operatorWindow = new Promise<BrowserWindow>(resolve => {
+    resolveOperatorWindow = resolve
+  })
 
   host = await startDesktopHost({
     binName: 'desktop',
@@ -106,11 +118,12 @@ async function start(): Promise<void> {
       void prepared.plugin(carrierPlugin)
       void prepared.plugin(windowRpcPlugin)
       void prepared.plugin(updateRpcPlugin)
-      // The OS integration seam: notifications, tray, and the auxiliary
-      // surfaces. `mainWindow` is read lazily — a plugin may present a
-      // surface before the operator window exists.
+      // The OS integration seam: notifications, tray, the floating ball, and
+      // the operator window's exit policy (`requestQuit` is the one thing the
+      // Shell may not do by itself — ending the app disposes this tree).
       void prepared.plugin(shellPlugin, {
-        mainWindow: currentMainWindow,
+        operatorWindow,
+        requestQuit: quitApplication,
         renderer: {
           preloadPath: join(app.getAppPath(), 'dist/preload/index.cjs'),
           ...devUrl() !== undefined ? { devUrl: devUrl()! } : {},
@@ -127,7 +140,7 @@ async function start(): Promise<void> {
   // why. A plugin fiber's failure is only as loud as the logger attached to
   // it — which a packaged terminal has none of — so assert it here instead.
   const served = host.ctx.rpc.describe().methods.map(method => method.name)
-  const missingShell = ['shell.toast', 'shell.surface.present', 'shell.ball.state']
+  const missingShell = ['shell.toast', 'shell.surface.present', 'shell.ball.state', 'shell.ball.dock', 'shell.exit.resolve']
     .filter(name => !served.includes(name))
   if (missingShell.length > 0) {
     console.error(`snap-rail: Shell 适配器未挂载（缺 ${missingShell.join(', ')}）——通知、托盘与悬浮球不可用`)
@@ -150,9 +163,12 @@ async function start(): Promise<void> {
   })
   // The un-targeted window controls (the suite titlebar) drive this window.
   trackMainWindow(win)
+  // Hand the window to the Shell: from here on, what closing it means is the
+  // exit policy's decision (default: quit, exactly as before).
+  resolveOperatorWindow(win)
   win.once('ready-to-show', () => win.show())
-  // X = quit. Closing the operator window ends the app even while a ball or
-  // panel window is still alive — those are satellites, not the app.
+  // Safety net: `closed` only fires once the app is really going away (the
+  // Shell intercepts every ordinary close), and `quitting` guards re-entry.
   win.once('closed', () => quitApplication())
 
   const url = devUrl()

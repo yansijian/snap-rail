@@ -74,18 +74,18 @@ Electron Shell + Node Host（当前同进程）        renderer（每窗口一�
 │  gateway ── 点表/管理方法    │ ◀─────── │   runtime → 住户(组件)   │
 │  shell 缝 ── 通知/托盘/窗口   │  帧流端口 │  React root（槽位驱动）   │
 │  equipment / driver-* …    │          └─────────────────────────┘
-└───────────────────────────┘            main / ball / panel 三种窗口
+└───────────────────────────┘            main / ball 两种窗口
 ```
 
 - **窗口即 surface**：`main`（操作员主窗口，唯一默认存在的窗口）、`ball`
-  （128×128 透明置顶悬浮球）、`panel`（360×480 透明置顶小面板）。三种窗口
+  （128×128 透明置顶悬浮球）。两种窗口
   跑同一份 renderer 代码、同一个 page 之外的两张 html（`index.html` /
-  `surface.html?surface=ball|panel`），差别只在**装哪些面**：主窗口装每行
+  `surface.html?surface=ball`），差别只在**装哪些面**：主窗口装每行
   的 `clientUrl`，辅助窗口装 `surfaceUrls[surface]`（模块 id
   `<包名>/<surface>`），种子提供方（框架）在所有窗口都装——一个球面也需要
   框架的原语与样式。承载者（`carrier`）按 WebContents 分流帧流，多窗口天然
   支持。
-- **辅助窗口不订阅工业点**：球/面板只消费宿主聚合后的帧（如
+- **辅助窗口不订阅工业点**：球只消费宿主聚合后的帧（如
   `shell/ball-changed`、`production/stats-changed`），因此隐藏的球不保留
   任何数据通路，显示的球也不需要第二套订阅图。
 - Electron Shell 只持有 Host 边界与 IPC carrier；当前 Host 与 Shell 同进程，
@@ -112,14 +112,14 @@ Electron Shell + Node Host（当前同进程）        renderer（每窗口一�
 | --- | --- | --- |
 | 启动/组合 | `base/app-boot` | 两层合成、boot()、LayerAdmin 热重载、`./rpc` 管理桥（认领 `plugins` 域；互斥组、requires 正反向预检与按来源的内置保护在这里执行；`./contract` 是方法行与 schema 的家）；池扫描 `./scan`（含 clientOnly/subpath 声音）、解析钩子 `./resolve-hooks`（appRoot 优先、池内回退）；dev 静态住户经 `rendererPackages` 挡板（仅 dev） |
 | 工作站桥 | `base/station-rpc` | `session.*`/`settings.*`/`audit.*`/`client-config.list`（登录态落 settings + 审计；`./contract` 是方法/帧行与 schema 的家，渲染住户 import 它获得类型；行携带 `clientUrl` 与该包**每个辅助 surface 的面 URL**（`surfaceUrls`），渲染端据此决定每个窗口装什么） |
-| 系统外壳 | `base/shell` | **OS 集成缝**：`ctx.shell`（宿主面）与 `./contract`（渲染面）两个面。宿主面 = 通知（含动作按钮与点击回执）、托盘菜单贡献、辅助 surface 的窗口生命周期、悬浮球状态；渲染面只有单向 `shell.toast`、`surface.present/hide`、`shell.ball.state` 与两个帧。**池插件永不 import Electron**，Electron 只出现在首方 provider（`apps/desktop/src-host/main/shell`） |
+| 系统外壳 | `base/shell` | **OS 集成缝**：`ctx.shell`（宿主面）与 `./contract`（渲染面）两个面。宿主面 = 通知（含动作按钮与点击回执）、托盘菜单贡献、辅助 surface 的窗口生命周期、悬浮球状态、**操作员窗口的退出策略**（`ctx.shell.window`）；渲染面只有单向 `shell.toast`、`surface.present/hide`、`shell.ball.state`、`shell.ball.dock`、`shell.exit.resolve` 与四个帧。**池插件永不 import Electron**，Electron 只出现在首方 provider（`apps/desktop/src-host/main/shell`） |
 | RPC 协议 | `base/protocol` | **信封封闭、内容开放**：四象限消息模型、RpcMethodMap/FrameMap 两个开放合并基座（只有平台行 `host.*`/`rpc.*`/`window.*` 留在这里）、zod 信封校验、AbstractApiClient 双 overload |
 | RPC 宿主侧 | `base/gateway` | `ctx.rpc`：域名认领（`claimDomain` 首认即得、冲突 fail-loud）、`method`（请求 schema 必须随注册）、`frame`（载荷 schema 注册）、`bridgeEvent`、`rpc.describe` 能力发现、帧泵 |
 | RPC 客户端侧 | `base/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势；`rpcErrorText` 统一错误文案 |
 | 设置持久化 | `base/settings` | 原子 JSON 持久化（`settings.json`）；`settings.get/set` RPC + `settings/changed` 帧让渲染端简单配置即时生效 |
 | 审计 | `base/audit` | 追加式 JSONL：启停/配置/控制写全记录；`list(filter)` 读回；wire 类型（`AuditEntryInfo`）由它导出 |
 | 工具 | `base/util`、`base/plugin-kit` | Branded、assertNever、`formatClock`/`formatDuration`；`util/manifest` 是层词汇与规则单源。plugin-kit：`snapRail` manifest 词汇表（zod：kind/layer/category/exclusive/framework/requires/clientOnly/client/permissions）、种子两层（`SEED_MODULES` 基础层 + `CONTRIBUTED_SEED_MODULES` 框架贡献层，并集 `CLIENT_EXTERNALS` 是 clientBundle external 面）、tsdown preset（含 CSS 内联、三方库全内联、**种子导入护栏**——种子只准 named/star 导入，default 经 rolldown CJS interop 会变成命名空间对象，构建期硬错）、最终格式打包器 `./pack`（含 exports 映射、clientOnly 形态、**pack 时盖 `snapRail.client.seedAbi` 章**——bundle 真实 require 到的种子 id + 本包解析到的版本 + `SEED_ABI_REVISION`） |
-| 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架朴素插件页**（三合一输入：地址/拖拽/搜索安装 + 已安装列表 + 红色异常提示条；`droppedZipPath` 路径桥；`showBootstrapAfterFailure` 崩溃回退——框架运行时抛异常时重植 root 并把错误带上提示条回到此页）；**辅助 surface 回退**（`showSurfaceFallback`：球是没有框架时的可拖可点圆球、面板是说明卡；`ClientHandle.surface` 让每个窗口知道自己是哪个 surface）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
+| 引导 | `base/kernel`、`base/modules` | 启动页、carrier 握手、root 移交、**无框架朴素插件页**（三合一输入：地址/拖拽/搜索安装 + 已安装列表 + 红色异常提示条；`droppedZipPath` 路径桥；`showBootstrapAfterFailure` 崩溃回退——框架运行时抛异常时重植 root 并把错误带上提示条回到此页）；**辅助 surface 回退**（`showSurfaceFallback`：没有框架时的可拖可点圆球，跟随贴边状态画收起小标签；`ClientHandle.surface` 让每个窗口知道自己是哪个 surface）；渲染端模块系统（`__ModuleLoader__` queue→live 门面 + 种子表 + `loadPluginBundle`） |
 | 持久化规范 | `store/store` | `ctx.store` 的 Service Definition：`register(caller, ns, drizzle表)`；**drizzle 查询构建器即规范**（无裸 SQL/CTE/窗口函数）；命名空间 = 隔离边界；注册即建表 + append-only 加列 |
 | 持久化实现 | `store/store-sqlite` | 参考实现（zip 安装；互斥组 `store-backend`，单活）：node:sqlite + 自写 drizzle 适配器（零原生模块），`data/<ns>.db`，WAL；换后端 = 新实现包替换单活 |
 | 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection, probe?}`——驱动是纯协议适配器（零存储、零渲染端）；`probe` 驱动一次性只读连接测试，`equipment.devices.test` 是其 wire 面。底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。zip 声明 `requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影（消费方零改动）。`./contract` 是随应用发布的渲染契约（base 种子），`./driver` 是独立驱动仓库只读的纯类型面 |
@@ -127,7 +127,7 @@ Electron Shell + Node Host（当前同进程）        renderer（每窗口一�
 | EtherNet/IP 驱动 | 独立仓 `snap-rail-driver-enip` | 照 modbus 范本的第二个驱动（首期对接 OMRON NX1P2）：自研轻量 ENIP/CIP 编解码（RegisterSession + SendRRData + Read/Write Tag 符号寻址，无第三方协议库），按已发布全局变量名轮询读写；变量级 CIP 失败只 null 单点（设备保持在线），写前经首读自学类型字；`slot>0` 发背板路由段（留 Logix 兼容门） |
 | UI 框架 | 独立仓 `snap-rail-framework-shadcn` | **框架插件（互斥组 `framework`，单活，clientOnly）**：接管全套 UI 栈——槽位词汇 `ctx.uiSlots`（well-known ids + `custom:*` + 缺槽降级）、renderer runtime + 槽位驱动 Shell、shadcn 共享原语 + 主题令牌（theme.css，Tailwind v4 预编译输出随 zip 走）+ `SchemaForm` + `useRefresh`、`ctx.settingsPages`/`ctx.session`/`ctx.variables`/`ctx.workflows` 服务、**设置外壳（对话框 occupant + 主题热应用 + 一方「插件/主题/软件更新」三页——原 `ui/settings-station` 包已退役并入，只装框架即得完整管理界面）**、fallback 布局。client 面把全部面贡献为共享种子（`client.seeds`）；Component 经 `requires` 里的框架条目绑定（绑定即依赖）；换框架 = 换生态 |
 | 统一设备管理页 | `ui/equipment-station` | equipment 缝的渲染面：设备 Tabs、连接灯、分组健康、点位表（方言列+实时值）、SchemaForm 配置对话框（见 equipment 语义节）；经 `ctx.settingsPages` 缝贡献设置页；clientOnly zip，`requires` 声明框架与 equipment |
-| 业务套件 | 独立仓 `snap-rail-suite-terminal-ops` | **套件 = 单包单行，可双面**（互斥组 `suite`，单活）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页，成员为子 fiber，跨页 action 常量收在包内）；宿主面 `./stats` 是同一场景的持久班产计数（store 缝 + 登录锚定 + `production/stats-changed` 帧），契约面为包内私面——场景逻辑收在套件内，杜绝跨包场景工具；`requires` 声明框架、equipment、`service:store` |
+| 业务套件 | 独立仓 `snap-rail-suite-terminal-ops` | **套件 = 单包单行，可双面**（互斥组 `suite`，单活）：一个渲染行挂全套成员（layout 槽+titlebar 槽+五个流程页+产量采集设置页+「窗口与退出」设置页+退出确认框，成员为子 fiber，跨页 action 常量收在包内）；宿主面 `./stats` 是同一场景的持久班产计数（store 缝 + 登录锚定 + `production/stats-changed` 帧）并**声明窗口退出策略**（`./window`：关窗到悬浮球/托盘/询问，托盘退出确认，设置热切换），契约面为包内私面——场景逻辑收在套件内，杜绝跨包场景工具；`requires` 声明框架、equipment、`service:store`、`service:shell` |
 
 ## 窗口与 surface（OS 集成）
 
@@ -138,20 +138,49 @@ provider，消费方零改动。
 
 **所有权按点击寿命划分，不按调用点划分**：
 
-- **宿主面**（`ctx.shell`）：带动作按钮的通知、托盘菜单项、窗口本身。这些
-  活得比任何 renderer 都长——按钮点击可能在客户端面消失几分钟后才到，所以
-  只有宿主面 fiber（与应用同寿）能贡献它们；`shell/notification-clicked`、
-  `shell/notification-action`、`shell/tray-clicked` 是回执。
+- **宿主面**（`ctx.shell`）：带动作按钮的通知、托盘菜单项、窗口本身、退出
+  策略。这些活得比任何 renderer 都长——按钮点击可能在客户端面消失几分钟后
+  才到，所以只有宿主面 fiber（与应用同寿）能贡献它们；`shell/notification-clicked`、
+  `shell/notification-action`、`shell/tray-clicked`、`shell/exit-requested`、
+  `shell/exit-resolved` 是回执。
 - **渲染面**（`./contract`）：单向 `shell.toast`（无按钮、无回调，点击聚焦
-  主窗口）、`shell.surface.present/hide`、`shell.ball.state` 与两个帧
-  （`shell/surface-changed`、`shell/ball-changed`）。会消失的调用方不得留下
-  无法应答的按钮，也拿不到 OS 句柄。
+  主窗口）、`shell.surface.present/hide`、`shell.ball.state`、
+  `shell.ball.dock`、`shell.exit.resolve` 与四个帧（`shell/surface-changed`、
+  `shell/ball-changed`、`shell/ball-dock-changed`、`shell/exit-requested`）。
+  会消失的调用方不得留下无法应答的按钮，也拿不到 OS 句柄。
 
-**窗口**：`main` 永远由 Shell 拥有；`ball`/`panel` **按需创建**、隐藏后保留
-（下次 present 不重载，订阅仍在）。面板失焦即隐藏、Esc 即隐藏（由窗口拦截，
-任何 renderer 都吃不到"关不掉"的浮窗）。悬浮球位置跨会话记忆；记忆位置不再
-落在任何显示器工作区内时丢弃并回到右下角。尺寸固定（球 128、面板 360×480），
-不接受任意 URL 或任意窗口——surface 白名单就是封闭的三元组。
+**窗口**：`main` 永远由 Shell 拥有（应用入口创建、交给 Shell 接管关闭与可见
+性）；`ball` **按需创建**、隐藏后保留（下次 present 不重载，订阅仍在）。
+悬浮球位置跨会话记忆——自由位置记坐标，贴边停泊记 `{edge, offset}`，分辨率
+变化也能正确复位；记忆的自由位置不再落在任何显示器工作区内时丢弃并回到右下
+角。尺寸固定（球 128×128，几何单源 `BALL_SURFACE`），不接受任意 URL 或任意
+窗口——surface 白名单就是封闭的二元组。
+
+**互斥不变式**：操作员窗口与悬浮球互斥，由底座保证、与路径无关——
+`present('main')` 顺带收起球，`present('ball')` 顺带收起主窗口，任何旁路
+show（任务栏还原、第二实例、通知点击）也会被 `show` 监听扳回。插件的职责只
+有两处：声明"关窗之后去哪"（见退出策略），以及画好两种形态（球与贴边小标签）。
+
+**贴边收起**：拖动落点距工作区边缘 ≤16px 即停泊——左右边缘**收起只留 1/3**
+（`shell/ball-dock-changed` 推 `{edge, collapsed, visiblePx}`），上下边缘只
+吸附不收起（收向上会压别家标题栏、收向下会压任务栏）。停泊后光标进入可见条
+即滑出，移开 600ms 缩回；必须"先离开再进入"才再次滑出（防止放下即弹出），
+由 `present` 显式唤起的球在被使用前不自动缩回。决策数学单源 `shell/dock.ts`
+（纯函数、无 Electron、可测），动画与光标轮询是适配器的胶水。
+
+**阴影余量**：球窗口 128px、球体 112px，四周 8px 是面**唯一**的软画空间；
+CSS `box-shadow` 会被窗口边界硬切成灰边，因此阴影必须以径向渐变画在余量内
+并衰减到零（`BALL_SURFACE` 是这份几何的单源，kernel 回退球与首方套件都照此
+绘制）。
+
+**退出策略**：关闭操作员窗口与托盘「退出」做什么，由宿主面插件以**数据**
+声明——`ctx.shell.window.setExitPolicy(caller, { close, quit })`，取值
+`'ball' | 'tray' | 'quit' | 'hold'`；最后声明且存活的插件生效，fiber 回收
+即回退默认 `quit/quit`（无插件声明 = 与历史行为完全一致）。`'hold'` 把请求
+挂起交回插件：Shell 冻结窗口、广播 `shell/exit-requested`（宿主事件 + 同名
+帧），插件用**自己的**渲染面弹确认框（底座从不画任何 UI），经
+`shell.exit.resolve` 应答 `ball/tray/quit/cancel`；超过 `SHELL_LIMITS.exitHoldMs`
+（10s）无人应答则按操作员原意 `quit` 兜底——渲染进程挂了也不能让应用关不掉。
 
 **通知**：宿主面 `ctx.shell.notify(caller, input)`，上限单源在
 `SHELL_LIMITS`（标题 120 / 正文 512 / 动作标题 20 / 动作 id 64 / 一条最多 3
@@ -166,8 +195,8 @@ provider，消费方零改动。
 终端默认不在通知区占位）；固定行（显示主窗口 / 隐藏到托盘 / 退出）+ 贡献行。
 托盘项 id 按 `<插件>:<id>` 命名空间化，两个插件可以都叫 `pause` 而互不干扰；
 单插件 12 项、全体 24 项上限；贡献随**调用方 fiber** 回收（`caller.effect`），
-重载/禁用插件不会留下孤儿菜单项。`X = 关窗即退出` 保持不变；隐藏到托盘只能
-是托盘菜单里的显式动作——托盘建不起来时该动作回 `{applied:false}`，绝不把
+重载/禁用插件不会留下孤儿菜单项。「退出」与窗口关闭走同一条退出策略（无声明
+即退出）；「隐藏到托盘」是显式动作——托盘建不起来时该动作不藏窗口，绝不把
 窗口藏进一个不存在的图标后面。
 
 **悬浮球状态**：`ctx.shell.ball.setState(caller, patch)` 是宿主聚合面——产量

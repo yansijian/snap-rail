@@ -77,7 +77,7 @@ const requiredArtifacts: ReadonlyArray<readonly [path: string, why: string]> = [
   ['dist/main/index.js', 'the Electron main entry'],
   ['dist/preload/index.cjs', 'the IPC carrier preload (every window mounts it)'],
   ['dist/client/index.html', 'the operator window page'],
-  ['dist/client/surface.html', 'the ball/panel surface page'],
+  ['dist/client/surface.html', 'the ball surface page'],
   ['resources/builtins.cordis.yml', 'the built-in layer'],
   ['resources/tray.png', 'the tray glyph'],
 ]

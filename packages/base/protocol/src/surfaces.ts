@@ -1,8 +1,8 @@
 /**
  * The surface vocabulary: one renderer window role. `main` is the operator
- * window (the app's only always-present surface); `ball` and `panel` are the
- * auxiliary always-on-top surfaces a plugin drives through the Shell seam —
- * the floating ball and its mini panel.
+ * window (the app's only always-present surface); `ball` is the auxiliary
+ * always-on-top surface a plugin drives through the Shell seam — the floating
+ * ball.
  *
  * A surface is an identity, not a layout. Every surface boots the same
  * renderer with its own client entry (`snapRail.client.surfaces`) and its own
@@ -14,16 +14,16 @@
  *
  * The whitelist is closed on purpose: a plugin may not name an arbitrary URL
  * or spawn an arbitrary window — the Shell owns every window and only these
- * three roles exist.
+ * two roles exist.
  *
  * @module @snap-rail/protocol/surfaces
  */
 
 /** Every surface id, in boot order (`main` first). */
-export const SURFACE_IDS = ['main', 'ball', 'panel'] as const
+export const SURFACE_IDS = ['main', 'ball'] as const
 
 /** The always-on-top auxiliary surfaces: windows the Shell creates lazily. */
-export const AUX_SURFACE_IDS = ['ball', 'panel'] as const
+export const AUX_SURFACE_IDS = ['ball'] as const
 
 /** One renderer window role. */
 export type SurfaceId = (typeof SURFACE_IDS)[number]

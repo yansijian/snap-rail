@@ -107,10 +107,10 @@ zip 里残留的字段在 manifest 校验时被剥离，宿主永不再读它们
 `createConnection`（返回 `{ update, dispose }`，经 handle 上报
 status/sample/write）。设备/组/点住在底座表里，驱动零自有存储。
 
-## 多窗口：悬浮球、小面板、托盘与通知
+## 多窗口：悬浮球、托盘、退出策略与通知
 
-窗口有三种 **surface**：`main`（操作员主窗口）、`ball`（128×128 透明置顶
-悬浮球）、`panel`（360×480 透明置顶小面板）。一个插件包可以给任意多个
+窗口有两种 **surface**：`main`（操作员主窗口）、`ball`（128×128 透明置顶
+悬浮球）。一个插件包可以给任意多个
 surface 各出一个渲染面——**一个包、一个开关、每个窗口一个 bundle**：
 
 ```json
@@ -118,7 +118,7 @@ surface 各出一个渲染面——**一个包、一个开关、每个窗口一�
   "snapRail": {
     "client": {
       "entry": "lib-client/client.js",
-      "surfaces": { "ball": "lib-client/ball.js", "panel": "lib-client/panel.js" }
+      "surfaces": { "ball": "lib-client/ball.js" }
     }
   }
 }
@@ -129,17 +129,57 @@ surface 各出一个渲染面——**一个包、一个开关、每个窗口一�
 export default defineConfig([
   clientBundle('@my-scope/my-suite', 'src/index.tsx'),                                  // lib-client/client.js
   clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),         // lib-client/ball.js
-  clientBundle('@my-scope/my-suite/panel', 'src/panel.tsx', { outName: 'panel' }),      // lib-client/panel.js
 ])
 ```
 
 - 主面的模块 id 就是**包名**，辅助面是 **`<包名>/<surface>`**；`outName` 只
   决定文件名，`moduleId` 决定注册 id（`clientBundle` 的第三个参数，默认
   包名）。渲染端按行里的 `surfaceUrls` 装对应窗口的面，没声明的窗口显示
-  kernel 的朴素回退（球 = 可拖可点的圆球，面板 = 说明卡）。
+  kernel 的朴素回退（球 = 可拖可点、可贴边收起的圆球）。
 - **`main` 不能出现在 `surfaces` 里**：主窗口的面就是 `client.entry`。
-- 辅助面**不要订阅工业点**：球/面板隐藏时不该保留数据通路。要显示的信息
+- 辅助面**不要订阅工业点**：球隐藏时不该保留数据通路。要显示的信息
   由宿主面聚合后推帧（如 `production/stats-changed`、`shell/ball-changed`）。
+
+### 球面：几何、阴影与贴边
+
+球的几何是缝词汇、单源 `BALL_SURFACE`（`@snap-rail/shell/contract`）：
+窗口 128×128、球体 112、四周 8px 余量。三条硬规则：
+
+- **阴影画在余量内**：CSS `box-shadow` 会被透明窗口边界硬切成灰边；用径向
+  渐变把阴影画进 8px 余量并衰减到零。
+- **贴边状态读 `shell.ball.dock` + 订阅 `shell/ball-dock-changed`**
+  （`{edge, collapsed, visiblePx}`）：球被拖到左右边缘会自动收起只留 1/3，
+  悬停自动滑出——底座负责一切几何与时机；面在 `collapsed` 时按 `edge` 在
+  可见条里画**收起形态**（贴边小标签），并**自留拖拽区**
+  （`-webkit-app-region: drag`），否则收起的球拽不回来。
+- 主窗口与球**互斥**由底座保证：`present('main')` 收球、`present('ball')`
+  收主窗口。面只需画好两种形态，不做互斥逻辑。
+
+### 关闭与退出：`ctx.shell.window`（宿主面）
+
+关窗与托盘退出的行为是**宿主面插件的数据声明**，不是底座硬编码：
+
+```ts
+// 宿主面：声明一次（登记即 effect，fiber 回收即回退默认）
+ctx.shell.window.setExitPolicy(ctx, {
+  close: 'ball',                       // 关窗 → 收进悬浮球（'tray' | 'quit' | 'hold'）
+  quit: 'quit',                        // 托盘退出：'quit' | 'tray' | 'ball' | 'hold'
+})
+```
+
+- `'hold'`：Shell 冻结请求、广播 `shell/exit-requested`（宿主事件 + 帧，
+  载荷 `{source: 'window' | 'tray'}`），**由你的渲染面弹确认框**
+  （底座从不画 UI），经 `shell.exit.resolve` 应答 `'ball' | 'tray' | 'quit' | 'cancel'`。
+  超过 10s 未应答按 `quit` 兜底——确认框是锦上添花，不能变成关不掉。
+- 确认框的挂载方式：**没有 overlay 槽**——对话框要叠在套件布局之上，就用
+  `ctx.uiContract.registerLayout(ctx, { id, order, slots: [], render })`
+  注册为叠层 layout occupant（`order` 取高于套件主布局的值，如 101；参考
+  首方套件的 `exit-prompt`）。订阅 `shell/exit-requested` 帧决定显示与否，
+  用户选择后 `shell.exit.resolve` 应答并撤下自己。
+- 宿主面收到 `source: 'tray'` 而主窗口正藏着时，自己 `surface.present(ctx, 'main')`
+  把窗口叫回来（对话框要有一个活着的渲染面才能弹），取消时把球放回去。
+- 默认（无声明）`quit/quit`，与无策略时代码路径完全一致；策略随 fiber 回收
+  自动还原。
 
 ### `ctx.shell`（宿主面）与 `./contract`（渲染面）
 
@@ -149,11 +189,13 @@ OS 资源只走这条缝，插件**永不 import Electron**。所有权按点击
 | --- | --- | --- |
 | `ctx.shell.notify(caller, {title, body, actions, tag, silent})` | 宿主面 | 带按钮的通知；返回 `{applied, id}` 或 `{applied:false, reason, message}` |
 | `ctx.shell.tray.addItem/updateItem/removeItem(caller, …)` | 宿主面 | 托盘菜单项（单插件 12、全体 24）；点击回执 `ctx.on('shell/tray-clicked', key)` |
-| `ctx.shell.surface.present/hide/state(caller, …)` | 宿主面 | 并按需创建/显示/隐藏辅助窗口（`main` = 显示并聚焦） |
+| `ctx.shell.surface.present/hide/state(caller, …)` | 宿主面 | 并按需创建/显示/隐藏辅助窗口（`main` = 显示并聚焦；互斥由底座保证） |
 | `ctx.shell.ball.setState(caller, patch)` | 宿主面 | 宿主聚合的球状态：`{progress 0..1\|null, label ≤8字\|null, tone}` |
+| `ctx.shell.window.setExitPolicy/exitPolicy/resolve(caller, …)` | 宿主面 | 关窗/托盘退出的行为声明与挂起应答 |
 | `shell.toast` | 渲染面 | 单向通知（无按钮、无回调，点击聚焦主窗口） |
-| `shell.surface.present/hide` | 渲染面 | 立起/收起窗口；`present('main')` 是回退圆球唯一的动作 |
-| `shell.ball.state` | 渲染面 | 读宿主聚合的球状态；帧 `shell/ball-changed` 负责推送 |
+| `shell.surface.present/hide/state` | 渲染面 | 立起/收起窗口；`state` 读当前可见面（球在主窗隐藏时出生，必须先读再画）；`present('main')` 是回退圆球唯一的动作 |
+| `shell.ball.state` / `shell.ball.dock` | 渲染面 | 读宿主聚合的球内容态与窗口贴边态；帧 `shell/ball-changed`、`shell/ball-dock-changed` 负责推送 |
+| `shell.exit.resolve` | 渲染面 | 应答一个挂起的退出请求（`shell/exit-requested` 帧到达后） |
 
 ```ts
 // 宿主面：一个托盘项 + 一条错误通知（登记即 effect，随 fiber 回收）

@@ -1,8 +1,9 @@
 /**
  * The OS integration seam — the specification half. Everything a plugin may
  * ask of the operating system arrives here, so that no plugin ever imports
- * Electron: notifications, tray menu contributions, and the lifecycle of the
- * auxiliary surfaces (the floating ball and its mini panel).
+ * Electron: notifications, tray menu contributions, the lifecycle of the
+ * auxiliary surface (the floating ball, docking included), and the operator
+ * window's exit policy.
  *
  * Ownership follows the click lifetime, not the call site:
  *
@@ -11,10 +12,11 @@
  *   windows themselves. These outlive any renderer, so only a host-face
  *   plugin — a fiber that lives as long as the app — may contribute them. The
  *   events below are the return path.
- * - **Client face** (`@snap-rail/shell/contract`): a one-way toast and
- *   control over the surface the caller renders in. A renderer that vanishes
- *   must not leave a dead menu row or an unanswerable action behind, and a
- *   client cannot be trusted with an OS handle anyway.
+ * - **Client face** (`@snap-rail/shell/contract`): a one-way toast, control
+ *   over the surface the caller renders in, the ball's dock state, and the
+ *   one-way answer to a held exit request. A renderer that vanishes must not
+ *   leave a dead menu row or an unanswerable action behind, and a client
+ *   cannot be trusted with an OS handle anyway.
  *
  * The service is implemented by the first-party desktop Shell adapter
  * (`apps/desktop/src-host/main/shell`) — the only code in the repository that
@@ -27,7 +29,7 @@
 
 import type { Context } from '@snap-rail/cordis'
 import type { AuxSurfaceId, SurfaceId } from '@snap-rail/protocol'
-import type { BallPatch, BallState, SurfaceState } from './contract.ts'
+import type { BallDockState, BallPatch, BallState, ShellExitAction, ShellExitSource, SurfaceState } from './contract.ts'
 
 export * from './contract.ts'
 
@@ -58,6 +60,22 @@ declare module '@snap-rail/cordis' {
      * @param state - the ball state after the change.
      */
     'shell/ball-changed'(state: BallState): void
+    /** The ball window parked at, left, tucked into, or slid out of an edge.
+     * @param state - the dock state after the change.
+     */
+    'shell/ball-dock-changed'(state: BallDockState): void
+    /**
+     * An exit was requested and held (`hold` in the exit policy): nothing has
+     * happened yet. A host-face plugin may present a window so its renderer
+     * can ask the operator, then answer through {@link ShellWindowCapability.resolve}.
+     * @param request - where the request came from.
+     */
+    'shell/exit-requested'(request: ShellExitRequest): void
+    /** A held exit request was answered (or timed out as `quit`).
+     * @param request - the request being answered.
+     * @param action - the applied resolution (`cancel` applied nothing).
+     */
+    'shell/exit-resolved'(request: ShellExitRequest, action: ShellExitAction): void
   }
 }
 
@@ -186,6 +204,52 @@ export interface ShellBallCapability {
   setState(caller: Context, patch: BallPatch): BallState
 }
 
+/**
+ * What closing the operator window or quitting from the tray does. The
+ * dispositions are data, declared by a host-face plugin; the Shell owns the
+ * mechanism (intercepting the close, parking the window, ending the app) and
+ * never paints a prompt — a confirmation is the declaring plugin's own UI,
+ * which is why `'hold'` exists: the Shell freezes the request and hands the
+ * decision back (`shell/exit-requested` → `resolve`), applying `quit` itself
+ * if no one answers within {@link SHELL_LIMITS.exitHoldMs}.
+ */
+export const EXIT_DECISIONS = ['ball', 'tray', 'quit', 'hold'] as const
+
+/** One exit policy decision: act immediately, or hold for the declaring plugin. */
+export type ShellExitDecision = (typeof EXIT_DECISIONS)[number]
+
+/** The decisions that act at once (`hold` defers instead). */
+export type ShellExitDisposition = Exclude<ShellExitDecision, 'hold'>
+
+/** The operator window's and the tray's exit behavior, as a plugin declares it. */
+export interface ShellExitPolicy {
+  /** The operator window's close (X, Alt+F4, taskbar close, `window.control`). */
+  close: ShellExitDecision
+  /** The tray menu's 退出 row. */
+  quit: ShellExitDecision
+}
+
+/** A held exit request, as the events carry it. */
+export interface ShellExitRequest {
+  /** What raised the request. */
+  source: ShellExitSource
+}
+
+/**
+ * The operator window's exit policy: what closing it and quitting from the
+ * tray do. The last live declaration wins; a declaring fiber's disposal
+ * reverts its fields to the defaults (`quit`/`quit` — today's behavior), so a
+ * disabled scenario can never leave a surprise behind.
+ */
+export interface ShellWindowCapability {
+  /** Declare (part of) the policy; omitted fields keep the default. */
+  setExitPolicy(caller: Context, policy: Partial<ShellExitPolicy>): ShellResult
+  /** The policy in force right now. */
+  exitPolicy(): Readonly<ShellExitPolicy>
+  /** Answer a held exit request; `cancel` keeps everything as it was. */
+  resolve(caller: Context, action: ShellExitAction): ShellResult
+}
+
 /** The OS integration service exposed on `ctx.shell`. */
 export interface ShellService {
   /** Whether an OS integration is mounted at all (headless boots answer `false`). */
@@ -198,4 +262,6 @@ export interface ShellService {
   readonly surface: ShellSurfaceCapability
   /** The host-aggregated ball state. */
   readonly ball: ShellBallCapability
+  /** The operator window's exit policy. */
+  readonly window: ShellWindowCapability
 }
