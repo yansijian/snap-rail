@@ -33,6 +33,10 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
 - 启用做**正向校验**：缺依赖或版本不合 → 拒绝启用；
 - 禁用/卸载做**反向校验**：还有依赖方 → 拒绝；
 - 语义版本单源 `@snap-rail/util/semver`。
+- **`requires` 只放可安装插件包 / `service:`**。npm 类型包（SDK 的 `/api`
+  门面、`@snap-rail/protocol`）不是插件，放 `dependencies` /
+  `devDependencies`；`@snap-rail/gateway` / `connection` / `settings` 是
+  SDK 依赖/base 运行时，永远不进 `requires`。
 - 错误永远不会留到下次开机才爆——这是设计目标，不要想办法绕过预检。
 
 ## 渲染面 `client` 块
@@ -60,8 +64,11 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
   类型拒——升 plugin-sdk `0.2.4+`。
 - `seeds`：本包贡献给别人的共享组件子路径（每个键成为 `<包名>/<键>` 种子
   id，跨插件共享同一实例）。
-- `externalSeeds`：本包渲染面要 require 的**别人的**种子 id。它只是构建期
-  外部化清单，**不是**兼容声明——版本兼容永远走 `requires`。
+- `externalSeeds`：只列**贡献种子**（框架或其他插件的 `<包>/<子路径>`）。
+  base 种子（connection / protocol / util / shell-contract /
+  equipment-contract / react / zod）由 shell 自动播种，**不能写**——写了
+  启用预检会报“提供方未安装”。它同时是构建期外部化清单和启用期提供方
+  检查清单，**不是**兼容声明——版本兼容永远走 `requires`。
 - `seedAbi`：pack 自动盖章（构建时真实 require 到的种子 + 版本 + ABI 修订
   号），安装期与渲染端 boot 双向比对，不符则拒装/skip + fail-loud。
 

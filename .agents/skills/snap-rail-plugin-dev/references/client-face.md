@@ -1,15 +1,23 @@
 # 渲染面：种子纪律、框架原语、多窗口与退出策略
 
 渲染面跑在浏览器/Electron renderer 里，构建产物是 **CJS 工厂包**（焊进
-`__ModuleLoader__` 执行）。入口导出 `definePlugin({ name, inject, apply })`
-（ui-extension 例外：导出 `{ seeds }`）。
+`__ModuleLoader__` 执行）。入口导出 `{ name, inject, apply } satisfies Plugin`
+（`Plugin` 从 `@snap-rail/cordis` type-only 导入；ui-extension 例外：导出
+`{ seeds }`）。
 
 ## 种子纪律（最先搞懂，崩都崩在这）
 
-- 渲染面运行时能 `require` 的外部模块 = **种子表**：base 契约种子 ∪ 框架
-  贡献种子（框架的面经 `client.seeds` 贡献：
+- 渲染面运行时能 `require` 的外部模块 = **种子表**：base 种子 ∪ 框架贡献
+  种子（框架的面经 `client.seeds` 贡献：
   `ui/slots/semantic/settings-pages/session/variables/workflows/runtime/
-  fallback`）∪ 消费方 manifest `client.externalSeeds` 声明的 id。
+  fallback`）∪ 消费方 manifest `client.externalSeeds` 声明的贡献 id。
+- **base 种子由 shell 自动播种，不能写 `externalSeeds`**：connection、
+  protocol、util、shell/contract、equipment/contract、react、zod 等。写了
+  启用预检会报“提供方未安装”（base 包不在插件池里）。
+- **只有贡献种子才写 `externalSeeds`**：框架子路径、其他插件的
+  `<包>/<子路径>`。UI 模板默认声明 `<framework>/slots`、`/semantic`、`/ui`；
+  多 import 了一条（如 `/session`）就自己补。只 type-only 导入的贡献种子
+  不产生运行时 require，不用写。
 - **import 语句写法**：只准 named/star——
   ```ts
   import { Card, CardContent } from '@snap-rail/framework-shadcn/ui'   // ✓
@@ -18,10 +26,6 @@
   ```
   原因：default 导入经 rolldown 的 CJS node-mode interop 会把 `.default`
   变成整个命名空间对象而非模块自身的 default，运行时挂载即崩。
-- **每个 import 到的外部种子 id 必须出现在 manifest
-  `client.externalSeeds`**，否则启用预检拒装。UI 模板默认声明
-  `<framework>/slots`、`<framework>/semantic`、`<framework>/ui`；多 import
-  了一条（如 `/session`）就自己补。
 - **跨插件值导入禁止**：种子共享单实例，协作走 cordis 服务与帧。
 - node 侧实现（store-sqlite、drizzle、node:sqlite）**永不进 client
   bundle**；跨端消费类型/schema 走包的 `./contract` 纯面。
@@ -33,12 +37,30 @@ Button / Card / Dialog / Table / Tabs / Collapsible / SchemaForm…
 缺原语时**不要在页面里手写交互组件**——要么改用现有原语组合，要么等框架
 包补（那不是你能做的决定）。
 
-横切物不手搓：重渲染 tick 用 `useRefresh(ctx, events)`；错误文案用
-`rpcErrorText`；时间用 `formatClock` / `formatDuration`；色值一律 theme
-令牌（明暗由 `html[data-mode]` 切换，禁止硬编码色值和 `dark:` 变体；图表
-系列只用 `--chart-1…6`，红/黄/绿是状态语义不进数据系列）；schema 驱动的
-配置表单用 `SchemaForm`。这些横切助手来自框架包（`/ui`、`/runtime`），以
-包内 d.ts 为准。
+横切物不手搓，按来源取：
+
+| 助手 | import |
+| --- | --- |
+| `useRefresh(ctx, events)` / `SchemaForm` / 框架组件 | `@snap-rail/framework-shadcn/ui` |
+| `rpcErrorText` / `subscribeFrame` / `HostLink` | `@snap-rail/plugin-sdk/api/client` |
+| `formatClock` / `formatDuration` | `@snap-rail/util` |
+
+色值一律 theme 令牌（明暗由 `html[data-mode]` 切换，禁止硬编码色值和
+`dark:` 变体；图表系列只用 `--chart-1…6`，红/黄/绿是状态语义不进数据系列）。
+
+## link 与帧
+
+- `ctx.client` 由框架 runtime 提供（`{ link, surface }`）；
+  `inject: ['client']`。
+- 类型增强：`import type {} from '@snap-rail/framework-shadcn/runtime'`——只为
+  把 `ctx.client` 的 `Context` 增强带进程序，不产生运行时代码，不写
+  `externalSeeds`。
+- 订阅：`import { subscribeFrame, rpcErrorText } from
+  '@snap-rail/plugin-sdk/api/client'`；
+  `ctx.effect(() => subscribeFrame(ctx.client.link, '域/事件', schema, cb))`。
+- `HostLink` 类型也从 SDK `/api/client` 取；`ctx.client.link.call` 返回
+  `RpcResult`，`ok: false` 时用 `rpcErrorText(result.error)` 出文案。
+- 完整双面骨架见 [faces-and-wire.md](faces-and-wire.md)。
 
 触屏基线：数值输入 `NumberInput`（数字键盘）、单选 `TouchSelect`（模态列
 表）、滚动容器 `DragScroll`（按住拖动）。
@@ -142,7 +164,8 @@ clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),  /
 | `shell.ball.state` / `shell.ball.dock` | 读宿主聚合的球内容态 / 窗口贴边态（帧：`shell/ball-changed`、`shell/ball-dock-changed`）。 |
 | `shell.exit.resolve` | 应答挂起的退出请求（见下）。 |
 
-帧消费一律 `subscribeFrame`，禁止手写判形。
+帧消费一律 `subscribeFrame(ctx.client.link, …)`（从
+`@snap-rail/plugin-sdk/api/client` 导入），禁止手写判形。
 
 ## 退出策略（套件的渲染面 + 宿主面配合）
 

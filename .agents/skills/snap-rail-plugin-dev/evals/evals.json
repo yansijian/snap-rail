@@ -1,6 +1,6 @@
 {
   "skill_name": "snap-rail-plugin-dev",
-  "note": "轻量实测记录（2026-10-24，plugin-sdk 0.2.3 / plugin-kit 0.2.1 / equipment 0.1.4 锚点）。完整产物在评测 TEMP（未入库）。",
+  "note": "轻量实测记录（2026-10-24）。eval 1 锚点：plugin-sdk 0.2.3 / plugin-kit 0.2.1 / equipment 0.1.4；eval 2/3 锚点：plugin-sdk 0.2.5 / plugin-kit 0.2.2 / equipment 0.1.5 / gateway 0.1.1 / connection 0.1.0 / settings 0.1.0。完整产物在评测 TEMP（未入库）。",
   "evals": [
     {
       "id": 1,
@@ -30,6 +30,40 @@
         "改名四处清单补全（含 tests/manifest.spec.ts；注明哪些模板的 tsdown 才有包名字符串）",
         "排错表补 pnpm≥10 构建脚本审批、镜像解析旧版本、弱网 lockfile 挂死、host.js 体积超标、脏 chunk、schema 拒新字段"
       ]
+    },
+    {
+      "id": 2,
+      "name": "suite-wire-and-frame",
+      "prompt": "做一个 snap-rail 双面套件：宿主面暴露 demo.ping 方法，调用时广播 demo/pinged 帧；渲染面订阅该帧并把时间显示在页面上。用独立插件仓，最后 build + doctor 通过。",
+      "expected_output": "suite 模板；contract.ts 用 defineContract 单源声明；宿主 ctx.rpc claimDomain/serveContract；渲染 ctx.client.link + subscribeFrame；类型从 SDK /api 门面取；package.json 不直接依赖 gateway/connection/settings；externalSeeds 只含框架贡献种子；build/doctor 绿",
+      "files": [],
+      "assertions": [
+        { "text": "宿主 import type GatewayService from '@snap-rail/plugin-sdk/api'，inject 含 rpc", "passed": false },
+        { "text": "宿主 claimDomain('demo') + serveContract(...)，帧由 contract 注册", "passed": false },
+        { "text": "渲染 import { subscribeFrame } from '@snap-rail/plugin-sdk/api/client'，用 ctx.client.link 且包在 ctx.effect 里", "passed": false },
+        { "text": "渲染用 import type {} from '@snap-rail/framework-shadcn/runtime' 引入 ctx.client 增强", "passed": false },
+        { "text": "package.json 不含 gateway/connection/settings 直接依赖；protocol 在 dependencies（宿主 value 用）", "passed": false },
+        { "text": "externalSeeds 只含 framework 贡献种子，不含 connection/protocol/shell/contract 等 base 种子", "passed": false },
+        { "text": "pnpm run build 产出 lib-host/host.js 与 lib-client/client.js；host.js 无 plugin-sdk；client bundle 无 node 内置", "passed": false },
+        { "text": "pnpm run doctor 全绿", "passed": false },
+        { "text": "transcript 未读取 node_modules/@snap-rail/framework-shadcn/lib 或 apps/desktop 反推 API", "passed": false }
+      ],
+      "result": "待发布 plugin-sdk 0.2.5 后实跑",
+      "findings_applied": []
+    },
+    {
+      "id": 3,
+      "name": "seed-tier-boundary",
+      "prompt": "我的渲染面 import 了 @snap-rail/plugin-sdk/api/client、@snap-rail/util 和 @snap-rail/framework-shadcn/ui。manifest 的 client.externalSeeds 应该写哪些？为什么？",
+      "expected_output": "只写 @snap-rail/framework-shadcn/ui；connection/protocol/util 是 base 种子，由 shell 自动播种，写了会被启用预检拒绝",
+      "files": [],
+      "assertions": [
+        { "text": "externalSeeds 只包含 @snap-rail/framework-shadcn/ui（或按实际 import 的框架子路径）", "passed": false },
+        { "text": "明确不写 @snap-rail/connection / @snap-rail/util / @snap-rail/protocol 等 base 种子", "passed": false },
+        { "text": "解释 base 种子自动播种、贡献种子才写 externalSeeds；写 base 种子会报“提供方未安装”", "passed": false }
+      ],
+      "result": "待实跑",
+      "findings_applied": []
     }
   ]
 }

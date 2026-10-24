@@ -21,8 +21,13 @@ warning = 建议（放行但要逐条确认）。
 | --- | --- | --- |
 | 「种子默认导入」构建硬错 | `import x from '@snap-rail/framework-shadcn/ui'` 这类 default 导入 | 改 `import { … } from` 或 `import * as`——CJS interop 下 default 导入运行时即崩，护栏故意硬错 |
 | pack 报 missing its host face | 先 build 后 pack 的顺序反了，或 `main` 与产物不一致 | `pnpm run build`；确认 `main` = `lib-host/host.js`（模板默认） |
-| 渲染面构建后无法 require 框架组件 | import 到的种子没进 manifest `externalSeeds` | 每个框架子路径（`/slots` `/semantic` `/ui`…）都要在 `client.externalSeeds` 里声明 |
+| 渲染面构建后无法 require 框架组件 | import 到的**框架/其他插件贡献**种子没进 manifest `externalSeeds` | 每个贡献子路径（`/slots` `/semantic` `/ui`…）都要在 `client.externalSeeds` 里声明；base 种子（connection/protocol/util/shell-contract）不写 |
 | `clientBundle` 打进 node 侧代码报错 | client bundle 里 import 了宿主入口 / node-only 模块 | 跨端消费类型/schema 走 `./contract` 纯面；宿主实现永不进渲染图 |
+| `Cannot find module '@snap-rail/plugin-sdk/api'` | SDK 低于 0.2.5，没有作者 API 门面 | 升级 `@snap-rail/plugin-sdk` 到 `^0.2.5`；宿主类型从 `/api`、渲染 link/帧从 `/api/client` 取 |
+| `Property 'rpc' does not exist on type 'Context'` | 没引入 gateway 类型增强 | `import type { GatewayService } from '@snap-rail/plugin-sdk/api'`；不要直接 import gateway |
+| `Property 'client' does not exist on type 'Context'` | 没引入框架 runtime 的 `Context` 增强 | `import type {} from '@snap-rail/framework-shadcn/runtime'`（type-only，不产生运行时代码） |
+| `Cannot find module '@snap-rail/connection'` | 绕过 SDK 直接 import 了未单列的包 | 改用 `@snap-rail/plugin-sdk/api/client`；确实要直接用时才加 devDependency |
+| `Cannot find module '@snap-rail/client-kernel'`（框架 d.ts 里） | 框架 d.ts 引用了未发布的内部包 | `skipLibCheck` 会跳过；不要直接 import kernel，需要 `ClientHandle` 从框架 runtime 的 re-export 取 |
 
 ## init / 安装依赖
 
@@ -42,6 +47,7 @@ warning = 建议（放行但要逐条确认）。
 | 症状 | 原因 | 修法 |
 | --- | --- | --- |
 | host.js 上百 kB | 契约包在 devDependencies 被内联，或入口 value 导入了 plugin-sdk（definePlugin） | 契约包挪进 dependencies；入口改 `satisfies Plugin` + type-only 导入（见 host-face.md 构建纪律） |
+| client bundle 体积异常 / 含 node 内置 | 渲染面 value import 了 settings/gateway，或入口 value import plugin-sdk | 宿主包只 type-only；入口用 `satisfies Plugin`；宿主 link/帧走 SDK `/api/client` |
 | zip 里混进已删代码的旧 chunk | hostBundle 不清产物目录、pack 整目录收编 | 重发布前清空 `lib-host/`、`lib-client/`、`dist/` 再 build/pack |
 | manifest 类型/schema 拒绝 `client.surfaces` / `probe` 等字段 | 两个来源：安装版确实旧（plugin-kit <0.2.2 / equipment <0.1.5），或 `plugin-sdk@0.2.3` 的内联类型按旧 schema 生成 | 升级 `@snap-rail/plugin-sdk` 到 0.2.4+、`@snap-rail/equipment` 到 0.1.5+；仍被拒就查镜像是否给了旧版（见上「装到的版本比官方 npm 旧」），并以安装的 d.ts 为准先不写该字段 |
 
@@ -50,6 +56,7 @@ warning = 建议（放行但要逐条确认）。
 | 症状 | 原因 | 修法 |
 | --- | --- | --- |
 | 安装预检列 `missing` | requires 的包没装/没启用 | 先装依赖包（如设备底座、框架），再启用本包 |
+| 启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方未安装）` | 把 base 种子写进了 `client.externalSeeds` | 删掉该条；base 种子由 shell 自动播种，不进 externalSeeds |
 | 启用被拒：版本不合 | `name@range` 与已装版本冲突 | 放宽 range 或升级依赖包 |
 | 卸载/禁用被拒 | 还有别的包依赖它 | 先停用依赖方 |
 | 管理页找不到我的包 | clientOnly 行不在宿主树 | 正常：纯渲染包经渲染端下发行展示；检查 `client-config.list` |

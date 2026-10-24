@@ -1,8 +1,9 @@
 # 宿主面：cordis 纪律与各缝的写法
 
 宿主面跑在终端的 node 进程里（ESM）。入口导出
-`definePlugin({ name, inject, apply })`；`apply(ctx)` 里完成一切注册。
-类型以 `@snap-rail/cordis` 与各契约包的 d.ts 为准。
+`{ name, inject, apply } satisfies Plugin`（`Plugin` 从 `@snap-rail/cordis`
+type-only 导入）；`apply(ctx)` 里完成一切注册。
+类型以 `@snap-rail/cordis`、`@snap-rail/plugin-sdk/api` 与各契约包的 d.ts 为准。
 
 ## cordis 纪律（所有模板通用）
 
@@ -34,6 +35,7 @@
 ```ts
 import { z } from 'zod'
 import type { DriverRegistration } from '@snap-rail/equipment/driver'
+import type { Plugin } from '@snap-rail/cordis'
 
 const driver: DriverRegistration = {
   id: 'my-driver',
@@ -68,6 +70,12 @@ const driver: DriverRegistration = {
     }
   },
 }
+
+export default {
+  name: 'my-driver',
+  inject: ['equipment'],
+  apply(ctx) { ctx.equipment.registerDriver(ctx, driver) },
+} satisfies Plugin
 ```
 
 硬规则：
@@ -129,6 +137,23 @@ import { sqliteTable, text, integer } from 'drizzle-orm'  // 表定义随你的�
 行（那要重启）、也不要建表：键 `域.名` 经 settings 服务的 get/set 存取，
 写后 `settings/changed` 帧广播，消费方当场热应用；值结构由消费方 zod 校验。
 
+```ts
+import type { Plugin } from '@snap-rail/cordis'
+import type { SettingsService } from '@snap-rail/plugin-sdk/api'
+
+export default {
+  name: '@my-scope/my-service',
+  inject: ['settings'],
+  apply(ctx) {
+    const settings: SettingsService = ctx.settings
+    settings.set('my-domain.threshold', 42)
+  },
+} satisfies Plugin
+```
+
+settings 是 base 内置服务：类型从 SDK `/api` 转出，不要把
+`@snap-rail/settings` 写进 `requires` 或单独安装。
+
 ## wire 方法与帧（host-service / suite 的宿主面）
 
 - 用 `@snap-rail/protocol` 的 `defineContract` **单源声明**：一处写清方法
@@ -136,11 +161,37 @@ import { sqliteTable, text, integer } from 'drizzle-orm'  // 表定义随你的�
   `RpcMethodMap`/`FrameMap` 收敛类型。方法名 `域.资源.动词`、帧名
   `域/事件`，全 kebab-case。**不改 protocol 任何文件**——协议只有信封是
   封闭的，方法/帧行住在各域自己的 `./contract` 模块。
+- 挂载用 `ctx.rpc`：类型从 `@snap-rail/plugin-sdk/api` 转出，
+  `inject: ['rpc']`；`claimDomain` 先占域，`serveContract` 一次注册全部方法
+  和帧：
+
+```ts
+import type { Plugin } from '@snap-rail/cordis'
+import type { GatewayService } from '@snap-rail/plugin-sdk/api'
+import { demoContract } from './contract.ts'
+
+export default {
+  name: '@my-scope/my-service',
+  inject: ['rpc'],
+  apply(ctx) {
+    const rpc: GatewayService = ctx.rpc
+    rpc.claimDomain(ctx, 'demo')
+    rpc.serveContract(ctx, demoContract, {
+      'demo.ping': () => ({ pong: Date.now() }),
+    })
+    // 广播：rpc.broadcast('demo/pinged', { at: Date.now() })
+    // 或 rpc.bridgeEvent(ctx, 'point/updated', 'demo/point-updated', …)
+  },
+} satisfies Plugin
+```
+
+- gateway 是 base 内置服务：不要写进 `requires`、不要单独安装、不要 value
+  import；类型统一从 SDK `/api` 取。
 - 业务失败 `throw RpcBusinessError`，别返回裸错误对象。
-- 渲染端消费帧一律 `subscribeFrame(link, '域/事件', schema, cb)`——禁止
-  `payload as` 手写判形。
-- 声明完以安装的 SDK 类型为准核对挂载 API；配方测试：schema 拒坏载荷、
-  disposer 随插件卸载。
+- 渲染端消费帧：`subscribeFrame(ctx.client.link, '域/事件', schema, cb)`，
+  从 `@snap-rail/plugin-sdk/api/client` 导入；`ctx.client` 由框架 runtime
+  提供。完整双面骨架见 [faces-and-wire.md](faces-and-wire.md)。
+- 配方测试：schema 拒坏载荷、disposer 随插件卸载。
 
 ## `ctx.shell`（宿主面，OS 集成缝）
 

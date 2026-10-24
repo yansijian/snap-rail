@@ -24,6 +24,10 @@ UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`；`--framework
 生效。绑定同时决定 manifest `requires` 条目、devDependency、bundle 外部化
 种子——三处由模板保证一致，不会互相矛盾。
 
+要写宿主 RPC 或渲染帧时不需要新增依赖：宿主类型从
+`@snap-rail/plugin-sdk/api`、渲染 link/帧从 `/api/client` 导入；完整骨架见
+[faces-and-wire.md](faces-and-wire.md)。
+
 ## tsdown 配置形态（生成后一般不用动）
 
 ```ts
@@ -64,7 +68,7 @@ export default [
 import '@snap-rail/equipment'
 import { z } from 'zod'
 import type { DriverRegistration } from '@snap-rail/equipment/driver'
-import { definePlugin } from '@snap-rail/plugin-sdk'
+import type { Plugin } from '@snap-rail/cordis'
 
 const driver: DriverRegistration = {
   id: 'my-driver',
@@ -73,11 +77,11 @@ const driver: DriverRegistration = {
   createConnection: () => ({ update() {}, dispose() {} }),
 }
 
-export default definePlugin({
+export default {
   name: 'my-driver',
   inject: ['equipment'],
   apply(ctx) { ctx.equipment.registerDriver(ctx, driver) },
-})
+} satisfies Plugin
 ```
 
 细节全部在 [host-face.md](host-face.md) 的「驱动」一节——schema 怎么写才有
@@ -93,20 +97,25 @@ export default definePlugin({
 
 骨架是空 `apply()`。宿主服务 = `ctx.provide('<服务名>', 实现)` +
 `inject: ['<依赖服务>']`；wire 方法/帧用 `@snap-rail/protocol` 的
-`defineContract` 单源声明。工具与宿主服务同层（tool），**工具互不依赖**
-（门禁强制）；跨包场景逻辑请做 suite，不要拆成工具。
+`defineContract` 单源声明，挂载用 `ctx.rpc`（类型从
+`@snap-rail/plugin-sdk/api` 导入，`inject: ['rpc']`）。工具与宿主服务同层
+（tool），**工具互不依赖**（门禁强制）；跨包场景逻辑请做 suite，不要拆成
+工具。
 
 ### suite（双面、单活）
 
 - 宿主面 `src/index.ts`：场景私有宿主逻辑——服务、store 命名空间、wire
-  方法/帧、聚合帧推送。渲染面通过协作服务与宿主面通信，**永不 import 宿主
-  代码**。
+  方法/帧、聚合帧推送。`ctx.rpc.claimDomain/serveContract` 挂载；类型从
+  `@snap-rail/plugin-sdk/api` 导入。渲染面通过 wire 与宿主面通信，**永不
+  import 宿主代码**。
 - 渲染面 `src/client.tsx`：`ctx.uiContract.registerView/registerLayout`
-  挂进框架槽位；只组合框架原语。
+  挂进框架槽位；`ctx.client.link` + `subscribeFrame`（SDK `/api/client`）
+  消费宿主帧；只组合框架原语。
 - 场景契约（跨面类型/帧载荷）住套件包自己的 `./<子路径>` 导出（如首方
   `terminal-ops` 的 `./stats`），别外置。
 - 要悬浮球就加 `surfaces.ball` + 对应 `clientBundle`；要用通知/托盘/退出
   策略就 `requires: ['service:shell']`。
+- 双面最小通道完整代码见 [faces-and-wire.md](faces-and-wire.md)。
 
 ### ui-view
 
@@ -114,9 +123,9 @@ export default definePlugin({
 import '@snap-rail/framework-shadcn/semantic'
 import { UI_SLOT_IDS } from '@snap-rail/framework-shadcn/slots'
 import { Card, CardContent, CardHeader, CardTitle } from '@snap-rail/framework-shadcn/ui'
-import { definePlugin } from '@snap-rail/plugin-sdk'
+import type { Plugin } from '@snap-rail/cordis'
 
-export default definePlugin({
+export default {
   name: '@my-scope/my-ui',
   inject: ['uiContract'],
   apply(ctx) {
@@ -128,7 +137,7 @@ export default definePlugin({
       render: () => (/* 只组合框架原语 */),
     })
   },
-})
+} satisfies Plugin
 ```
 
 ### ui-layout
@@ -148,7 +157,7 @@ render })` 接管槽位编排。叠层对话框（如退出确认）也走 layou
 - `init` 默认 `@local/<目录名>`：只用于本地试验；发布前改成自己的 npm
   scope。**要同步改的四处**（漏一处 doctor/测试就红）：
   1. `package.json` 的 `name`；
-  2. 入口对象里的 `name`（`definePlugin`/`satisfies` 的那一份）；
+  2. 入口对象里的 `name`（`satisfies Plugin` 的那一份）；
   3. `tests/manifest.spec.ts` 断言里的包名（init 时硬编码）；
   4. `tsdown.config.ts` 里的包名字符串——**仅 ui-view / ui-layout /
      ui-extension / suite 模板有**（clientBundle 第一参）；driver 等宿主
