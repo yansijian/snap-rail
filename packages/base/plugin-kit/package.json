@@ -57,6 +57,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/shell": "workspace:^",
     "@snap-rail/util": "workspace:^",
     "fflate": "^0.8.3",
     "zod": "^4.4.3"

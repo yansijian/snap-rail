@@ -31,6 +31,8 @@ export interface SnapRailManifest {
    * `service:` live-service id.
    */
   requires?: readonly string[]
+  /** The author's declared relationship to the skin contract. */
+  uiProfile?: string
   /** True when the package has no host face (renderer-only). */
   clientOnly?: boolean
   /** The renderer face: the client bundle path inside the package. */
@@ -80,6 +82,8 @@ export interface PluginDescriptor {
   exclusive?: string
   /** The manifest's `snapRail.requires`, when declared. */
   requires?: readonly string[]
+  /** The manifest's `snapRail.uiProfile`, when declared. */
+  uiProfile?: string
   /** The manifest's `snapRail.clientOnly`, when declared. */
   clientOnly?: boolean
   /** The renderer bundle path (`snapRail.client.entry`), when declared. */
@@ -199,6 +203,8 @@ export function scanPluginPool(dirs: readonly string[]): Map<string, PluginDescr
       if (exclusive !== undefined) descriptor.exclusive = exclusive
       const requires = stringArrayOrUndefined(snapRail?.requires)
       if (requires !== undefined) descriptor.requires = requires
+      const uiProfile = stringOrUndefined(snapRail?.uiProfile)
+      if (uiProfile !== undefined) descriptor.uiProfile = uiProfile
       if (snapRail?.clientOnly === true) descriptor.clientOnly = true
       const clientEntry = stringOrUndefined(snapRail?.client?.entry)
       if (clientEntry !== undefined) descriptor.clientEntry = clientEntry

@@ -22,6 +22,8 @@
  * @module @snap-rail/desktop/client-renderer-boot
  */
 
+import '@snap-rail/ui/styles/base.css'
+import '@snap-rail/ui/styles/default.css'
 import * as React from 'react'
 import * as ReactDom from 'react-dom'
 import * as ReactDomClient from 'react-dom/client'
@@ -34,6 +36,7 @@ import {
   type ClientHandle,
 } from '@snap-rail/client-kernel'
 import { installModuleLoader, loadPluginBundle, type ModuleSystem } from '@snap-rail/client-modules'
+import { EquipmentPage } from '@snap-rail/equipment-station/page'
 import * as clientKernel from '@snap-rail/client-kernel'
 import * as connection from '@snap-rail/connection'
 import * as protocol from '@snap-rail/protocol'
@@ -42,6 +45,17 @@ import * as appBootContract from '@snap-rail/app-boot/contract'
 import * as equipmentContract from '@snap-rail/equipment/contract'
 import * as shellContract from '@snap-rail/shell/contract'
 import * as snapRailUtil from '@snap-rail/util'
+import * as ui from '@snap-rail/ui'
+import * as uiCharts from '@snap-rail/ui/charts'
+import * as uiComponents from '@snap-rail/ui/components'
+import * as uiContract from '@snap-rail/ui/contract'
+import * as uiFallback from '@snap-rail/ui/fallback'
+import * as uiPages from '@snap-rail/ui/pages'
+import * as uiRuntime from '@snap-rail/ui/runtime'
+import * as uiSettings from '@snap-rail/ui/settings'
+import * as uiSkins from '@snap-rail/ui/skins'
+import * as uiSlots from '@snap-rail/ui/slots'
+import { createClientRuntime } from '@snap-rail/ui/runtime'
 import { checkSeedAbi, SEED_MODULES, type SeedAbi } from '@snap-rail/plugin-kit/seeds'
 import * as cordis from '@snap-rail/cordis'
 import * as zod from 'zod'
@@ -70,14 +84,6 @@ interface LoadedFace {
   seated: boolean
 }
 
-/** The runtime face every framework serves from its contributed seeds. */
-interface FrameworkRuntimeFace {
-  createClientRuntime(
-    clientHandle: ClientHandle,
-    options: { plugins: readonly (Plugin | { plugin: Plugin, config?: unknown })[], surface?: SurfaceId },
-  ): Promise<unknown>
-}
-
 /**
  * Seed the base shared-instance table. The table's ids must cover
  * {@link SEED_MODULES} exactly — a drift fails loud at boot, so the shell's
@@ -103,6 +109,16 @@ export async function seedBaseTable(system: ModuleSystem): Promise<void> {
     ['@snap-rail/station-rpc/contract', stationRpcContract],
     ['@snap-rail/app-boot/contract', appBootContract],
     ['@snap-rail/equipment/contract', equipmentContract],
+    ['@snap-rail/ui', ui],
+    ['@snap-rail/ui/components', uiComponents],
+    ['@snap-rail/ui/charts', uiCharts],
+    ['@snap-rail/ui/contract', uiContract],
+    ['@snap-rail/ui/slots', uiSlots],
+    ['@snap-rail/ui/skins', uiSkins],
+    ['@snap-rail/ui/settings', uiSettings],
+    ['@snap-rail/ui/runtime', uiRuntime],
+    ['@snap-rail/ui/pages', uiPages],
+    ['@snap-rail/ui/fallback', uiFallback],
     ['@snap-rail/util', snapRailUtil],
     ['zod', zod],
   ]
@@ -140,7 +156,7 @@ async function runSurfaceRenderer(options: {
   const { handle, system, rows, hostSeedAbi, surface } = options
   const enabled = rows.filter(row => row.enabled !== false)
   const rank = (row: Row): number =>
-    row.kind === 'framework' ? 0 : (row.seeds?.length ?? 0) > 0 ? 1 : 2
+    row.kind === 'skin' ? 0 : (row.seeds?.length ?? 0) > 0 ? 1 : 2
   const ordered = [...enabled].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
 
   const faces: LoadedFace[] = []
@@ -173,34 +189,35 @@ async function runSurfaceRenderer(options: {
     }
   }
 
-  const frameworkFace = faces.find(face => face.row.kind === 'framework')
-  if (frameworkFace === undefined || !system.has(`${frameworkFace.name}/runtime`)) {
-    if (frameworkFace !== undefined) {
-      console.error(`client: framework face "${frameworkFace.name}" contributes no runtime seed`)
-    }
-    if (surface === 'main') showBootstrap(handle)
-    else showSurfaceFallback(handle)
-    return
-  }
-  const runtime = system.require(`${frameworkFace.name}/runtime`) as FrameworkRuntimeFace
-
   const seats: Array<Plugin | { plugin: Plugin, config?: unknown }> = []
   for (const face of faces) {
     if (!face.seated || !isPlugin(face.value)) continue
     seats.push(face.row.config === undefined ? face.value : { plugin: face.value, config: face.row.config })
   }
   try {
-    await runtime.createClientRuntime(handle, {
+    await createClientRuntime(handle, {
       plugins: seats,
       ...surface !== 'main' ? { surface } : {},
+      ...surface === 'main'
+        ? {
+            builtinPages: [{
+              id: 'equipment',
+              title: '设备管理',
+              group: '设备',
+              order: 10,
+              keywords: ['PLC', '点位', '驱动'],
+              render: () => <EquipmentPage />,
+            }],
+          }
+        : {},
     })
   } catch (cause) {
     const detail = cause instanceof Error ? cause.message : String(cause)
-    console.error(`client: the framework runtime failed on ${surface}`, cause)
+    console.error(`client: the UI runtime failed on ${surface}`, cause)
     if (surface === 'main') {
       showBootstrapAfterFailure(
         handle,
-        `插件异常：界面框架启动失败\n${detail}\n\n`
+        `插件异常：界面基座启动失败\n${detail}\n\n`
         + '可在下方禁用或卸载出问题的插件后重启；插件管理、搜索与安装不受影响。',
       )
     } else {
@@ -221,6 +238,18 @@ export async function bootRenderer(options: RendererBootOptions): Promise<Client
   // global; the seed table hands them the same instances this bundle uses.
   const createSystem = installModuleLoader(globalThis as { __ModuleLoader__?: never })
   const handle = await bootClient({ element: options.element, surface: options.surface })
+
+  // Safe mode lives outside the plugin UI contract: the host restarts with
+  // `--safe-mode` (or a shortcut) and the renderer mounts the kernel recovery
+  // console, which can disable/uninstall any plugin before the next boot.
+  const safeMode = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).has('safe-mode')
+  if (safeMode) {
+    if (options.surface === 'main') showBootstrap(handle)
+    else showSurfaceFallback(handle)
+    return handle
+  }
+
   const system: ModuleSystem = createSystem()
   await seedBaseTable(system)
 

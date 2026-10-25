@@ -17,6 +17,9 @@
   "dependencies": {
     "@snap-rail/app-boot": "workspace:^",
     "@snap-rail/audit": "workspace:^",
+    "@snap-rail/equipment": "workspace:^",
+    "@snap-rail/equipment-station": "workspace:^",
+    "@snap-rail/store-sqlite": "workspace:^",
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-group": "workspace:^",
@@ -29,6 +32,7 @@
     "@snap-rail/settings": "workspace:^",
     "@snap-rail/shell": "workspace:^",
     "@snap-rail/station-rpc": "workspace:^",
+    "@snap-rail/ui": "workspace:^",
     "@snap-rail/store": "workspace:^",
     "@snap-rail/util": "workspace:^",
     "drizzle-orm": "^0.45.2",
@@ -52,8 +56,6 @@
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",
     "vite": "^8.2.2",
-    "vite-tsconfig-paths": "^5.1.4",
-    "@snap-rail/equipment": "workspace:^",
-    "@snap-rail/store-sqlite": "workspace:^"
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }

@@ -15,7 +15,7 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut } from 'electron'
 import carrierPlugin from './carrier.ts'
 import windowRpcPlugin, { currentMainWindow, trackMainWindow } from './window-rpc.ts'
 import updateRpcPlugin from './update-rpc.ts'
@@ -171,9 +171,28 @@ async function start(): Promise<void> {
   // Shell intercepts every ordinary close), and `quitting` guards re-entry.
   win.once('closed', () => quitApplication())
 
+  // Host-level recovery remains available even when the renderer is bricked:
+// restart into safe mode, which skips every pool plugin and shows the
+// kernel's plugin console. Register before loading so a broken first paint
+// cannot take the shortcut down with it.
+  globalShortcut.register('CommandOrControl+Shift+F12', () => {
+    app.relaunch({ args: [...process.argv.slice(1), '--safe-mode'] })
+    app.exit(0)
+  })
+  app.on('before-quit', () => globalShortcut.unregisterAll())
+
+  const safeMode = process.argv.includes('--safe-mode') || process.env.SNAP_RAIL_SAFE_MODE === '1'
   const url = devUrl()
-  if (url !== undefined) await win.loadURL(url)
-  else await win.loadFile(join(app.getAppPath(), 'dist/client/index.html'))
+  if (url !== undefined) {
+    const target = new URL(url)
+    if (safeMode) target.searchParams.set('safe-mode', '1')
+    await win.loadURL(target.toString())
+  } else {
+    await win.loadFile(
+      join(app.getAppPath(), 'dist/client/index.html'),
+      safeMode ? { query: { 'safe-mode': '1' } } : undefined,
+    )
+  }
 
   app.on('window-all-closed', () => quitApplication())
 }

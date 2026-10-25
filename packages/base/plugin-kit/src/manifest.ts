@@ -9,10 +9,11 @@
 
 import { z } from 'zod'
 import { AUX_SURFACE_IDS } from '@snap-rail/protocol'
+import { ballProfileSchema, windowProfileSchema } from '@snap-rail/shell/contract'
 import { PLUGIN_LAYERS } from '@snap-rail/util/manifest'
 
-/** Plugin package kinds. `suite` and `framework` packages are single-active. */
-export const PLUGIN_KINDS = ['suite', 'driver', 'framework', 'plugin'] as const
+/** Plugin package kinds. `suite` and `skin` packages are single-active. */
+export const PLUGIN_KINDS = ['suite', 'driver', 'skin', 'plugin'] as const
 
 /** The layer taxonomy — single source in `@snap-rail/util/manifest`. */
 export { PLUGIN_LAYERS }
@@ -84,11 +85,10 @@ export const clientFaceSchema = z.object({
  * - `name` — a package requirement (`@snap-rail/equipment`): satisfied when
  *   that package is installed and enabled.
  * - `name@range` — the same, with a version range on the resolved versions
- *   (`@snap-rail/framework-shadcn@^0.1`): also requires the installed
- *   version to satisfy the range (`@snap-rail/util/semver` semantics).
- *   A renderer face's ecosystem binding IS this form: requiring the
- *   framework package is what binds a component to it — there is no
- *   separate framework field.
+ *   (`@snap-rail/equipment@^0.1.5`): also requires the installed version to
+ *   satisfy the range (`@snap-rail/util/semver` semantics). Renderer plugins
+ *   declare `uiProfile` for the skin contract; `@snap-rail/ui` itself is a
+ *   base seed, not a requirement.
  * - `service:id` — a live cordis service (`service:store`), checked
  *   against the running service table.
  *
@@ -97,9 +97,12 @@ export const clientFaceSchema = z.object({
  */
 const requiresSchema = z.array(z.string().min(1)).optional()
 
+/** The UI profiles a renderer plugin may declare. */
+export const UI_PROFILES = ['native', 'integrated', 'custom'] as const
+
 /** The `snapRail` manifest field's schema. */
 export const snapRailManifestSchema = z.object({
-  /** Role declaration; `suite` and `framework` packages are single-active. */
+  /** Role declaration; `suite` and `skin` packages are single-active. */
   kind: z.enum(PLUGIN_KINDS).optional(),
   /** The layer this package belongs to; gates the import direction. */
   layer: z.enum(PLUGIN_LAYERS).optional(),
@@ -123,6 +126,18 @@ export const snapRailManifestSchema = z.object({
    * to `'suite'`, frameworks to `'framework'`.
    */
   exclusive: z.string().min(1).optional(),
+  /**
+   * The author's declared relationship to the skin contract. `native` uses
+   * the built-in kit and receives full skin coverage; `integrated` uses the
+   * kit for chrome plus a token bridge for third-party visualization;
+   * `custom` owns its visuals. This is metadata for the management badge and
+   * `doctor`, never a build/install gate.
+   */
+  uiProfile: z.enum(UI_PROFILES).optional(),
+  /** A layout/suite's preferred operator-window stage (boot hint). */
+  window: windowProfileSchema.optional(),
+  /** A layout/suite or ball-face package's preferred floating-ball stage. */
+  ball: ballProfileSchema.optional(),
   requires: requiresSchema,
   /**
    * True for packages with no host face at all (frameworks, renderer

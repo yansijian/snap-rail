@@ -24,14 +24,13 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）；尾接 v
                           #       pnpm exec electron-builder --win --dir --config electron-builder.offline.yml
 ```
 
-主仓对两个拆分仓（framework / driver-modbus）的构建期依赖以 **workspace
-链接** 提供：`external/` gitignored，由 `node scripts/setup-external.mjs`
-克隆（CI 用 `SNAP_RAIL_EXTERNAL_REF` 固定 ref；本地无 GitHub 访问时用
-`SNAP_RAIL_EXTERNAL_LOCAL=1` 从同级目录拷贝工作树）；公开构建因此不需要
-任何私有 registry。`external/` 缺失时 `pnpm install` 会解析不到这两个
-包——先跑 setup。feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到四个仓
-（再加 enip / suite），从源码构建并签名全部一方插件，不依赖拆分仓自己的
-Release 节奏。
+主仓对拆分驱动仓（driver-modbus）的构建期依赖以 **workspace 链接** 提供：
+`external/` gitignored，由 `node scripts/setup-external.mjs` 克隆（CI 用
+`SNAP_RAIL_EXTERNAL_REF` 固定 ref；本地无 GitHub 访问时用
+`SNAP_RAIL_EXTERNAL_LOCAL=1` 从同级目录拷贝工作树）。UI 基座、默认皮肤、
+设置页与设备管理页已内置，不再有 framework/suite 拆分仓依赖。
+feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
+从源码构建并签名一方插件，不依赖拆分仓自己的 Release 节奏。
 
 ## 分层模型（无脊柱名单）
 
@@ -43,27 +42,25 @@ Release 节奏。
 - **依赖方向**：只准 import 严格更低的层；两个例外——base 内部互相自由引用，
   以及任何包可以 import 更低或同层缝包（见下）。
 - **每层的缝**（Service Definition 属主，同层唯一可 import 的目标）：
-  `store → @snap-rail/store`、`equipment → @snap-rail/equipment`、
-  `ui → @snap-rail/framework-shadcn`。同层其余包互不依赖
-  （驱动不 import 驱动、工具不 import 工具、套件不 import 套件）。
-- **base 层 = 出厂全集**：打包只带 base；store/equipment/ui/tool/suite
-  的一切包都经 zip 安装进 `<home>/plugins/` 池。内置不可禁用——
-  `plugins.set-enabled/set-config/uninstall` 一律拒绝；保护按**来源**判定
-  （builtin 行，宿主从层文件计算，manifest 声明改变不了
-  它），并有两条结构闸：与内置行重名的 zip 拒绝安装；组合解析对内置
-  名字永不走池（手拷进池的同名目录也遮蔽不了）。替换 base 包的唯一路径
-  是拿源码重新构建。管理面**不显示内置行**（全部操作都被拒绝的行是噪音；
-  dev overlay 住户一并隐藏，开发经引导页/手编层文件）。dev（Vite）用
-  `apps/desktop/dev/builtins.dev.cordis.yml`
-  覆盖 base 行（永不随包发布）；可安装插件（框架/驱动/套件）dev 与生产
-  同路——经 `install-dev-plugins` 把 zip 装进 dev home 的插件池。
+  `store → @snap-rail/store`、`equipment → @snap-rail/equipment`。
+  **ui 层没有同层缝**：语义 UI 基座 `@snap-rail/ui` 是 base 内置包，
+  所有 layout/page/skin 经普通低层 import 使用它，彼此不依赖。
+- **出厂底座**：打包带 base 启动链 + 内置默认的 `store-sqlite`、`equipment`
+  与内置 `@snap-rail/ui`、默认皮肤、设置/插件管理页、设备管理页；
+  驱动/业务页/套件/额外皮肤仍经 zip 安装进 `<home>/plugins/` 池。
+  硬内置不可禁用；`default: true` 的内置默认可被同互斥组的池插件替换
+  （启用替代者时同批停用默认，替代者停用后自动恢复默认；无替代者时
+  拒绝停用默认）。保护按**来源**判定（层文件计算，manifest 改变不了），
+  与内置行重名的 zip 拒绝安装，组合解析对内置名字永不走池。
+  管理面只显示可操作的池行与只读「内置默认」行；硬内置不显示。
+  dev（Vite）用 `apps/desktop/dev/builtins.dev.cordis.yml` 覆盖底座，
+  可安装插件 dev 与生产同路。
 - **依赖预检（`snapRail.requires`，唯一兼容声明）**：三种条目——包名
-  （`@snap-rail/equipment`）、带版本范围的包名（`name@range`，如
-  `@snap-rail/framework-shadcn@^0.2`，语义单源
+  （`@snap-rail/equipment`）、带版本范围的包名（`name@range`，语义单源
   `@snap-rail/util/semver`）、服务名（`service:store`）；启用正向校验
   （缺/版本不合 → 拒绝）、禁用/卸载反向校验（有依赖方 → 拒绝）。
-  **框架绑定就是一条 requires 条目**——没有独立的 framework 字段；
-  错序安装不再变成下次开机失败。
+  `@snap-rail/ui` 是 base 种子，**不是 requires 条目**；UI 插件用
+  `snapRail.uiProfile` 声明皮肤覆盖关系（只做徽标，不做门禁）。
 - **分类与显示名（`snapRail.category` / `snapRail.title`）**：开放字符串、
   插件作者随意命名（中文可用）；管理页按标记原文动态分组——声明即归组、
   不问来源（dev overlay 住户也各归其标记），未声明落「其他」，无硬编码
@@ -80,36 +77,34 @@ Release 节奏。
 - **store 层**：`@snap-rail/store` 是规范包（`ctx.store.register(caller, ns,
   schema)`；**drizzle 查询构建器即规范**——只用查询构建器，无裸 SQL/CTE/窗口函数；
   命名空间 = 隔离边界；注册即建表 + append-only 加列）——纯类型零运行时，
-  随应用惰性发布（规范随应用、实现随插件）。实现包
-  `@snap-rail/store-sqlite`（zip 安装；node:sqlite，`data/<ns>.db`，WAL）
-  全局单活（`snapRail.exclusive: 'store-backend'`）；换后端 = 新实现包
-  替换单活，消费者零改动。
+  随应用惰性发布。实现包 `@snap-rail/store-sqlite`（node:sqlite，
+  `data/<ns>.db`，WAL）是**内置默认**：随应用发布、默认启用，可被同
+  `exclusive: 'store-backend'` 的池插件替换；替代者停用后自动恢复默认。
 - **equipment 层**：`@snap-rail/equipment` 即规范包（设备/组/点底座表
   `data/equipment.db`、`ctx.equipment.registerDriver` 契约、点运行时、reconcile 调度），
-  zip 安装、`requires: ['service:store']`；`./rpc` 桥以子路径行
+  **内置默认**、`requires: ['service:store']`；`./rpc` 桥以子路径行
   （`@snap-rail/equipment/rpc`）一并启用，`./contract` 是随应用发布的
   base 种子。驱动（modbus/…）是实例插件，**多活并存**，零渲染端代码、
   零自有存储，住独立仓（GitHub `yansijian`；新驱动照抄
-  `snap-rail-driver-modbus`，见 docs/split-runbook.md）。统一「设备管理」设置页在
-  `@snap-rail/equipment-station`（ui 层）。点位地址 = (device, group, name)
-  三元组；wire 名 `equipment.*`、帧 `equipment/*`。
-- **ui 层**：`@snap-rail/framework-shadcn` 是**框架插件**（独立仓
-  `snap-rail-framework-shadcn`，zip 安装、clientOnly、单活，`snapRail.exclusive: 'framework'`），接管全套 UI
-  栈——槽位词汇（`ctx.uiSlots`）、renderer runtime + Shell、shadcn 共享
-  原语 + 主题令牌（预编译 tailwind 输出随 zip 内联）、settings/session/
-  variables/workflows 服务、**设置外壳（对话框 occupant + 主题热应用 +
-  一方「插件/主题/软件更新」三页，原 `ui/settings-station` 包已退役并入
-  ——只装框架即得完整管理界面）**、fallback 布局；client 面把全部面贡献为共享
-  种子（`client.seeds`）。**没有框架面启用时，kernel 的朴素插件页**
-  （三合一输入：地址/拖拽/搜索 + 已安装列表 + 红色异常提示条）就是全部
-  界面。**生态断裂是已接受的决策**：Component 插件在 manifest 的
-  `requires` 里声明框架包（`'@snap-rail/framework-shadcn@^0.2'`，绑定即
-  依赖），框架不匹配装不上/启不了；换框架 = 换生态。Component 永不互相
-  import，只占槽。
+  `snap-rail-driver-modbus`，见 docs/split-runbook.md）。统一「设备管理」
+  设置页 `@snap-rail/equipment-station` 是**内置页面库**，由 desktop 在
+  runtime 启动时注册为 builtin settings page，不再是 clientOnly 插件行。
+  点位地址 = (device, group, name) 三元组；wire 名 `equipment.*`、帧 `equipment/*`。
+- **ui 层**：**没有同层缝、没有 framework 插件**。语义 UI 基座
+  `@snap-rail/ui` 是 base 内置包，分五层契约——语义组件（`/components`）、
+  类型化区域插槽（`/slots` + `/contract`）、皮肤 token（`/skins`）、内置
+  设置外壳与页面注册（`/settings`）、runtime（`/runtime`）。layout/page/
+  feature 通过 `ctx.ui`/`ctx.pages`/`ctx.settings` 组合；skin 通过
+  `ctx.skins` 提供 token + part CSS + 展示变体；默认钴蓝皮肤内置，额外
+  皮肤是 `kind: 'skin'`、`exclusive: 'skin'` 的可安装插件。页面默认组合
+  `@snap-rail/ui/components`，禁止裸 Tailwind；第三方图表允许包在
+  `Visualization`/`ChartFrame` 内。**没有 UI 插件时 kernel 引导页仍是
+  最后恢复面；宿主安全模式（CLI `--safe-mode` / `Ctrl+Shift+F12`）位于
+  UI 契约之外，custom 插件不能覆盖。**
 - **tool 层**：暂无规范缝，工具互不依赖（门禁强制）。暂无住户——场景私有
   逻辑收进套件（见 suite 层），不再拆跨包场景工具。
 - **suite 层**：单包单行、可双面（宿主面 + 渲染面）、单活（`snapRail.exclusive: 'suite'`
-  或 kind=suite 默认），住独立仓（如 `snap-rail-suite-terminal-ops`）。一个场景的全部界面**与场景私有宿主逻辑**合成一个
+  或 kind=suite 默认），住作者自己的独立仓。一个场景的全部界面**与场景私有宿主逻辑**合成一个
   套件包（班产计数住 `./stats`：store 缝持久化 + 订阅 equipment 点事件 +
   `production/stats-changed` 帧）——杜绝跨包场景耦合；启用套件经
   `plugins.set-enabled` 自动停用其他同互斥组成员。
@@ -124,10 +119,12 @@ Release 节奏。
   **池插件永不 import `electron`**——Electron 只出现在首方 provider
   `apps/desktop/src-host/main/shell/*`。可点回执（通知按钮、托盘项、退出
   请求）只准宿主面贡献：它活得比任何 renderer 都长；渲染面只有单向 toast、
-  窗口控制与挂起退出的应答。主窗口与球**互斥**、贴边收起（左右收 1/3、上下
-  只吸附、悬停滑出）都是底座不变式，插件只画两种形态。球的几何单源
-  `BALL_SURFACE`（128 窗/112 球/8px 余量）：**阴影必须画在余量内**
-  （径向渐变衰减到零；`box-shadow` 会被窗口边界切成灰边）。退出策略是宿主面
+  窗口控制与挂起退出的应答。主窗口与球**互斥**、贴边收起（默认左右收 1/3、
+  上下只吸附、悬停滑出）都是底座不变式；活动 layout/suite 可声明
+  `WindowProfile`/`BallProfile`（尺寸/模式/停泊行为，全部有界），宿主校验
+  夹取。球的几何单源 `resolveBallProfile`（默认 128 窗/112 球/8px 余量）：
+  **窗口必须方形、8px 余量固定、阴影必须画在余量内**（径向渐变衰减到零；
+  `box-shadow` 会被窗口边界切成灰边）。退出策略是宿主面
   的数据声明（`close/quit: 'ball'|'tray'|'quit'|'hold'`，最后声明且存活者
   生效，fiber 回收即回退默认 quit）；`'hold'` 把请求挂起交回插件——确认框
   **永远由插件的渲染面自己画**（底座不画任何 UI），经 `shell.exit.resolve`
@@ -142,12 +139,13 @@ Release 节奏。
   node 侧实现（store-sqlite/drizzle/node:sqlite）永不进 client bundle；跨端消费
   类型/schema 走该包 `./contract` 纯面（equipment 的 contract 是随应用
   发布的 base 种子；场景契约住在套件包内）。渲染面运行时 require 的模块 id 必须在
-  `CLIENT_EXTERNALS`（= base 种子 `SEED_MODULES` ∪ 框架贡献种子
+  `CLIENT_EXTERNALS`（= base 种子 `SEED_MODULES` ∪ 提供方贡献种子
   `CONTRIBUTED_SEED_MODULES` ∪ 消费方 manifest 声明的 `client.externalSeeds`；
   基础层单源三处一致：种子表 = 客户端入口
-  播种 = `clientBundle` external，客户端入口 boot 时 parity fail-loud，加
-  base id 是 base 层决策；框架的面经其 client 入口的 `seeds` 映射贡献，
-  壳 require 后统一播种——跨插件共享框架单实例）。**种子消费只准
+  播种 = `clientBundle` external，客户端入口 boot 时 parity fail-loud。
+  `@snap-rail/ui` 及其 components/contract/slots/skins/settings/runtime/pages
+  子路径是 base 种子；皮肤/扩展插件经其 client 入口的 `seeds` 映射贡献
+  额外组件。**种子消费只准
   named/star 导入**——default 导入经 rolldown 的 CJS node-mode interop
   会把 `.default` 变成整个命名空间对象而非模块自身的 default（类形种子
   挂载即崩），`clientBundle` 构建期护栏硬错；zip 由 pack 盖
@@ -157,7 +155,7 @@ Release 节奏。
   skip + fail-loud）双向校验；缺章的存量 zip 放行（过渡宽限）。
 - **可安装插件是构建产物**：发行 zip = 精简 manifest（`main` 指宿主面或
   （clientOnly 包）client 入口，`exports` 映射子路径，池内包单宿主入口）
-  + 构建好的面目录，永不带 src；经设置页「安装插件」或无框架时的引导页
+  + 构建好的面目录，永不带 src；经设置页「安装插件」或 UI 基座不可用时的引导页
   拖拽（取路径 → `plugins.inspect` 预检（`missing` 缺依赖警告）→ 确认 →
   `plugins.install` 解压进 `<home>/plugins/`；启用经 `plugins.set-enabled`
   做 requires 正反向预检）落地；渲染面必须是 plugin-kit `clientBundle`
@@ -224,8 +222,8 @@ Release 节奏。
   任意用户自加静态源；**不存在集中市场仓、没有 PR 上架、官方不转存社区
   字节**。公开 SDK 闭包（plugin-sdk 含 `/api` 宿主类型门面与 `/api/client`
   渲染面门面；plugin-kit/util/protocol/store/equipment/cordis/cosmokit +
-  拆分仓 framework-shadcn；base 服务类型包 shell/gateway/connection/settings
-  作为 SDK 依赖/闭包成员）发布到公共 npm
+  内置 UI 基座 `@snap-rail/ui`；base 服务类型包 shell/gateway/connection/
+  settings 作为 SDK 依赖/闭包成员）发布到公共 npm
   （`scripts/publish-npm.mjs`：闭包清单单源 + 发布期过滤未发布 peer，
   `npm.yml` 手动触发）。
 - **简单持久化配置走 settings.json**：键 `域.名`，经 `settings.get/set`
@@ -242,20 +240,19 @@ Release 节奏。
   做表单标签）+ 可选探测 + `createConnection`（返回 `{update, dispose}`），
   经 handle 上报 status/sample/write。方言
   表单由 equipment-station 的 SchemaForm 渲染。
-- **页面组件必须用框架原语**：客户端页面只组合 `@snap-rail/framework-shadcn/ui`
-  里的 shadcn 原语（Button/Card/Dialog/Table/Tabs/Collapsible…）；
-  缺原语按 shadcn 官方实现移植进框架包（包 Radix、内联 SVG、`cn` 合并），
-  不在页面里手写交互组件，也不自创变体。横切物不手搓：重渲染
-  tick 用 `useRefresh`，错误文案用 `rpcErrorText`，时间用
-  `formatClock`/`formatDuration`，色值用 theme 令牌；schema 驱动的
-  配置表单用 `SchemaForm`（新交互模式往框架包加字段类型，不开
-  每驱动自定义表单的口子）。
-- **主题与图表色单源在 theme 令牌**：明暗两模式由 `html[data-mode]`
-  切换（设置键 `ui.theme`），页面禁止硬编码色值或 `dark:` 变体；
-  图表系列只用 `--chart-1…6`
-  （实际=系列1实心+`glow-bar`，理论=系列2虚线），红/黄/绿是状态语义
-  不进数据系列。触屏基线：数值输入用 `NumberInput`（数字键盘）、
-  单选用 `TouchSelect`（模态列表）、滚动容器用 `DragScroll`（按住拖动）。
+- **页面组件只用内置语义原语**：一方页面组合 `@snap-rail/ui/components`
+  （Button/Card/Dialog/Table/Tabs/Stack/Grid/Page…）；缺原语补进
+  `@snap-rail/ui`（Radix 行为 + `data-snap-part` 解剖），不在页面里手写
+  交互组件或裸 Tailwind。横切物不手搓：重渲染 tick 用 UI 服务订阅，错误
+  文案用 `rpcErrorText`，时间用 `formatClock`/`formatDuration`；schema
+  驱动的配置表单用 `SchemaForm`（新交互模式往 UI 基座加字段类型）。
+  第三方图表允许包在 `Visualization`/`ChartFrame` 内，从 `useChartTheme`
+  取 skin token；`uiProfile` 声明 `native`/`integrated`/`custom`。
+- **主题与图表色单源在 skin token**：明暗由 `html[data-snap-mode]` +
+  `data-mode` 切换（设置键 `ui.theme`），皮肤在 `ctx.skins` 注册
+  `--snap-*` token；页面禁止硬编码色值或 `dark:` 变体；图表系列只用
+  `--snap-chart-1…6`，红/黄/绿是状态语义不进数据系列。触屏基线：数值输入
+  用 `NumberInput`、单选用 `TouchSelect`、滚动容器用 `DragScroll`。
   细则见 [docs/theme.md](docs/theme.md)。
 - **模型可见 ⟺ 有事件**；模型/用户可见行为变更配可运行例子的无 key
   快照式测试（本仓以 vitest 直测装配链路为主）。
@@ -284,9 +281,10 @@ Release 节奏。
   `域.资源.动词`、帧 `域/事件`）。
 - strict + `exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`；
   模块与导出有 JSDoc；文件恰好一个结尾换行。
-- 打包：asar 关闭是决策不是疏忽（见 architecture.md 打包节）；**出厂净身**
-  ——desktop 生产依赖只有 base 包 + 纯类型规范包 `@snap-rail/store` +
-  共享库，一切可替换实现只能 zip 安装（打包器只收生产依赖）。
+- 打包：asar 关闭是决策不是疏忽（见 architecture.md 打包节）；**出厂底座**
+  ——desktop 生产依赖包含 base 启动链、`@snap-rail/ui`、内置默认的
+  store-sqlite/equipment、equipment-station 页面库 + 共享库；驱动/额外
+  皮肤/业务页/套件仍只经 zip 安装（打包器只收生产依赖）。
 
 ## Vendoring
 
@@ -304,9 +302,11 @@ Release 节奏。
   残留的这类字段在 manifest 校验时被剥离（非 strict 放行，与 seedAbi
   宽限同策略），宿主永不再读它们。安装、启用、禁用、卸载都过 requires
   解析，不能把缺依赖留给下次启动。
-- UI 插件按 `@snap-rail/framework-shadcn/semantic` 的语义契约注册
-  view、layout、navigation；槽位使用 `UI_SLOT_IDS` 的稳定命名，禁止把
-  某个布局包名当作组件依赖。
+- UI 插件用 `@snap-rail/ui/contract` 的稳定语义：页面用
+  `ctx.pages.registerPage`，布局用 `ctx.ui.registerLayout` + `UI_SLOT_IDS`，
+  设置页用 `ctx.settings.registerPage`，皮肤用 `ctx.skins.register`；
+  禁止把某个布局/皮肤包名当作组件依赖。所有 slot 对任意 `uiProfile`
+  开放；custom 插件替换宿主界面时自担风险，安全模式/引导页不可覆盖。
 - 独立插件仓库使用 `@snap-rail/plugin-sdk` 和 `snap-rail-plugin` CLI，
   仓库根部必须有自己的 `AGENTS.md`。插件 Agent 只读 SDK 类型和该指南，
   不需要进入本仓库或复制 `packages/*/src`。

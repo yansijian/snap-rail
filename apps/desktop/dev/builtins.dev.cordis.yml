@@ -1,9 +1,7 @@
-# The dev overlay — the base rows the Vite harness runs with. The
-# production layer ships the same base (see resources/builtins.cordis.yml);
-# installable plugins (framework, drivers, suites) never ride this file —
-# they come from the plugin pool, like production: pack the client repo,
-# build the standalone plugin repos, then `install-dev-plugins` the zips
-# into the dev home. This file lives outside resources/ on purpose:
+# The dev overlay — the factory rows the Vite harness runs with. The
+# production layer ships the same core (see resources/builtins.cordis.yml);
+# drivers, skins, pages and suites never ride this file — they come from the
+# plugin pool, like production. This file lives outside resources/ on purpose:
 # packaging can never ship it. Rows resolve through the workspace's
 # node_modules (appRoot), not the plugin pool.
 - id: timer
@@ -12,6 +10,7 @@
   name: '@snap-rail/settings'
 - id: store-sqlite
   name: '@snap-rail/store-sqlite'
+  default: true
 - id: audit
   name: '@snap-rail/audit'
 - id: gateway
@@ -22,8 +21,10 @@
     bin: desktop
 - id: equipment
   name: '@snap-rail/equipment'
+  default: true
 - id: equipment-rpc
   name: '@snap-rail/equipment/rpc'
+  default: true
 - id: plugins-rpc
   name: '@snap-rail/app-boot/rpc'
 - id: station-rpc

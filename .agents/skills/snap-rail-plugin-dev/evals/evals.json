@@ -34,6 +34,8 @@
     {
       "id": 2,
       "name": "suite-wire-and-frame",
+      "historical": true,
+      "note": "framework 时代锚点（2026-10-24，framework-shadcn 0.2.x）。当前基座是内置 @snap-rail/ui（base 种子），ctx.client 增强与 runtime 均随内置 UI 提供；字段断言中出现的 framework-shadcn 仅作历史记录，勿作为现行写法。现行对照见 eval 4。",
       "prompt": "做一个 snap-rail 双面套件：宿主面暴露 demo.ping 方法，调用时广播 demo/pinged 帧；渲染面订阅该帧并把时间显示在页面上。用独立插件仓，最后 build + doctor 通过。",
       "expected_output": "suite 模板；contract.ts 用 defineContract 单源声明；宿主 ctx.rpc claimDomain/serveContract；渲染 ctx.client.link + subscribeFrame；类型从 SDK /api 门面取；package.json dependencies 含 protocol 与 zod、不含 gateway/connection/settings；externalSeeds 只含框架贡献种子；build/doctor 绿",
       "files": [],
@@ -65,6 +67,8 @@
     {
       "id": 3,
       "name": "seed-tier-boundary",
+      "historical": true,
+      "note": "framework 时代锚点（2026-10-24）。问题中的 @snap-rail/framework-shadcn/ui 现已不存在；现行答案形态：@snap-rail/ui 及其 components/contract/slots/skins/settings/runtime/pages/charts/fallback 子路径是 base 种子，不写 externalSeeds；只有其他插件 client.seeds 贡献的 <包>/<子路径> 才写。",
       "prompt": "我的渲染面 import 了 @snap-rail/plugin-sdk/api/client、@snap-rail/util 和 @snap-rail/framework-shadcn/ui。manifest 的 client.externalSeeds 应该写哪些？为什么？",
       "expected_output": "只写 @snap-rail/framework-shadcn/ui；connection/protocol/util 是 base 种子，由 shell 自动播种，写了会被启用预检拒绝",
       "files": [],
@@ -75,6 +79,17 @@
       ],
       "result": "3/3 断言通过（子代理基于 skill 回答：externalSeeds 只写 @snap-rail/framework-shadcn/ui；connection/util 是 base 种子，不写；写 base 种子会报提供方未安装；externalSeeds 不是版本兼容声明）",
       "findings_applied": []
+    },
+    {
+      "id": 4,
+      "name": "builtin-ui-settings-page-and-overlay",
+      "status": "draft",
+      "note": "内置 UI 基座时代（2026-10-25 起）。补跑后把 result 改成实际断言结果。",
+      "prompt": "给 snap-rail 做一个独立插件：一个主页面 + 一个设置页（设置页里改一个阈值并即时生效），再往状态栏挂一个时钟、往全局叠层挂一个退出确认框。用独立插件仓，build/doctor 通过后签名打包。",
+      "expected_output": "ui-view 模板（同一个包可同时注册 pages 与 settings）；渲染面 import type {} from '@snap-rail/ui/runtime' 引入 ctx.client 增强；overlay 用 ctx.ui.contribute(ctx, UI_SLOT_IDS.overlay, { id, order, render }) 而不是注册高 order 布局；状态栏用 shell.statusbar；@snap-rail/ui 只在 devDependencies、不写 externalSeeds/requires；包名用自己的 scope；doctor/build/pack 绿",
+      "files": [],
+      "assertions": [],
+      "result": "待实测：本计划更新 skill 后补跑"
     }
   ]
 }

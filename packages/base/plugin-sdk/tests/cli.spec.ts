@@ -69,7 +69,7 @@ describe('snap-rail-plugin init', () => {
     }
   })
 
-  it('binds UI templates to the framework and externalizes its seeds', async () => {
+  it('binds UI templates to the built-in UI substrate without a requires entry', async () => {
     const root = tempRoot('sdk-cli-uiview')
     try {
       const dir = join(root, 'panel')
@@ -77,13 +77,14 @@ describe('snap-rail-plugin init', () => {
       const source = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
         main?: string
         devDependencies: Record<string, string>
-        snapRail: { clientOnly?: boolean, requires?: string[], client?: { externalSeeds?: string[] } }
+        snapRail: { clientOnly?: boolean, uiProfile?: string, requires?: string[], client?: { externalSeeds?: string[] } }
       }
       expect(source.main).toBeUndefined()
       expect(source.snapRail.clientOnly).toBe(true)
-      expect(source.snapRail.requires).toEqual(['@snap-rail/framework-shadcn@^0.2.0'])
-      expect(source.snapRail.client?.externalSeeds).toContain('@snap-rail/framework-shadcn/ui')
-      expect(source.devDependencies['@snap-rail/framework-shadcn']).toBe('^0.2.0')
+      expect(source.snapRail.uiProfile).toBe('native')
+      expect(source.snapRail.requires).toBeUndefined()
+      expect(source.snapRail.client?.externalSeeds).toBeUndefined()
+      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.1.0')
       expect(source.devDependencies.react).toBeDefined()
       const config = readFileSync(join(dir, 'tsdown.config.ts'), 'utf8')
       expect(config).toContain('clientBundle')
@@ -99,18 +100,43 @@ describe('snap-rail-plugin init', () => {
     }
   })
 
-  it('honors --framework name@range across manifest, deps, and bundle', async () => {
+  it('scaffolds a skin package with the single-active skin group', async () => {
+    const root = tempRoot('sdk-cli-uiski')
+    try {
+      const dir = join(root, 'skin')
+      await main(['init', dir, '--template', 'ui-skin'])
+      const source = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
+        main?: string
+        devDependencies: Record<string, string>
+        snapRail: { kind?: string, exclusive?: string, uiProfile?: string, clientOnly?: boolean }
+      }
+      expect(source.main).toBeUndefined()
+      expect(source.snapRail.kind).toBe('skin')
+      expect(source.snapRail.exclusive).toBe('skin')
+      expect(source.snapRail.uiProfile).toBe('native')
+      expect(source.snapRail.clientOnly).toBe(true)
+      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.1.0')
+      const client = readFileSync(join(dir, 'src', 'client.tsx'), 'utf8')
+      expect(client).toContain('ctx.skins.register')
+      expect(client).toContain('DEFAULT_SKIN.tokens')
+      expect(readFileSync(join(dir, 'tsdown.config.ts'), 'utf8')).toContain('clientBundle')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('honors a custom UI package binding for types and build', async () => {
     const root = tempRoot('sdk-cli-fw')
     try {
       const dir = join(root, 'panel')
       await main(['init', dir, '--template', 'ui-view', '--framework', '@acme/ui@^3'])
       const source = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
         devDependencies: Record<string, string>
-        snapRail: { requires?: string[], client?: { externalSeeds?: string[] } }
+        snapRail: { requires?: string[], uiProfile?: string }
       }
-      expect(source.snapRail.requires).toEqual(['@acme/ui@^3'])
+      expect(source.snapRail.requires).toBeUndefined()
+      expect(source.snapRail.uiProfile).toBe('native')
       expect(source.devDependencies['@acme/ui']).toBe('^3')
-      expect(source.snapRail.client?.externalSeeds).toContain('@acme/ui/ui')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -133,8 +159,7 @@ describe('snap-rail-plugin init', () => {
       expect(source.snapRail.client?.entry).toBe('lib-client/client.js')
       expect(source.devDependencies['@snap-rail/gateway']).toBeUndefined()
       expect(source.devDependencies['@snap-rail/connection']).toBeUndefined()
-      expect(source.snapRail.client?.externalSeeds).not.toContain('@snap-rail/connection')
-      expect(source.snapRail.client?.externalSeeds).not.toContain('@snap-rail/shell/contract')
+      expect(source.snapRail.client?.externalSeeds).toBeUndefined()
       const config = readFileSync(join(dir, 'tsdown.config.ts'), 'utf8')
       expect(config).toContain('hostBundle')
       expect(config).toContain('clientBundle')
@@ -279,19 +304,18 @@ describe('snap-rail-plugin pack / verify / feed', () => {
 })
 
 describe('snap-rail-plugin doctor warnings', () => {
-  it('warns when a renderer plugin has only package-name requires', async () => {
+  it('warns when a renderer plugin omits its uiProfile declaration', async () => {
     const root = tempRoot('sdk-cli-doctor-fw')
     try {
       const dir = join(root, 'panel')
       await main(['init', dir, '--template', 'ui-view'])
       const manifestPath = join(dir, 'package.json')
-      const parsed = JSON.parse(readFileSync(manifestPath, 'utf8')) as { snapRail: { requires?: string[] } }
-      // A scoped package name contains `@` but binds no framework version.
-      parsed.snapRail.requires = ['@snap-rail/equipment']
+      const parsed = JSON.parse(readFileSync(manifestPath, 'utf8')) as { snapRail: { uiProfile?: string } }
+      delete parsed.snapRail.uiProfile
       writeFileSync(manifestPath, `${JSON.stringify(parsed, null, 2)}\n`)
       await main(['doctor', dir])
       const report = lastReport() as { warnings: string[] }
-      expect(report.warnings.join(' ')).toContain('框架绑定')
+      expect(report.warnings.join(' ')).toContain('uiProfile')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

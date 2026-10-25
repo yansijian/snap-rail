@@ -1,0 +1,112 @@
+{
+  "name": "@snap-rail/ui",
+  "description": "The built-in UI substrate: semantic components, typed region slots, skins, settings and renderer runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./contract": {
+      "types": "./lib/types/contract.d.ts",
+      "default": "./lib/contract.js"
+    },
+    "./components": {
+      "types": "./lib/types/components/index.d.ts",
+      "default": "./lib/components/index.js"
+    },
+    "./charts": {
+      "types": "./lib/types/charts.d.ts",
+      "default": "./lib/charts.js"
+    },
+    "./slots": {
+      "types": "./lib/types/slots.d.ts",
+      "default": "./lib/slots.js"
+    },
+    "./skins": {
+      "types": "./lib/types/skins.d.ts",
+      "default": "./lib/skins.js"
+    },
+    "./settings": {
+      "types": "./lib/types/settings.d.ts",
+      "default": "./lib/settings.js"
+    },
+    "./settings-pages": {
+      "types": "./lib/types/settings-pages/index.d.ts",
+      "default": "./lib/settings-pages/index.js"
+    },
+    "./runtime": {
+      "types": "./lib/types/runtime.d.ts",
+      "default": "./lib/runtime.js"
+    },
+    "./pages": {
+      "types": "./lib/types/pages.d.ts",
+      "default": "./lib/pages.js"
+    },
+    "./fallback": {
+      "types": "./lib/types/fallback.d.ts",
+      "default": "./lib/fallback.js"
+    },
+    "./styles/base.css": "./src/styles/base.css",
+    "./styles/default.css": "./src/styles/default.css",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/types/**/*.d.ts",
+    "src/**/*.css"
+  ],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@radix-ui/react-checkbox": "^1.1.3",
+    "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-label": "^2.1.2",
+    "@radix-ui/react-radio-group": "^1.2.3",
+    "@radix-ui/react-scroll-area": "^1.2.18",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slot": "^1.3.3",
+    "@radix-ui/react-switch": "^1.3.7",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-tooltip": "^1.2.16"
+  },
+  "peerDependencies": {
+    "@snap-rail/app-boot": "workspace:^",
+    "@snap-rail/client-kernel": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/shell": "workspace:^",
+    "@snap-rail/station-rpc": "workspace:^",
+    "react": ">=19",
+    "react-dom": ">=19",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@snap-rail/app-boot": "workspace:^",
+    "@snap-rail/client-kernel": "workspace:^",
+    "@snap-rail/connection": "workspace:^",
+    "@snap-rail/cordis": "workspace:^",
+    "@snap-rail/cordis-plugin-timer": "workspace:^",
+    "@snap-rail/protocol": "workspace:^",
+    "@snap-rail/shell": "workspace:^",
+    "@snap-rail/station-rpc": "workspace:^",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "happy-dom": "^20.0.11",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8",
+    "zod": "^4.4.3"
+  },
+  "snapRail": {
+    "layer": "base",
+    "title": "界面基座"
+  }
+}

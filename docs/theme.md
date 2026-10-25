@@ -1,92 +1,64 @@
-# 主题与图表色规范
+# 主题、皮肤与语义部件规范
 
-单源在框架独立仓 `snap-rail-framework-shadcn` 的 `src/ui/theme.css`；本文件是使用规范。
-设计出处见 `docs/design/theme-samples.html`（明暗各 9 款候选，最终选钴蓝）。
+单源在 `@snap-rail/ui`：
 
-## 两种模式，一套令牌
+- 语义组件与 `data-snap-part` 解剖：`packages/base/ui/src/contract.ts` 的 `UI_COMPONENTS`；
+- 默认钴蓝皮肤的 token 与 CSS：`packages/base/ui/src/skins.tsx`、`src/styles/default.css`；
+- 皮肤注册服务：`ctx.skins`；页面/布局只消费 `useSkinTokens()` / `useChartTheme()`。
 
-Tailwind v4 `@theme` 里的令牌就是黑夜模式（石墨钢面板 + 钴蓝）；
-`html[data-mode='light']` 用同名令牌覆盖为白天模式（雾白面板 + 加深钴蓝）。
-运行时切模式只是改 `<html>` 上的 `data-mode` 属性：
+## 两层：token 与 part
 
-- 模式选择存 settings.json 键 `ui.theme`（`{ mode: 'system' | 'light' | 'dark' }`），
-  由框架设置外壳的「主题」页写入（框架仓 `src/settings-dialog.tsx`），
-  `settings/changed` 帧当场热应用。
-- 读写走 `@snap-rail/framework-shadcn/ui` 导出的 `themeSettingsSchema` / `applyTheme`，
-  不要在别处再写一套。
+**token** 是皮肤填的值（颜色/字体/间距/圆角/密度/动效/z-index），以
+`--snap-*` CSS 变量注入 `<html>`；**part** 是组件暴露的稳定 DOM 部位
+（`button.root`、`dialog.panel`、`field.error`…）。皮肤只命中 part，页面不写
+视觉 CSS，也不依赖组件内部结构。
 
-页面代码永远只用令牌工具类（`bg-card`、`text-muted-foreground`…），**不得出现
-硬编码色值或 `dark:` 变体**——模式切换靠令牌自动生效。唯一例外是内核
-引导/启动页（`packages/base/kernel`）：它运行在任何框架面加载之前，拿不到
-令牌，色值以**镜像值**写死并注明（`BootstrapPage.tsx` 顶部的 `theme` 块），
-改令牌时同步。
+```css
+[data-snap-skin='industrial'] [data-snap-part='button.root'] {
+  background: var(--snap-color-primary);
+  border-radius: var(--snap-radius-md);
+}
+```
 
-## 类扫描（工具类从哪来）
+- 每个皮肤必须把规则作用域到 `[data-snap-skin='<id>']`；未激活皮肤的 CSS
+  即使还在 DOM 中也不会命中。
+- 明暗模式由 `html[data-snap-mode='light'|'dark']` 切换（设置键
+  `ui.theme`，`system/light/dark`）；运行时同时写 `data-mode` 供兼容读取。
+- 皮肤通过 `ctx.skins.register(ctx, { id, title, tokens, presentations })` 注册；
+  默认皮肤 id 为 `default`，池皮肤单活（`exclusive: 'skin'`），加载失败回退默认。
+- `presentations` 选择核心实现的展示变体（`dialog: modal|sheet|fullscreen`、
+  `select: popover|modal` 等），页面仍可显式覆盖。
 
-唯一样式表就是框架仓的 `theme.css`，工具类靠 Tailwind 扫源码生成。`@source`
-按 **CSS 文件自身位置** 解析（不是 Vite cwd）：框架仓 `src/ui/theme.css` 的
-宽 glob `../../../../**/src/**/*.{ts,tsx}` 从仓库位置出发，把主仓
-`packages/` 的渲染包 src 与各独立仓（套件、equipment-station 所在的兄弟
-checkout）一起扫进来，住户名单不在此复列；构建产物被 gitignore 天然排除。
-**新渲染包放进任一被扫描的 `src/` 即自动覆盖**；挪出扫描范围会让它独有的
-类静默消失——框架仓 `tests/theme-scan.spec.ts` 的门禁（每条 `@source`
-前缀真实存在 + 覆盖每个包）会当场红。
+## 图表与状态色
 
-## 调色板
+- 数据系列只用 `--snap-chart-1…6`；实际/目标对比沿用系列 1/2 的语义。
+- 红/黄/绿（`--snap-color-danger/success/warning`）只表达设备/流程状态，
+  不进数据系列。
+- 第三方图表必须包在 `ChartFrame`/`Visualization` 内，从 `useChartTheme()`
+  取 ECharts/D3 主题；皮肤覆盖外框/标题/图例容器与色板，不覆盖图表库内部 DOM。
+- 数字读数统一 `font-mono tabular-nums`；主角数字用 `glow-number` 类。
 
-| 令牌 | 黑夜 | 白天 | 用途 |
-| --- | --- | --- | --- |
-| background | `#0b0f14` | `#e4e9ef` | 页面底（叠加柔和渐变） |
-| card / popover | `#11161d` / `#161b22` | `#f3f6f9` / `#ffffff` | 卡片 / 浮层面 |
-| secondary / accent | `#1c2430` | `#dde4ec` | 次级按钮面、选中面 |
-| foreground | `#ced8e3` | `#26323e` | 正文 |
-| muted-foreground | `#8b949e` | `#5d6d7e` | 说明文字、表头 |
-| primary | `#4a6cff` | `#3857e8` | 主题色（钴蓝）、选中、键线 |
-| success / warning / destructive | `#3fb950` / `#d29922` / `#f85149` | `#15803d` / `#b45309` / `#dc2626` | 状态语义专用 |
-| border / input | `#1f2933` | `#c7d0da` | 描边、输入框边 |
+## 触控基线
 
-状态色（success/warning/destructive）只表达设备/流程状态，**不进数据系列**。
+一体机触屏，最小点击目标 48px：`Button` default h-12 / lg h-14 / icon 48×48；
+`Input` h-12；表格行 py-3。数值输入用 `NumberInput`，单选用 `TouchSelect`，
+滚动容器用 `DragScroll`。这些组件的 part 由默认皮肤保证触控尺寸；custom
+皮肤必须维持最小目标，`uiProfile: custom` 的插件自担其责。
 
-## 图表系列色模板
+## 窗口与悬浮球
 
-系列色是独立的一组令牌 `--color-chart-1 … --color-chart-6`（工具类
-`bg-chart-1` 等），随模式联动派生：
+- 主窗口：活动 layout/suite 的 `LayoutContribution.window` 声明
+  `WindowProfile`；用户可在「外观与显示」写 `ui.window` 覆盖，手动调整
+  由宿主持久化。窗口尺寸不是响应式布局的替代品，页面仍用布局原语。
+- 悬浮球：活动 layout/suite 的 `LayoutContribution.ball` 声明 `BallProfile`
+  （尺寸/启用/停泊行为）。几何不变量：方形窗口、8px 余量固定、
+  `orb = size - 16`、阴影必须画在余量内；`resolveBallProfile` 是宿主与
+  球面共用的单源。球内内容由球面插件（`shell.ball`）决定，颜色由皮肤决定。
 
-| 系列 | 黑夜 | 白天 | 派生规则 |
-| --- | --- | --- | --- |
-| chart-1 | `#4a6cff` | `#3857e8` | 主题色本体 |
-| chart-2 | `#3147a1` | `#7088ee` | 主题色加深/提亮 |
-| chart-3 | `#667fcd` | `#667dd0` | 主题色 × 钢灰 |
-| chart-4…6 | `#7d8fa5` → `#33414f` | `#94a3b8` → `#ccd6e0` | 钢灰梯度（次要系列） |
+## 新皮肤清单
 
-规则：
-
-1. 数据系列按 1→6 顺序取色，**上限 6 系列**；超过先问设计。
-2. 「实际 vs 目标」类对比：实际 = chart-1 实心 + `glow-bar`；理论/目标 =
-   chart-2 虚线描边（`border-dashed border-chart-2`，无填充）。见
-   process-production 的每小时产量图。
-3. 数字读数统一 `font-mono tabular-nums`；主角数字（hero）用 `glow-number`
-   + `text-4xl` 以上。
-
-## 光晕与渐变
-
-- `glow-number`：主角数字的主题色光晕（强度随模式自动收敛）。
-- `glow-bar`：chart-1 柱体的柔光。
-- `channel-keyline`：选中态的 3px 主题色内侧键线（侧栏、设置导航、选中行）。
-- 页面背景是 `--app-gradient`（顶部中心向外、主题色 ≤8% 晕染的径向渐变）；
-  卡片/浮层保持不透明，靠实底分层。不要再叠加别的背景图。
-
-光晕三件套**只用在主角读数、chart-1 柱体和选中键线**上，别当装饰撒。
-
-## 触控尺寸基线
-
-一体机触屏，最小点击目标 48px：Button default h-12 / lg h-14 / xl h-16 /
-icon 48×48；Input h-12；表格行 py-3。字号令牌已放大（xs 13 / sm 15 /
-base 17px），页面里不得再缩回 `text-xs` 以下。数值输入一律
-`NumberInput`（弹数字键盘），单选列表一律 `TouchSelect`（弹模态列表），
-滚动容器一律 `DragScroll`（支持按住拖动）。
-
-## 新增主题色
-
-改 `theme.css`：`@theme` 里改黑夜值（或 chart 令牌），`html[data-mode='light']`
-块里改白天值；两处成对改。不要新增只改一面的主题色。
+1. 从 `DEFAULT_SKIN.tokens` 复制 dark/light 两套 token，填满 `SkinTokens`；
+2. 为 `UI_COMPONENTS` 的每个 part 写规则（至少覆盖 root/label/field/panel）；
+3. 所有规则作用域到 `[data-snap-skin='<id>']`；
+4. 设置 `snapRail.kind: 'skin'`、`exclusive: 'skin'`、`clientOnly: true`；
+5. 用默认皮肤做对照，在「外观与显示」启用后重启验证设置/设备/表单/对话框。

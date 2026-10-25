@@ -28,12 +28,12 @@ const ref = process.env.SNAP_RAIL_EXTERNAL_REF ?? 'master'
 const local = process.env.SNAP_RAIL_EXTERNAL_LOCAL === '1'
 
 /**
- * The split repos the main workspace build depends on. The feed job widens
- * the list (suite + the second driver) because it packs every first-party
- * plugin from source; the app build only needs the framework and modbus.
+ * The split repos the main workspace build depends on. The UI substrate is
+ * built into the app now; the app build only needs the first-party drivers.
+ * The feed job widens the list when it packs every first-party plugin.
  */
 const REPOS = (process.env.SNAP_RAIL_EXTERNAL_REPOS
-  ?? 'snap-rail-framework-shadcn,snap-rail-driver-modbus')
+  ?? 'snap-rail-driver-modbus')
   .split(',')
   .map(repo => repo.trim())
   .filter(repo => repo !== '')

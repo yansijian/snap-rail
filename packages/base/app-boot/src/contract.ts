@@ -13,7 +13,7 @@ import { defineContract, method } from '@snap-rail/protocol'
 import type { FrameRows, MethodRows } from '@snap-rail/protocol'
 
 /** Where a plugin row comes from in the merged view. */
-export type PluginSource = 'builtin' | 'preset' | 'user' | 'pool'
+export type PluginSource = 'builtin' | 'builtin-default' | 'preset' | 'user' | 'pool'
 
 /** One plugin as the management surface sees it. */
 export interface PluginInfo {
@@ -44,6 +44,9 @@ export interface PluginInfo {
   /** The mutex group (`snapRail.exclusive`, or the kind default): enabling a
    * package of group X disables every other enabled member of X. */
   exclusive?: string
+  /** The author's declared skin-contract relationship (`native` /
+   * `integrated` / `custom`); a display badge, never a gate. */
+  uiProfile?: string
   /** True when the package has no host face (`snapRail.clientOnly`): its rows
    * are renderer-only, enabled state applies after a restart. */
   clientOnly?: boolean

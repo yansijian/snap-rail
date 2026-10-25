@@ -6,11 +6,6 @@
   },
   "sources": [
     {
-      "repo": "snap-rail-framework-shadcn",
-      "asset": "@snap-rail__framework-shadcn.zip",
-      "local": "external/snap-rail-framework-shadcn/dist"
-    },
-    {
       "repo": "snap-rail-driver-modbus",
       "asset": "@snap-rail__driver-modbus.zip",
       "local": "external/snap-rail-driver-modbus/dist"
@@ -19,11 +14,6 @@
       "repo": "snap-rail-driver-enip",
       "asset": "@snap-rail__driver-enip.zip",
       "local": "external/snap-rail-driver-enip/dist"
-    },
-    {
-      "repo": "snap-rail-suite-terminal-ops",
-      "asset": "@snap-rail__suite-terminal-ops.zip",
-      "local": "external/snap-rail-suite-terminal-ops/dist"
     }
   ]
 }

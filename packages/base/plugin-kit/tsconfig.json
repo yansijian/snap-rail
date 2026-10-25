@@ -15,6 +15,7 @@
   "references": [
     { "path": "../../base/util" },
     { "path": "../../base/protocol" },
+    { "path": "../../base/shell" },
     { "path": "../../../vendor/cordis" }
   ]
 }

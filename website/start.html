@@ -6,10 +6,10 @@
     <title>快速上手 · snap-rail</title>
     <meta
       name="description"
-      content="snap-rail 快速上手：装客户端、装标准基座、建设备、测试连接、套模板建点。Windows 10/11，离线可装，数据留在本机。"
+      content="snap-rail 快速上手：装客户端、建设备、测试连接、套模板建点。Windows 10/11，离线可装，数据留在本机。"
     />
     <meta property="og:title" content="快速上手 · snap-rail" />
-    <meta property="og:description" content="从下载到第一个点：装客户端、装标准基座、测连接、建点。" />
+    <meta property="og:description" content="从下载到第一个点：装客户端、测连接、建点。" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://www.snap-rail.top/og.png" />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
@@ -74,7 +74,7 @@
               <p class="kicker">downloads</p>
               <h2>先下这两个。</h2>
             </div>
-            <p>客户端 + 标准基座是第一次的最小组合。想看完整画面，再加一个产线看板场景包。</p>
+            <p>客户端装好就是一个可用的空终端。需要更多能力时，从插件页装驱动或场景插件。</p>
           </div>
 
           <div class="download-grid">
@@ -82,27 +82,20 @@
               <span class="badge badge--amber">01 · 必装</span>
               <h3>Windows 客户端</h3>
               <p class="download-meta" data-version-label>Windows 10/11 x64</p>
-              <p>安装包，装好打开。未做商业代码签名，SmartScreen 可能提示“未知发布者”。</p>
+              <p>安装包，装好打开就是完整界面：存储、设备底座、语义 UI 与设备管理页已内置。未做商业代码签名，SmartScreen 可能提示“未知发布者”。</p>
               <a class="btn btn-primary" data-download="installer" href="https://github.com/yansijian/snap-rail/releases">下载安装包</a>
             </article>
             <article class="download-card reveal">
-              <span class="badge badge--amber">02 · 第一次必装</span>
-              <h3>标准基座</h3>
-              <p class="download-meta">standard-base · v1.1.0 · 约 450 KB</p>
-              <p>存储、设备底座、界面框架、设备管理页。拖进客户端，重启一次。</p>
-              <a class="btn btn-secondary" data-download="combo" data-combo="standard-base" href="https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/standard-base.zip">下载标准基座（.zip）</a>
-            </article>
-            <article class="download-card reveal">
-              <span class="badge badge--green">03 · 想看完整场景</span>
-              <h3>产线看板场景包</h3>
-              <p class="download-meta">production-board · v1.1.0 · 约 2.9 MB</p>
-              <p>在标准基座上加 ModbusTCP 采集与生产作业套件；装完按第 5 步建演示设备。</p>
-              <a class="btn btn-secondary" data-download="combo" data-combo="production-board" href="https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/production-board.zip">下载产线看板（.zip）</a>
+              <span class="badge badge--green">02 · 按需</span>
+              <h3>驱动与插件</h3>
+              <p class="download-meta">ModbusTCP / EtherNet/IP · 插件生态</p>
+              <p>建设备前先装一个通讯驱动：在线在「插件管理」搜索安装，离线从插件页取驱动 zip 拖入。</p>
+              <a class="btn btn-secondary" href="./plugins.html">浏览插件与驱动</a>
             </article>
           </div>
 
           <p class="download-foot reveal">
-            安装包未做商业代码签名；企业可自行签名。安装包与场景包都可以离线拷贝；
+            安装包未做商业代码签名；企业可自行签名。安装包、驱动与插件 zip 都可以离线拷贝；
             feed 同源，客户端内“软件更新”走同一目录。
           </p>
         </div>
@@ -113,9 +106,9 @@
           <div class="section-head reveal">
             <div>
               <p class="kicker">the first run</p>
-              <h2>五步，跑通一个点。</h2>
+              <h2>四步，跑通一个点。</h2>
             </div>
-            <p>前两步是安装；后三步是“建设备 → 测连接 → 建点”。每一步都可在车间离线完成。</p>
+            <p>安装只有一步；后续是“装驱动 → 建设备 → 测连接 → 建点”，每一步都可在车间离线完成。</p>
           </div>
 
           <div class="runbook">
@@ -123,16 +116,17 @@
               <div class="runbook-index">01</div>
               <div>
                 <h3>装客户端</h3>
-                <p>双击安装包。SmartScreen 提示时点“更多信息 → 仍要运行”。装完打开，先看到内核引导页。</p>
-                <div class="mini"><b>首次启动</b><br />引导页 = 拖入 zip / 搜索插件源的入口</div>
+                <p>双击安装包。SmartScreen 提示时点“更多信息 → 仍要运行”。装完打开就是完整界面——存储、设备底座、设置中心与设备管理页都已内置。</p>
+                <div class="mini"><b>首次启动</b><br />无需装基座；需要更多能力时再拖入插件 zip</div>
               </div>
             </article>
             <article class="runbook-step reveal">
               <div class="runbook-index">02</div>
               <div>
-                <h3>装标准基座</h3>
-                <p>把 <code>standard-base.zip</code> 拖进引导页（或「插件」页），确认安装；装完重启客户端一次。</p>
-                <div class="mini"><b>重启后</b><br />设置 → 设备管理 出现</div>
+                <h3>装驱动</h3>
+                <p>「设置 → 插件管理」搜索安装 ModbusTCP 驱动（范本）；离线现场把 driver-modbus 的 zip 拖进「安装插件」。</p>
+                <div class="mini"><b>插件管理 → 安装插件</b><br />ModbusTCP 驱动 · 可多装共存</div>
+                <p class="runbook-note">驱动是纯协议适配器：设备、组、点都住在底座表里，驱动卸载不丢配置。</p>
               </div>
             </article>
             <article class="runbook-step reveal">
@@ -151,15 +145,6 @@
                 <p>保存设备后，点“从模板添加点位”。示例给 count / rate / running；地址按设备手册改。</p>
                 <div class="mini"><b>line / count</b><br />FC3 @ 0 · int · 实时刷新</div>
                 <p class="runbook-note">没有模板的驱动，也可以手动新建分组和点位；点位地址 = (设备, 组, 点) 三元组。</p>
-              </div>
-            </article>
-            <article class="runbook-step reveal">
-              <div class="runbook-index">05</div>
-              <div>
-                <h3>装场景包，看完整画面</h3>
-                <p>把 <code>production-board.zip</code> 拖进「插件」页，确认安装，重启一次。按场景页的指引建一组演示设备即可看到班产看板。</p>
-                <div class="mini"><b>重启后</b><br />生产作业页 · 班产统计 · 设备管理</div>
-                <p class="runbook-note">组合包本身不签名，成员 zip 各自保留发布签名；安装预览逐成员显示验证结果。</p>
               </div>
             </article>
           </div>
@@ -239,7 +224,7 @@
             <article class="role reveal">
               <span class="tag">SCENE PACK</span>
               <h3>装一个场景包</h3>
-              <p>产线看板把设备管理、采集、班产统计和作业流程串起来，装完重启一次。</p>
+              <p>场景包把驱动、页面与套件打成一组；用插件 SDK 自建，或从社区插件源安装别人做好的场景。</p>
               <a class="link-arrow" href="./scenarios.html">看场景包</a>
             </article>
             <article class="role reveal">

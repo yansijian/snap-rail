@@ -1,0 +1,321 @@
+/*
+ * Structural baseline for every semantic component. Visual design lives in
+ * the active skin; this file only guarantees that the anatomy is laid out and
+ * focusable even before/without a skin.
+ */
+@layer snap.base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--snap-color-bg);
+    color: var(--snap-color-text);
+    font-family: var(--snap-font-sans);
+    font-size: var(--snap-text-md);
+    line-height: var(--snap-leading-normal);
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  [data-snap-component] {
+    box-sizing: border-box;
+  }
+
+  [data-snap-component='button'] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--snap-space-sm);
+    border: var(--snap-border-width) solid transparent;
+    cursor: pointer;
+    min-height: var(--snap-control-height-md);
+  }
+
+  [data-snap-component='button'][data-size='sm'] {
+    min-height: var(--snap-control-height-sm);
+  }
+
+  [data-snap-component='button'][data-size='lg'] {
+    min-height: var(--snap-control-height-lg);
+  }
+
+  [data-snap-component='icon-button'] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: var(--snap-border-width) solid transparent;
+    cursor: pointer;
+  }
+
+  [data-snap-component='input'],
+  [data-snap-component='number-input'] {
+    display: flex;
+    align-items: center;
+    gap: var(--snap-space-sm);
+  }
+
+  [data-snap-component='input'] [data-snap-part='input.field'],
+  [data-snap-component='number-input'] [data-snap-part='number-input.field'],
+  [data-snap-part='textarea.field'] {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  [data-snap-component='textarea'] {
+    display: flex;
+  }
+
+  [data-snap-part='textarea.field'] {
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+  }
+
+  [data-snap-component='select'] {
+    display: inline-flex;
+  }
+
+  [data-snap-part='select.trigger'] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--snap-space-sm);
+    width: 100%;
+    min-height: var(--snap-control-height-md);
+    border: var(--snap-border-width) solid var(--snap-color-border);
+    background: transparent;
+    cursor: pointer;
+  }
+
+  [data-snap-part='select.content'] {
+    z-index: var(--snap-z-modal);
+  }
+
+  [data-snap-part='switch.root'],
+  [data-snap-part='checkbox.root'],
+  [data-snap-part='radio-group.item'] {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .snap-switch-label,
+  .snap-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--snap-space-sm);
+    cursor: pointer;
+  }
+
+  [data-snap-part='switch.label'],
+  [data-snap-part='checkbox.label'],
+  [data-snap-part='checkbox.thumb'],
+  [data-snap-part='radio-group.label'] {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  [data-snap-part='tabs.list'] {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--snap-space-xs);
+  }
+
+  [data-snap-part='tabs.trigger'] {
+    cursor: pointer;
+    border: 0;
+    background: transparent;
+  }
+
+  [data-snap-part='tabs.content'] {
+    outline: 0;
+  }
+
+  [data-snap-part='table.root'] {
+    width: 100%;
+    overflow: auto;
+  }
+
+  [data-snap-part='table.root'] table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  [data-snap-part='table.head'],
+  [data-snap-part='table.cell'] {
+    text-align: left;
+  }
+
+  [data-snap-part='card.root'],
+  [data-snap-part='panel.root'] {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  [data-snap-part='card.header'],
+  [data-snap-part='panel.header'],
+  [data-snap-part='section.header'] {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--snap-space-md);
+  }
+
+  [data-snap-part='dialog.overlay'] {
+    position: fixed;
+    inset: 0;
+  }
+
+  [data-snap-part='dialog.panel'] {
+    position: fixed;
+    outline: 0;
+    z-index: var(--snap-z-modal);
+  }
+
+  [data-snap-part='field.root'] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--snap-space-xs);
+    min-width: 0;
+  }
+
+  [data-snap-part='form.root'],
+  [data-snap-part='form.fields'] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--snap-space-md);
+  }
+
+  [data-snap-part='form.actions'] {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--snap-space-sm);
+  }
+
+  [data-snap-part='toolbar.root'] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--snap-space-sm);
+  }
+
+  [data-snap-part='badge.root'],
+  [data-snap-part='led.root'],
+  [data-snap-part='progress.root'] {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  [data-snap-part='progress.track'] {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  [data-snap-part='progress.indicator'] {
+    height: 100%;
+  }
+
+  [data-snap-part='empty-state.root'] {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--snap-space-sm);
+    text-align: center;
+  }
+
+  [data-snap-part='visualization.root'],
+  [data-snap-part='chart-frame.root'] {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  [data-snap-part='settings.root'] {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  [data-snap-part='settings.header'] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--snap-space-md);
+    flex-shrink: 0;
+  }
+
+  [data-snap-part='settings.body'] {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  [data-snap-part='settings.nav'] {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: auto;
+  }
+
+  [data-snap-part='settings.content'] {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+  }
+
+  [data-snap-part='settings.nav-item'] {
+    display: flex;
+    align-items: center;
+    gap: var(--snap-space-sm);
+    width: 100%;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  [data-snap-part='visualization.body'],
+  [data-snap-part='chart-frame.body'] {
+    flex: 1;
+    min-height: 0;
+  }
+
+  [data-snap-component='button']:focus-visible,
+  [data-snap-component='icon-button']:focus-visible,
+  [data-snap-part='select.trigger']:focus-visible,
+  [data-snap-part='tabs.trigger']:focus-visible,
+  [data-snap-part='switch.root']:focus-visible,
+  [data-snap-part='checkbox.root']:focus-visible,
+  [data-snap-part='radio-group.item']:focus-visible {
+    outline: 2px solid var(--snap-color-focus);
+    outline-offset: 2px;
+  }
+}

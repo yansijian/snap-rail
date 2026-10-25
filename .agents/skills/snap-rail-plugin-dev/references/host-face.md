@@ -189,8 +189,9 @@ export default {
   import；类型统一从 SDK `/api` 取。
 - 业务失败 `throw RpcBusinessError`，别返回裸错误对象。
 - 渲染端消费帧：`subscribeFrame(ctx.client.link, '域/事件', schema, cb)`，
-  从 `@snap-rail/plugin-sdk/api/client` 导入；`ctx.client` 由框架 runtime
-  提供。完整双面骨架见 [faces-and-wire.md](faces-and-wire.md)。
+  从 `@snap-rail/plugin-sdk/api/client` 导入；`ctx.client` 由内置
+  `@snap-rail/ui/runtime` 提供。完整双面骨架见
+  [faces-and-wire.md](faces-and-wire.md)。
 - 配方测试：schema 拒坏载荷、disposer 随插件卸载。
 
 ## `ctx.shell`（宿主面，OS 集成缝）

@@ -34,7 +34,7 @@ describe('satisfiesRange', () => {
 
 describe('splitNameRange', () => {
   it('splits scoped and bare names at the last separator', () => {
-    expect(splitNameRange('@snap-rail/framework-shadcn@^0.1')).toEqual({ name: '@snap-rail/framework-shadcn', range: '^0.1' })
+    expect(splitNameRange('@snap-rail/equipment@^0.1')).toEqual({ name: '@snap-rail/equipment', range: '^0.1' })
     expect(splitNameRange('pkg@1.2.0')).toEqual({ name: 'pkg', range: '1.2.0' })
     expect(splitNameRange('@snap-rail/equipment')).toEqual({ name: '@snap-rail/equipment' })
     expect(splitNameRange('service:store')).toEqual({ name: 'service:store' })

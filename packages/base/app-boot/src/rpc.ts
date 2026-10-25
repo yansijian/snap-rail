@@ -69,14 +69,23 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
     // enabled packages, mutex groups, and requirement relations — shared
     // with the invariant sidecar.
     const view = createLayerView(layers.handles, service => ctx.get(service) !== undefined)
+    /** Factory defaults that a pool package in the same mutex group may replace. */
+    const defaultNames = new Set(
+      loadBuiltinLayer(layers.handles.builtinLayerPath)
+        .filter(entry => entry.default === true)
+        .flatMap(entry => [entry.name as string, packageNameOf(entry.name as string)]),
+    )
 
     rpc.claimDomain(ctx, 'plugins')
     // The auto-update announcement frame: the sweep carries the pending
     // set, an apply empties it.
     rpc.frame(ctx, 'plugins/updates-changed', { payload: pluginUpdatesChangedSchema })
 
-    const assertNotBase = (name: string): void => {
+    const assertNotBase = (name: string, allowDefault = false): void => {
       const target = packageNameOf(name)
+      if (!allowDefault && (defaultNames.has(target) || defaultNames.has(name))) {
+        throw new RpcBusinessError({ code: 'bad-request', details: { issues: [`内置默认插件禁止删除/改配置：${target}（可被同组池插件替换）`] } })
+      }
       const shipped = view.shippedNames()
       if (shipped.has(target) || shipped.has(name)) {
         throw new RpcBusinessError({ code: 'bad-request', details: { issues: [`内置插件禁止删除/修改：${target}（替换经源码重建）`] } })
@@ -182,7 +191,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       let installed: { name: string, version: string, updated: boolean }
       try {
         installed = installPluginFromZip(zipPath, poolDir, {
-          reserved: [...view.shippedNames()],
+          reserved: [...view.reservedNames()],
           trustedKeys: trustedKeys(),
           signaturePolicy: signaturePolicy(),
           seedAbi: await resolveSeedAbi(layers.handles.appRoot),
@@ -289,7 +298,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
     const inspectArchive = (zipPath: string): InspectedArchive => {
       if (archiveKind(zipPath) === 'combo') {
         const poolDir = layers.handles.poolDirs[0]
-        const shipped = view.shippedNames()
+        const shipped = view.reservedNames()
         const inspection = inspectComboZip(zipPath, {
           trustedKeys: trustedKeys(),
           signaturePolicy: signaturePolicy(),
@@ -338,7 +347,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         const infos: PluginInfo[] = []
         const seen = new Set<string>()
         const toInfoFor = (name: string, source: PluginSource, enabled: boolean, config: unknown, version?: string): PluginInfo => {
-          const { kind, layer, title, category, exclusive, clientOnly, requires, engines } = view.manifestOf(name, pool)
+          const { kind, layer, title, category, exclusive, uiProfile, clientOnly, requires, engines } = view.manifestOf(name, pool)
           const signatureKeyId = pool.get(packageNameOf(name))?.signatureKeyId
           return {
             name,
@@ -351,6 +360,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
             ...(title !== undefined ? { title } : {}),
             ...(category !== undefined ? { category } : {}),
             ...(exclusive !== undefined ? { exclusive } : {}),
+            ...(uiProfile !== undefined ? { uiProfile } : {}),
             ...(clientOnly ? { clientOnly: true } : {}),
             ...(requires !== undefined && requires.length > 0 ? { requires } : {}),
             ...(engines === undefined ? {} : { engines }),
@@ -361,7 +371,12 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         for (const entry of builtin) {
           seen.add(entry.name as string)
           const live = composed.get(entry.id as string)
-          infos.push(toInfoFor(entry.name as string, 'builtin', live?.disabled !== true, live?.config))
+          infos.push(toInfoFor(
+            entry.name as string,
+            entry.default === true ? 'builtin-default' : 'builtin',
+            live?.disabled !== true,
+            live?.config,
+          ))
         }
         for (const row of user.plugins) {
           if (seen.has(row.name)) continue
@@ -431,7 +446,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       },
 
       'plugins.set-enabled': async ({ name, enabled }) => {
-        assertNotBase(name)
+        assertNotBase(name, true)
         const pool = scanPluginPool(layers.handles.poolDirs)
         if (enabled) {
           // Every requirement must be satisfiable before the row lands — an
@@ -470,6 +485,28 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
               if (owner !== target && groupOf(candidate) === group) edits.push({ name: candidate, enabled: false })
             }
           }
+        } else {
+          const target = packageNameOf(name)
+          const group = view.groupOf(target, pool)
+          if (group !== undefined) {
+            const remaining = [...view.enabledPackages(pool)].filter(candidate => {
+              if (candidate === target) return false
+              return view.groupOf(candidate, pool) === group
+            })
+            if (defaultNames.has(target) && remaining.length === 0) {
+              throw new RpcBusinessError({
+                code: 'bad-request',
+                details: { issues: [`${target} 是内置默认，停用前必须先启用同组替代插件`] },
+              })
+            }
+            if (remaining.length === 0) {
+              const fallback = loadBuiltinLayer(layers.handles.builtinLayerPath)
+                .find(entry => entry.default === true && view.groupOf(packageNameOf(entry.name as string), pool) === group)
+              if (fallback !== undefined && packageNameOf(fallback.name as string) !== target) {
+                edits.push({ name: fallback.name as string, enabled: true })
+              }
+            }
+          }
         }
         await mutate(() => layers.setUserRows(edits))
         audit.record({
@@ -502,7 +539,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         if (presetDir === undefined) {
           throw new RpcBusinessError({ code: 'unavailable', details: { what: 'no preset directory is configured' } })
         }
-        const shipped = view.shippedNames()
+        const shipped = view.reservedNames()
         // Re-read the original archive: the preview's member zips were swept
         // when its inspection returned, and installs must consume a fresh,
         // digest-free local archive exactly as handed in.

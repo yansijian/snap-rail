@@ -36,13 +36,15 @@ Agent 即可，无需阅读 snap-rail 源码。
 | `host-service` | 宿主 | 宿主服务（注册能力 / wire 方法与帧） |
 | `tool` | 宿主 | 独立工具（工具互不依赖） |
 | `suite` | 双面 | 业务套件（场景私有宿主逻辑 + 场景界面，单活） |
-| `ui-view` | 渲染 | 一个挂进 `shell.view` 的界面（React + 框架原语） |
-| `ui-layout` | 渲染 | 布局（接管槽位编排） |
+| `ui-view` | 渲染 | 注册进 `ctx.pages` 的页面（React + `@snap-rail/ui/components`） |
+| `ui-layout` | 渲染 | 布局（声明 `provides` + `window`/`ball` profile） |
 | `ui-extension` | 渲染 | 共享组件贡献（`client.seeds`，供其他组件插件复用） |
+| `ui-skin` | 渲染 | 界面皮肤（`kind: 'skin'`、`exclusive: 'skin'`、token + part CSS） |
 
-UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`；`--framework
-<package[@range]>` 可换绑（框架绑定就是 manifest `requires` 里的一条
-`name@range`，没有独立的 framework 字段）。
+UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它随应用内置，**不是**
+`requires` 条目，也不需要 framework 绑定。`--framework <pkg[@range]>` 仅作为
+类型/构建包的覆盖入口保留。渲染面插件用 `snapRail.uiProfile` 声明
+native/integrated/custom（管理页徽标，不做门禁）。
 
 ## CLI / 命令
 
@@ -78,8 +80,8 @@ SDK 的 dependencies 与终端 base 运行时，不是可安装插件：不要�
 
 `@snap-rail/plugin-sdk`（含 `/api` 与 `/api/client`）、`@snap-rail/protocol`
 （wire 契约）、`@snap-rail/store`、`@snap-rail/equipment`、
-`@snap-rail/cordis`、`@snap-rail/cosmokit`；UI 模板另需
-`@snap-rail/framework-shadcn`。
+`@snap-rail/cordis`、`@snap-rail/cosmokit`；UI 模板另需内置语义基座
+`@snap-rail/ui`（仅类型/构建依赖，运行时由 base 种子提供）。
 
 `@snap-rail/gateway` / `@snap-rail/connection` / `@snap-rail/settings` 由
 SDK 传递安装，作者不需要在 `package.json` 里单列。

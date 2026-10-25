@@ -51,8 +51,8 @@ export const DOCK_SNAP_PX = 16
 export const DOCK_TUCK_DELAY_MS = 600
 
 /** Pixels of the ball window that stay inside the work area while parked. */
-export function visiblePxOf(size: Size): number {
-  return Math.max(1, Math.round(Math.min(size.width, size.height) * BALL_SURFACE.dockVisibleRatio))
+export function visiblePxOf(size: Size, ratio: number = BALL_SURFACE.dockVisibleRatio): number {
+  return Math.max(1, Math.round(Math.min(size.width, size.height) * ratio))
 }
 
 /**

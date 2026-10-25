@@ -17,7 +17,7 @@ jobs:
     env:
       # 只装 electron 的 npm 包（类型），二进制不下载——本流水线不打包桌面应用
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      SNAP_RAIL_EXTERNAL_REPOS: snap-rail-framework-shadcn,snap-rail-driver-modbus,snap-rail-driver-enip,snap-rail-suite-terminal-ops
+      SNAP_RAIL_EXTERNAL_REPOS: snap-rail-driver-modbus,snap-rail-driver-enip
     steps:
       - name: Checkout
         # job 容器在默认桥接网络，解析不了 runner 的内网注册地址（gitea:3000），
@@ -71,10 +71,8 @@ jobs:
         run: |
           pnpm exec tsc -b tsconfig.bootstrap.json
           pnpm exec tsdown --config tsdown.bootstrap.config.ts
-          pnpm --filter @snap-rail/framework-shadcn run build
           pnpm --filter @snap-rail/driver-modbus run build
           pnpm --filter @snap-rail/driver-enip run build
-          pnpm --filter @snap-rail/suite-terminal-ops run build
       - run: pnpm run build
       - name: pack first-party split plugins (signed)
         env:
@@ -83,7 +81,7 @@ jobs:
         run: |
           printf '%s' "$SIGN_KEY" | base64 -d > release.private.pem
           mkdir -p collect-dl
-          for repo in snap-rail-framework-shadcn snap-rail-driver-modbus snap-rail-driver-enip snap-rail-suite-terminal-ops; do
+          for repo in snap-rail-driver-modbus snap-rail-driver-enip; do
             node packages/base/plugin-sdk/lib/cli.js pack "external/$repo" \
               --out "external/$repo/dist" \
               --sign-key release.private.pem \

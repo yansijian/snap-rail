@@ -38,7 +38,7 @@ for (const page of pages) {
 requireText('index.html', '接上设备', 'H1 outcome')
 requireText('index.html', 'data-download="installer"', 'installer CTA')
 requireText('index.html', 'media/hero-test-top.webp', 'real hero screenshot')
-requireText('index.html', 'data-image="scenario-standard-base"', 'standard-base screenshot slot')
+requireText('index.html', 'data-image="scenario-standard-base"', 'built-in base screenshot slot')
 requireText('index.html', 'https://www.snap-rail.top/og.png', 'production og:image origin')
 requireText('scenarios.html', 'id="combos"', 'combo mount')
 requireText('plugins.html', 'id="plugin-catalog"', 'catalog mount')
@@ -47,7 +47,7 @@ requireText('plugins.html', 'href="./dev.html"', 'local plugin-dev link')
 requireText('dev.html', 'id="dev-doc"', 'doc mount')
 requireText('dev.html', 'id="doc-toc"', 'doc TOC mount')
 requireText('start.html', 'id="download"', 'download section')
-requireText('start.html', 'data-combo="standard-base"', 'standard-base download')
+requireText('start.html', 'data-download="installer"', 'installer download')
 requireText('vite.config.ts', "scenarios: 'scenarios.html'", 'scenarios entry')
 requireText('vite.config.ts', "dev: 'dev.html'", 'dev entry')
 requireText('vite.config.ts', "start: 'start.html'", 'start entry')
@@ -65,16 +65,17 @@ requireText('public/sitemap.xml', 'https://www.snap-rail.top/dev.html', 'dev pag
 requireText('public/robots.txt', 'https://www.snap-rail.top/sitemap.xml', 'robots sitemap origin')
 
 // The generated doc body must carry the contract every reader needs: the
-// one-command start, all eight templates, and the publish flow.
+// one-command start, all nine templates, and the publish flow.
 const devPage = read('src/generated/dev-page.ts')
 for (const needle of [
   'pnpm dlx @snap-rail/plugin-sdk',
-  // The eight templates each appear code-wrapped in the doc's template table.
+  // The nine templates each appear code-wrapped in the doc's template table.
   '<code>driver</code>',
   '<code>store-provider</code>',
   '<code>ui-view</code>',
   '<code>ui-layout</code>',
   '<code>ui-extension</code>',
+  '<code>ui-skin</code>',
   '<code>host-service</code>',
   '<code>tool</code>',
   '<code>suite</code>',

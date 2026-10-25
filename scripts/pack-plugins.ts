@@ -25,36 +25,16 @@ import { catalogEntryFromZip } from './lib/catalog-entry.ts'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-/** The packages shipped as installable zips — the base catalog. The
- * publish pipeline reuses the list to enrich `catalog.json` from the repo
- * sources (author, repository, readme), so it lives here: the shipment
- * list has exactly one home. Installable non-base plugins (framework,
- * drivers, suites) live in their own repositories and reach the feed
- * through the collect pipeline (docs/split-runbook.md §3). */
-export const PLUGIN_PACKAGES: readonly ReleaseSpec[] = [
-  // 存储后端：drizzle 查询构建器规范的 node:sqlite 实现（全局单活）。
-  {
-    name: '@snap-rail/store-sqlite',
-    dir: join(repoRoot, 'packages/store/store-sqlite'),
-    hostDir: 'lib',
-    hostFace: 'lib/index.js',
-  },
-  // 设备底座：配置表 + 点运行时 + 驱动注册缝；./rpc 是设置页/渲染端的
-  // wire 桥（启用两行：本包 + @snap-rail/equipment/rpc）。
-  {
-    name: '@snap-rail/equipment',
-    dir: join(repoRoot, 'packages/equipment/equipment'),
-    hostDir: 'lib',
-    hostFace: 'lib/index.js',
-    exports: { './rpc': 'lib/rpc.js', './contract': 'lib/contract.js' },
-  },
-  // 统一设备管理页（clientOnly）；设置外壳与一方三页随框架包发布。
-  {
-    name: '@snap-rail/equipment-station',
-    dir: join(repoRoot, 'packages/ui/equipment-station'),
-    clientFace: 'lib-client',
-  },
-]
+/** The packages shipped as installable zips — the base catalog. The publish
+ * pipeline reuses the list to enrich `catalog.json` from the repo sources
+ * (author, repository, readme), so it lives here: the shipment list has
+ * exactly one home. It is **empty on purpose**: store-sqlite, equipment, the
+ * equipment-station page library and the whole UI substrate are built-in
+ * defaults since the UI refactor, and a zip sharing a built-in name is refused
+ * at install. Everything installable — drivers, extra skins, business pages,
+ * suites — lives in its own repository and reaches the feed through the
+ * collect pipeline (docs/split-runbook.md). */
+export const PLUGIN_PACKAGES: readonly ReleaseSpec[] = []
 
 function dirname(path: string): string {
   const index = path.replaceAll('\\', '/').lastIndexOf('/')

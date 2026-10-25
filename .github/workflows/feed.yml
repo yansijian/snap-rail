@@ -44,10 +44,11 @@ jobs:
       RELEASE_PRIVATE_PEM: ${{ secrets.RELEASE_PRIVATE_PEM }}
       RELEASE_KEY_ID: ${{ secrets.RELEASE_KEY_ID }}
       RELEASE_PUBLISHER: ${{ secrets.RELEASE_PUBLISHER }}
-      # The feed packs every first-party plugin from source: the framework and
-      # modbus are already needed by the app build, the suite and enip driver
-      # join here so the feed never depends on their own release cadence.
-      SNAP_RAIL_EXTERNAL_REPOS: snap-rail-framework-shadcn,snap-rail-driver-modbus,snap-rail-driver-enip,snap-rail-suite-terminal-ops
+      # The feed packs every first-party installable plugin from source: the
+      # drivers join here so the feed never depends on their own release
+      # cadence. The UI substrate and business pages are built in and never
+      # ship as plugins.
+      SNAP_RAIL_EXTERNAL_REPOS: snap-rail-driver-modbus,snap-rail-driver-enip
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,7 +65,6 @@ jobs:
       - name: build the feed-only split plugin faces
         run: |
           pnpm --filter @snap-rail/driver-enip run build
-          pnpm --filter @snap-rail/suite-terminal-ops run build
 
       - name: download the latest versioned installer trio
         run: |
@@ -94,7 +94,7 @@ jobs:
         run: |
           printf '%s' "$RELEASE_PRIVATE_PEM" | base64 -d > release.private.pem
           mkdir -p collect-dl
-          for repo in snap-rail-framework-shadcn snap-rail-driver-modbus snap-rail-driver-enip snap-rail-suite-terminal-ops; do
+          for repo in snap-rail-driver-modbus snap-rail-driver-enip; do
             node packages/base/plugin-sdk/lib/cli.js pack "external/$repo" \
               --out "external/$repo/dist" \
               --sign-key release.private.pem \

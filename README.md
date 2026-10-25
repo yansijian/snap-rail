@@ -13,16 +13,18 @@ Electron 宿主。基于 vendored Cordis 元框架；一期交付核心 + 插件
 - **主进程**跑 Cordis 宿主树：内置层清单（只读，**随包只带 base**）+
   用户层 userData `plugins.yml`（可被页面按钮、手编、Agent 编辑——文件即
   接口）合成出实际挂载的插件集，watch 热重载、坏配置保持旧树并报错。
-- **其余一切 zip 安装**：store 后端、设备底座、驱动、UI 框架、设置页、
-  工具、业务套件都从 `dist-plugins/*.zip` 装进 `<home>/plugins/` 池
-  （设置页按钮或无框架时的拖拽引导页）；包内 `snapRail.category` 是
-  作者自定义的分类标记，管理页按标记分组；`snapRail.requires` 驱动
-  启用/卸载的依赖预检。
+- **出厂底座内置、其余 zip 安装**：base 启动链 + `@snap-rail/ui` 语义基座、
+  默认皮肤、设置/插件管理/外观/设备管理页，以及内置默认的 store-sqlite 与
+  equipment 都随应用发布；驱动、额外皮肤、业务页面与套件从
+  `dist-plugins/*.zip` 装进 `<home>/plugins/` 池（设置页「安装插件」或引导页
+  拖拽）；包内 `snapRail.category` 是作者自定义的分类标记，管理页按标记
+  分组；`snapRail.requires` 驱动启用/卸载的依赖预检。
 - **点表缝** `ctx.points`：连接注册点位、推送样本（`null`=异常）、
   路由写入；modbus 驱动是纯协议适配器的范本。
 - **renderer** 是投影客户端：preload 只暴露 `invoke`/`openStream`/
-  `zipPathOf` 三原语，四象限 RPC 协议在此之上类型化；框架、布局、
-  标题栏、看板、管理页全部是插件，没有框架时内置引导页兜底安装。
+  `zipPathOf` 三原语，四象限 RPC 协议在此之上类型化；内置
+  `@snap-rail/ui` runtime 接管 React root，布局、标题栏、看板、管理页
+  都是插件贡献；没有业务套件时内置回退布局兜底。
 - **独立插件开发**：插件仓库使用公共 npm 的 `@snap-rail/plugin-sdk` 和
   `snap-rail-plugin` CLI，不需要放进本仓库；manifest 依赖声明、Host/Renderer
   面、语义 UI 槽位和 Ed25519 发布签名见
@@ -41,17 +43,19 @@ Electron 宿主。基于 vendored Cordis 元框架；一期交付核心 + 插件
 vendor/      vendored Cordis（rescope @snap-rail/*，见 vendor/README.md）
 packages/    层组 packages/<层>/<包>（snapRail.layer 声明，层序 base→store→equipment→ui→tool→suite）：
   base/        util / plugin-kit / plugin-sdk / settings / audit / protocol /
-               gateway / connection / app-boot / station-rpc / kernel / modules
+               gateway / connection / app-boot / station-rpc / kernel / modules /
+               ui（@snap-rail/ui 语义基座：组件/插槽/皮肤/设置页/runtime）
                （出厂全集，替换经源码重建）
-  store/       store（规范：drizzle 查询构建器即规范，随应用发布）+ store-sqlite（实现，zip 安装，单活）
-  equipment/   equipment（设备连接底座缝，zip 安装）
-  ui/          equipment-station（界面住户，zip、clientOnly；设置外壳随框架包发布）
+  store/       store（规范：drizzle 查询构建器即规范，随应用发布）+
+               store-sqlite（内置默认实现，可被同 exclusive 池插件替换）
+  equipment/   equipment（设备连接底座缝，内置默认；驱动是可安装池插件）
+  ui/          equipment-station（内置「设备管理」设置页页面库，由 desktop 注册）
   tool/        暂无住户（场景逻辑收进套件，不再拆跨包场景工具）
 apps/desktop  Electron 应用（无框窗口、IPC 载体、打包配置；dev overlay 见 dev/）
 docs/         architecture.md（缝目录与决策）、split-runbook.md（多仓拆分）
 独立插件仓（GitHub `yansijian`，内网 Gitea 作镜像；feed 由主仓从源码统一打包）：
-  snap-rail-framework-shadcn（UI 框架插件）、snap-rail-driver-modbus /
-  snap-rail-driver-enip（驱动范本）、snap-rail-suite-terminal-ops（业务套件）
+  snap-rail-driver-modbus / snap-rail-driver-enip（驱动范本）
+  ——UI 基座内置；业务页面与套件由作者自建独立仓
 ```
 
 ## 命令

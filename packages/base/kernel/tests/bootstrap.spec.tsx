@@ -41,7 +41,7 @@ const poolRow = (name: string, enabled: boolean, category?: string): PluginInfo 
   ...(category !== undefined ? { category } : {}),
 })
 
-describe('the no-framework bootstrap page', () => {
+describe('the recovery bootstrap page', () => {
   it('renders the drag hint with the close affordance, and closing returns to the startup page', async () => {
     const { channel } = await makeReady()
     const element = document.createElement('div')
@@ -78,7 +78,7 @@ describe('the no-framework bootstrap page', () => {
     ctx.rpc.claimDomain(ctx, 'window')
     ctx.rpc.method(ctx, 'plugins.list', { request: z.object({}).strict() }, () => ({
       plugins: [
-        poolRow('@snap-rail/framework-shadcn', false, '界面框架'),
+        poolRow('@snap-rail/sample-ui', false, '界面插件'),
         poolRow('@snap-rail/equipment-station', true, '界面'),
         { name: '@snap-rail/settings', source: 'builtin', enabled: true, packageName: '@snap-rail/settings' } as PluginInfo,
       ],
@@ -104,8 +104,8 @@ describe('the no-framework bootstrap page', () => {
 
     // Both pool rows list with their author-named categories; the shipped
     // built-in row stays invisible (un-actionable rows are noise).
-    expect(document.body.textContent).toContain('@snap-rail/framework-shadcn')
-    expect(document.body.textContent).toContain('界面框架')
+    expect(document.body.textContent).toContain('@snap-rail/sample-ui')
+    expect(document.body.textContent).toContain('界面插件')
     expect(document.body.textContent).toContain('@snap-rail/equipment-station')
     expect(document.body.textContent).not.toContain('@snap-rail/settings（')
 
@@ -115,7 +115,7 @@ describe('the no-framework bootstrap page', () => {
     expect(toggles[0]!.checked).toBe(false)
     toggles[0]!.click()
     await flush()
-    expect(calls).toEqual(['@snap-rail/framework-shadcn'])
+    expect(calls).toEqual(['@snap-rail/sample-ui'])
     const restartButton = [...document.querySelectorAll<HTMLButtonElement>('button')]
       .find(button => button.textContent === '重启生效')
     expect(restartButton).not.toBeNull()
@@ -146,7 +146,7 @@ describe('the no-framework bootstrap page', () => {
       plugins: [
         { name: '@snap-rail/store-sqlite', version: '0.1.0', action: 'current', source: 'feed.example' },
         {
-          name: '@snap-rail/framework-shadcn', version: '0.1.4', file: '@snap-rail__framework-shadcn.zip',
+          name: '@snap-rail/sample-ui', version: '0.1.4', file: '@snap-rail__sample-ui.zip',
           action: 'install', source: 'feed.example', feedUrl: 'http://feed.example/plugins/',
         },
       ],
@@ -167,7 +167,7 @@ describe('the no-framework bootstrap page', () => {
         archive: {
           kind: 'plugin' as const,
           plugin: {
-            name: '@snap-rail/framework-shadcn', version: '0.1.4', permissions: [], hasClient: true,
+            name: '@snap-rail/sample-ui', version: '0.1.4', permissions: [], hasClient: true,
             requires: [], missing: [], action: 'install' as const,
             signature: { state: 'unverified', reason: 'unsigned' } as const,
           },
@@ -179,8 +179,8 @@ describe('the no-framework bootstrap page', () => {
       request: z.object({ zipPath: z.string() }).strict(),
     }, ({ zipPath }) => {
       calls.push(`install:${zipPath}`)
-      installed = [poolRow('@snap-rail/framework-shadcn', false, '界面框架')]
-      return { installed: { name: '@snap-rail/framework-shadcn', version: '0.1.4', updated: false } }
+      installed = [poolRow('@snap-rail/sample-ui', false, '界面插件')]
+      return { installed: { name: '@snap-rail/sample-ui', version: '0.1.4', updated: false } }
     })
     const channel = inProcessChannel(ctx)
 
@@ -207,15 +207,15 @@ describe('the no-framework bootstrap page', () => {
     // and its source; the 安装 previews through the address pipeline (the
     // entry's own feed base + file).
     const input = document.querySelector<HTMLInputElement>('input[placeholder^="粘贴本地/网络地址"]')!
-    fireEvent.change(input, { target: { value: 'framework' } })
+    fireEvent.change(input, { target: { value: 'sample' } })
     ;[...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '搜索')!.click()
     await flush()
-    expect(document.body.textContent).toContain('@snap-rail/framework-shadcn')
+    expect(document.body.textContent).toContain('@snap-rail/sample-ui')
     expect(document.body.textContent).toContain('feed.example')
     const install = [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '安装')!
     install.click()
     await flush()
-    expect(calls).toContain('inspect-from-url:http://feed.example/plugins/@snap-rail__framework-shadcn.zip')
+    expect(calls).toContain('inspect-from-url:http://feed.example/plugins/@snap-rail__sample-ui.zip')
 
     // The preview shows the unverified signature; the confirm routes through
     // the explicit risk step before the install consumes the temp path.
@@ -223,12 +223,12 @@ describe('the no-framework bootstrap page', () => {
     const confirm = [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '安装' && button.disabled === false)!
     confirm.click()
     await flush()
-    expect(calls).not.toContain('install:temp-@snap-rail__framework-shadcn.zip')
+    expect(calls).not.toContain('install:temp-@snap-rail__sample-ui.zip')
     expect(document.querySelector('[data-bootstrap-risk]')).not.toBeNull()
     ;[...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '我知晓风险，仍要安装')!.click()
     await flush()
-    expect(calls).toContain('install:temp-@snap-rail__framework-shadcn.zip')
-    expect(document.body.textContent).toContain('@snap-rail/framework-shadcn')
+    expect(calls).toContain('install:temp-@snap-rail__sample-ui.zip')
+    expect(document.body.textContent).toContain('@snap-rail/sample-ui')
 
     handle.root.unmount()
     element.remove()

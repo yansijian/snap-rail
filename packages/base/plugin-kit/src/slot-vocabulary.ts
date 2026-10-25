@@ -1,6 +1,6 @@
 /**
- * Authoring helper for UI framework packages: define the package's slot
- * vocabulary in one place and get a runtime membership guard for it. A
+ * Authoring helper for UI packages: define the package's slot vocabulary in
+ * one place and get a runtime membership guard for it. A
  * vocabulary is plain data — a `shell.menu`-style dotted id table plus the
  * reserved `custom:<publisher>.<name>` extension namespace — and every
  * consumer (components, layouts) checks membership through the returned
@@ -8,9 +8,9 @@
  * `as const` object so consumers get autocomplete and compile-time
  * misspelling errors from the literal-union type (`SlotIdOf`).
  *
- * The shipped framework (@snap-rail/framework-shadcn) implements the same
- * contract inline (`UI_SLOT_IDS`/`isValidUiSlotId`); new frameworks start
- * here.
+ * The built-in UI substrate (`@snap-rail/ui`) owns the canonical
+ * `UI_SLOT_IDS`/`isValidSlotId` vocabulary; page/layout/skin plugins consume
+ * that contract instead of declaring a parallel one.
  *
  * @module @snap-rail/plugin-kit/slot-vocabulary
  */

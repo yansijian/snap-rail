@@ -125,15 +125,16 @@ describe('seed tiers', () => {
     expect(SEED_MODULES.filter(id => id.includes('suite-') || id.includes('driver-') || id.includes('trend'))).toEqual([])
     // No host entries: the node side must never enter the client graph.
     expect(SEED_MODULES.filter(id => id === '@snap-rail/equipment' || id === '@snap-rail/store')).toEqual([])
-    // The framework's faces are NOT base — they arrive with the installed
-    // framework's client face.
-    expect(SEED_MODULES.filter(id => id.startsWith('@snap-rail/framework-shadcn'))).toEqual([])
+    // The semantic UI substrate is base: every page/skin shares these exact
+    // instances, and there is no framework plugin to install.
+    expect(SEED_MODULES).toContain('@snap-rail/ui')
+    expect(SEED_MODULES).toContain('@snap-rail/ui/components')
+    expect(SEED_MODULES).toContain('@snap-rail/ui/runtime')
+    expect(SEED_MODULES).toContain('@snap-rail/ui/charts')
   })
 
-  it('contributed tier: the framework faces only; the union is the external surface', () => {
-    expect(CONTRIBUTED_SEED_MODULES).toContain('@snap-rail/framework-shadcn/ui')
-    expect(CONTRIBUTED_SEED_MODULES).toContain('@snap-rail/framework-shadcn/runtime')
-    expect(CONTRIBUTED_SEED_MODULES.every(id => id.startsWith('@snap-rail/framework-shadcn/'))).toBe(true)
+  it('contributed tier is empty until an extension provider contributes seeds', () => {
+    expect(CONTRIBUTED_SEED_MODULES).toEqual([])
     expect([...CLIENT_EXTERNALS].sort()).toEqual([...new Set([...SEED_MODULES, ...CONTRIBUTED_SEED_MODULES])].sort())
   })
 

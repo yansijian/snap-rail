@@ -52,6 +52,7 @@
   "snapRail": {
     "layer": "equipment",
     "category": "设备",
+    "exclusive": "equipment-core",
     "requires": [
       "service:store"
     ],

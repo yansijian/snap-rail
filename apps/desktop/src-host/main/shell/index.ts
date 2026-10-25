@@ -20,7 +20,8 @@
  * @module @snap-rail/desktop/main/shell
  */
 
-import { app, BrowserWindow, Notification } from 'electron'
+import { app, BrowserWindow, Notification, screen } from 'electron'
+import { z } from 'zod'
 import { Context, type Plugin } from '@snap-rail/cordis'
 import type { GatewayService } from '@snap-rail/gateway'
 import type { SettingsService } from '@snap-rail/settings'
@@ -28,11 +29,21 @@ import type { AuxSurfaceId, SurfaceId } from '@snap-rail/protocol'
 import {
   EXIT_DECISIONS,
   SHELL_LIMITS,
+  WINDOW_LIMITS,
+  ballProfileSchema,
+  resolveBallProfile,
+  resolveWindowProfile,
   shellContract,
+  windowProfileSchema,
   type BallDockEdge,
   type BallDockState,
   type BallPatch,
+  type BallProfile,
+  type BallProfileApplyResult,
   type BallState,
+  type ResolvedBallProfile,
+  type ResolvedWindowProfile,
+  type ShellBallProfileState,
   type ShellExitAction,
   type ShellExitDecision,
   type ShellExitDisposition,
@@ -42,7 +53,11 @@ import {
   type ShellNotificationResult,
   type ShellResult,
   type ShellService,
+  type ShellWindowProfileState,
   type SurfaceState,
+  type UiProfileSource,
+  type WindowProfile,
+  type WindowProfileApplyResult,
 } from '@snap-rail/shell'
 import { createShellMachine } from './machine.ts'
 import { createTrayHost } from './tray.ts'
@@ -50,6 +65,25 @@ import { createSurfaceHost, type SurfaceHostOptions } from './surfaces.ts'
 
 /** Settings key remembering where the ball was left. */
 export const BALL_POSITION_KEY = 'shell.ballPosition'
+
+/** Settings key carrying the operator's explicit window profile. */
+export const WINDOW_PROFILE_KEY = 'ui.window'
+
+/** Settings key carrying the operator's explicit ball profile. */
+export const BALL_PROFILE_KEY = 'ui.ball'
+
+/** Settings key carrying the last manual operator-window bounds. */
+export const WINDOW_STATE_KEY = 'shell.windowState'
+
+/** The persisted manual window state. */
+interface SavedWindowState {
+  x: number
+  y: number
+  width: number
+  height: number
+  maximized: boolean
+  fullscreen: boolean
+}
 
 /** What the desktop entry hands the adapter. */
 export interface DesktopShellOptions {
@@ -89,6 +123,170 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
     const settings: SettingsService = ctx.settings
     const logger = ctx.logger('desktop-shell')
     const machine = createShellMachine()
+
+    const readSetting = <T>(schema: { safeParse(value: unknown): { success: true, data: T } | { success: false } }, key: string): T | undefined => {
+      const raw = settings.get<unknown>(key)
+      if (raw === undefined) return undefined
+      const parsed = schema.safeParse(raw)
+      return parsed.success ? parsed.data : undefined
+    }
+    const savedWindowRaw = settings.get<Record<string, unknown>>(WINDOW_STATE_KEY)
+    const savedWindow: SavedWindowState | undefined = (
+      savedWindowRaw !== undefined
+      && typeof savedWindowRaw.x === 'number'
+      && typeof savedWindowRaw.y === 'number'
+      && typeof savedWindowRaw.width === 'number'
+      && typeof savedWindowRaw.height === 'number'
+    )
+      ? {
+          x: savedWindowRaw.x,
+          y: savedWindowRaw.y,
+          width: savedWindowRaw.width,
+          height: savedWindowRaw.height,
+          maximized: savedWindowRaw.maximized === true,
+          fullscreen: savedWindowRaw.fullscreen === true,
+        }
+      : undefined
+    const userWindow = readSetting(windowProfileSchema, WINDOW_PROFILE_KEY) as WindowProfile | undefined
+    const userBall = readSetting(ballProfileSchema, BALL_PROFILE_KEY) as BallProfile | undefined
+    let windowSource: UiProfileSource = userWindow !== undefined ? 'user' : savedWindow !== undefined ? 'persisted' : 'default'
+    let windowProfile: ResolvedWindowProfile = resolveWindowProfile(
+      userWindow !== undefined
+        ? userWindow
+        : savedWindow === undefined
+          ? {}
+          : {
+              width: savedWindow.width,
+              height: savedWindow.height,
+              mode: savedWindow.fullscreen ? 'fullscreen' : savedWindow.maximized ? 'maximized' : 'windowed',
+            },
+      screen.getPrimaryDisplay().workArea,
+    )
+    let windowRemember = windowProfile.remember
+    let windowManual = userWindow !== undefined || savedWindow !== undefined
+    let ballSource: UiProfileSource = userBall !== undefined ? 'user' : 'default'
+    let ballProfile: ResolvedBallProfile = resolveBallProfile(userBall)
+    let applyingWindow = false
+    let windowSaveTimer: ReturnType<typeof setTimeout> | undefined
+
+    /** The current operator-window profile state. */
+    const windowProfileState = (): ShellWindowProfileState => ({ profile: windowProfile, source: windowSource })
+
+    /** The current floating-ball profile state. */
+    const ballProfileState = (): ShellBallProfileState => ({ profile: ballProfile, source: ballSource })
+
+    /** The work area that contains the window's current bounds (or the primary). */
+    const workAreaOf = (win: BrowserWindow): { x: number, y: number, width: number, height: number } => {
+      try {
+        return screen.getDisplayMatching(win.getBounds()).workArea
+      } catch {
+        return screen.getPrimaryDisplay().workArea
+      }
+    }
+
+    /** Apply a resolved window profile to a live window. */
+    const applyWindowProfile = (win: BrowserWindow, profile: ResolvedWindowProfile, bounds?: SavedWindowState): void => {
+      applyingWindow = true
+      try {
+        win.setResizable(profile.resizable)
+        if (profile.mode === 'fullscreen') {
+          win.setFullScreen(true)
+        } else if (profile.mode === 'maximized') {
+          if (win.isFullScreen()) win.setFullScreen(false)
+          win.maximize()
+        } else {
+          if (win.isFullScreen()) win.setFullScreen(false)
+          if (win.isMaximized()) win.unmaximize()
+          const work = workAreaOf(win)
+          const x = bounds !== undefined
+            ? Math.min(Math.max(bounds.x, work.x), work.x + Math.max(0, work.width - WINDOW_LIMITS.minVisiblePx))
+            : work.x + Math.round((work.width - profile.width) / 2)
+          const y = bounds !== undefined
+            ? Math.min(Math.max(bounds.y, work.y), work.y + Math.max(0, work.height - WINDOW_LIMITS.minVisiblePx))
+            : work.y + Math.round((work.height - profile.height) / 2)
+          win.setBounds({ x, y, width: profile.width, height: profile.height })
+        }
+      } finally {
+        applyingWindow = false
+      }
+    }
+
+    /** Persist manual bounds (debounced) and remember the operator's override. */
+    const scheduleWindowSave = (win: BrowserWindow): void => {
+      if (!windowRemember || applyingWindow || win.isDestroyed()) return
+      if (windowSaveTimer !== undefined) clearTimeout(windowSaveTimer)
+      windowSaveTimer = setTimeout(() => {
+        if (win.isDestroyed()) return
+        const bounds = win.getBounds()
+        const state: SavedWindowState = {
+          x: bounds.x,
+          y: bounds.y,
+          width: win.isMaximized() || win.isFullScreen() ? bounds.width : bounds.width,
+          height: bounds.height,
+          maximized: win.isMaximized(),
+          fullscreen: win.isFullScreen(),
+        }
+        settings.set(WINDOW_STATE_KEY, state)
+        windowManual = true
+        windowSource = 'persisted'
+        windowProfile = resolveWindowProfile(
+          {
+            width: state.width,
+            height: state.height,
+            mode: state.fullscreen ? 'fullscreen' : state.maximized ? 'maximized' : 'windowed',
+            remember: true,
+          },
+          workAreaOf(win),
+        )
+        publishWindowProfile()
+      }, 300)
+    }
+
+    /** Emit the host event; the wire bridge forwards it to every renderer. */
+    const publishWindowProfile = (): void => {
+      ctx.emit('shell/window-profile-changed', windowProfileState())
+    }
+
+    /** Emit the ball profile event. */
+    const publishBallProfile = (): void => {
+      ctx.emit('shell/ball-profile-changed', ballProfileState())
+    }
+
+    /** Apply a requested window profile, honouring explicit user overrides. */
+    const configureWindow = (request: WindowProfile): WindowProfileApplyResult => {
+      if (windowManual || windowSource === 'user') {
+        return {
+          applied: false,
+          profile: windowProfile,
+          source: windowSource,
+          reason: '用户已固定窗口设置；请在外观设置中恢复“跟随布局”。',
+        }
+      }
+      const win = surfaces.windowOf('main')
+      const work = win === undefined ? screen.getPrimaryDisplay().workArea : workAreaOf(win)
+      windowProfile = resolveWindowProfile(request, work)
+      windowRemember = windowProfile.remember
+      windowSource = 'layout'
+      if (win !== undefined && !win.isDestroyed()) applyWindowProfile(win, windowProfile)
+      publishWindowProfile()
+      return { applied: true, profile: windowProfile, source: windowSource }
+    }
+
+    /** Apply a requested ball profile, honouring explicit user overrides. */
+    const configureBall = (request: BallProfile): BallProfileApplyResult => {
+      if (ballSource === 'user') {
+        return {
+          applied: false,
+          profile: ballProfile,
+          source: ballSource,
+          reason: '用户已固定悬浮球设置；请在外观设置中恢复“跟随布局”。',
+        }
+      }
+      ballProfile = surfaces.setBallProfile(request)
+      ballSource = 'layout'
+      publishBallProfile()
+      return { applied: true, profile: ballProfile, source: ballSource }
+    }
 
     /**
      * The app is leaving through the front door (a `quit` disposition, the
@@ -132,6 +330,16 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         ctx.emit('shell/ball-dock-changed', state)
       },
       onMainWindowAttached: win => {
+        // Apply the effective stage before the window is shown (the app entry
+        // waits for ready-to-show), so there is no 1280×800 flash.
+        applyWindowProfile(win, windowProfile, windowSource === 'persisted' ? savedWindow : undefined)
+        win.on('resize', () => scheduleWindowSave(win))
+        win.on('move', () => scheduleWindowSave(win))
+        win.on('maximize', () => scheduleWindowSave(win))
+        win.on('unmaximize', () => scheduleWindowSave(win))
+        win.on('enter-full-screen', () => scheduleWindowSave(win))
+        win.on('leave-full-screen', () => scheduleWindowSave(win))
+
         // The operator window's close is the exit policy's to decide: hold
         // the window open, park it, or end the app.
         win.on('close', event => {
@@ -143,6 +351,45 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         // re-asserts exclusivity: the operator window takes the screen.
         win.on('show', () => hideAuxSurfaces())
       },
+    })
+    surfaces.setBallProfile(ballProfile)
+
+    // The appearance page writes the same settings keys the boot path reads;
+    // apply them live so operators do not need a restart for a resize.
+    ctx.on('settings/changed', (key, value) => {
+      if (key === WINDOW_PROFILE_KEY) {
+        const win = surfaces.windowOf('main')
+        if (value === null || value === undefined) {
+          windowManual = false
+          windowSource = 'default'
+          windowProfile = resolveWindowProfile({}, win === undefined ? screen.getPrimaryDisplay().workArea : workAreaOf(win))
+          if (win !== undefined && !win.isDestroyed()) applyWindowProfile(win, windowProfile)
+          publishWindowProfile()
+          return
+        }
+        const parsed = windowProfileSchema.safeParse(value)
+        if (!parsed.success) return
+        const work = win === undefined ? screen.getPrimaryDisplay().workArea : workAreaOf(win)
+        windowProfile = resolveWindowProfile(parsed.data as WindowProfile, work)
+        windowRemember = windowProfile.remember
+        windowManual = true
+        windowSource = 'user'
+        if (win !== undefined && !win.isDestroyed()) applyWindowProfile(win, windowProfile)
+        publishWindowProfile()
+      }
+      if (key === BALL_PROFILE_KEY) {
+        if (value === null || value === undefined) {
+          ballProfile = surfaces.setBallProfile({})
+          ballSource = 'default'
+          publishBallProfile()
+          return
+        }
+        const parsed = ballProfileSchema.safeParse(value)
+        if (!parsed.success) return
+        ballProfile = surfaces.setBallProfile(parsed.data as BallProfile)
+        ballSource = 'user'
+        publishBallProfile()
+      }
     })
 
     /** Tell every surface (and every host plugin) that a window changed. */
@@ -184,6 +431,14 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
           present('main')
         }
       },
+      openSettings: () => {
+        present('main')
+        rpc.broadcast('shell/settings-open-requested', {})
+      },
+      recovery: () => {
+        app.relaunch({ args: [...process.argv.slice(1), '--safe-mode'] })
+        app.exit(0)
+      },
       quit: () => {
         applyExit('tray', machine.exitDecision('tray'))
       },
@@ -204,6 +459,9 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         const ok = surfaces.present(surface)
         if (ok) publishSurface(surface)
         return resultOf(ok, `无法显示窗口 ${surface}`)
+      }
+      if (surface === 'ball' && !ballProfile.enabled) {
+        return { applied: false, reason: 'unavailable', message: '悬浮球已被当前布局禁用' }
       }
       const mainWin = surfaces.windowOf('main')
       const mainVisible = mainWin !== undefined && !mainWin.isDestroyed() && mainWin.isVisible()
@@ -379,8 +637,12 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
           ctx.emit('shell/ball-changed', next)
           return next
         },
+        profile: () => ballProfileState(),
+        setProfile: (_caller, profile) => configureBall(profile),
       },
       window: {
+        profile: () => windowProfileState(),
+        setProfile: (_caller, profile) => configureWindow(profile),
         setExitPolicy: (caller, policy) => {
           for (const key of ['close', 'quit'] as const) {
             const value = policy[key]
@@ -407,12 +669,15 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
     // The Shell domain is this plugin's wire identity; every method and frame
     // below rides it (serveContract asserts the claim and refuses otherwise).
     rpc.claimDomain(ctx, 'shell')
+    rpc.frame(ctx, 'shell/settings-open-requested', { payload: z.object({}).strict() })
 
     // Every surface, ball, dock, and exit change reaches the renderer over
     // the wire as a frame; the bridge keeps the host-side event and the wire
     // frame on one path so a host plugin and a renderer see the same sequence.
     rpc.bridgeEvent(ctx, 'shell/surface-changed', 'shell/surface-changed', (state: SurfaceState) => state)
     rpc.bridgeEvent(ctx, 'shell/ball-changed', 'shell/ball-changed', (state: BallState) => state)
+    rpc.bridgeEvent(ctx, 'shell/window-profile-changed', 'shell/window-profile-changed', (state: ShellWindowProfileState) => state)
+    rpc.bridgeEvent(ctx, 'shell/ball-profile-changed', 'shell/ball-profile-changed', (state: ShellBallProfileState) => state)
     rpc.bridgeEvent(ctx, 'shell/ball-dock-changed', 'shell/ball-dock-changed', (state: BallDockState) => state)
     rpc.bridgeEvent(ctx, 'shell/exit-requested', 'shell/exit-requested', (request: ShellExitRequest) => request)
 
@@ -436,6 +701,10 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       'shell.surface.present': ({ surface }) => outcomeOf(present(surface)),
       'shell.surface.hide': ({ surface }) => outcomeOf(hide(surface)),
       'shell.surface.state': () => surfaces.states(),
+      'shell.window.profile': () => windowProfileState(),
+      'shell.window.configure': ({ profile }) => configureWindow(profile as WindowProfile),
+      'shell.ball.profile': () => ballProfileState(),
+      'shell.ball.configure': ({ profile }) => configureBall(profile as BallProfile),
       'shell.ball.state': () => machine.ballState(),
       'shell.ball.dock': () => surfaces.dockState(),
       'shell.exit.resolve': ({ action }) => outcomeOf(resolveExit(action)),
@@ -450,6 +719,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
     ctx.effect(() => () => {
       app.removeListener('before-quit', onBeforeQuit)
       if (pendingExit !== undefined) clearTimeout(pendingExit.timer)
+      if (windowSaveTimer !== undefined) clearTimeout(windowSaveTimer)
       tray.dispose()
       surfaces.dispose()
     })

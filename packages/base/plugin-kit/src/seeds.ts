@@ -43,6 +43,16 @@ export const SEED_MODULES: readonly string[] = [
   '@snap-rail/station-rpc/contract',
   '@snap-rail/app-boot/contract',
   '@snap-rail/equipment/contract',
+  '@snap-rail/ui',
+  '@snap-rail/ui/components',
+  '@snap-rail/ui/charts',
+  '@snap-rail/ui/contract',
+  '@snap-rail/ui/slots',
+  '@snap-rail/ui/skins',
+  '@snap-rail/ui/settings',
+  '@snap-rail/ui/runtime',
+  '@snap-rail/ui/pages',
+  '@snap-rail/ui/fallback',
   '@snap-rail/util',
   'zod',
 ]
@@ -57,17 +67,7 @@ export const SEED_MODULES: readonly string[] = [
  * suite package. A third-party framework contributes its own ids; this
  * list covers the in-repo builds.
  */
-export const CONTRIBUTED_SEED_MODULES: readonly string[] = [
-  '@snap-rail/framework-shadcn/ui',
-  '@snap-rail/framework-shadcn/slots',
-  '@snap-rail/framework-shadcn/semantic',
-  '@snap-rail/framework-shadcn/settings-pages',
-  '@snap-rail/framework-shadcn/session',
-  '@snap-rail/framework-shadcn/workflows',
-  '@snap-rail/framework-shadcn/variables',
-  '@snap-rail/framework-shadcn/runtime',
-  '@snap-rail/framework-shadcn/fallback',
-]
+export const CONTRIBUTED_SEED_MODULES: readonly string[] = []
 
 /** The full external surface for in-repo client-bundle builds. */
 export const CLIENT_EXTERNALS: readonly string[] = [...SEED_MODULES, ...CONTRIBUTED_SEED_MODULES]
@@ -81,7 +81,7 @@ export const CLIENT_EXTERNALS: readonly string[] = [...SEED_MODULES, ...CONTRIBU
  * renderer (r1 exists because a seed default-import compiled to a namespace
  * where the author meant a class — the shape must be checkable).
  */
-export const SEED_ABI_REVISION = 1
+export const SEED_ABI_REVISION = 2
 
 /** What a client face declares about the seed table it was built against. */
 export interface SeedAbi {

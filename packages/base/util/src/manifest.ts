@@ -42,7 +42,9 @@ export const LAYER_RANK: Readonly<Record<string, number>> = {
 export const LAYER_SEAMS: Readonly<Record<string, string>> = {
   store: '@snap-rail/store',
   equipment: '@snap-rail/equipment',
-  ui: '@snap-rail/framework-shadcn',
+  // The semantic UI substrate is a base package (`@snap-rail/ui`), so every
+  // ui-layer package may import it through the ordinary lower-layer rule.
+  // There is no same-layer ui seam: layouts, pages and skins stay independent.
 }
 
 /** The vendored framework packages — treated as base-ranked imports. */
@@ -62,7 +64,7 @@ export const VENDOR_PACKAGES: readonly string[] = [
  * Whether an import edge from a package of `fromLayer` onto `toPackage`
  * (of `toLayer`) is legal under the layer rules: descend strictly, or land
  * on a lower/equal layer's seam package (drivers onto the equipment seam,
- * store backends onto the store seam, components onto the framework).
+ * store backends onto the store seam).
  */
 export function edgeAllowed(fromLayer: string, toLayer: string, toPackage: string): boolean {
   const from = LAYER_RANK[fromLayer]

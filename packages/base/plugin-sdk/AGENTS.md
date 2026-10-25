@@ -6,10 +6,11 @@ files from the snap-rail workspace.
 
 - Validate `package.json.snapRail` with `definePluginManifest` and declare
   every *plugin* dependency once in `requires` — package names, `name@range`
-  version-constrained packages (the framework binding is such an entry), or
-  `service:` ids. npm type packages (the SDK's `./api` facade,
-  `@snap-rail/protocol`) belong in `dependencies`/`devDependencies`, never in
-  `requires`. `snapRail.framework` / `snapRail.capabilities` are retired.
+  version-constrained packages, or `service:` ids. npm type packages (the
+  SDK's `./api` facade, `@snap-rail/protocol`, `@snap-rail/ui`) belong in
+  `dependencies`/`devDependencies`, never in `requires`.
+  `snapRail.framework` / `snapRail.capabilities` are retired. Renderer
+  plugins declare `uiProfile: native|integrated|custom`.
 - Depend on published SDK and contract packages from public npm. Do not import
   `apps/desktop` or `packages/*/src` from an external plugin.
 - Base service authoring APIs are the SDK's `./api` (host types:
@@ -18,9 +19,10 @@ files from the snap-rail workspace.
   gateway/connection/settings packages are SDK dependencies; external plugins
   must not install or import them directly.
 - Drivers import the pure `@snap-rail/equipment/driver` registration contract
-  and do not own equipment storage. UI plugins register semantic
-  views/layouts/navigation through the
-  framework contract and use shared renderer primitives.
+  and do not own equipment storage. UI plugins register pages
+  (`ctx.pages`), layouts (`ctx.ui`), settings pages (`ctx.settings`) and skins
+  (`ctx.skins`) through `@snap-rail/ui` and use its shared semantic
+  components; `@snap-rail/ui` is a base seed, not a plugin dependency.
 - Store providers implement the store seam and are globally exclusive
   (`snapRail.exclusive: 'store-backend'`); use the pure `@snap-rail/store`
   `StoreService` type and let the provider own its backend. Consumers depend on

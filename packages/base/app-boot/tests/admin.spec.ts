@@ -40,7 +40,16 @@ afterAll(async () => {
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
 })
 
-async function makeWorld(builtinRows?: string[], rendererPackages?: readonly string[]): Promise<World> {
+interface AppPackageFixture {
+  name: string
+  snapRail: Record<string, unknown>
+}
+
+async function makeWorld(
+  builtinRows?: string[],
+  rendererPackages?: readonly string[],
+  appPackages: readonly AppPackageFixture[] = [],
+): Promise<World> {
   const base = mkdtempSync(join(tmpdir(), 'snap-rail-admin-'))
   homes.push(base)
   const home = join(base, 'home')
@@ -63,6 +72,20 @@ async function makeWorld(builtinRows?: string[], rendererPackages?: readonly str
   link('gateway', join(repoRoot, 'packages/base/gateway'))
   link('app-boot', join(repoRoot, 'packages/base/app-boot'))
   link('cordis-plugin-timer', join(repoRoot, 'vendor/timer'))
+  for (const pkg of appPackages) {
+    const short = pkg.name.split('/').at(-1)!
+    const dir = join(scopeDir, short)
+    mkdirSync(join(dir, 'lib'), { recursive: true })
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      name: pkg.name,
+      version: '1.0.0',
+      type: 'module',
+      main: 'lib/index.js',
+      snapRail: pkg.snapRail,
+    }))
+    writeFileSync(join(dir, 'lib', 'index.js'),
+      `export default { name: ${JSON.stringify(short)}, apply(c) { c.provide(${JSON.stringify(short)}, true) } }\n`)
+  }
   writeFileSync(join(appRoot, 'package.json'), JSON.stringify({ name: 'test-app', private: true, type: 'module' }))
 
   const builtinPath = join(base, 'builtin.cordis.yml')
@@ -166,6 +189,54 @@ describe('plugin layers admin', () => {
     // manifest says (a zip can never ship inside the app's builtin layer).
     const builtinOff = await world.client.call('plugins.set-enabled', { name: '@snap-rail/cordis-plugin-timer', enabled: false })
     expect(builtinOff.ok).toBe(false)
+  })
+
+  it('replaces a builtin default with a pool peer and restores it on disable', async () => {
+    const world = await makeWorld([
+      "- id: timer",
+      "  name: '@snap-rail/cordis-plugin-timer'",
+      "- id: settings",
+      "  name: '@snap-rail/settings'",
+      "- id: audit",
+      "  name: '@snap-rail/audit'",
+      "- id: gateway",
+      "  name: '@snap-rail/gateway'",
+      "  config:",
+      "    name: rig",
+      "    version: 1.0.0",
+      "    bin: test",
+      "- id: default-store",
+      "  name: '@snap-rail/default-store'",
+      '  default: true',
+    ], undefined, [{
+      name: '@snap-rail/default-store',
+      snapRail: { kind: 'plugin', layer: 'store', title: 'Default store', exclusive: 'store-backend' },
+    }])
+    seedPoolPackage(world.home, '@snap-rail/alt-store', {
+      kind: 'plugin', layer: 'store', title: 'Alt store', exclusive: 'store-backend',
+    })
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/alt-store'\n    enabled: true\n")
+    await world.layers.apply()
+    await sleepUntil(() => world.ctx.get('alt-store') !== undefined)
+
+    const listed = await world.client.call('plugins.list', {})
+    expect(listed.ok).toBe(true)
+    if (!listed.ok) return
+    expect(listed.value.plugins.find(plugin => plugin.name === '@snap-rail/default-store')?.source).toBe('builtin-default')
+
+    const replaced = await world.client.call('plugins.set-enabled', { name: '@snap-rail/alt-store', enabled: true })
+    expect(replaced.ok).toBe(true)
+    await sleepUntil(() => world.ctx.get('default-store') === undefined)
+    expect(readFileSync(world.userPath, 'utf8')).toContain("name: '@snap-rail/default-store'")
+    expect(readFileSync(world.userPath, 'utf8')).toContain('enabled: false')
+
+    const restored = await world.client.call('plugins.set-enabled', { name: '@snap-rail/alt-store', enabled: false })
+    expect(restored.ok).toBe(true)
+    await sleepUntil(() => world.ctx.get('default-store') !== undefined)
+    await sleepUntil(() => world.ctx.get('alt-store') === undefined)
+
+    const noReplacement = await world.client.call('plugins.set-enabled', { name: '@snap-rail/default-store', enabled: false })
+    expect(noReplacement.ok).toBe(false)
   })
 
   it('lists the merged view: builtin, user rows, and pool extras', async () => {

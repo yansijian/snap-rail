@@ -55,5 +55,5 @@ export function definePlugin<T extends Plugin>(plugin: T): T {
 }
 
 /** Public plugin template categories used by the standalone CLI. */
-export const PLUGIN_TEMPLATES = ['driver', 'store-provider', 'ui-view', 'ui-layout', 'ui-extension', 'host-service', 'tool', 'suite'] as const
+export const PLUGIN_TEMPLATES = ['driver', 'store-provider', 'ui-view', 'ui-layout', 'ui-extension', 'ui-skin', 'host-service', 'tool', 'suite'] as const
 export type PluginTemplate = typeof PLUGIN_TEMPLATES[number]

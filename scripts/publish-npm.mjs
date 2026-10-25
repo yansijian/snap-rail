@@ -53,18 +53,16 @@ const closure = [
   'packages/base/connection',
   'packages/base/gateway',
   'packages/base/settings',
-  // The OS integration seam: the framework (and any UI package that drives the
-  // ball/panel surfaces) imports `@snap-rail/shell/contract`, so the spec
-  // package publishes before the kit that lists it as a seed.
+  // The OS integration seam: the UI substrate imports
+  // `@snap-rail/shell/contract`, so the spec package publishes before the kit
+  // that lists it as a seed.
   'packages/base/shell',
+  // The built-in semantic UI substrate.
+  'packages/base/ui',
   'packages/base/plugin-kit',
   'packages/base/plugin-sdk',
   'packages/store/store',
   'packages/equipment/equipment',
-  // The UI framework: first npm publication; lives in its split repo and is
-  // staged into the workspace by scripts/setup-external.mjs (prepare-workspace
-  // builds its faces before this script runs).
-  'external/snap-rail-framework-shadcn',
 ]
 
 /** Third-party peers that are themselves public on npm. Closure package names

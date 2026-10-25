@@ -1,4 +1,4 @@
-# 八种模板：选型、manifest 与骨架要点
+# 九种模板：选型、manifest 与骨架要点
 
 `init` 生成的仓库自带：`package.json`（manifest 与依赖已配好）、`src/`
 骨架、`tsdown.config.ts`、`tsconfig.json`（extends
@@ -14,15 +14,15 @@
 | `store-provider` | plugin / store | 宿主 | `store-backend` 单活 | `@snap-rail/store@^0.1.0`（dev） |
 | `host-service` | plugin / tool | 宿主 | 多活 | cordis |
 | `tool` | plugin / tool | 宿主 | 多活 | cordis |
-| `suite` | suite / suite | 双面 | `suite` 单活 | framework-shadcn + react |
-| `ui-view` | plugin / ui | 渲染（clientOnly） | 多活 | framework-shadcn + react |
-| `ui-layout` | plugin / ui | 渲染（clientOnly） | 多活 | framework-shadcn + react |
-| `ui-extension` | plugin / ui | 渲染（clientOnly） | 多活 | framework-shadcn + react |
+| `suite` | suite / suite | 双面 | `suite` 单活 | `@snap-rail/ui` + react |
+| `ui-view` | plugin / ui | 渲染（clientOnly） | 多活 | `@snap-rail/ui` + react |
+| `ui-layout` | plugin / ui | 渲染（clientOnly） | 多活 | `@snap-rail/ui` + react |
+| `ui-extension` | plugin / ui | 渲染（clientOnly） | 多活 | `@snap-rail/ui` + react |
+| `ui-skin` | skin / ui | 渲染（clientOnly） | `skin` 单活 | `@snap-rail/ui` + react |
 
-UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`；`--framework
-<包名[@范围]>` 只对 `ui-view` / `ui-layout` / `ui-extension` / `suite`
-生效。绑定同时决定 manifest `requires` 条目、devDependency、bundle 外部化
-种子——三处由模板保证一致，不会互相矛盾。
+UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 `requires` 条目，
+模板只把它放进 devDependencies 供类型/构建，运行时由终端种子表提供。
+`--framework <包名[@范围]>` 只对 UI 模板生效，作为类型/构建包覆盖入口保留。
 
 要写宿主 RPC 或渲染帧时不需要新增依赖：宿主类型从
 `@snap-rail/plugin-sdk/api`、渲染 link/帧从 `/api/client` 导入；完整骨架见
@@ -53,7 +53,7 @@ export default [
   `@snap-rail/equipment` 等契约包——所以要把模板放在 devDependencies 的
   契约包挪进 dependencies），其余第三方库打进包内；运行时由终端按
   appRoot 优先、池内回退解析 `@snap-rail/*` / `zod` / `drizzle-orm`。
-- 渲染面：CJS 工厂包；种子模块（框架原语、base 契约）外部化到运行时种子
+- 渲染面：CJS 工厂包；种子模块（`@snap-rail/ui` 语义原语、base 契约）外部化到运行时种子
   表，第三方库与 CSS 全部内联，位图/SVG 以 `snap-plugin://` URL 随包发射。
 - 两个模板层面的坑（详见
   [host-face.md](host-face.md) 的「构建纪律」）：入口对 plugin-sdk 只准
@@ -109,9 +109,12 @@ import）。工具与宿主服务同层（tool），**工具互不依赖**（门
   方法/帧、聚合帧推送。`ctx.rpc.claimDomain/serveContract` 挂载；类型从
   `@snap-rail/plugin-sdk/api` 导入。渲染面通过 wire 与宿主面通信，**永不
   import 宿主代码**。
-- 渲染面 `src/client.tsx`：`ctx.uiContract.registerView/registerLayout`
-  挂进框架槽位；`ctx.client.link` + `subscribeFrame`（SDK `/api/client`）
-  消费宿主帧；只组合框架原语。
+- 渲染面 `src/client.tsx`：`ctx.pages.registerPage`（主页面）与
+  `ctx.ui.registerLayout`（布局）注册进内置 UI 基座；`ctx.client.link` +
+  `subscribeFrame`（SDK `/api/client`）消费宿主帧；只组合
+  `@snap-rail/ui/components` 的语义原语。设置页不需要另一个模板：同一个
+  `ui-view` 包在 `apply` 里追加 `ctx.settings.registerPage` 即可
+  （片段见 [client-face.md](client-face.md)）。
 - 场景契约（跨面类型/帧载荷）住套件包自己的 `./<子路径>` 导出（如首方
   `terminal-ops` 的 `./stats`），别外置。契约模块 import `zod`；
   `dependencies` 至少 `@snap-rail/protocol` + `zod`（host value import，
@@ -124,37 +127,46 @@ import）。工具与宿主服务同层（tool），**工具互不依赖**（门
 ### ui-view
 
 ```tsx
-import '@snap-rail/framework-shadcn/semantic'
-import { UI_SLOT_IDS } from '@snap-rail/framework-shadcn/slots'
-import { Card, CardContent, CardHeader, CardTitle } from '@snap-rail/framework-shadcn/ui'
+import { Page } from '@snap-rail/ui/components'
 import type { Plugin } from '@snap-rail/cordis'
 
 export default {
   name: '@my-scope/my-ui',
-  inject: ['uiContract'],
+  inject: ['pages'],
   apply(ctx) {
-    ctx.uiContract.registerView(ctx, {
+    ctx.pages.registerPage(ctx, {
       id: '@my-scope/my-ui',
       title: '我的页面',
-      slot: UI_SLOT_IDS.view,
       order: 100,
-      render: () => (/* 只组合框架原语 */),
+      render: () => <Page title="我的页面">…</Page>,
     })
   },
 } satisfies Plugin
 ```
 
+同一个包也可以在 `apply` 里追加 `ctx.settings.registerPage`，把设置页注册进
+内置设置外壳（无需新模板；字段见 [client-face.md](client-face.md)）。
+
 ### ui-layout
 
-`registerLayout(ctx, { id, order, slots: Object.values(UI_SLOT_IDS),
-render })` 接管槽位编排。叠层对话框（如退出确认）也走 layout：空
-`slots: []` + 高 `order`（如 101，高于套件主布局）。
+`ctx.ui.registerLayout(ctx, { id, order, provides: [...], window, ball,
+render })` 声明并编排区域插槽。叠层对话框（如退出确认）**不要**为此注册
+高 order 布局——贡献到 `UI_SLOT_IDS.overlay`（
+`ctx.ui.contribute(ctx, UI_SLOT_IDS.overlay, { id, order, render })`），由
+内置 runtime 渲染、永远在最上层。
 
 ### ui-extension
 
 `export default { seeds: { widget } }`——`client.seeds` 声明的每个键成为
-`<包名>/<键>` 种子 id；组件必须建在框架原语上，不许私有拷贝。消费方在
-自己的 `externalSeeds` 里声明 `<你的包>/<键>`。
+`<包名>/<键>` 种子 id；组件必须建在 `@snap-rail/ui/components` 原语上，
+不许私有拷贝。消费方在自己的 `externalSeeds` 里声明 `<你的包>/<键>`。
+
+### ui-skin
+
+`ctx.skins.register(ctx, { id, title, tokens, presentations, css })` 注册
+token + part CSS + 展示变体。皮肤单活（`exclusive: 'skin'`），默认皮肤
+永远兜底；所有 CSS 规则必须作用域到 `[data-snap-skin='<id>']`，只命中
+`data-snap-part`。启用后重启生效。
 
 ## 包名规则
 
@@ -164,8 +176,8 @@ render })` 接管槽位编排。叠层对话框（如退出确认）也走 layou
   2. 入口对象里的 `name`（`satisfies Plugin` 的那一份）；
   3. `tests/manifest.spec.ts` 断言里的包名（init 时硬编码）；
   4. `tsdown.config.ts` 里的包名字符串——**仅 ui-view / ui-layout /
-     ui-extension / suite 模板有**（clientBundle 第一参）；driver 等宿主
-     单面模板的 tsdown 配置里没有包名，别找。
+     ui-extension / ui-skin / suite 模板有**（clientBundle 第一参）；
+     driver 等宿主单面模板的 tsdown 配置里没有包名，别找。
 - `@snap-rail/*` 命名空间保留给官方（无论签名策略强制 verified）；doctor
   会对你的 `@snap-rail/*` 包名给 warning。
 - 目录名即初始包名来源，先想好再 init，省一轮重命名。

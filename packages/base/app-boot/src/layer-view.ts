@@ -22,6 +22,7 @@ export interface ManifestInfo {
   title?: string | undefined
   category?: string | undefined
   exclusive?: string | undefined
+  uiProfile?: string | undefined
   clientOnly?: boolean | undefined
   requires?: readonly string[] | undefined
   /** Contributed seed ids this client face requires from other plugins. */
@@ -31,10 +32,13 @@ export interface ManifestInfo {
 
 /** Everything the administration and diagnostic surfaces read from the layers. */
 export interface LayerView {
-  /** The protected set: builtin-layer rows, their packages, and the dev
-   * harness's renderer occupants. Derived from the layer FILES, never from
-   * manifest claims, so no zip can join it. */
+  /** The protected set: hard builtin-layer rows, their packages, and the dev
+   * harness's renderer occupants. `default: true` rows are replaceable and are
+   * excluded here. Derived from the layer FILES, never from manifest claims. */
   shippedNames(): ReadonlySet<string>
+  /** Every builtin row name/package, replaceable defaults included — the
+   * reserved set that zips may never shadow and the app tree always wins. */
+  reservedNames(): ReadonlySet<string>
   /** The snapRail manifest projection of one row's package (pool manifest
    * wins; unresolvable or undeclared yields the empty projection). */
   manifestOf(name: string, pool?: ReadonlyMap<string, PluginDescriptor>): ManifestInfo
@@ -75,8 +79,21 @@ export function createLayerView(
   handles: LayerHandles,
   serviceReady: (service: string) => boolean = () => false,
 ): LayerView {
+  const allBuiltin = (): ReturnType<typeof loadBuiltinLayer> => loadBuiltinLayer(handles.builtinLayerPath)
+
+  const reservedNames = (): ReadonlySet<string> => {
+    const builtin = allBuiltin()
+    return new Set<string>([
+      ...builtin.map(entry => entry.name as string),
+      ...builtin.map(entry => packageNameOf(entry.name as string)),
+      ...handles.rendererPackages,
+    ])
+  }
+
   const shippedNames = (): ReadonlySet<string> => {
-    const builtin = loadBuiltinLayer(handles.builtinLayerPath)
+    // A `default: true` row is a replaceable factory default, not a protected
+    // builtin: the admin bridge may disable it in favour of a pool replacement.
+    const builtin = allBuiltin().filter(entry => entry.default !== true)
     return new Set<string>([
       ...builtin.map(entry => entry.name as string),
       ...builtin.map(entry => packageNameOf(entry.name as string)),
@@ -85,7 +102,7 @@ export function createLayerView(
   }
 
   const manifestOf = (name: string, pool: ReadonlyMap<string, PluginDescriptor> = scanPluginPool(handles.poolDirs)): ManifestInfo => {
-    const manifest = packageManifestOf(name, handles.appRoot, pool, shippedNames()) ?? {}
+    const manifest = packageManifestOf(name, handles.appRoot, pool, reservedNames()) ?? {}
     const pick = (key: string): string | undefined => {
       const value = manifest[key]
       return typeof value === 'string' ? value : undefined
@@ -106,6 +123,7 @@ export function createLayerView(
       title: pick('title'),
       category: pick('category'),
       exclusive: pick('exclusive'),
+      uiProfile: pick('uiProfile'),
       clientOnly: manifest.clientOnly === true ? true : undefined,
       requires: Array.isArray(requires) && requires.every(entry => typeof entry === 'string') ? requires : undefined,
       ...(externalSeeds === undefined ? {} : { externalSeeds }),
@@ -201,6 +219,7 @@ export function createLayerView(
 
   return {
     shippedNames,
+    reservedNames,
     manifestOf,
     requirementsOf,
     groupOf,

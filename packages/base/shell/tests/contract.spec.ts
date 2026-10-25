@@ -2,14 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { AUX_SURFACE_IDS, SURFACE_IDS, isAuxSurfaceId, isSurfaceId } from '@snap-rail/protocol'
 import { EXIT_DECISIONS } from '../src/index.ts'
 import {
+  BALL_DOCK_EDGES,
+  BALL_LIMITS,
   BALL_SURFACE,
   BALL_TONES,
   EXIT_ACTIONS,
   SHELL_LIMITS,
+  WINDOW_LIMITS,
   ballDockStateSchema,
+  ballProfileSchema,
   ballStateSchema,
+  resolveBallProfile,
+  resolveWindowProfile,
   shellContract,
   surfaceStateSchema,
+  windowProfileSchema,
 } from '../src/contract.ts'
 
 /** The request schema of one method row, narrowed for inspection. */
@@ -50,22 +57,96 @@ describe('ball geometry', () => {
   })
 })
 
+describe('window profile', () => {
+  it('uses factory defaults when nothing is requested', () => {
+    const profile = resolveWindowProfile()
+    expect(profile.mode).toBe('windowed')
+    expect(profile.width).toBe(WINDOW_LIMITS.defaultWidth)
+    expect(profile.height).toBe(WINDOW_LIMITS.defaultHeight)
+    expect(profile.minWidth).toBe(WINDOW_LIMITS.minWidth)
+    expect(profile.minHeight).toBe(WINDOW_LIMITS.minHeight)
+    expect(profile.resizable).toBe(true)
+    expect(profile.center).toBe(true)
+    expect(profile.remember).toBe(true)
+  })
+
+  it('clamps an oversized request to the display work area and a tiny one to the guard', () => {
+    const profile = resolveWindowProfile(
+      { width: 5000, height: 4000, minWidth: 100, minHeight: 100 },
+      { width: 1600, height: 900 },
+    )
+    expect(profile.width).toBe(1600)
+    expect(profile.height).toBe(900)
+    expect(profile.minWidth).toBe(WINDOW_LIMITS.minWidth)
+    expect(profile.minHeight).toBe(WINDOW_LIMITS.minHeight)
+  })
+
+  it('rejects malformed wire profiles', () => {
+    expect(windowProfileSchema.safeParse({ width: 0 }).success).toBe(false)
+    expect(windowProfileSchema.safeParse({ width: 1280, extra: true }).success).toBe(false)
+    expect(windowProfileSchema.safeParse({ mode: 'kiosk' }).success).toBe(false)
+    expect(windowProfileSchema.safeParse({ mode: 'fullscreen', width: 1920, height: 1080 }).success).toBe(true)
+  })
+})
+
+describe('ball profile', () => {
+  it('keeps the paint rim fixed while the window size changes', () => {
+    const small = resolveBallProfile({ size: 96 })
+    const large = resolveBallProfile({ size: 192 })
+    expect(small.inset).toBe(BALL_LIMITS.inset)
+    expect(large.inset).toBe(BALL_LIMITS.inset)
+    expect(small.orb + 2 * small.inset).toBe(small.size)
+    expect(large.orb + 2 * large.inset).toBe(large.size)
+  })
+
+  it('clamps size, docking ratio, and hover timing into the documented range', () => {
+    const tiny = resolveBallProfile({ size: 1, collapseRatio: 0.01, hoverDelayMs: 1 })
+    expect(tiny.size).toBe(BALL_LIMITS.minSize)
+    expect(tiny.dockVisibleRatio).toBe(BALL_LIMITS.minCollapseRatio)
+    expect(tiny.hoverDelayMs).toBe(BALL_LIMITS.minHoverDelayMs)
+
+    const huge = resolveBallProfile({ size: 999, collapseRatio: 0.99, hoverDelayMs: 99_999 })
+    expect(huge.size).toBe(BALL_LIMITS.maxSize)
+    expect(huge.dockVisibleRatio).toBe(BALL_LIMITS.maxCollapseRatio)
+    expect(huge.hoverDelayMs).toBe(BALL_LIMITS.maxHoverDelayMs)
+  })
+
+  it('deduplicates dock edges and falls back to all edges when the request is empty', () => {
+    expect(resolveBallProfile({ dockEdges: ['left', 'left'] }).dockEdges).toEqual(['left'])
+    expect(resolveBallProfile({ dockEdges: [] }).dockEdges).toEqual([...BALL_DOCK_EDGES])
+  })
+
+  it('rejects malformed wire profiles', () => {
+    expect(ballProfileSchema.safeParse({ size: 0 }).success).toBe(false)
+    expect(ballProfileSchema.safeParse({ dockEdges: [] }).success).toBe(false)
+    expect(ballProfileSchema.safeParse({ dockEdges: ['diagonal'] }).success).toBe(false)
+    expect(ballProfileSchema.safeParse({ size: 160, dockEdges: ['left', 'right'] }).success).toBe(true)
+  })
+})
+
 describe('shell contract', () => {
   it('declares the client-facing rows and frames', () => {
     expect(Object.keys(shellContract.methods).sort()).toEqual([
+      'shell.ball.configure',
       'shell.ball.dock',
+      'shell.ball.profile',
       'shell.ball.state',
       'shell.exit.resolve',
       'shell.surface.hide',
       'shell.surface.present',
       'shell.surface.state',
       'shell.toast',
+      'shell.window.configure',
+      'shell.window.profile',
     ])
     expect(Object.keys(shellContract.frames).sort()).toEqual([
       'shell/ball-changed',
       'shell/ball-dock-changed',
+      'shell/ball-profile-changed',
       'shell/exit-requested',
+      'shell/settings-open-requested',
       'shell/surface-changed',
+      'shell/window-profile-changed',
     ])
     expect(shellContract.domain).toBe('shell')
   })

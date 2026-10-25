@@ -29,7 +29,20 @@
 
 import type { Context } from '@snap-rail/cordis'
 import type { AuxSurfaceId, SurfaceId } from '@snap-rail/protocol'
-import type { BallDockState, BallPatch, BallState, ShellExitAction, ShellExitSource, SurfaceState } from './contract.ts'
+import type {
+  BallDockState,
+  BallPatch,
+  BallProfile,
+  BallProfileApplyResult,
+  BallState,
+  ShellBallProfileState,
+  ShellExitAction,
+  ShellExitSource,
+  ShellWindowProfileState,
+  SurfaceState,
+  WindowProfile,
+  WindowProfileApplyResult,
+} from './contract.ts'
 
 export * from './contract.ts'
 
@@ -64,6 +77,14 @@ declare module '@snap-rail/cordis' {
      * @param state - the dock state after the change.
      */
     'shell/ball-dock-changed'(state: BallDockState): void
+    /** The effective operator-window stage changed.
+     * @param state - the resolved profile and its source.
+     */
+    'shell/window-profile-changed'(state: ShellWindowProfileState): void
+    /** The effective floating-ball stage changed.
+     * @param state - the resolved profile and its source.
+     */
+    'shell/ball-profile-changed'(state: ShellBallProfileState): void
     /**
      * An exit was requested and held (`hold` in the exit policy): nothing has
      * happened yet. A host-face plugin may present a window so its renderer
@@ -202,6 +223,13 @@ export interface ShellBallCapability {
   state(): BallState
   /** Merge a patch and broadcast `shell/ball-changed`; returns the new state. */
   setState(caller: Context, patch: BallPatch): BallState
+  /** The effective ball stage and where it came from. */
+  profile(): ShellBallProfileState
+  /**
+   * Request a ball stage (size, availability, docking, timing). The host
+   * clamps the profile and returns the effective values.
+   */
+  setProfile(caller: Context, profile: BallProfile): BallProfileApplyResult
 }
 
 /**
@@ -248,6 +276,13 @@ export interface ShellWindowCapability {
   exitPolicy(): Readonly<ShellExitPolicy>
   /** Answer a held exit request; `cancel` keeps everything as it was. */
   resolve(caller: Context, action: ShellExitAction): ShellResult
+  /** The effective operator-window stage and where it came from. */
+  profile(): ShellWindowProfileState
+  /**
+   * Request an operator-window stage (size/mode/constraints). User settings
+   * and remembered bounds win; otherwise the host applies and clamps it.
+   */
+  setProfile(caller: Context, profile: WindowProfile): WindowProfileApplyResult
 }
 
 /** The OS integration service exposed on `ctx.shell`. */

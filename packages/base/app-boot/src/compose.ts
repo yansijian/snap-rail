@@ -47,6 +47,16 @@ export function packageNameOf(name: string): string {
   return secondSlash < 0 ? name : name.slice(0, secondSlash)
 }
 
+/** A builtin row; `default: true` marks a replaceable factory default. */
+export type BuiltinEntry = EntryOptions & {
+  /**
+   * Shipped and enabled by factory, but replaceable by a pool package in the
+   * same mutex group. Excluded from the protected set; disabling it without a
+   * replacement is refused by the admin bridge.
+   */
+  default?: boolean
+}
+
 /**
  * Load the built-in layer: a YAML array of loader entries (bare package names
  * plus their default config). The file ships with the application.
@@ -55,7 +65,7 @@ export function packageNameOf(name: string): string {
  * @returns the parsed entry list; every row keeps its bare module name.
  * @throws when the file is missing or not a YAML array of entry rows.
  */
-export function loadBuiltinLayer(path: string): EntryOptions[] {
+export function loadBuiltinLayer(path: string): BuiltinEntry[] {
   let parsed: unknown
   try {
     parsed = load(readFileSync(path, 'utf8'))
@@ -65,21 +75,22 @@ export function loadBuiltinLayer(path: string): EntryOptions[] {
   if (!Array.isArray(parsed)) {
     throw new Error(`built-in layer: ${path} is not an entry list (expected a YAML array)`)
   }
-  const entries: EntryOptions[] = []
+  const entries: BuiltinEntry[] = []
   const seen = new Set<string>()
   for (const row of parsed) {
     if (row === null || typeof row !== 'object') {
       throw new Error(`built-in layer: ${path} contains a non-object row`)
     }
-    const options = row as Partial<EntryOptions>
+    const options = row as Partial<EntryOptions> & { default?: unknown }
     if (typeof options.name !== 'string' || options.name === '') {
       throw new Error(`built-in layer: ${path} contains a row without a name`)
     }
-    const entry: EntryOptions = {
+    const entry: BuiltinEntry = {
       id: options.id ?? options.name,
       name: options.name,
       ...options.config !== undefined ? { config: options.config } : {},
       ...options.disabled !== undefined ? { disabled: options.disabled } : {},
+      ...options.default === true ? { default: true } : {},
     }
     if (seen.has(entry.id)) {
       throw new Error(`built-in layer: duplicate entry id ${entry.id} in ${path}`)
@@ -353,6 +364,7 @@ export function packageManifestOf(
     if (descriptor.title !== undefined) manifest.title = descriptor.title
     if (descriptor.category !== undefined) manifest.category = descriptor.category
     if (descriptor.exclusive !== undefined) manifest.exclusive = descriptor.exclusive
+    if (descriptor.uiProfile !== undefined) manifest.uiProfile = descriptor.uiProfile
     if (descriptor.requires !== undefined) manifest.requires = descriptor.requires
     if (descriptor.clientOnly === true) manifest.clientOnly = true
     if (descriptor.clientEntry !== undefined || descriptor.clientSeeds !== undefined || descriptor.externalSeeds !== undefined

@@ -40,13 +40,14 @@ URL 形状一致，终端换源只改设置键）：
    `feed.yml` 是滚动 Release 与官网的唯一写者；`release.yml` 只做版本化
    Release 并在安装包上传后触发 feed；`npm.yml` 在配置 `NPM_TOKEN` 后手动
    触发，发布公开 SDK。
-6. **拆分仓进入工作区**：主仓 `equipment-station` 的构建期依赖（framework /
-   driver-modbus）以 workspace 链接提供，CI 在 install 前执行
+6. **拆分仓进入工作区**：主仓应用构建只链接驱动仓
+   （`snap-rail-driver-modbus`），CI 在 install 前执行
    `node scripts/setup-external.mjs`（克隆到 `external/`，可用
    `SNAP_RAIL_EXTERNAL_REF` 固定 ref）——**公开构建不需要任何私有
-   registry**。feed 作业把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到四个仓
-   （framework / modbus / enip / suite），从源码构建并签名全部一方插件；
-   主仓应用构建仍只 stage 前两个。本地首次构建同样先跑这条命令；
+   registry**。UI 基座、默认皮肤、设置页与设备管理页已内置，framework
+   不再是构建依赖、也不再进入 feed。feed 作业把
+   `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus / enip）与业务套件仓，
+   从源码构建并签名全部一方可安装插件。本地首次构建同样先跑这条命令；
    `external/` 已 gitignore。
 
 ## 发布：一条命令
@@ -58,7 +59,8 @@ pnpm run publish -- --collect collect-out \
   --sign-key .keys/<key-id>.private.pem --key-id <key-id> --publisher snap-rail
 ```
 
-publish 依次：构建 → 打包一方插件 zip（Ed25519 签名）→ 合并 `--collect`
+publish 依次：构建 → 打包 base 清单（`scripts/pack-plugins.ts` 当前为空——
+出厂基座已全部内置，zip 会被内置重名拒装）→ 合并 `--collect`
 目录里的一方拆分仓 pack 产物 → 装配离线组合包（`<id>.zip`：`recipe.yml` +
 `plugins/*.zip`，成员取 feed 里的原样 zip）→ 汇总平铺资产（`plugins/` 全部
 平面文件 + `desktop/` 三件套；组合截图 `assets/` 只进本地 staging 供官网构建，
@@ -70,7 +72,7 @@ publish 依次：构建 → 打包一方插件 zip（Ed25519 签名）→ 合并
 | 插件源 | `plugins.feedUrls`（列表；旧 `plugins.feedUrl` 读作单元素） | 同上一地址（平铺同址） |
 
 - `--skip-sync`：只在本地 `dist-publish/` 装配，不上传；
-- `--collect <dir>`：合并**一方**拆分仓（framework/driver/suite）的 pack
+- `--collect <dir>`：合并**一方**拆分仓（驱动/套件）的 pack
   产物（`index.json` + zip），可重复。社区插件**不**走这里——作者在自己的
   Release 发布，用户自行添加源；
 - `--feed-tag <t>`：覆盖滚动 tag（默认 `feed`）。
@@ -315,8 +317,8 @@ pnpm run build && pnpm app:dist
   文件**——客户验证过作者一次，该作者此后的一切更新都有完整性锚，换 key 的
   更新会被单独拦下确认。
 - **命名门禁**：`@snap-rail/*` 命名空间由终端强制 verified（见信任模型节）
-  ——社区包用作者自己的 scope/name；基座兼容以 `requires`（框架条目即生态
-  绑定）展示。
+  ——社区包用作者自己的 scope/name；基座兼容以 `requires`（包名 /
+  `name@range` / `service:`）展示。
 - **一方侧不变**：主仓发布链照旧 org 强制签名、照旧出厂内置 org 公钥；
   主仓保持出厂纯净，社区内容零进入。
 

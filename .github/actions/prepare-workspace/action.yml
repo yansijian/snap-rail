@@ -24,16 +24,12 @@ runs:
       run: pnpm install --no-frozen-lockfile
     - name: build the base surface the split repos resolve against
       shell: bash
-      # equipment-station imports the framework, so the full host project is a
-      # cycle here: build the base/store/equipment declarations + bundles
-      # first (the framework's tsc/tsdown read them), then the framework, then
-      # the complete workspace in the caller's `pnpm test` / `pnpm run build`.
+      # The split repos resolve against the base declarations and bundles, so
+      # those build first; the complete workspace build stays in the caller's
+      # `pnpm test` / `pnpm run build`.
       run: |
         pnpm exec tsc -b tsconfig.bootstrap.json
         pnpm exec tsdown --config tsdown.bootstrap.config.ts
-    - name: build framework face
-      shell: bash
-      run: pnpm --filter @snap-rail/framework-shadcn run build
     - name: build modbus driver face
       shell: bash
       run: pnpm --filter @snap-rail/driver-modbus run build

@@ -8,11 +8,12 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `kind` | `suite \| driver \| framework \| plugin` | 角色声明；`suite` 与 `framework` 单活。缺省 = `plugin`。 |
+| `kind` | `suite \| driver \| skin \| plugin` | 角色声明；`suite` 与 `skin` 单活。缺省 = `plugin`。 |
 | `layer` | `base \| store \| equipment \| ui \| tool \| suite` | 层词汇，仓内门禁用；可安装插件照模板填即可。 |
 | `title` | string ≤64 | 管理页显示名，随意命名（中文可用）；缺省回退包名。 |
 | `category` | string ≤64 | 开放分类标记，声明即归组（管理页按原文分组，无枚举校验）；缺省落「其他」。 |
-| `exclusive` | string | 互斥组：启用本包自动停用同组其他已启用包。`suite` 默认 `'suite'`，`framework` 默认 `'framework'`，store 后端必须 `'store-backend'`。 |
+| `exclusive` | string | 互斥组：启用本包自动停用同组其他已启用包。`suite` 默认 `'suite'`，skin 必须 `'skin'`，store 后端必须 `'store-backend'`。 |
+| `uiProfile` | `native \| integrated \| custom` | 渲染面与皮肤契约的关系声明；管理页徽标，不做门禁。 |
 | `requires` | string[] | **唯一兼容声明**，见下节。 |
 | `clientOnly` | boolean | 纯渲染包（无宿主面）：行不进宿主树，经 `client-config.list` 下发给渲染端。必须声明 `client.entry`。 |
 | `client` | object | 渲染面声明：`entry`（CJS 工厂包路径；schema 默认 `lib/client.js`，init 模板显式写 `lib-client/client.js`，以模板/doctor 为准）、`surfaces`（辅助面映射）、`seeds`（贡献的种子子路径）、`externalSeeds`（消费的贡献种子 id）。`seedAbi` 由 pack 盖章，**永不手写**。 |
@@ -25,7 +26,7 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
 // 示意：JSON 不支持注释，照抄时去掉注释行
 "requires": [
   "@snap-rail/equipment",                    // 包名：已安装且启用
-  "@snap-rail/framework-shadcn@^0.2",        // name@range：还要版本合范围（框架绑定就是这条）
+  "@snap-rail/equipment@^0.1.5",             // name@range：还要版本合范围
   "service:store"                            // service:id：运行时存在该 cordis 服务
 ]
 ```
@@ -34,9 +35,9 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
 - 禁用/卸载做**反向校验**：还有依赖方 → 拒绝；
 - 语义版本单源 `@snap-rail/util/semver`。
 - **`requires` 只放可安装插件包 / `service:`**。npm 类型包（SDK 的 `/api`
-  门面、`@snap-rail/protocol`）不是插件，放 `dependencies` /
-  `devDependencies`；`@snap-rail/gateway` / `connection` / `settings` 是
-  SDK 依赖/base 运行时，永远不进 `requires`。
+  门面、`@snap-rail/protocol`、`@snap-rail/ui`）不是插件，放
+  `dependencies` / `devDependencies`；`@snap-rail/gateway` / `connection` /
+  `settings` 是 SDK 依赖/base 运行时，永远不进 `requires`。
 - 错误永远不会留到下次开机才爆——这是设计目标，不要想办法绕过预检。
 
 ## 渲染面 `client` 块
@@ -46,11 +47,7 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
   "entry": "lib-client/client.js",
   "surfaces": { "ball": "lib-client/ball.js" },
   "seeds": ["widget"],
-  "externalSeeds": [
-    "@snap-rail/framework-shadcn/slots",
-    "@snap-rail/framework-shadcn/semantic",
-    "@snap-rail/framework-shadcn/ui"
-  ]
+  "externalSeeds": ["@other-scope/shared/widget"]
 }
 ```
 
@@ -64,11 +61,11 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
   类型拒——升 plugin-sdk `0.2.4+`。
 - `seeds`：本包贡献给别人的共享组件子路径（每个键成为 `<包名>/<键>` 种子
   id，跨插件共享同一实例）。
-- `externalSeeds`：只列**贡献种子**（框架或其他插件的 `<包>/<子路径>`）。
-  base 种子（connection / protocol / util / shell-contract /
-  equipment-contract / react / zod）由 shell 自动播种，**不能写**——写了
-  启用预检会报“提供方未安装”。它同时是构建期外部化清单和启用期提供方
-  检查清单，**不是**兼容声明——版本兼容永远走 `requires`。
+- `externalSeeds`：只列**其他插件贡献的种子**（`<包>/<子路径>`）。base
+  种子（connection / protocol / util / shell-contract / equipment-contract /
+  react / zod / `@snap-rail/ui`）由 shell 自动播种，**不能写**——写了启用
+  预检会报“提供方未安装”。它同时是构建期外部化清单和启用期提供方检查
+  清单，**不是**兼容声明——版本兼容永远走 `requires`。
 - `seedAbi`：pack 自动盖章（构建时真实 require 到的种子 + 版本 + ABI 修订
   号），安装期与渲染端 boot 双向比对，不符则拒装/skip + fail-loud。
 
@@ -105,20 +102,15 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
     "layer": "suite",
     "title": "我的套件",
     "exclusive": "suite",
+    "uiProfile": "native",
     "requires": [
-      "@snap-rail/framework-shadcn@^0.2",
       "@snap-rail/equipment",
       "service:store",
       "service:shell"
     ],
     "client": {
       "entry": "lib-client/client.js",
-      "surfaces": { "ball": "lib-client/ball.js" },
-      "externalSeeds": [
-        "@snap-rail/framework-shadcn/slots",
-        "@snap-rail/framework-shadcn/semantic",
-        "@snap-rail/framework-shadcn/ui"
-      ]
+      "surfaces": { "ball": "lib-client/ball.js" }
     }
   }
 }

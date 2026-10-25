@@ -1,6 +1,6 @@
 ---
 name: snap-rail-plugin-dev
-description: 开发、构建、验证、签名与发布 snap-rail 可安装插件的完整指南——在独立插件仓库里用公共 @snap-rail/plugin-sdk 完成，不需要 snap-rail 源码。覆盖全部 8 种模板：设备驱动 driver、存储后端 store-provider、宿主服务 host-service、工具 tool、业务套件 suite、UI 页面 ui-view、布局 ui-layout、共享组件 ui-extension，以及宿主 RPC（ctx.rpc / serveContract）、渲染面 link 与帧订阅（subscribeFrame）。只要用户想写/改/发 snap-rail 插件、snap-rail driver、snap-rail suite、snapRail manifest、snap-rail-plugin CLI、插件 zip 签名或 feed 滚动发布，就用本 skill；哪怕用户只说「给 snap-rail 做个××」，也应触发。
+description: 开发、构建、验证、签名与发布 snap-rail 可安装插件的完整指南——在独立插件仓库里用公共 @snap-rail/plugin-sdk 完成，不需要 snap-rail 源码。覆盖全部 9 种模板：设备驱动 driver、存储后端 store-provider、宿主服务 host-service、工具 tool、业务套件 suite、UI 页面 ui-view、布局 ui-layout、共享组件 ui-extension、皮肤 ui-skin，以及宿主 RPC（ctx.rpc / serveContract）、渲染面 link 与帧订阅（subscribeFrame）。只要用户想写/改/发 snap-rail 插件、snap-rail driver、snap-rail suite、snapRail manifest、snap-rail-plugin CLI、插件 zip 签名或 feed 滚动发布，就用本 skill；哪怕用户只说「给 snap-rail 做个××」，也应触发。
 ---
 
 # snap-rail 插件开发（独立仓库）
@@ -22,8 +22,9 @@ description: 开发、构建、验证、签名与发布 snap-rail 可安装插�
   - **宿主面**：node ESM 包，`hostBundle` 构建 → `lib-host/host.js`，
     即 package.json 的 `main`。设备通讯、存储、服务、wire 方法都在这。
   - **渲染面**：浏览器 CJS 工厂包，`clientBundle` 构建 →
-    `lib-client/client.js`，焊进 `__ModuleLoader__` 工厂壳执行；框架原语、
-    契约等**种子模块**运行时从共享种子表取单实例。
+    `lib-client/client.js`，焊进 `__ModuleLoader__` 工厂壳执行；`@snap-rail/ui`
+    语义原语、插槽/皮肤/设置/runtime 与契约等**种子模块**运行时从共享种子表
+    取单实例。
 - 插件之间**永不互相 import**：协作只走 cordis 服务（`ctx.provide` /
   `inject`）、wire 帧和 store 服务缝。
 - **三张表别混**：npm 依赖表决定 TypeScript 能 resolve 什么；运行时种子表
@@ -34,18 +35,21 @@ description: 开发、构建、验证、签名与发布 snap-rail 可安装插�
 
 1. **`snapRail.requires` 是唯一兼容声明**。三种条目：包名
    （`@snap-rail/equipment`）、带版本范围的包名
-   （`@snap-rail/framework-shadcn@^0.2`）、服务名（`service:store`）。
-   渲染面的框架绑定就是一条 `name@range`——没有独立的 framework 字段；
+   （`@snap-rail/equipment@^0.1.5`）、服务名（`service:store`）。
+   `@snap-rail/ui` 是 base 种子，**不是** requires 条目；渲染面插件用
+   `snapRail.uiProfile` 声明 native/integrated/custom。
    `snapRail.framework` / `snapRail.capabilities` 已退役，宿主不再读。
 2. **种子消费只准 named/star 导入，且分 base / 贡献两层**。default 导入经
    CJS interop 会把 `.default` 变成整个命名空间对象，运行时挂载即崩——
    `clientBundle` 构建期会故意硬错。base 种子（connection / protocol /
    util / shell-contract / equipment-contract / react / zod 等）由 shell 自动
    播种，**不能写** `client.externalSeeds`（写了启用预检会报“提供方未安装”）；
-   只有框架或其他插件贡献的 `<包>/<子路径>` 才写。只 type-only 导入的贡献
+   只有其他插件贡献的 `<包>/<子路径>` 才写。只 type-only 导入的贡献
    种子不产生运行时 require，也不用写。自己贡献给别人的组件进 `client.seeds`。
 3. **`snapRail.client.seedAbi` 永不手写**——pack 时自动盖章，安装期与渲染
-   端 boot 双向校验。
+   端 boot 双向校验。**终端升级后必须用当前 plugin-kit 重新 build + pack**：
+   旧包带的种子 ABI 章（如 r1）与宿主修订号（当前 r2）不符时，安装期拒装、
+   渲染端 skip + fail-loud（报「插件构建于种子 ABI r1，宿主为 r2」）。
 4. **注册皆 effect，缝方法自带回收**。缝注册方法（首参 caller 上下文，如
    `ctx.equipment.registerDriver(ctx, driver)`）的处置随 caller 的 fiber 自
    动跟踪——插件停用/卸载时自动回收，**模板骨架的裸调用就是完整写法**，
@@ -54,11 +58,12 @@ description: 开发、构建、验证、签名与发布 snap-rail 可安装插�
    另存另管。把函数本身传进 `ctx.effect()`（而不是调它）等于立即执行。
 5. **状态放构造期闭包，不放 Service 子类字段**。cordis 可追踪代理每次访问
    重绑 `this`，字段状态会「每读一次一个世界」。
-6. **页面组件只组合框架原语**（`@snap-rail/framework-shadcn/ui` 的
-   Button/Card/Dialog/Table/Tabs/SchemaForm…）。缺原语不要在页面里手搓交互
-   组件、不要自创变体。
-7. **主题只用令牌**。页面禁止硬编码色值和 `dark:` 变体；图表系列只用
-   `--chart-1…6`；红/黄/绿是状态语义，不进数据系列。
+6. **页面组件只用内置语义原语**（`@snap-rail/ui/components` 的
+   Button/Card/Dialog/Table/Tabs/Page/Stack/Grid…）。缺原语补进
+   `@snap-rail/ui`，不要在页面里手搓交互组件、不要写裸 Tailwind。
+7. **主题只用 skin token**。页面禁止硬编码色值和 `dark:` 变体；图表系列
+   只用 `--snap-chart-1…6`；红/黄/绿是状态语义，不进数据系列。第三方图表
+   包在 `ChartFrame`/`Visualization` 内，用 `useChartTheme()` 取色。
 8. **触屏基线**：数值输入用 `NumberInput`，单选用 `TouchSelect`，滚动容器
    用 `DragScroll`。
 9. **OS 资源只走 shell 缝，插件永不 import `electron`**。通知、托盘、窗口
@@ -108,8 +113,8 @@ pnpm install
 #      + `inject: ['rpc']` + `ctx.rpc.claimDomain/serveContract`；不需要单独
 #      安装 gateway，也不要写进 requires。
 #    - 渲染 link/帧：`import { subscribeFrame, rpcErrorText } from
-#      '@snap-rail/plugin-sdk/api/client'`；`ctx.client` 由框架 runtime 提供，
-#      用 `import type {} from '@snap-rail/framework-shadcn/runtime'` 引入增强。
+#      '@snap-rail/plugin-sdk/api/client'`；`ctx.client` 由内置 @snap-rail/ui
+#      runtime 提供，用 `import type {} from '@snap-rail/ui/runtime'` 引入增强。
 #    - wire 契约模块 import zod：`@snap-rail/protocol` 与 `zod` 都放
 #      dependencies（host value import；zod 由 app 的 resolve-hooks 外部化）。
 #    - UI 用 `formatClock`/`formatDuration` 时把 `@snap-rail/util` 加
@@ -145,7 +150,7 @@ pnpm exec snap-rail-plugin feed dist
 #    终端「插件页 → ⚙ 插件源」，或直接拖 zip 进「安装插件」。
 ```
 
-## 选模板（8 选 1）
+## 选模板（9 选 1）
 
 | template | 面 | 什么时候选 |
 | --- | --- | --- |
@@ -154,12 +159,16 @@ pnpm exec snap-rail-plugin feed dist
 | `host-service` | 宿主 | 在宿主进程贡献一个 cordis 能力服务（无界面）。 |
 | `tool` | 宿主 | 独立工具；工具互不依赖（层门禁强制）。跨包场景逻辑请用 suite。 |
 | `suite` | 双面 | 一个业务场景的**全部**：场景私有宿主逻辑 + 场景界面，单活。 |
-| `ui-view` | 渲染 | 一个挂进 `shell.view` 槽位的页面（React + 框架原语）。 |
-| `ui-layout` | 渲染 | 布局：接管槽位编排。 |
+| `ui-view` | 渲染 | 注册进 `ctx.pages` 的页面（React + `@snap-rail/ui/components`）。 |
+| `ui-layout` | 渲染 | 布局：声明 `provides` + `window`/`ball` profile。 |
 | `ui-extension` | 渲染 | 贡献共享组件（`client.seeds`），供其他组件插件复用。 |
+| `ui-skin` | 渲染 | 皮肤：token + part CSS + 展示变体，单活 `exclusive: 'skin'`。 |
 
-UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`；`--framework
-<包名[@范围]>` 可换绑第三方框架——换框架 = 换生态，是设计决策不是限制。
+UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires 条目，
+也不需要 framework 绑定。`--framework <包名[@范围]>` 仅作为类型/构建包覆盖
+入口保留。设置页不需要单独模板：用 `ui-view` 模板，在 `apply` 里多调一次
+`ctx.settings.registerPage`（片段见
+[references/client-face.md](references/client-face.md)）。
 
 ## 深入参考（何时读哪个）
 
@@ -168,7 +177,7 @@ UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`；`--framework
 | [references/manifest.md](references/manifest.md) | 动 `package.json` 的 `snapRail` 块之前；拿不准 `requires`/`exclusive`/`client` 字段怎么写时。 |
 | [references/templates.md](references/templates.md) | init 之后、动手实现之前；确认所选模板的 manifest、构建与骨架要点。 |
 | [references/host-face.md](references/host-face.md) | 写宿主面代码：cordis 纪律、驱动、store、宿主服务、shell 宿主面 API。 |
-| [references/client-face.md](references/client-face.md) | 写渲染面代码：种子纪律、框架原语、页面/布局/扩展写法、球面与退出策略。 |
+| [references/client-face.md](references/client-face.md) | 写渲染面代码：种子纪律、语义原语、页面/布局/扩展/皮肤写法、球面与退出策略。 |
 | [references/faces-and-wire.md](references/faces-and-wire.md) | 写宿主 RPC、渲染面 link/帧，或分不清 npm 包 / 种子 / requires 时。 |
 | [references/publish.md](references/publish.md) | 发布前：密钥、pack/feed/verify 细节、滚动 Release 规则、信任模型、组合包、CI。 |
 | [references/troubleshooting.md](references/troubleshooting.md) | 报错时：doctor 警告语义、常见构建/安装错误对照表。 |
@@ -181,14 +190,16 @@ UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`；`--framework
   <https://github.com/yansijian/snap-rail/blob/master/docs/plugin-development.md>。
 - **先查能力地图**：[faces-and-wire.md](references/faces-and-wire.md)。能力
   存在但类型包没装 → 按地图升级 SDK；地图里没有的才是真的没有。不要从已装
-  框架的编译产物反推 API，也不要在插件里 `as any`——那是 skill/闭包缺口的
+  插件的编译产物反推 API，也不要在插件里 `as any`——那是 skill/闭包缺口的
   信号。
 - **版本锚**（本 skill 快照对应）：plugin-sdk `^0.2.5`、plugin-kit `^0.2.2`、
-  cordis `^4.0.1`、equipment `^0.1.5`、store `^0.1.0`、framework-shadcn
-  `^0.2`、zod `^4`、react `^19`、tsdown `^0.22`。`@snap-rail/shell` 随公共
+  cordis `^4.0.1`、equipment `^0.1.5`、store `^0.1.0`、`@snap-rail/ui`
+  `^0.1.0`、zod `^4`、react `^19`、tsdown `^0.22`。`@snap-rail/shell` 随公共
   闭包发布，`npm view @snap-rail/shell version` 查最新。
   base 服务门面 `@snap-rail/plugin-sdk/api` 与 `/api/client` 从 `0.2.5`
   起提供；底层 gateway/connection/settings 由 SDK 传递安装，作者不单列。
+  `SEED_ABI_REVISION` 当前为 **r2**（以 `@snap-rail/plugin-kit` 导出为准）；
+  终端升级后旧 zip 需用当前 plugin-kit 重打包才能过渲染端 ABI 校验。
 - **版本陷阱（以 plugin-sdk 0.2.3 / equipment 0.1.4 为界，之后消除）**：
   - `probe`（驱动「测试连接」）：主仓已实现，但 npm
     `@snap-rail/equipment@0.1.4` 的类型里**没有**该字段——`0.1.5` 起恢复；
@@ -196,14 +207,12 @@ UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`；`--framework
     `0.2.2` 已支持；但 `plugin-sdk@0.2.3` 的 d.ts 按旧 schema 内联生成，
     manifest 字面量里写 `surfaces` 会被 excess property check 拒——
     `0.2.4` 起恢复；
-  - framework-shadcn `0.2.0` 的 `ClientServices` 只有 `link`；`surface`
-    从 `0.2.2+` 才有。pnpm 11 的 `minimumReleaseAge` 可能把刚发布的
-    `0.2.2` 继续压到 `0.2.0`（官方 registry 也会）——用
-    `pnpm why @snap-rail/framework-shadcn` 查看，必要时把版本加进
-    `minimumReleaseAgeExclude` 或显式装 `@snap-rail/framework-shadcn@^0.2.2`；
-  - npmmirror 元数据同步滞后还可能让 `^0.2.1` 这类范围解析到旧版本
-    （实测装出 0.2.1）——遇到「文档说有、类型说没有」，先切官方
-    registry 重装再判断；
+  - `@snap-rail/ui` 是 base 内置包，版本随终端走；插件只把它放
+    devDependencies 供类型/构建，运行时由 base 种子提供。`ClientServices`
+    由内置 runtime 提供（`ctx.client.link` / `surface`），不再有可替换的
+    独立 UI 框架插件；
+  - npmmirror 元数据同步滞后还可能让版本范围解析到旧版本——遇到「文档说有、
+    类型说没有」，先切官方 registry 重装再判断；
   - 对策恒定：**以安装的 d.ts/schema 为准**——
     `Select-String -Path node_modules/@snap-rail/*/lib/types/*.d.ts -Pattern <字段名>`
     查得到才写；查不到就不写（写了类型/schema 当场拒绝），并优先升级
@@ -223,14 +232,14 @@ UI 模板默认绑定 `@snap-rail/framework-shadcn@^0.2`；`--framework
       （hostBundle 不清产物目录，pack 按面目录整目录收编——旧 chunk 会混进 zip）
 - [ ] `pnpm run build` 后 `main`（与 `client.entry`）产物真实存在
 - [ ] `pnpm run doctor` 全绿（warning 逐条确认过）
-- [ ] `requires` 与真实依赖一致；渲染面声明了框架绑定与全部**贡献**种子
-      （base 种子不写）
+- [ ] `requires` 与真实依赖一致；渲染面声明了 `uiProfile` 与全部**贡献**
+      种子（`@snap-rail/ui` 等 base 种子不写）
 - [ ] zod schema 字段都有 `.meta({ title })`（驱动/配置表单才有中文标签）
 - [ ] 无 `import … from 'electron'`；无种子 default 导入
 - [ ] 宿主 RPC 用 `@snap-rail/plugin-sdk/api` 的 type-only 导入；渲染面帧用
       `@snap-rail/plugin-sdk/api/client`；gateway/connection/settings 没有
       出现在 `requires` / `externalSeeds` / `package.json`
-- [ ] `externalSeeds` 只列框架/其他插件贡献种子，没有 base 种子
+- [ ] `externalSeeds` 只列其他插件贡献种子，没有 base 种子
 - [ ] `lib-host/host.js` 不含 plugin-sdk（入口是 `satisfies Plugin`）；
       `lib-client/client.js` 不含 plugin-sdk / node 内置
 - [ ] vitest 冒烟测试通过（manifest 校验 + 装配链路）

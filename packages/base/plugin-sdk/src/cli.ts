@@ -24,13 +24,13 @@ import { catalogEntryFromZip, definePluginManifest, PLUGIN_TEMPLATES, releaseFil
 /** The SDK's own published version — generated repos pin this as `^<version>`. */
 const sdkVersion = createRequire(import.meta.url)('../package.json').version as string
 
-/** The UI framework a component plugin binds to. The manifest `requires`
- * entry, the devDependency, and the bundle's external seeds all derive from
- * this one pair — templates can never disagree about the binding. */
-const DEFAULT_FRAMEWORK = '@snap-rail/framework-shadcn'
-const FRAMEWORK_RANGE = '^0.2.0'
+/** The built-in UI substrate a renderer template compiles against. It is a
+ * base seed, not a pool package, so it never appears in `requires`; the
+ * generated repository only needs it as a dependency for types and build. */
+const DEFAULT_UI_PACKAGE = '@snap-rail/ui'
+const UI_PACKAGE_RANGE = '^0.1.0'
 
-interface FrameworkBinding {
+interface UiBinding {
   name: string
   range: string
 }
@@ -38,7 +38,7 @@ interface FrameworkBinding {
 const usage = `snap-rail-plugin <command>
 
 Commands:
-  init <directory> --template <driver|store-provider|ui-view|ui-layout|ui-extension|host-service|tool|suite>
+  init <directory> --template <driver|store-provider|ui-view|ui-layout|ui-extension|ui-skin|host-service|tool|suite>
       [--framework <package[@range]>] [--force]
   doctor <directory>
       Validate the repository contract (manifest, faces, built entries).
@@ -130,13 +130,10 @@ function doctorPlugin(directory: string): void {
   if (typeof clientEntry === 'string' && !existsSync(join(root, clientEntry))) {
     warnings.push(`渲染入口尚未构建：${clientEntry} 不存在（先 pnpm run build，否则 pack 会拒绝）`)
   }
-  // A scoped package *name* starts with `@` too; a version binding is the
-  // only form with an `@` after the first character (`pkg@^1`,
-  // `@scope/pkg@^1`). `requires: ['@snap-rail/equipment']` is a name, not a
-  // framework binding, and must not silence this warning.
-  const versionBound = (snapRail.requires ?? []).some(entry => entry.lastIndexOf('@') > 0)
-  if (snapRail.client !== undefined && !versionBound) {
-    warnings.push('渲染面插件应声明框架绑定（requires: <framework>@<range>）——绑定即生态依赖')
+  // The UI profile is a declaration for the management badge and skin
+  // coverage expectations, not a gate. Missing it is a warning only.
+  if (snapRail.client !== undefined && snapRail.uiProfile === undefined) {
+    warnings.push('渲染面插件建议声明 snapRail.uiProfile（native/integrated/custom）——管理页据此展示皮肤覆盖范围')
   }
   if (manifest.name.startsWith('@snap-rail/')) {
     warnings.push('@snap-rail/* 命名空间在终端侧强制受信签名（官方）——社区包请使用你自己的 scope')
@@ -320,11 +317,11 @@ async function initPlugin(directory: string | undefined, template: PluginTemplat
   if (directory === undefined || template === undefined || !PLUGIN_TEMPLATES.includes(template)) {
     throw new Error(`${usage.trim()}\nAvailable templates: ${PLUGIN_TEMPLATES.join(', ')}`)
   }
-  const uiTemplates: readonly PluginTemplate[] = ['ui-view', 'ui-layout', 'ui-extension', 'suite']
+  const uiTemplates: readonly PluginTemplate[] = ['ui-view', 'ui-layout', 'ui-extension', 'ui-skin', 'suite']
   if (frameworkOption !== undefined && !uiTemplates.includes(template)) {
-    throw new Error('init: --framework applies to the ui-view, ui-layout, ui-extension, and suite templates')
+    throw new Error('init: --framework applies to the ui-view, ui-layout, ui-extension, ui-skin, and suite templates')
   }
-  const framework = parseFrameworkBinding(frameworkOption)
+  const framework = parseUiBinding(frameworkOption)
   const root = resolve(directory)
   if (!force && (existsSync(join(root, 'package.json')) || existsSync(join(root, 'src')))) {
     throw new Error(`init: ${root} 不是空目录（确认后加 --force 覆盖）`)
@@ -336,7 +333,7 @@ async function initPlugin(directory: string | undefined, template: PluginTemplat
   const isHost = !isClient || template === 'suite'
   await mkdir(resolve(root, 'src'), { recursive: true })
   await mkdir(resolve(root, 'tests'), { recursive: true })
-  const manifest = templateManifest(template, framework)
+  const manifest = templateManifest(template)
   await writeFile(resolve(root, 'package.json'), `${JSON.stringify({
     name: packageName,
     version: '0.1.0',
@@ -382,19 +379,19 @@ async function initPlugin(directory: string | undefined, template: PluginTemplat
   await writeFile(resolve(root, 'tests', 'manifest.spec.ts'), sampleTestSource(packageName, template))
   if (isHost) await writeFile(resolve(root, 'src', 'index.ts'), hostSource(template, packageName))
   if (isClient) await writeFile(resolve(root, 'src', 'client.tsx'), clientSource(template, packageName, framework))
-  console.log(`initialized ${packageName} in ${root}${isClient ? ` (framework: ${framework.name}@${framework.range})` : ''}`)
+  console.log(`initialized ${packageName} in ${root}${isClient ? ` (ui: ${framework.name}@${framework.range})` : ''}`)
 }
 
-/** `--framework <package[@range]>`; the default is the first-party framework. */
-function parseFrameworkBinding(value: string | undefined): FrameworkBinding {
-  if (value === undefined || value === '') return { name: DEFAULT_FRAMEWORK, range: FRAMEWORK_RANGE }
+/** `--framework <package[@range]>`; the default is the built-in UI package. */
+function parseUiBinding(value: string | undefined): UiBinding {
+  if (value === undefined || value === '') return { name: DEFAULT_UI_PACKAGE, range: UI_PACKAGE_RANGE }
   const scoped = value.startsWith('@')
   const separator = value.indexOf('@', scoped ? 1 : 0)
   if (separator <= 0) {
     if (!/^(?:@[a-z0-9-]+\/)?[a-z0-9][a-z0-9._-]*$/.test(value)) {
       throw new Error(`init: --framework 不是合法的包名：${value}`)
     }
-    return { name: value, range: FRAMEWORK_RANGE }
+    return { name: value, range: UI_PACKAGE_RANGE }
   }
   const name = value.slice(0, separator)
   const range = value.slice(separator + 1)
@@ -413,10 +410,10 @@ export default [
 ]
 `
   }
-  if (template === 'ui-view' || template === 'ui-layout' || template === 'ui-extension') {
+  if (template === 'ui-view' || template === 'ui-layout' || template === 'ui-extension' || template === 'ui-skin') {
     return `import { clientBundle } from '@snap-rail/plugin-sdk'
 
-// 渲染面：CJS 工厂包，种子模块（框架原语/契约）外部化到运行时种子表。
+// 渲染面：CJS 工厂包，种子模块（UI 原语/契约）外部化到运行时种子表。
 export default clientBundle(${JSON.stringify(packageName)}, 'src/client.tsx')
 `
   }
@@ -435,8 +432,8 @@ dist/
 .keys/
 `
 
-function readmeSource(template: PluginTemplate, packageName: string, framework: FrameworkBinding, isHost: boolean): string {
-  const binding = isHost && template !== 'suite' ? '' : `（绑定 ${framework.name}@${framework.range}）`
+function readmeSource(template: PluginTemplate, packageName: string, framework: UiBinding, isHost: boolean): string {
+  const binding = isHost && template !== 'suite' ? '' : `（语义 UI 基座 ${framework.name}@${framework.range}，随应用内置）`
   return `# ${packageName}
 
 snap-rail ${template} 插件，由 \`@snap-rail/plugin-sdk\` init 生成${binding}。
@@ -471,7 +468,7 @@ pnpm run feed
 `
 }
 
-function agentGuide(template: PluginTemplate, framework: FrameworkBinding): string {
+function agentGuide(template: PluginTemplate, framework: UiBinding): string {
   return `# snap-rail plugin guide
 
 This repository is an independently developed ${template} plugin. Work only
@@ -484,21 +481,21 @@ snap-rail checkout or copy host internals.
   \`definePluginManifest\`. \`title\`/\`category\` are free vocabulary (Chinese
   included); the management page groups by the raw marker.
 - Declare every plugin dependency once in \`requires\` — package names
-  (\`@snap-rail/equipment\`), version-constrained packages
-  (\`${framework.name}@${framework.range}\` — the framework binding IS this
-  entry), or \`service:\` ids. npm type packages (the SDK's \`/api\` facade,
-  \`@snap-rail/protocol\`) are not plugins: put them in
-  \`dependencies\`/\`devDependencies\`, never in \`requires\`.
+  (\`@snap-rail/equipment\`), version-constrained packages, or \`service:\` ids.
+  The semantic UI substrate (\`${framework.name}\`) is a **base seed** that is
+  always present, not a pool package: put it in \`dependencies\` for types and
+  never in \`requires\`. npm type packages (the SDK's \`/api\` facade,
+  \`@snap-rail/protocol\`) are not plugins either.
 - Host faces build with \`hostBundle\` → \`lib-host/host.js\` (the manifest
   \`main\`); renderer faces build with \`clientBundle\` →
   \`lib-client/client.js\` (a CJS factory package the module loader executes).
-- Renderer code may \`require\` only base seeds plus the framework-contributed
+- Renderer code may \`require\` only base seeds plus provider-contributed
   seeds declared in \`client.externalSeeds\`, via **named or star imports** (a
   default import breaks CJS interop at runtime — the build fails it on
   purpose). Base seeds (connection/protocol/util/shell-contract/
-  equipment-contract/react/zod) are always seeded — never declare them in
-  \`externalSeeds\`. UI pages compose the framework primitives
-  (\`${framework.name}/ui\`), never hand-rolled widgets.
+  equipment-contract/ui/react/zod) are always seeded — never declare them in
+  \`externalSeeds\`. UI pages compose \`${framework.name}/components\`, never
+  hand-rolled widgets.
 - Release archives contain the trimmed manifest and built faces only —
   never \`src/\`. \`pack\` refuses to ship one.
 
@@ -512,7 +509,7 @@ snap-rail checkout or copy host internals.
   \`package.json\`.
 - Host settings: \`inject: ['settings']\`; type it with
   \`import type { SettingsService } from '@snap-rail/plugin-sdk/api'\`.
-- Renderer link/frames: the framework runtime provides \`ctx.client\`
+- Renderer link/frames: the built-in UI runtime provides \`ctx.client\`
   (\`{ link, surface }\`); subscribe with
   \`subscribeFrame(ctx.client.link, name, schema, cb)\` imported from
   \`@snap-rail/plugin-sdk/api/client\` (also \`rpcErrorText\`, \`HostLink\`). The
@@ -544,7 +541,11 @@ describe('the plugin manifest', () => {
     const source = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
     const manifest = definePluginManifest(source)
     expect(manifest.name).toBe(${JSON.stringify(packageName)})
-    expect(manifest.snapRail.kind).toBe(${JSON.stringify(template === 'store-provider' || template === 'host-service' || template === 'tool' || template.startsWith('ui-') ? 'plugin' : template)})
+    expect(manifest.snapRail.kind).toBe(${JSON.stringify(
+      template === 'ui-skin' ? 'skin'
+        : template === 'store-provider' || template === 'host-service' || template === 'tool' || template.startsWith('ui-') ? 'plugin'
+          : template,
+    )})
   })
 })
 `
@@ -616,14 +617,38 @@ export default { name: ${JSON.stringify(packageName)}, apply() {} } satisfies Pl
 `
 }
 
-function clientSource(template: PluginTemplate, packageName: string, framework: FrameworkBinding): string {
-  const fw = framework.name
+function clientSource(template: PluginTemplate, packageName: string, ui: UiBinding): string {
+  const fw = ui.name
+  if (template === 'ui-skin') {
+    const skinId = `${packageName}-skin`
+    return `import { DEFAULT_SKIN } from '${fw}/skins'
+import type { Plugin } from '@snap-rail/cordis'
+
+/** 皮肤：token + part CSS + 展示变体。默认皮肤永远兜底；本皮肤单活
+ * （snapRail.exclusive: 'skin'），启用后重启生效。先用默认 token 起步，
+ * 再逐项替换为你的色板与尺寸；所有规则必须作用域到 data-snap-skin。 */
+export default {
+  name: ${JSON.stringify(packageName)},
+  inject: ['skins'],
+  apply(ctx) {
+    ctx.skins.register(ctx, {
+      id: ${JSON.stringify(skinId)},
+      title: 'Generated skin',
+      tokens: DEFAULT_SKIN.tokens,
+      presentations: { dialog: 'sheet' },
+      parts: ['button.root', 'dialog.panel'],
+      css: '[data-snap-skin="${skinId}"] [data-snap-part="button.root"] { border-radius: 4px; }',
+    })
+  },
+} satisfies Plugin
+`
+  }
   if (template === 'ui-extension') {
-    return `import { Card, CardContent } from '${fw}/ui'
+    return `import { Card, CardContent } from '${fw}/components'
 
 /** 共享组件贡献面：\`snapRail.client.seeds\` 里声明的每个键都会成为
  * \`<package>/<key>\` 种子 id，其他组件插件的渲染面可以 require 到同一实例。
- * 组件必须建在框架原语（${fw}/ui）上，不许私有拷贝。 */
+ * 组件必须建在内置语义原语（${fw}/components）上，不许私有拷贝。 */
 const widget = () => (
   <Card>
     <CardContent>${packageName} widget</CardContent>
@@ -636,53 +661,53 @@ export default {
 `
   }
   if (template === 'ui-layout') {
-    return `import '${fw}/semantic'
-import { UI_SLOT_IDS } from '${fw}/slots'
+    return `import { AppShell, Page } from '${fw}/components'
+import { UI_SLOT_IDS } from '${fw}/contract'
+import { Slot } from '${fw}/slots'
 import type { Plugin } from '@snap-rail/cordis'
 
+/** 布局：声明自己提供的区域插槽，并把设置入口留给 layout 决定位置。 */
 export default {
   name: ${JSON.stringify(packageName)},
-  inject: ['uiContract'],
+  inject: ['ui'],
   apply(ctx) {
-    ctx.uiContract.registerLayout(ctx, {
+    ctx.ui.registerLayout(ctx, {
       id: ${JSON.stringify(`${packageName}-layout`)},
       order: 0,
-      slots: Object.values(UI_SLOT_IDS),
-      render: () => null,
+      provides: [UI_SLOT_IDS.titlebar, UI_SLOT_IDS.settingsEntry, UI_SLOT_IDS.statusbar],
+      window: { width: 1440, height: 900, minWidth: 1024, minHeight: 600 },
+      ball: { size: 128 },
+      render: () => (
+        <AppShell header={<Slot name={UI_SLOT_IDS.settingsEntry} context={{ presentation: 'icon' }} />}>
+          <Page title="Generated layout"><div>从这里开始编排你的页面。</div></Page>
+        </AppShell>
+      ),
     })
   },
 } satisfies Plugin
 `
   }
-  // ui-view and the suite's renderer face: a real view on the framework
-  // primitives, so the generated project renders something honest.
+  // ui-view and the suite's renderer face: a real page on the built-in kit.
   const id = template === 'suite' ? `${packageName}-view` : packageName
   const title = template === 'suite' ? 'Suite' : 'Generated view'
   const note = template === 'suite'
-    ? `/** 套件的渲染面：整个场景的界面从这里挂进框架槽位。只组合框架原语
- * (${fw}/ui)，不手搓交互组件。 */`
-    : `/** 渲染面：一个挂进 shell.view 槽位的界面。用框架原语搭出真实界面，
- * 需要 shell 之外的 seat（标题栏/侧栏/状态栏）就换 slot id。 */`
-  return `import '${fw}/semantic'
-import { UI_SLOT_IDS } from '${fw}/slots'
-import { Card, CardContent, CardHeader, CardTitle } from '${fw}/ui'
+    ? `/** 套件的渲染面：场景页面注册进 ctx.pages，由套件布局负责渲染。 */`
+    : `/** 页面：注册进 ctx.pages，由活动布局渲染；只组合内置语义组件。 */`
+  return `import { Card, CardContent, CardHeader, CardTitle } from '${fw}/components'
 import type { Plugin } from '@snap-rail/cordis'
 
 ${note}
 export default {
   name: ${JSON.stringify(packageName)},
-  inject: ['uiContract'],
+  inject: ['pages'],
   apply(ctx) {
-    ctx.uiContract.registerView(ctx, {
+    ctx.pages.registerPage(ctx, {
       id: ${JSON.stringify(id)},
       title: ${JSON.stringify(title)},
-      slot: UI_SLOT_IDS.view,
       order: 100,
       render: () => (
         <Card>
-          <CardHeader>
-            <CardTitle>${title}</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>${title}</CardTitle></CardHeader>
           <CardContent>从这里开始你的界面。</CardContent>
         </Card>
       ),
@@ -692,9 +717,7 @@ export default {
 `
 }
 
-function templateManifest(template: PluginTemplate, framework: FrameworkBinding): Record<string, unknown> {
-  const binding = `${framework.name}@${framework.range}`
-  const uiExternalSeeds = [`${framework.name}/slots`, `${framework.name}/semantic`, `${framework.name}/ui`]
+function templateManifest(template: PluginTemplate): Record<string, unknown> {
   if (template === 'driver') {
     return { kind: 'driver', layer: 'equipment', title: 'Generated driver', category: '设备', requires: ['@snap-rail/equipment'] }
   }
@@ -703,25 +726,26 @@ function templateManifest(template: PluginTemplate, framework: FrameworkBinding)
   }
   if (template === 'ui-view') {
     return {
-      kind: 'plugin', layer: 'ui', title: 'Generated view', clientOnly: true,
-      requires: [binding],
-      client: { entry: 'lib-client/client.js', externalSeeds: uiExternalSeeds },
+      kind: 'plugin', layer: 'ui', title: 'Generated view', uiProfile: 'native', clientOnly: true,
+      client: { entry: 'lib-client/client.js' },
     }
   }
   if (template === 'ui-layout') {
     return {
-      kind: 'plugin', layer: 'ui', title: 'Generated layout', clientOnly: true,
-      requires: [binding],
-      client: { entry: 'lib-client/client.js', externalSeeds: uiExternalSeeds },
+      kind: 'plugin', layer: 'ui', title: 'Generated layout', uiProfile: 'native', clientOnly: true,
+      client: { entry: 'lib-client/client.js' },
     }
   }
   if (template === 'ui-extension') {
     return {
-      kind: 'plugin', layer: 'ui', title: 'Generated extension', clientOnly: true,
-      // The extension's own shared components ride `client.seeds`; the
-      // components themselves build on the framework's contributed seeds.
-      requires: [binding],
-      client: { entry: 'lib-client/client.js', seeds: ['widget'], externalSeeds: [`${framework.name}/ui`] },
+      kind: 'plugin', layer: 'ui', title: 'Generated extension', uiProfile: 'native', clientOnly: true,
+      client: { entry: 'lib-client/client.js', seeds: ['widget'] },
+    }
+  }
+  if (template === 'ui-skin') {
+    return {
+      kind: 'skin', layer: 'ui', title: 'Generated skin', uiProfile: 'native', exclusive: 'skin', clientOnly: true,
+      client: { entry: 'lib-client/client.js' },
     }
   }
   if (template === 'host-service') {
@@ -732,9 +756,8 @@ function templateManifest(template: PluginTemplate, framework: FrameworkBinding)
   }
   // suite: dual-face (host logic + renderer UI in one package), single-active.
   return {
-    kind: 'suite', layer: 'suite', title: 'Generated suite', exclusive: 'suite',
-    requires: [binding],
-    client: { entry: 'lib-client/client.js', externalSeeds: uiExternalSeeds },
+    kind: 'suite', layer: 'suite', title: 'Generated suite', uiProfile: 'native', exclusive: 'suite',
+    client: { entry: 'lib-client/client.js' },
   }
 }
 

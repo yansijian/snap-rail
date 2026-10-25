@@ -24,6 +24,10 @@ export interface TrayActions {
   showMain(): void
   /** Hide the operator window into the tray. */
   hideMain(): void
+  /** Open the renderer's settings surface (presents the main window first). */
+  openSettings(): void
+  /** Restart into host safe mode / the recovery console. */
+  recovery(): void
   /** Quit the whole app. */
   quit(): void
   /** A contributed row was picked (`key` is `<plugin>:<id>`). */
@@ -61,6 +65,9 @@ export function createTrayHost(iconPath: string, actions: TrayActions): TrayHost
     const items: MenuItemConstructorOptions[] = [
       { label: '显示主窗口', click: () => actions.showMain() },
       { label: '隐藏到托盘', click: () => actions.hideMain() },
+      { type: 'separator' },
+      { label: '设置', click: () => actions.openSettings() },
+      { label: '恢复控制台', click: () => actions.recovery() },
     ]
     if (entries.length > 0) {
       items.push({ type: 'separator' })

@@ -104,7 +104,7 @@ describe('fetchRemoteCatalog', () => {
         plugins: [{
           name: '@scope/alpha', version: '1.0.0', file: 'alpha.zip',
           title: '阿尔法', category: '通讯驱动', requires: ['service:store'],
-          framework: '@snap-rail/framework-shadcn',
+          framework: '@legacy/framework',
           sha256: 'a'.repeat(64), size: 1024,
           signature: { algorithm: 'Ed25519', keyId: 'test-key' },
         }],

@@ -40,11 +40,7 @@ export const SERVICE: null | {
 export const KIND_META: Record<string, { label: string; tone?: 'amber' | 'green' }> = {
   suite: { label: '业务套件', tone: 'green' },
   driver: { label: '通讯驱动' },
-  framework: { label: '界面框架' },
   tool: { label: '工具插件' },
-  store: { label: '存储' },
-  equipment: { label: '设备底座' },
-  ui: { label: '界面' },
   plugin: { label: '插件' },
 }
 
@@ -56,18 +52,18 @@ export const NAV = [
   { id: 'start', label: '快速上手', href: './start.html' },
 ] as const
 
-/** The honest first-run path: two downloads, then the connection test. */
+/** The honest first-run path: one download, then the connection test. */
 export const FIRST_RUN = [
   {
     title: '装客户端',
     detail: '下载 Windows 安装包，装好打开。未做商业代码签名，SmartScreen 可能提示“未知发布者”。',
   },
   {
-    title: '装标准基座',
-    detail: '把 standard-base.zip 拖进引导页或「插件」页；重启一次，设备管理页就出现了。',
+    title: '装驱动，建设备',
+    detail: '先在「插件管理」装一个驱动（ModbusTCP 范本），再打开「设置 → 设备管理」新建设备——存储、底座、语义 UI 与设备管理页都随客户端内置。',
   },
   {
     title: '测第一台设备',
-    detail: '新建设备，填 IP/端口/单元号，点“测试连接”；通了就套模板建点，回设备页看实时值。',
+    detail: '选 ModbusTCP，填 IP/端口/单元号，点“测试连接”；通了就套模板建点，回设备页看实时值。',
   },
 ] as const

@@ -12,6 +12,7 @@
   ],
   "references": [
     { "path": "../../base/connection" },
+    { "path": "../../base/ui" },
     { "path": "../../equipment/equipment" },
     { "path": "../../../vendor/cordis" }
   ]

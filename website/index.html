@@ -47,7 +47,7 @@
           {
             "@type": "Question",
             "name": "一定要联网吗？",
-            "acceptedAnswer": { "@type": "Answer", "text": "不。客户端、标准基座、场景包都可以离线拷贝安装，车间不需要访问插件服务器。" }
+            "acceptedAnswer": { "@type": "Answer", "text": "不。客户端与场景包都可以离线拷贝安装，车间不需要访问插件服务器。" }
           },
           {
             "@type": "Question",
@@ -124,7 +124,7 @@
               <span>数据留在本机</span>
             </p>
             <div class="hero-note">
-              <span>客户端 + 标准基座，两步装好</span>
+              <span>客户端装好即用，场景包按需叠加</span>
               <span>安装包未做商业代码签名，SmartScreen 会提示</span>
             </div>
           </div>
@@ -174,7 +174,7 @@
               <h2>从 IP 到第一个点，三步。</h2>
             </div>
             <p>
-              不用先学组态、不用等集成商。装好标准基座，建设备、点测试，
+              不用先学组态、不用等集成商。装好客户端，建设备、点测试，
               先把一个值读出来，再决定下一步长成什么样。
             </p>
           </div>
@@ -281,14 +281,14 @@
 
           <div class="scenario-grid">
             <article class="scenario reveal">
-              <div class="scenario-media media-slot" data-image="scenario-production-board" data-alt="产线看板场景：生产作业页与班产统计">
+              <div class="scenario-media media-slot" data-alt="自建场景包：插件 SDK 与终端界面">
                 <div class="mock">
                   <div class="mock-screen">
                     <div class="bar"><i></i><i></i><i></i></div>
                     <div class="screen">
-                      <div class="mock-kpi"><strong>1843</strong><span>本班实产 / 件</span></div>
-                      <div class="mock-bars"><i style="height:34%"></i><i style="height:52%"></i><i style="height:41%"></i><i style="height:66%"></i><i style="height:58%"></i><i style="height:79%"></i><i style="height:71%"></i><i style="height:88%"></i><i style="height:62%"></i><i style="height:95%"></i><i style="height:74%"></i><i style="height:84%"></i></div>
-                      <div class="mock-rows"><span></span><span></span><span></span></div>
+                      <div class="mock-kpi"><strong style="font-size:17px">你的工位</strong><span>SCENE PACK</span></div>
+                      <div class="mock-rows"><span></span><span></span><span></span><span style="width:66%"></span></div>
+                      <div style="display:flex;gap:5px;margin-top:12px"><span class="badge">driver</span><span class="badge">page</span><span class="badge">suite</span></div>
                     </div>
                   </div>
                   <span class="mock-label">界面示意</span>
@@ -297,33 +297,31 @@
               <div class="scenario-body">
                 <div class="scenario-top">
                   <div>
-                    <h3>产线看板</h3>
-                    <p class="sub">SCENARIO · v1.1.0 · 2.9 MB</p>
+                    <h3>你的场景包</h3>
+                    <p class="sub">SDK · 自建</p>
                   </div>
-                  <span class="badge badge--green">场景</span>
+                  <span class="badge badge--green">可扩展</span>
                 </div>
-                <p>标准基座之上加装 ModbusTCP 采集与生产作业套件：设备管理、点位采集、班产统计、作业流程一条链。</p>
+                <p>场景包 = 一组插件 + 一份预设。用 plugin SDK 做驱动、页面与套件，打包签名后拖进终端「插件」页即可安装。</p>
                 <ul>
-                  <li>设备在线状态、组健康灯、点位实时值</li>
-                  <li>本班实际 / 理论产量、24 小时柱状图</li>
-                  <li>维护、生产、抽检、故障、停机五流程</li>
+                  <li>9 种模板：驱动 / 套件 / 页面 / 布局 / 皮肤…</li>
+                  <li>公共 npm 闭包，插件住自己的仓库</li>
+                  <li>离线组合包：一个 zip 带齐成员</li>
                 </ul>
                 <div class="scenario-chips">
-                  <span class="badge">store-sqlite</span>
-                  <span class="badge">equipment</span>
-                  <span class="badge">framework</span>
-                  <span class="badge">driver-modbus</span>
-                  <span class="badge">terminal-ops</span>
+                  <span class="badge">driver</span>
+                  <span class="badge">ui-view</span>
+                  <span class="badge">suite</span>
                 </div>
                 <div class="scenario-foot">
-                  <a class="btn btn-primary btn-sm" data-download="combo" data-combo="production-board" href="./start.html#download">下载场景包（.zip）</a>
-                  <span class="hint">装完重启一次；按快速上手建一组演示设备</span>
+                  <a class="btn btn-secondary btn-sm" href="./dev.html">看插件开发指南</a>
+                  <span class="hint">社区场景包经插件源安装</span>
                 </div>
               </div>
             </article>
 
             <article class="scenario reveal">
-              <div class="scenario-media media-slot" data-image="scenario-standard-base" data-alt="标准基座：设备管理页与插件池">
+              <div class="scenario-media media-slot" data-image="scenario-standard-base" data-alt="出厂基座：设备管理页与插件池">
                 <div class="mock">
                   <div class="mock-screen">
                     <div class="bar"><i></i><i></i><i></i></div>
@@ -338,26 +336,26 @@
               <div class="scenario-body">
                 <div class="scenario-top">
                   <div>
-                    <h3>标准基座</h3>
-                    <p class="sub">BASE · v1.1.0 · 450 KB</p>
+                    <h3>出厂基座</h3>
+                    <p class="sub">BUILT-IN · 随客户端发布</p>
                   </div>
-                  <span class="badge badge--amber">第一次必装</span>
+                  <span class="badge badge--amber">已内置</span>
                 </div>
-                <p>存储、设备底座、界面框架、设备管理页一次就位。装完就能建设备、测连接、加点位。</p>
+                <p>存储后端、设备底座、语义 UI、设置中心与设备管理页随客户端发布：打开就能建设备、测连接、加点位，不需要再装基座包。</p>
                 <ul>
                   <li>本地 SQLite 存储，数据留在本机</li>
                   <li>设备 / 组 / 点统一管理</li>
-                  <li>界面框架自带设置中心与插件管理</li>
+                  <li>内置设置中心、插件管理与主题</li>
                 </ul>
                 <div class="scenario-chips">
                   <span class="badge">store-sqlite</span>
                   <span class="badge">equipment</span>
-                  <span class="badge">framework</span>
+                  <span class="badge">ui</span>
                   <span class="badge">equipment-station</span>
                 </div>
                 <div class="scenario-foot">
-                  <a class="btn btn-secondary btn-sm" data-download="combo" data-combo="standard-base" href="./start.html#download">下载标准基座（.zip）</a>
-                  <span class="hint">客户端 + 标准基座，两步装好</span>
+                  <a class="btn btn-secondary btn-sm" href="./start.html#download">下载客户端</a>
+                  <span class="hint">基座随安装包发布；场景包按需叠加</span>
                 </div>
               </div>
             </article>
@@ -391,7 +389,7 @@
             <article class="proof">
               <span class="num">02 / OFFLINE</span>
               <h3>断网也能交付</h3>
-              <p>客户端、标准基座、场景包都能离线拷贝安装；车间不需要访问插件服务器。</p>
+              <p>客户端与场景包都能离线拷贝安装；车间不需要访问插件服务器。</p>
             </article>
             <article class="proof">
               <span class="num">03 / SIGNED</span>
@@ -424,7 +422,7 @@
             <article class="role reveal">
               <span class="tag">FACTORY IT / AUTOMATION</span>
               <h3>工厂 IT / 自动化</h3>
-              <p>不用等集成商排期。装好标准基座，自己建设备、测连接、加点位；先在一个工位跑通，再复制到第二条线。</p>
+              <p>不用等集成商排期。装好客户端，自己建设备、测连接、加点位；先在一个工位跑通，再复制到第二条线。</p>
               <a class="link-arrow" href="./start.html">从快速上手开始</a>
             </article>
             <article class="role reveal">
@@ -462,21 +460,6 @@
             <a class="plugin-chip" href="./plugins.html#driver-enip">
               <span class="pkg">@snap-rail/driver-enip</span><strong>EtherNet/IP 驱动</strong><span class="kind">DRIVER</span>
             </a>
-            <a class="plugin-chip" href="./plugins.html#equipment">
-              <span class="pkg">@snap-rail/equipment</span><strong>设备底座</strong><span class="kind">EQUIPMENT</span>
-            </a>
-            <a class="plugin-chip" href="./plugins.html#equipment-station">
-              <span class="pkg">@snap-rail/equipment-station</span><strong>设备管理</strong><span class="kind">UI</span>
-            </a>
-            <a class="plugin-chip" href="./plugins.html#framework-shadcn">
-              <span class="pkg">@snap-rail/framework-shadcn</span><strong>界面框架</strong><span class="kind">FRAMEWORK</span>
-            </a>
-            <a class="plugin-chip" href="./plugins.html#suite-terminal-ops">
-              <span class="pkg">@snap-rail/suite-terminal-ops</span><strong>生产作业套件</strong><span class="kind">SUITE</span>
-            </a>
-            <a class="plugin-chip" href="./plugins.html#store-sqlite">
-              <span class="pkg">@snap-rail/store-sqlite</span><strong>本地存储</strong><span class="kind">STORE</span>
-            </a>
           </div>
           <div class="reveal" style="margin-top:22px;display:flex;flex-wrap:wrap;gap:12px;align-items:center">
             <a class="link-arrow" href="./plugins.html">浏览插件生态</a>
@@ -501,7 +484,7 @@
             </details>
             <details class="faq-item">
               <summary>一定要联网吗？</summary>
-              <div class="faq-body">不。客户端、标准基座、场景包都可以在联网 PC 下载后拷进内网安装；车间不需要访问插件服务器。终端内的“插件源”是可选能力，用于在线搜索和更新。</div>
+              <div class="faq-body">不。客户端与场景包都可以在联网 PC 下载后拷进内网安装；车间不需要访问插件服务器。终端内的“插件源”是可选能力，用于在线搜索和更新。</div>
             </details>
             <details class="faq-item">
               <summary>数据存在哪里？会上传吗？</summary>
@@ -536,7 +519,7 @@
           <div class="reveal">
             <p class="kicker">try it on your own device</p>
             <h2>先装上，连一台设备试试。</h2>
-            <p>不用先买授权、不用先做方案。下载客户端，装标准基座，填一个 IP——通没通，几分钟内就知道。</p>
+            <p>不用先买授权、不用先做方案。下载客户端，填一个 IP——通没通，几分钟内就知道。</p>
           </div>
           <div class="cta-actions reveal">
             <a class="btn btn-primary" data-download="installer" href="./start.html#download">下载 Windows 客户端</a>

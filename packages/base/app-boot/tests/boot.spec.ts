@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -311,5 +311,40 @@ describe('preset layers', () => {
     mkdirSync(presetDir, { recursive: true })
     writeFileSync(join(presetDir, 'bad.preset.yml'), 'plugins: [unclosed\n', 'utf8')
     expect(() => loadPresetLayers([presetDir])).toThrow(/failed to parse/)
+  })
+
+  it('migrates retired UI rows out of presets and the pool before composing', async () => {
+    const world = makeWorld()
+    const presetDir = join(world.home, 'presets')
+    mkdirSync(presetDir, { recursive: true })
+    writeFileSync(join(presetDir, 'recipe-standard-base.yml'), [
+      'plugins:',
+      "  - name: '@snap-rail/framework-shadcn'",
+      "  - name: '@snap-rail/equipment-station'",
+      '    enabled: false',
+      "  - name: '@snap-rail/settings'",
+      '    config: { locale: zh-CN }',
+      '',
+    ].join('\n'))
+    writeFileSync(world.userPath, [
+      'plugins:',
+      "  - name: '@snap-rail/equipment-station'",
+      '',
+    ].join('\n'))
+    const stalePool = join(world.home, 'plugins', '@snap-rail__framework-shadcn')
+    mkdirSync(stalePool, { recursive: true })
+    writeFileSync(join(stalePool, 'package.json'), JSON.stringify({
+      name: '@snap-rail/framework-shadcn',
+      version: '0.2.0',
+    }))
+
+    await bootWorld(world)
+
+    const preset = readFileSync(join(presetDir, 'recipe-standard-base.yml'), 'utf8')
+    expect(preset).not.toContain('framework-shadcn')
+    expect(preset).not.toContain('equipment-station')
+    expect(preset).toContain('@snap-rail/settings')
+    expect(readFileSync(world.userPath, 'utf8')).not.toContain('equipment-station')
+    expect(existsSync(stalePool)).toBe(false)
   })
 })

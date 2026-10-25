@@ -1,13 +1,14 @@
-# The shipped built-in layer — base only. Everything beyond the base layer
-# (store backends, the equipment base and drivers, the UI framework and its
-# stations, tools, suites) installs from zips: the settings page's 安装插件
-# or, before any framework is enabled, the kernel's drag-to-install
-# bootstrap page. The dev overlay (dev/builtins.dev.cordis.yml) is the
-# full-list variant Vite runs use; it never ships.
+# The shipped factory substrate: the boot spine plus the core data/equipment
+# base. The UI substrate (@snap-rail/ui, the default skin and the built-in
+# settings pages) rides the renderer bundle, not a host row. Drivers, extra
+# skins, business pages and suites remain installable zips.
 - id: timer
   name: '@snap-rail/cordis-plugin-timer'
 - id: settings
   name: '@snap-rail/settings'
+- id: store-sqlite
+  name: '@snap-rail/store-sqlite'
+  default: true
 - id: audit
   name: '@snap-rail/audit'
 - id: gateway
@@ -16,6 +17,12 @@
     name: snap-rail
     version: 0.3.0
     bin: desktop
+- id: equipment
+  name: '@snap-rail/equipment'
+  default: true
+- id: equipment-rpc
+  name: '@snap-rail/equipment/rpc'
+  default: true
 - id: plugins-rpc
   name: '@snap-rail/app-boot/rpc'
 - id: station-rpc

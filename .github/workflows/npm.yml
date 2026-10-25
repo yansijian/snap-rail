@@ -3,9 +3,9 @@ name: npm
 # Publish the public authoring closure (@snap-rail/*) to npm after a versioned
 # release succeeds. plugin-kit/plugin-sdk/util/protocol/store/equipment plus
 # the vendored Cordis runtime, the base service/type packages plugin-sdk's
-# ./api facade re-exports (gateway/connection/settings), and the UI framework
-# (staged from its split repo) are the packages an independent plugin repo
-# needs; everything else stays app-internal.
+# ./api facade re-exports (gateway/connection/settings), and the built-in UI
+# substrate are the packages an independent plugin repo needs; everything else
+# stays app-internal.
 on:
   # Manual until the repository owns an npm token: a tag push must not turn
   # the release run red just because the SDK registry credential is absent.
@@ -37,7 +37,7 @@ jobs:
       - uses: ./.github/actions/prepare-workspace
       - run: pnpm run build
       - name: publish the public closure (idempotent per version)
-        # The closure list (incl. the framework from its split repo) and the
+        # The closure list (mirroring scripts/publish-npm.mjs) and the
         # publish-time peer filter live in one script so external installs
         # can never meet an unpublished peer again.
         run: node scripts/publish-npm.mjs

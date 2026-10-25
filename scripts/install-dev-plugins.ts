@@ -28,10 +28,8 @@ const SUBPATH_ROWS: Readonly<Record<string, readonly string[]>> = {
 
 /** Sibling standalone plugin repos whose dist zips join the catalog when built. */
 const SIBLING_DISTS: readonly string[] = [
-  'snap-rail-framework-shadcn',
   'snap-rail-driver-modbus',
   'snap-rail-driver-enip',
-  'snap-rail-suite-terminal-ops',
 ]
 
 interface UserRow {

@@ -38,19 +38,19 @@
 
 | 你要做的事 | 代码里怎么写 | 运行时谁提供 | `externalSeeds` |
 | --- | --- | --- | --- |
-| 拿宿主链接 | `ctx.client.link`；`inject: ['client']`；`import type {} from '@snap-rail/framework-shadcn/runtime'` 引入 `ctx.client` 增强 | 框架 runtime `ctx.provide('client', { link, surface })` | 不写（type-only） |
+| 拿宿主链接 | `ctx.client.link`；`inject: ['client']`；`import type {} from '@snap-rail/ui/runtime'` 引入 `ctx.client` 增强 | `@snap-rail/ui` runtime `ctx.provide('client', { link, surface })` | 不写（type-only） |
 | 订阅宿主帧 | `import { subscribeFrame, rpcErrorText } from '@snap-rail/plugin-sdk/api/client'`；`import type { HostLink } from '@snap-rail/plugin-sdk/api/client'` | base 种子 `@snap-rail/connection` | **不写**（base 种子） |
 | 时间/时长格式化 | `import { formatClock, formatDuration } from '@snap-rail/util'`（模板未带则 `pnpm add -D @snap-rail/util`） | base 种子 `@snap-rail/util` | **不写**（base 种子） |
-| 框架原语/槽位/语义契约 | `import … from '@snap-rail/framework-shadcn/ui'` / `/slots` / `/semantic` | 框架贡献种子 | 写对应子路径 |
-| 重渲染 tick | `import { useRefresh } from '@snap-rail/framework-shadcn/ui'` | 框架贡献种子 | 写 `/ui` |
+| 语义组件/插槽/契约/皮肤 | `import … from '@snap-rail/ui/components'` / `/slots` / `/contract` / `/skins` | base 种子 | **不写** |
+| 页面/布局版本 tick | `usePagesVersion()` / `useUiVersion()` | base 种子 | **不写** |
 | 消费其他插件的组件 | `import … from '<包名>/<子路径>'` | 对方贡献种子 | 写 `<包名>/<子路径>` |
 
 - **base 种子**由 shell 在 boot 时播种，任何 client bundle 都能 `require`；
   它们**不属于** `externalSeeds`。
-- **贡献种子**是框架或其他插件经 `client.seeds` 贡献的；只有值导入才需要写
+- **贡献种子**是其他插件经 `client.seeds` 贡献的；只有值导入才需要写
   `externalSeeds`。`import type {}` 被擦除，不产生运行时 require，不用写。
-- `ctx.client.surface` 只有 framework-shadcn `0.2.2+` 才有；`0.2.0` 的
-  `ClientServices` 只有 `link`。以安装的框架 d.ts 为准，不要写不存在的字段。
+- `ctx.client` 的 `ClientServices` 由内置 `@snap-rail/ui/runtime` 提供
+  （`link` + `surface`），不再有可替换的独立 UI 框架插件。
 - init 模板默认不带 `@snap-rail/protocol` / `zod` / `@snap-rail/util`；写
   wire 或使用 format 助手时按上表补到对应的 `dependencies` / `devDependencies`。
 
@@ -60,8 +60,8 @@
 | --- | --- | --- |
 | 宿主面 value import（`@snap-rail/protocol` / equipment / store / shell） | `dependencies` | `hostBundle` 只外部化 `dependencies`；运行时由终端按 appRoot 优先、池内回退解析 |
 | 宿主契约模块的 `zod`（`z.object` / `method`） | `dependencies` | 契约是 host value import；app 的 resolve-hooks 会外部化 zod，避免把 zod 内联 |
-| 宿主面 type-only import（`GatewayService` / `SettingsService` / 框架类型） | `devDependencies`（通常 SDK/框架已在） | 编译后擦除，不产生宿主运行时 import |
-| 渲染面种子 import（SDK `/api/client`、framework 子路径、util） | `devDependencies` | `clientBundle` 统一把种子外部化；运行时从种子表取单实例 |
+| 宿主面 type-only import（`GatewayService` / `SettingsService`） | `devDependencies`（通常 SDK 已在） | 编译后擦除，不产生宿主运行时 import |
+| 渲染面种子 import（SDK `/api/client`、`@snap-rail/ui` 子路径、util） | `devDependencies` | `clientBundle` 统一把种子外部化；运行时从种子表取单实例 |
 | 渲染面第三方库（非种子） | `dependencies` 或 `devDependencies` | 会被内联进 client bundle；zip 不带 node_modules |
 
 wire 契约的 `defineContract` / `method` / `RpcBusinessError` 是 **host value
@@ -119,17 +119,15 @@ export default {
 ### 渲染面 `src/client.tsx`
 
 ```tsx
-import '@snap-rail/framework-shadcn/semantic'
-import type {} from '@snap-rail/framework-shadcn/runtime'
-import { UI_SLOT_IDS } from '@snap-rail/framework-shadcn/slots'
-import { Card } from '@snap-rail/framework-shadcn/ui'
+import type {} from '@snap-rail/ui/runtime'
+import { Page } from '@snap-rail/ui/components'
 import type { Plugin } from '@snap-rail/cordis'
 import { subscribeFrame } from '@snap-rail/plugin-sdk/api/client'
 import { demoContract } from './contract.ts'
 
 export default {
   name: '@my-scope/demo',
-  inject: ['client', 'uiContract'],
+  inject: ['client', 'pages'],
   apply(ctx) {
     ctx.effect(() => subscribeFrame(
       ctx.client.link,
@@ -140,18 +138,17 @@ export default {
       },
     ))
 
-    ctx.uiContract.registerView(ctx, {
+    ctx.pages.registerPage(ctx, {
       id: '@my-scope/demo-view',
       title: 'Demo',
-      slot: UI_SLOT_IDS.view,
       order: 100,
-      render: () => <Card>…</Card>,
+      render: () => <Page title="Demo">…</Page>,
     })
   },
 } satisfies Plugin
 ```
 
-- `import type {} from '@snap-rail/framework-shadcn/runtime'` 只为把
+- `import type {} from '@snap-rail/ui/runtime'` 只为把
   `ctx.provide('client', …)` 的 `Context` 增强带进程序；不会产生运行时代码，
   也不需要写 `externalSeeds`。
 - `ctx.effect(() => subscribeFrame(...))`：effect 体返回退订函数，卸载时
@@ -165,13 +162,12 @@ export default {
 {
   "kind": "suite",
   "layer": "suite",
-  "requires": ["@snap-rail/framework-shadcn@^0.2"],
+  "uiProfile": "native",
+  "requires": ["@snap-rail/equipment", "service:store"],
   "client": {
     "entry": "lib-client/client.js",
     "externalSeeds": [
-      "@snap-rail/framework-shadcn/slots",
-      "@snap-rail/framework-shadcn/semantic",
-      "@snap-rail/framework-shadcn/ui"
+      "@other-scope/shared/widget"
     ]
   }
 }
@@ -197,9 +193,9 @@ export default {
 `@snap-rail/cordis-plugin-timer`、`@snap-rail/station-rpc/contract`、
 `@snap-rail/app-boot/contract`。
 
-- 需要 `ClientHandle` 类型时，从 `@snap-rail/framework-shadcn/runtime` 的
-  re-export 取；不要直接 import client-kernel（未发布，`skipLibCheck` 会跳过
-  框架 d.ts 里的引用）。
+- `ClientHandle` 是 app-internal 类型（内置 runtime 的启动入口用它）：插件
+  不需要引用，也**不要**从 `@snap-rail/client-kernel` import——`skipLibCheck`
+  会跳过 UI d.ts 里的内部引用。
 - 需要默认导出/类形种子时，仍然只准 named/star 导入。
 
 ## 5. 常见错误
@@ -209,8 +205,8 @@ export default {
 | 启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方未安装）` | 把 base 种子写进了 `externalSeeds` | 删掉；base 种子由 shell 自动播种 |
 | `Cannot find module '@snap-rail/plugin-sdk/api'` | SDK 低于 0.2.5 | 升级 `@snap-rail/plugin-sdk` 到 `^0.2.5` |
 | `Property 'rpc' does not exist on type 'Context'` | 没引入 gateway 类型增强 | 从 `@snap-rail/plugin-sdk/api` 导入 `GatewayService`；不要直接 import gateway |
-| `Property 'client' does not exist on type 'Context'` | 没引入框架 runtime 增强 | `import type {} from '@snap-rail/framework-shadcn/runtime'` |
+| `Property 'client' does not exist on type 'Context'` | 没引入 UI runtime 增强 | `import type {} from '@snap-rail/ui/runtime'` |
 | `Cannot find module '@snap-rail/connection'` | 绕过 SDK 直接 import 了未安装的包 | 改用 `@snap-rail/plugin-sdk/api/client` |
 | 渲染面构建报 node 内置错误 | client 文件里 import 了 `@snap-rail/settings` / `@snap-rail/gateway` | 这两个是宿主面包，只能 type-only 在宿主用 |
 | host.js 上百 kB | 入口 value import 了 `@snap-rail/plugin-sdk`（`definePlugin`） | 改 `satisfies Plugin` + type-only 导入 cordis |
-| `Cannot find module '@snap-rail/client-kernel'`（框架 d.ts） | 未发布的内部包被框架 d.ts 引用 | `skipLibCheck` 会跳过；不要直接 import kernel |
+| `Cannot find module '@snap-rail/client-kernel'`（UI d.ts 里） | 未发布的内部包被 UI d.ts 引用 | `skipLibCheck` 会跳过；不要直接 import kernel |

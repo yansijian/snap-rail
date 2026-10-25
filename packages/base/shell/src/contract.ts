@@ -96,6 +96,279 @@ export const BALL_TONES = ['neutral', 'accent', 'warning', 'danger'] as const
 /** One ball tone. */
 export type BallTone = (typeof BALL_TONES)[number]
 
+/** The window modes a layout/suite may request. */
+export const WINDOW_MODES = ['windowed', 'maximized', 'fullscreen'] as const
+
+/** One window mode. */
+export type WindowMode = (typeof WINDOW_MODES)[number]
+
+/** Absolute guards the host applies to every requested window profile. */
+export const WINDOW_LIMITS = {
+  /** The smallest window width a profile may request. */
+  minWidth: 960,
+  /** The smallest window height a profile may request. */
+  minHeight: 600,
+  /** The factory window width when nobody requested one. */
+  defaultWidth: 1280,
+  /** The factory window height when nobody requested one. */
+  defaultHeight: 800,
+  /** The largest accepted width before display clamping. */
+  maxWidth: 7680,
+  /** The largest accepted height before display clamping. */
+  maxHeight: 4320,
+  /** A restored window must keep at least this much inside the work area. */
+  minVisiblePx: 64,
+} as const
+
+/**
+ * A layout/suite's preferred operator-window stage. Every field is optional:
+ * omitted fields fall back to {@link WINDOW_LIMITS}. The host resolves and
+ * clamps the profile against the display work area before applying it.
+ */
+export interface WindowProfile {
+  /** Windowed, maximized, or fullscreen. */
+  mode?: WindowMode
+  /** Preferred content width in pixels. */
+  width?: number
+  /** Preferred content height in pixels. */
+  height?: number
+  /** Lower bound for operator resizing. */
+  minWidth?: number
+  /** Lower bound for operator resizing. */
+  minHeight?: number
+  /** Whether the operator may resize the window. */
+  resizable?: boolean
+  /** Center the window on the active display when no saved position exists. */
+  center?: boolean
+  /** Persist manual bounds across restarts. */
+  remember?: boolean
+}
+
+/** Wire/authoring schema for {@link WindowProfile}. */
+export const windowProfileSchema = z.object({
+  mode: z.enum(WINDOW_MODES).optional(),
+  width: z.number().int().positive().max(WINDOW_LIMITS.maxWidth).optional(),
+  height: z.number().int().positive().max(WINDOW_LIMITS.maxHeight).optional(),
+  minWidth: z.number().int().positive().max(WINDOW_LIMITS.maxWidth).optional(),
+  minHeight: z.number().int().positive().max(WINDOW_LIMITS.maxHeight).optional(),
+  resizable: z.boolean().optional(),
+  center: z.boolean().optional(),
+  remember: z.boolean().optional(),
+}).strict()
+
+/** A profile after defaults and display clamping. */
+export interface ResolvedWindowProfile {
+  mode: WindowMode
+  width: number
+  height: number
+  minWidth: number
+  minHeight: number
+  resizable: boolean
+  center: boolean
+  remember: boolean
+}
+
+/** The display area a profile is resolved against. */
+export interface WindowWorkArea {
+  width: number
+  height: number
+}
+
+/** Clamp a finite integer into `[min, max]`. */
+function clampInteger(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)))
+}
+
+/** Clamp a finite number into `[min, max]`. */
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+/**
+ * Resolve a requested window profile into safe, display-clamped values.
+ * Invalid or oversized requests are clamped instead of rejected so a bad
+ * layout hint can never place the operator window off-screen.
+ *
+ * @param profile - the requested profile; omitted fields use factory defaults.
+ * @param workArea - the target display work area, when known.
+ */
+export function resolveWindowProfile(
+  profile: WindowProfile = {},
+  workArea?: WindowWorkArea,
+): ResolvedWindowProfile {
+  const maxWidth = Math.max(1, Math.floor(workArea?.width ?? WINDOW_LIMITS.maxWidth))
+  const maxHeight = Math.max(1, Math.floor(workArea?.height ?? WINDOW_LIMITS.maxHeight))
+  const minWidth = Math.min(
+    Math.max(WINDOW_LIMITS.minWidth, Math.round(profile.minWidth ?? WINDOW_LIMITS.minWidth)),
+    maxWidth,
+  )
+  const minHeight = Math.min(
+    Math.max(WINDOW_LIMITS.minHeight, Math.round(profile.minHeight ?? WINDOW_LIMITS.minHeight)),
+    maxHeight,
+  )
+  return {
+    mode: profile.mode ?? 'windowed',
+    width: clampInteger(profile.width ?? WINDOW_LIMITS.defaultWidth, minWidth, maxWidth),
+    height: clampInteger(profile.height ?? WINDOW_LIMITS.defaultHeight, minHeight, maxHeight),
+    minWidth,
+    minHeight,
+    resizable: profile.resizable ?? true,
+    center: profile.center ?? true,
+    remember: profile.remember ?? true,
+  }
+}
+
+/** Absolute guards for a requested floating-ball profile. */
+export const BALL_LIMITS = {
+  /** The smallest square ball window. */
+  minSize: 96,
+  /** The largest square ball window. */
+  maxSize: 192,
+  /** The factory ball window edge. */
+  defaultSize: 128,
+  /** The paint-free rim on every side; shadows must stay inside it. */
+  inset: 8,
+  /** The smallest share of the window kept on screen while tucked. */
+  minCollapseRatio: 1 / 4,
+  /** The largest share of the window kept on screen while tucked. */
+  maxCollapseRatio: 1 / 2,
+  /** The factory share of the window kept on screen while tucked. */
+  defaultCollapseRatio: 1 / 3,
+  /** The fastest accepted hover reveal delay. */
+  minHoverDelayMs: 300,
+  /** The slowest accepted hover reveal delay. */
+  maxHoverDelayMs: 1_200,
+  /** The factory hover reveal delay. */
+  defaultHoverDelayMs: 600,
+} as const
+
+/**
+ * A layout/suite's preferred floating-ball stage. Geometry stays square and
+ * the 8px paint rim is fixed; only the window edge, docking behavior, and
+ * timing are configurable.
+ */
+export interface BallProfile {
+  /** Whether the ball surface is available at all. */
+  enabled?: boolean
+  /** Square window edge in pixels. */
+  size?: number
+  /** Whether the ball may park against screen edges. */
+  dockable?: boolean
+  /** Whether a parked ball tucks into the edge. */
+  collapse?: boolean
+  /** Edges the ball may park against; an empty request falls back to all. */
+  dockEdges?: readonly BallDockEdge[]
+  /** Share of the window kept on screen while tucked. */
+  collapseRatio?: number
+  /** Hover delay before a parked ball slides out. */
+  hoverDelayMs?: number
+}
+
+/** Wire/authoring schema for {@link BallProfile}. */
+export const ballProfileSchema = z.object({
+  enabled: z.boolean().optional(),
+  size: z.number().int().positive().max(512).optional(),
+  dockable: z.boolean().optional(),
+  collapse: z.boolean().optional(),
+  dockEdges: z.array(z.enum(BALL_DOCK_EDGES)).min(1).max(4).optional(),
+  collapseRatio: z.number().positive().max(1).optional(),
+  hoverDelayMs: z.number().int().nonnegative().max(10_000).optional(),
+}).strict()
+
+/** A ball profile after defaults and bounds clamping. */
+export interface ResolvedBallProfile {
+  enabled: boolean
+  size: number
+  orb: number
+  inset: number
+  dockVisibleRatio: number
+  dockable: boolean
+  collapse: boolean
+  dockEdges: readonly BallDockEdge[]
+  hoverDelayMs: number
+}
+
+/**
+ * Resolve a requested ball profile into safe, square geometry. The paint rim
+ * stays fixed; a too-small or too-large request is clamped, never accepted as
+ * an arbitrary shape.
+ *
+ * @param profile - the requested profile; omitted fields use factory defaults.
+ */
+export function resolveBallProfile(profile: BallProfile = {}): ResolvedBallProfile {
+  const size = clampInteger(profile.size ?? BALL_LIMITS.defaultSize, BALL_LIMITS.minSize, BALL_LIMITS.maxSize)
+  const requestedEdges = profile.dockEdges ?? BALL_DOCK_EDGES
+  const dedupedEdges = [...new Set(requestedEdges)].filter(edge => BALL_DOCK_EDGES.includes(edge))
+  return {
+    enabled: profile.enabled ?? true,
+    size,
+    orb: size - 2 * BALL_LIMITS.inset,
+    inset: BALL_LIMITS.inset,
+    dockVisibleRatio: clampNumber(
+      profile.collapseRatio ?? BALL_LIMITS.defaultCollapseRatio,
+      BALL_LIMITS.minCollapseRatio,
+      BALL_LIMITS.maxCollapseRatio,
+    ),
+    dockable: profile.dockable ?? true,
+    collapse: profile.collapse ?? true,
+    dockEdges: dedupedEdges.length > 0 ? dedupedEdges : [...BALL_DOCK_EDGES],
+    hoverDelayMs: clampInteger(
+      profile.hoverDelayMs ?? BALL_LIMITS.defaultHoverDelayMs,
+      BALL_LIMITS.minHoverDelayMs,
+      BALL_LIMITS.maxHoverDelayMs,
+    ),
+  }
+}
+
+/** Where an effective window/ball profile came from. */
+export const UI_PROFILE_SOURCES = ['user', 'persisted', 'layout', 'face', 'default'] as const
+
+/** One profile source. */
+export type UiProfileSource = (typeof UI_PROFILE_SOURCES)[number]
+
+/** Wire/authoring schema for {@link UiProfileSource}. */
+export const uiProfileSourceSchema = z.enum(UI_PROFILE_SOURCES)
+
+/** The effective operator-window profile and its source. */
+export interface ShellWindowProfileState {
+  profile: ResolvedWindowProfile
+  source: UiProfileSource
+}
+
+/** The effective floating-ball profile and its source. */
+export interface ShellBallProfileState {
+  profile: ResolvedBallProfile
+  source: UiProfileSource
+}
+
+/** Wire schema for {@link ShellWindowProfileState}. */
+export const windowProfileStateSchema = z.object({
+  profile: windowProfileSchema,
+  source: uiProfileSourceSchema,
+}).strict()
+
+/** Wire schema for {@link ShellBallProfileState}. */
+export const ballProfileStateSchema = z.object({
+  profile: ballProfileSchema,
+  source: uiProfileSourceSchema,
+}).strict()
+
+/** The answer to a window-profile request. */
+export interface WindowProfileApplyResult {
+  applied: boolean
+  profile: ResolvedWindowProfile
+  source: UiProfileSource
+  reason?: string | undefined
+}
+
+/** The answer to a ball-profile request. */
+export interface BallProfileApplyResult {
+  applied: boolean
+  profile: ResolvedBallProfile
+  source: UiProfileSource
+  reason?: string | undefined
+}
+
 /**
  * The host-aggregated ball state: what the floating ball renders. A ball
  * surface face may render its own visual, but this is the state every
@@ -234,6 +507,16 @@ export const shellContract = defineContract('shell', {
      * truth instead of guessing (a ball born while the operator window is
      * hidden must not believe the opposite). */
     'shell.surface.state': method(emptyRequest).ret<readonly SurfaceState[]>(),
+    /** Read the effective operator-window stage and where it came from. */
+    'shell.window.profile': method(emptyRequest).ret<ShellWindowProfileState>(),
+    /** Ask the Shell to apply a layout/suite's preferred operator-window stage. */
+    'shell.window.configure': method(z.object({ profile: windowProfileSchema }).strict())
+      .ret<WindowProfileApplyResult>(),
+    /** Read the effective floating-ball stage and where it came from. */
+    'shell.ball.profile': method(emptyRequest).ret<ShellBallProfileState>(),
+    /** Ask the Shell to apply a layout/suite's preferred floating-ball stage. */
+    'shell.ball.configure': method(z.object({ profile: ballProfileSchema }).strict())
+      .ret<BallProfileApplyResult>(),
     /** Read the host-aggregated ball state this surface renders. */
     'shell.ball.state': method(emptyRequest).ret<BallState>(),
     /** Read the ball window's dock state (parked edge and collapsed flag). */
@@ -251,6 +534,10 @@ export const shellContract = defineContract('shell', {
     'shell/surface-changed': surfaceStateSchema,
     /** The host-aggregated ball state changed; the ball surface repaints. */
     'shell/ball-changed': ballStateSchema,
+    /** The effective operator-window stage changed. */
+    'shell/window-profile-changed': windowProfileStateSchema,
+    /** The effective floating-ball stage changed (size, docking, or availability). */
+    'shell/ball-profile-changed': ballProfileStateSchema,
     /** The ball parked at, left, tucked into, or slid out of an edge. */
     'shell/ball-dock-changed': ballDockStateSchema,
     /**
@@ -259,6 +546,8 @@ export const shellContract = defineContract('shell', {
      * hold times out and the Shell applies `quit` itself.
      */
     'shell/exit-requested': z.object({ source: z.enum(EXIT_SOURCES) }).strict(),
+    /** A tray/menu shortcut asked the renderer to open its settings surface. */
+    'shell/settings-open-requested': z.object({}).strict(),
   },
 })
 

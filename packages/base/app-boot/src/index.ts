@@ -8,5 +8,6 @@
 export * from './home.ts'
 export * from './scan.ts'
 export * from './compose.ts'
+export * from './migrate.ts'
 export * from './admin.ts'
 export * from './boot.ts'

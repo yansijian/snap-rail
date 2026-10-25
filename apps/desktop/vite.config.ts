@@ -32,6 +32,17 @@ function snapRailSources(): Plugin {
     '@snap-rail/app-boot': 'packages/base/app-boot/src/index.ts',
     '@snap-rail/client-kernel': 'packages/base/kernel/src/index.tsx',
     '@snap-rail/client-modules': 'packages/base/modules/src/index.ts',
+    '@snap-rail/ui': 'packages/base/ui/src/index.ts',
+    '@snap-rail/ui/components': 'packages/base/ui/src/components/index.ts',
+    '@snap-rail/ui/charts': 'packages/base/ui/src/charts.tsx',
+    '@snap-rail/ui/contract': 'packages/base/ui/src/contract.ts',
+    '@snap-rail/ui/slots': 'packages/base/ui/src/slots.tsx',
+    '@snap-rail/ui/skins': 'packages/base/ui/src/skins.tsx',
+    '@snap-rail/ui/settings': 'packages/base/ui/src/settings.tsx',
+    '@snap-rail/ui/settings-pages': 'packages/base/ui/src/settings-pages/index.ts',
+    '@snap-rail/ui/runtime': 'packages/base/ui/src/runtime.tsx',
+    '@snap-rail/ui/pages': 'packages/base/ui/src/pages.tsx',
+    '@snap-rail/ui/fallback': 'packages/base/ui/src/fallback.tsx',
   }
   const sourceOf = new Map<string, string>()
   for (const [name, rel] of Object.entries(sourceFiles)) {
@@ -45,6 +56,7 @@ function snapRailSources(): Plugin {
   sourceOf.set('@snap-rail/app-boot/contract', `${repoRoot}/packages/base/app-boot/src/contract.ts`)
   sourceOf.set('@snap-rail/station-rpc/contract', `${repoRoot}/packages/base/station-rpc/src/contract.ts`)
   sourceOf.set('@snap-rail/equipment/contract', `${repoRoot}/packages/equipment/equipment/src/contract.ts`)
+  sourceOf.set('@snap-rail/equipment-station/page', `${repoRoot}/packages/ui/equipment-station/src/page.tsx`)
   sourceOf.set('@snap-rail/plugin-kit/seeds', `${repoRoot}/packages/base/plugin-kit/src/seeds.ts`)
   // The Shell seam's pure face: every surface's kernel code and every plugin
   // face reads the wire rows and the ball/surface vocabulary from here.

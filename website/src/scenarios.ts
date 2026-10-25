@@ -14,20 +14,7 @@ function formatBytes(bytes: number | undefined): string {
   return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
-function mockOf(id: string): string {
-  if (id === 'standard-base') {
-    return `
-      <div class="mock">
-        <div class="mock-screen">
-          <div class="bar"><i></i><i></i><i></i></div>
-          <div class="screen">
-            <div class="mock-kpi"><strong style="font-size:17px">设备管理</strong><span>STANDARD BASE</span></div>
-            <div class="mock-rows"><span></span><span></span><span></span><span style="width:66%"></span><span style="width:44%"></span></div>
-            <div style="display:flex;gap:5px;margin-top:12px"><span class="badge">在线</span><span class="badge">1 组 · 3 点</span></div>
-          </div>
-        </div>
-      </div>`
-  }
+function mockOf(): string {
   return `
     <div class="mock">
       <div class="mock-screen">
@@ -46,11 +33,11 @@ function renderCombos(): void {
   const root = document.querySelector<HTMLElement>('#combos')
   if (root === null) return
   if (CATALOG.combos.length === 0) {
-    root.innerHTML = '<div class="proof" style="grid-column:1/-1"><h3>场景包尚未发布</h3><p>先在仓库运行 <code style="font-family:var(--font-mono)">pnpm run publish -- --skip-sync</code> 装配 feed，再重新构建本站。</p></div>'
+    root.innerHTML = '<div class="proof" style="grid-column:1/-1"><h3>一方场景包首发中</h3><p>场景包由插件 SDK 组出来：驱动 + 页面 + 套件打包成一个 zip。先看 <a class="link-arrow" href="./dev.html">插件开发指南</a>，或从社区插件源安装别人做好的场景包。</p></div>'
     return
   }
 
-  const order = ['production-board', 'standard-base']
+  const order: string[] = []
   const combos = [...CATALOG.combos].sort((a, b) => {
     const ai = order.indexOf(a.id)
     const bi = order.indexOf(b.id)
@@ -65,7 +52,7 @@ function renderCombos(): void {
     return `
       <article class="scenario reveal">
         <div class="scenario-media media-slot" data-image="scenario-${combo.id}" data-alt="${copy.title} 客户端界面">
-          ${mockOf(combo.id)}
+          ${mockOf()}
         </div>
         <div class="scenario-body">
           <div class="scenario-top">

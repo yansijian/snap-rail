@@ -16,6 +16,7 @@ import Include from '@snap-rail/cordis-plugin-include'
 import Loader from '@snap-rail/cordis-plugin-loader'
 import { anchorSpineResolution } from './resolve-hooks.ts'
 import { composeEntries, loadBuiltinLayer, loadPresetLayers, loadUserLayer } from './compose.ts'
+import { migrateRetiredUiHome } from './migrate.ts'
 import { LayerAdmin } from './admin.ts'
 import { scanPluginPool } from './scan.ts'
 
@@ -96,6 +97,16 @@ export async function boot(options: BootOptions): Promise<Context> {
   const poolDirs = options.poolDirs ?? [join(options.home, 'plugins')]
   const presetDirs = options.presetDirs ?? [join(options.home, 'presets')]
   mkdirSync(options.home, { recursive: true })
+
+  // A home carried over from the split-framework era may still name retired
+  // UI packages; composition rejects unknown rows, so the migration runs
+  // before the layers and the pool are read. Idempotent on clean homes.
+  migrateRetiredUiHome({
+    presetDirs,
+    userLayerPath: options.userLayerPath,
+    poolDirs,
+    log: message => console.warn(message),
+  })
 
   const pool = scanPluginPool(poolDirs)
   const builtin = loadBuiltinLayer(options.builtinLayerPath)
