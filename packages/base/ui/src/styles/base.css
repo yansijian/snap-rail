@@ -121,6 +121,13 @@
     cursor: pointer;
   }
 
+  /* The switch thumb travels by the skin's translateX along the track, which
+   * measures from the content edge: centering would strand the off-state
+   * thumb mid-track and shove the on-state thumb past the track edge. */
+  [data-snap-part='switch.root'] {
+    justify-content: flex-start;
+  }
+
   .snap-switch-label,
   .snap-checkbox-label {
     display: inline-flex;
