@@ -88,6 +88,10 @@ description: 开发、构建、验证、签名与发布 snap-rail 可安装插�
 ```sh
 # 0. 环境：Node 22+，pnpm 或 npm。国内镜像同步新版本有延迟，
 #    pnpm dlx 报 404 / ETARGET 时：npm config set registry https://registry.npmjs.org/
+#    pnpm 11 默认给刚发布 24h 内的版本冷却（minimumReleaseAge=1440）：latest
+#    会被压回旧版（可能拿到 r1 时代模板）、装 SDK 也可能被拒。刚发版就追新：
+#    dlx 钉死版本（如 @snap-rail/plugin-sdk@0.2.6），项目 pnpm-workspace.yaml
+#    设 minimumReleaseAge: 0（或 minimumReleaseAgeExclude 列出 @snap-rail/*）。
 pnpm dlx @snap-rail/plugin-sdk init my-driver --template driver
 cd my-driver
 pnpm install

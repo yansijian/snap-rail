@@ -41,6 +41,7 @@ warning = 建议（放行但要逐条确认）。
 | install 报未发布包 E404 | 旧模板把未发布的内部包写进了 peer | 升级 SDK：`pnpm dlx @snap-rail/plugin-sdk@latest init` 重新生成 |
 | 运行 CLI 弹「选择应用打开 .js」 | SDK 0.2.2 及更早缺 shebang | 升级到 0.2.3+；临时用 `node node_modules/@snap-rail/plugin-sdk/lib/cli.js` |
 | `pnpm install` 报 `ERR_PNPM_IGNORED_BUILDS`（pnpm ≥10） | 依赖的构建脚本默认不跑（esbuild 等） | 按提示把 `pnpm-workspace.yaml` 的 `allowBuilds.<pkg>` 改成 `true`（pnpm 10 用 `onlyBuiltDependencies`），或跑 `pnpm approve-builds` |
+| `pnpm install` 报 `published … within the minimumReleaseAge cutoff` / 装不到刚发布的 SDK（pnpm 11） | pnpm 11 默认 `minimumReleaseAge: 1440`——刚发布 24h 内的版本被冷却跳过或压回旧版（防供应链攻击，官方 registry 也生效） | 项目 `pnpm-workspace.yaml` 里设 `minimumReleaseAge: 0`，或 `minimumReleaseAgeExclude` 列出 `@snap-rail/*`；不急就等 24h 自然解冻 |
 | `pnpm exec tsc` 报 not found | 模板只带 tsdown，不带 typescript | `pnpm add -D typescript` 后再 `pnpm exec tsc --noEmit`；tsdown 只转译不检查类型 |
 | 改 package.json 依赖段后 install 挂死 | 弱网/受限环境下 lockfile 重解析的元数据请求超时 | 避免频繁动依赖段；离线机器用 `--offline` 与本地 registry 镜像 |
 
