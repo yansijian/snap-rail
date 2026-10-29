@@ -121,7 +121,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
     const feedUrls = (): readonly string[] => {
       const value = resolvePluginFeedUrls(dirname(layers.handles.userLayerPath), dirname(layers.handles.builtinLayerPath))
       if (value === undefined || value.length === 0) {
-        throw new RpcBusinessError({ code: 'unavailable', details: { what: '未配置插件源：请点击插件页搜索框前的源图标填写插件源地址' } })
+        throw new RpcBusinessError({ code: 'unavailable', details: { what: '未配置插件源：请到 插件管理 页点「⚙ 配置插件源」填写插件源地址' } })
       }
       return value
     }
