@@ -18,10 +18,19 @@ import type { Context } from '@snap-rail/cordis'
 import type { InspectedArchive, PluginInfo, PluginSignature, PluginUpdate, RemotePluginInfo } from '@snap-rail/app-boot/contract'
 import { PLUGINS_FEED_URLS_KEY } from '@snap-rail/app-boot/contract'
 import '@snap-rail/app-boot/contract'
-import { droppedZipPath } from '@snap-rail/client-kernel'
 import { rpcErrorText } from '@snap-rail/connection'
 import { useEffect, useState, type DragEvent, type ReactNode } from 'react'
 import { Badge, Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, Input, Page, Section, Stack, Switch, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/index.ts'
+
+/** The preload's zip→path bridge (`webUtils.getPathForFile`); null outside
+ * Electron or in tests. Inlined rather than imported from the app-internal
+ * kernel package: it never ships in the installer, and the packaged-app gate
+ * refuses any shipped `@snap-rail/ui` lib that requires it. */
+function droppedZipPath(file: File): string | null {
+  const zipPathOf = (globalThis as { snapRail?: { zipPathOf?: unknown } }).snapRail?.zipPathOf
+  if (typeof zipPathOf !== 'function') return null
+  return (zipPathOf as (candidate: File) => string | null)(file)
+}
 
 /** Human labels for the package kinds. */
 const KIND_LABELS: Record<string, string> = {
