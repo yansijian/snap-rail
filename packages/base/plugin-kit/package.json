@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/plugin-kit",
   "description": "The plugin author's kit: snapRail manifest vocabulary, the renderer seed whitelist, tsdown presets for installable host + client faces, release signing, and the final-format packer",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

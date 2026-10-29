@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/shell",
   "description": "The OS integration seam (specification): ctx.shell for notifications, tray contributions, auxiliary surfaces and the ball state; ./contract is the pure wire contract",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
