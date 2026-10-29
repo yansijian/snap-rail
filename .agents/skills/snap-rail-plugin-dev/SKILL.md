@@ -42,8 +42,10 @@ description: 开发、构建、验证、签名与发布 snap-rail 可安装插�
 2. **种子消费只准 named/star 导入，且分 base / 贡献两层**。default 导入经
    CJS interop 会把 `.default` 变成整个命名空间对象，运行时挂载即崩——
    `clientBundle` 构建期会故意硬错。base 种子（connection / protocol /
-   util / shell-contract / equipment-contract / react / zod 等）由 shell 自动
-   播种，**不能写** `client.externalSeeds`（写了启用预检会报“提供方未安装”）；
+   util / shell-contract / equipment-contract / react / zod、`@snap-rail/ui`
+   及其 components/charts/contract/slots/skins/settings/runtime/pages/fallback
+   子路径等）由 shell 自动播种，**不能写** `client.externalSeeds`（写了启用
+   预检会报“提供方未安装”）；
    只有其他插件贡献的 `<包>/<子路径>` 才写。只 type-only 导入的贡献
    种子不产生运行时 require，也不用写。自己贡献给别人的组件进 `client.seeds`。
 3. **`snapRail.client.seedAbi` 永不手写**——pack 时自动盖章，安装期与渲染
@@ -192,14 +194,21 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
   存在但类型包没装 → 按地图升级 SDK；地图里没有的才是真的没有。不要从已装
   插件的编译产物反推 API，也不要在插件里 `as any`——那是 skill/闭包缺口的
   信号。
-- **版本锚**（本 skill 快照对应）：plugin-sdk `^0.2.5`、plugin-kit `^0.2.2`、
-  cordis `^4.0.1`、equipment `^0.1.5`、store `^0.1.0`、`@snap-rail/ui`
-  `^0.1.0`、zod `^4`、react `^19`、tsdown `^0.22`。`@snap-rail/shell` 随公共
-  闭包发布，`npm view @snap-rail/shell version` 查最新。
+- **版本锚**（本 skill 快照对应）：plugin-sdk `^0.2.6`、plugin-kit `^0.2.3`、
+  cordis `^4.0.1`、equipment `^0.1.6`、store `^0.1.0`、`@snap-rail/ui`
+  `^0.1.0`（已随 r2 闭包发布到公共 npm）、zod `^4`、react `^19`、
+  tsdown `^0.22`。`@snap-rail/shell` 随公共闭包发布（当前 0.2.2），
+  `npm view @snap-rail/shell version` 查最新。
   base 服务门面 `@snap-rail/plugin-sdk/api` 与 `/api/client` 从 `0.2.5`
   起提供；底层 gateway/connection/settings 由 SDK 传递安装，作者不单列。
   `SEED_ABI_REVISION` 当前为 **r2**（以 `@snap-rail/plugin-kit` 导出为准）；
   终端升级后旧 zip 需用当前 plugin-kit 重打包才能过渲染端 ABI 校验。
+- **时代分界（先查这个）**：npm 的 `plugin-sdk ≤ 0.2.5` / `plugin-kit ≤
+  0.2.2` 是 UI 基座内置化**之前**的旧时代产物——没有 `ui-skin` 模板、UI
+  模板默认依赖已退役的 `@snap-rail/framework-shadcn`、pack 盖 seed ABI r1
+  章（当前宿主安装期拒装）。r2 时代从 `plugin-sdk 0.2.6` / `plugin-kit
+  0.2.3` 起：9 模板齐、UI 模板默认内置 `@snap-rail/ui`。装到旧版按上面
+  版本锚升级重装，不要照旧骨架写。
 - **版本陷阱（以 plugin-sdk 0.2.3 / equipment 0.1.4 为界，之后消除）**：
   - `probe`（驱动「测试连接」）：主仓已实现，但 npm
     `@snap-rail/equipment@0.1.4` 的类型里**没有**该字段——`0.1.5` 起恢复；

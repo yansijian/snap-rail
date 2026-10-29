@@ -1,6 +1,6 @@
 {
   "skill_name": "snap-rail-plugin-dev",
-  "note": "轻量实测记录（2026-10-24）。eval 1 锚点：plugin-sdk 0.2.3 / plugin-kit 0.2.1 / equipment 0.1.4；eval 2/3 锚点：plugin-sdk 0.2.5 / plugin-kit 0.2.2 / equipment 0.1.5 / gateway 0.1.1 / connection 0.1.0 / settings 0.1.0。完整产物在评测 TEMP（未入库）。",
+  "note": "轻量实测记录（2026-10-24）。eval 1 锚点：plugin-sdk 0.2.3 / plugin-kit 0.2.1 / equipment 0.1.4；eval 2/3 锚点：plugin-sdk 0.2.5 / plugin-kit 0.2.2 / equipment 0.1.5 / gateway 0.1.1 / connection 0.1.0 / settings 0.1.0。r2 时代（UI 基座内置化后，2026-10-29 闭包发布起）锚点：plugin-sdk 0.2.6 / plugin-kit 0.2.3 / equipment 0.1.6 / ui 0.1.0 / shell 0.2.2。完整产物在评测 TEMP（未入库）。",
   "evals": [
     {
       "id": 1,

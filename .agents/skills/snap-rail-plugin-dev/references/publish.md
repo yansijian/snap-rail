@@ -79,8 +79,9 @@ openssl pkey -in .keys/release.private.pem -pubout -out .keys/release.public.pem
 官方工作流模板
 <https://github.com/yansijian/snap-rail/blob/master/docs/plugin-publish-ci.yml>
 复制进你仓库的 `.github/workflows/publish.yml`；secret 只需
-`RELEASE_PRIVATE_PEM` 与 `RELEASE_KEY_ID`。打 tag（如 `v1.0.0`）即构建、
-打包、签名、更新滚动 Release。
+`RELEASE_PRIVATE_PEM` 与 `RELEASE_KEY_ID`。推送到 master（改动涉及
+`packages/**`、`scripts/**` 或工作流文件本身）时自动构建、打包、签名、
+更新滚动 Release；也可在 Actions 页手动触发（`workflow_dispatch`）。
 
 ## 组合包（combo，可选）
 
