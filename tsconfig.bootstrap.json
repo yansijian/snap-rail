@@ -1,10 +1,11 @@
 {
-  // Bootstrap build for the split plugin repos: the framework's TypeScript
-  // program resolves the main packages through their published declarations,
-  // so those declarations (and the JS the framework's tsdown config imports)
-  // must exist before `external/` is built. This graph stops at the UI layer:
-  // equipment-station imports the framework, so the full host project (which
-  // includes it) can only build after the framework face exists.
+  // Bootstrap build for the split plugin repos: their TypeScript programs
+  // resolve the base packages through workspace declarations, so those
+  // declarations (and the JS the paired tsdown.bootstrap.config bundles) must
+  // exist before `external/` is built. The graph covers everything under the
+  // UI substrate (shell + ui included — the paired bootstrap tsdown's
+  // `packages/base/*` glob picks up both, so both must emit); it stops before
+  // equipment-station, whose page library builds in the full host project.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": false,
@@ -32,6 +33,8 @@
     { "path": "./packages/base/app-boot" },
     { "path": "./packages/base/station-rpc" },
     { "path": "./packages/base/protocol" },
+    { "path": "./packages/base/shell" },
+    { "path": "./packages/base/ui" },
     { "path": "./packages/base/gateway" },
     { "path": "./packages/base/connection" },
     { "path": "./packages/equipment/equipment" },
