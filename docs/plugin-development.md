@@ -45,7 +45,7 @@ pnpm dlx @snap-rail/plugin-sdk init my-driver --template driver
 | `ui-view` | 渲染 | 注册进 `ctx.pages` 的页面（React + 内置语义组件） |
 | `ui-layout` | 渲染 | 布局：声明 `provides`，编排区域插槽与窗口/球档案 |
 | `ui-extension` | 渲染 | 共享组件贡献（`client.seeds`，供其他组件插件复用） |
-| `ui-skin` | 渲染 | 皮肤：token + part CSS + 展示变体，单活 `exclusive: 'skin'` |
+| `ui-skin` | 渲染 | 主题：单套 token + 可选 part CSS（纯样式），单活 `exclusive: 'skin'` |
 
 UI 模板以 base 种子 `@snap-rail/ui` 为语义基座，它随应用内置，**不是**
 `requires` 条目，也不需要 framework 绑定。`--framework` 仅作为类型/构建包
@@ -93,7 +93,7 @@ zip 里残留的字段在 manifest 校验时被剥离，宿主永不再读它们
   `package.json` 依赖保持外部，其余打进包内），即 zip 的 `main`。
 - **渲染面**用 `clientBundle` 构建，产物 `lib-client/client.js`——一个焊
   进 `__ModuleLoader__` 工厂的 CJS 包。种子模块（`@snap-rail/ui` 语义组件/
-  插槽/皮肤/设置/runtime、base 契约）外部化到运行时种子表，跨插件共享单
+  插槽/主题/设置/runtime、base 契约）外部化到运行时种子表，跨插件共享单
   实例；第三方库全部内联；位图与 SVG 以 `snap-plugin://` 地址随包发射；
   `.css` 导入变成幂等的样式注入模块。
 - **种子消费只准 named/star 导入**：default 导入经 CJS interop 会把
@@ -113,7 +113,7 @@ zip 里残留的字段在 manifest 校验时被剥离，宿主永不再读它们
 `createConnection`（返回 `{ update, dispose }`，经 handle 上报
 status/sample/write）。设备/组/点住在底座表里，驱动零自有存储。
 
-### 渲染面注册面（页面 / 布局 / 设置页 / 皮肤）
+### 渲染面注册面（页面 / 布局 / 设置页 / 主题）
 
 四种注册都挂在 `apply(ctx)` 里（登记即 effect，停用/卸载自动回收）：
 
@@ -121,7 +121,7 @@ status/sample/write）。设备/组/点住在底座表里，驱动零自有存�
 ctx.pages.registerPage(ctx, { id, title, order, render })                   // 主页面
 ctx.ui.registerLayout(ctx, { id, order, provides, window?, ball?, render }) // 布局
 ctx.settings.registerPage(ctx, { id, title, group, order, render })         // 设置页
-ctx.skins.register(ctx, { id, title, tokens, presentations?, parts?, css? }) // 皮肤
+ctx.skins.register(ctx, { id, title, tokens, css? })                        // 主题（id 用包名）
 ```
 
 设置页不需要单独的模板：用 `ui-view` 模板，在同一个包里多调一次
@@ -186,10 +186,18 @@ export default defineConfig([
 - **贴边状态读 `shell.ball.dock` + 订阅 `shell/ball-dock-changed`**
   （`{edge, collapsed, visiblePx}`）：球被拖到左右边缘会自动收起只留 1/3，
   悬停自动滑出——底座负责一切几何与时机；面在 `collapsed` 时按 `edge` 在
-  可见条里画**收起形态**（贴边小标签），并**自留拖拽区**
-  （`-webkit-app-region: drag`），否则收起的球拽不回来。
-- 主窗口与球**互斥**由底座保证：`present('main')` 收球、`present('ball')`
-  收主窗口。面只需画好两种形态，不做互斥逻辑。
+  可见条里画**收起形态**（贴边小标签）。
+- **拖拽用内核导出的 `attachBallDrag`**（`@snap-rail/client-kernel`）：球面
+  只向 `shell.ball.move` 发 `begin`/`end` 两个信号——宿主从 OS 光标取锚、
+  16ms 轮询让球窗绝对跟随，松手后的贴边、收起、位置记忆也全在宿主；按住
+  不动松开算点击。不要自己流式上报坐标（窗动则坐标系动，必然停摆抖动），
+  CSS `-webkit-app-region` 在透明球窗上同样不可靠。
+- 主窗口与球**各自独立显隐**，底座不互斥：`present`/`hide` 只作用于自己
+  点名的面，所有显隐（含任务栏还原等旁路）都以 `shell/surface-changed` 帧
+  广播。需要「窗口与球二选一」的场景自己编排：订阅 `shell/surface-changed`，
+  见 `main` 可见就 `hide('ball')`、见 `main` 隐藏就 `present('ball')`
+  （宿主面 `ctx.on` + `ctx.shell` 同理）；`present('ball')` 受 `enabled`
+  门禁（球被用户或布局禁用时拒绝）。面只需画好两种形态。
 
 ### 关闭与退出：`ctx.shell.window`（宿主面）
 
@@ -225,12 +233,13 @@ OS 资源只走这条缝，插件**永不 import Electron**。所有权按点击
 | --- | --- | --- |
 | `ctx.shell.notify(caller, {title, body, actions, tag, silent})` | 宿主面 | 带按钮的通知；返回 `{applied, id}` 或 `{applied:false, reason, message}` |
 | `ctx.shell.tray.addItem/updateItem/removeItem(caller, …)` | 宿主面 | 托盘菜单项（单插件 12、全体 24）；点击回执 `ctx.on('shell/tray-clicked', key)` |
-| `ctx.shell.surface.present/hide/state(caller, …)` | 宿主面 | 并按需创建/显示/隐藏辅助窗口（`main` = 显示并聚焦；互斥由底座保证） |
+| `ctx.shell.surface.present/hide/state(caller, …)` | 宿主面 | 并按需创建/显示/隐藏辅助窗口（`main` = 显示并聚焦；各面独立显隐，互斥编排自己做） |
 | `ctx.shell.ball.setState(caller, patch)` | 宿主面 | 宿主聚合的球状态：`{progress 0..1 或 null, label ≤8字 或 null, tone}` |
 | `ctx.shell.window.setExitPolicy/exitPolicy/resolve(caller, …)` | 宿主面 | 关窗/托盘退出的行为声明与挂起应答 |
 | `shell.toast` | 渲染面 | 单向通知（无按钮、无回调，点击聚焦主窗口） |
 | `shell.surface.present/hide/state` | 渲染面 | 立起/收起窗口；`state` 读当前可见面（球在主窗隐藏时出生，必须先读再画）；`present('main')` 是回退圆球唯一的动作 |
 | `shell.ball.state` / `shell.ball.dock` | 渲染面 | 读宿主聚合的球内容态与窗口贴边态；帧 `shell/ball-changed`、`shell/ball-dock-changed` 负责推送 |
+| `shell.ball.move` | 渲染面 | 球面拖动信号（`begin`/`end`）：宿主从 OS 光标取锚、16ms 轮询绝对跟随，松手贴边落定；经内核 `attachBallDrag` 使用，不要自己流式上报坐标 |
 | `shell.exit.resolve` | 渲染面 | 应答一个挂起的退出请求（`shell/exit-requested` 帧到达后） |
 
 ```ts

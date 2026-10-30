@@ -129,6 +129,7 @@ describe('shell contract', () => {
     expect(Object.keys(shellContract.methods).sort()).toEqual([
       'shell.ball.configure',
       'shell.ball.dock',
+      'shell.ball.move',
       'shell.ball.profile',
       'shell.ball.state',
       'shell.exit.resolve',

@@ -146,6 +146,7 @@
 
   [data-snap-part='tabs.list'] {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--snap-space-xs);
   }

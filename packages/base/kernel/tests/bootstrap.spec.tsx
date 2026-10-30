@@ -206,7 +206,7 @@ describe('the recovery bootstrap page', () => {
     // Non-address text searches the feed: the result row carries the entry
     // and its source; the 安装 previews through the address pipeline (the
     // entry's own feed base + file).
-    const input = document.querySelector<HTMLInputElement>('input[placeholder^="粘贴本地/网络地址"]')!
+    const input = document.querySelector<HTMLInputElement>('input[placeholder^="本地路径"]')!
     fireEvent.change(input, { target: { value: 'sample' } })
     ;[...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '搜索')!.click()
     await flush()
@@ -335,7 +335,7 @@ describe('the recovery bootstrap page', () => {
     showBootstrap(handle)
     await flush()
 
-    const input = document.querySelector<HTMLInputElement>('input[placeholder^="粘贴本地/网络地址"]')!
+    const input = document.querySelector<HTMLInputElement>('input[placeholder^="本地路径"]')!
     fireEvent.change(input, { target: { value: 'C:\\tmp\\demo-base.zip' } })
     ;[...document.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '搜索')!.click()
     await flush()

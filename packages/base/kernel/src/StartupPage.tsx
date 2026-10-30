@@ -53,7 +53,7 @@ export function StartupPage(props: { describe: () => Promise<HostIdentity>, diag
   }, [props])
 
   const line = phase.kind === 'connecting'
-    ? '正在连接宿主…'
+    ? '正在启动…'
     : phase.kind === 'ready'
       ? `${phase.host.name} ${phase.host.version}`
       : `连接失败：${phase.message}`

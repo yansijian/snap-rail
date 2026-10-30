@@ -167,11 +167,14 @@ export interface PageProps extends LayoutProps {
   header?: ReactNode
   actions?: ReactNode
   title?: ReactNode
+  /** Controls that belong to the title itself; rendered right beside it,
+   * before the far-aligned `actions`. */
+  titleExtra?: ReactNode
   description?: ReactNode
 }
 
 /** A page body with its own header/actions anatomy. */
-export function Page({ header, actions, title, description, className, style, children }: PageProps): ReactNode {
+export function Page({ header, actions, title, titleExtra, description, className, style, children }: PageProps): ReactNode {
   return (
     <div
       {...part('page', 'root')}
@@ -181,7 +184,10 @@ export function Page({ header, actions, title, description, className, style, ch
       {(header !== undefined || title !== undefined || description !== undefined || actions !== undefined) && (
         <div {...part('page', 'header')} style={{ display: 'flex', flexDirection: 'column', gap: space('sm'), flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: space('md') }}>
-            {title !== undefined && <div {...part('page', 'title')}>{title}</div>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: space('sm') }}>
+              {title !== undefined && <div {...part('page', 'title')}>{title}</div>}
+              {titleExtra !== undefined && <div {...part('page', 'title-extra')}>{titleExtra}</div>}
+            </div>
             {actions !== undefined && <div {...part('page', 'actions')}>{actions}</div>}
           </div>
           {description !== undefined && <div {...part('page', 'description')}>{description}</div>}

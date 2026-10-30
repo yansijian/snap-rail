@@ -79,9 +79,10 @@ export const CLIENT_EXTERNALS: readonly string[] = [...SEED_MODULES, ...CONTRIBU
  * it was built against (`snapRail.client.seedAbi`); the shell refuses a
  * face stamped with a foreign revision instead of letting it crash the
  * renderer (r1 exists because a seed default-import compiled to a namespace
- * where the author meant a class — the shape must be checkable).
+ * where the author meant a class — the shape must be checkable; r2→r3
+ * because the theme contract collapsed to one token set per theme).
  */
-export const SEED_ABI_REVISION = 2
+export const SEED_ABI_REVISION = 3
 
 /** What a client face declares about the seed table it was built against. */
 export interface SeedAbi {

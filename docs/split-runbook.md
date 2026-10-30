@@ -1,7 +1,7 @@
 # 拆仓执行手册（snap-rail → 多仓）
 
 状态：**已收敛**。主仓 `snap-rail` 保留 base 启动链 + 内置默认
-store-sqlite/equipment + 内置 `@snap-rail/ui`、默认皮肤、设置/插件管理/
+store-sqlite/equipment + 内置 `@snap-rail/ui`、出厂双主题、设置/插件管理/
 外观/设备管理页；**没有 framework/suite 拆分仓依赖**。可安装插件只剩
 驱动与作者自己的业务页/套件（GitHub `yansijian`；内网 Gitea 作镜像/构建）。
 
@@ -27,7 +27,7 @@ store-sqlite/equipment + 内置 `@snap-rail/ui`、默认皮肤、设置/插件�
 
 主仓侧对应关系：
 
-- `packages/` 保留 base/store/equipment/ui（两 station）；UI 页面/皮肤不再
+- `packages/` 保留 base/store/equipment/ui（两 station）；UI 页面/主题不再
   作为可安装 zip；
 - `apps/desktop`：dev harness 与 `rendererPackages` 挡板移除——dev 与生产
   同路，可安装插件来自插件池；内置 UI 由 `@snap-rail/ui` 提供；

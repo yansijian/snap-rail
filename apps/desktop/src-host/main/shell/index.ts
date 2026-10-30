@@ -11,8 +11,8 @@
  * see Electron; they see `ctx.shell`.
  *
  * The decisions (caps, throttling, ownership, coalescing, the exit policy
- * fold, the exclusivity rule) live in `./machine`, and the dock math in
- * `./dock` — both Electron-free and tested. This module is the glue: it turns
+ * fold) live in `./machine`, and the dock math in `./dock` — both
+ * Electron-free and tested. This module is the glue: it turns
  * decisions into `Notification`/`Tray`/`BrowserWindow` calls and OS callbacks
  * back into context events. It never paints a prompt: a `hold` in the exit
  * policy freezes the request and hands the decision to the declaring plugin.
@@ -284,6 +284,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       }
       ballProfile = surfaces.setBallProfile(request)
       ballSource = 'layout'
+      syncBall()
       publishBallProfile()
       return { applied: true, profile: ballProfile, source: ballSource }
     }
@@ -347,9 +348,6 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
           event.preventDefault()
           applyExit('window', machine.exitDecision('window'))
         })
-        // A show from outside the Shell (taskbar restore, a stray `show`)
-        // re-asserts exclusivity: the operator window takes the screen.
-        win.on('show', () => hideAuxSurfaces())
       },
     })
     surfaces.setBallProfile(ballProfile)
@@ -381,6 +379,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         if (value === null || value === undefined) {
           ballProfile = surfaces.setBallProfile({})
           ballSource = 'default'
+          syncBall()
           publishBallProfile()
           return
         }
@@ -388,6 +387,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         if (!parsed.success) return
         ballProfile = surfaces.setBallProfile(parsed.data as BallProfile)
         ballSource = 'user'
+        syncBall()
         publishBallProfile()
       }
     })
@@ -395,20 +395,6 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
     /** Tell every surface (and every host plugin) that a window changed. */
     const publishSurface = (surface: SurfaceId): void => {
       ctx.emit('shell/surface-changed', surfaces.stateOf(surface))
-    }
-
-    /**
-     * The exclusivity invariant: presenting the operator window hides every
-     * auxiliary surface, and presenting an auxiliary surface hides the
-     * operator window. Whichever path made a window visible, exactly one of
-     * the two is on screen.
-     */
-    const hideAuxSurfaces = (): void => {
-      for (const surface of machine.exclusivityHides('main')) {
-        if (surfaces.stateOf(surface).visible && surfaces.hide(surface as AuxSurfaceId)) {
-          publishSurface(surface)
-        }
-      }
     }
 
     const tray = createTrayHost(options.trayIconPath, {
@@ -448,14 +434,14 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
     })
 
     /**
-     * Present a surface: enforce exclusivity, create it if needed, show it,
-     * and publish the change. Presenting an auxiliary surface is also what
-     * brings the tray icon into being — a floating ball with no way to reach
-     * the operator window would be a trap.
+     * Present a surface: create it if needed, show it, and publish the
+     * change. Surfaces are independent — the base never hides one because
+     * another became visible, and no surface's visibility has anything to do
+     * with the tray; a plugin that wants them swapped arranges it over
+     * `shell.surface.present/hide` and the `shell/surface-changed` frames.
      */
     const present = (surface: SurfaceId): ShellResult => {
       if (surface === 'main') {
-        hideAuxSurfaces()
         const ok = surfaces.present(surface)
         if (ok) publishSurface(surface)
         return resultOf(ok, `无法显示窗口 ${surface}`)
@@ -463,12 +449,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       if (surface === 'ball' && !ballProfile.enabled) {
         return { applied: false, reason: 'unavailable', message: '悬浮球已被当前布局禁用' }
       }
-      const mainWin = surfaces.windowOf('main')
-      const mainVisible = mainWin !== undefined && !mainWin.isDestroyed() && mainWin.isVisible()
-      if (mainVisible) mainWin.hide()
-      tray.ensure()
       const ok = surfaces.present(surface)
-      if (mainVisible) publishSurface('main')
       if (ok) publishSurface(surface)
       return resultOf(ok, `无法显示窗口 ${surface}`)
     }
@@ -480,6 +461,27 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       return { applied: true }
     }
 
+    /**
+     * Make the ball follow its profile's `enabled` flag: enabled keeps it on
+     * screen beside the operator window (the base never picks between them),
+     * disabled hides it (`setBallProfile` already applied that half).
+     */
+    const syncBall = (): void => {
+      if (!ballProfile.enabled) return
+      if (surfaces.present('ball')) publishSurface('ball')
+    }
+
+    // The tray is part of the client from boot: it stays for the session and
+    // plugins only add rows to it. Creation failure (missing glyph, no
+    // notification area) is tolerated but never silent.
+    if (!tray.ensure()) {
+      logger.warn('托盘图标创建失败：图标缺失或系统无通知区域，托盘不可用')
+    }
+
+    // The ball follows its profile from boot: an enabled ball sits beside the
+    // operator window instead of waiting for a plugin to summon it.
+    syncBall()
+
     /** Apply one immediate disposition. Returns false when nothing could be done. */
     const performExit = (source: ShellExitSource, action: ShellExitDisposition): void => {
       if (action === 'quit') {
@@ -487,7 +489,18 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         options.requestQuit()
         return
       }
-      if (action === 'ball' && present('ball').applied) return
+      if (action === 'ball') {
+        // The `ball` disposition is the plugin-declared exclusive form: the
+        // operator window goes away and the ball stays — the one pairing the
+        // base still performs, because the exit policy asked for it.
+        const parked = present('ball').applied
+        const win = surfaces.windowOf('main')
+        if (win !== undefined && !win.isDestroyed() && win.isVisible()) {
+          win.hide()
+          publishSurface('main')
+        }
+        if (parked) return
+      }
       // `tray`, or a ball that could not be shown: park behind the tray icon.
       if (!tray.ensure()) {
         logger.error(`退出处置 ${action}（来源 ${source}）失败：托盘图标创建失败，主窗口保持可见`)
@@ -598,8 +611,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
           return tray.available
         },
         addItem: (caller, item) => {
-          // The tray is created for the first contribution: the icon is the
-          // plugins' affordance, not the app's default chrome.
+          // Defensive only: the icon normally exists from boot.
           tray.ensure()
           if (!tray.available) return { applied: false, reason: 'no-tray', message: '当前环境无法创建托盘图标' }
           const added = machine.addTrayItem(caller.fiber.name, item)
@@ -707,6 +719,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       'shell.ball.configure': ({ profile }) => configureBall(profile as BallProfile),
       'shell.ball.state': () => machine.ballState(),
       'shell.ball.dock': () => surfaces.dockState(),
+      'shell.ball.move': event => outcomeOf(resultOf(surfaces.moveBall(event), '悬浮球窗口尚未创建')),
       'shell.exit.resolve': ({ action }) => outcomeOf(resolveExit(action)),
     })
 

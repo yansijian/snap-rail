@@ -107,6 +107,12 @@ export interface SurfaceHost {
   present(surface: SurfaceId): boolean
   /** Hide an auxiliary surface; false when no window exists. */
   hide(surface: AuxSurfaceId): boolean
+  /**
+   * Drag-drive the ball window: `begin` anchors the grab from the live OS
+   * cursor and starts the follow poll, `end` stops it and hands the window
+   * to the dock settle; false when no live window.
+   */
+  moveBall(event: { phase: 'begin' | 'end' }): boolean
   /** One surface's live state. */
   stateOf(surface: SurfaceId): SurfaceState
   /** Every surface's state, `main` first. */
@@ -162,6 +168,10 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
   let programmaticTimer: ReturnType<typeof setTimeout> | undefined
   /** The parked position (edge + offset + the work area it was computed against), when parked. */
   let parked: { dock: BallDock, work: Rect } | undefined
+  /** The live ball drag: the grab anchor (cursor offset from the window origin). */
+  let drag: { anchorX: number, anchorY: number } | undefined
+  /** The 60 fps follow poll that pins the dragged ball under the OS cursor. */
+  let dragTimer: ReturnType<typeof setInterval> | undefined
   let dockState: BallDockState = { edge: null, collapsed: false, visiblePx: ballVisiblePx() }
   let tuck: TuckState = initialTuckState(false)
 
@@ -270,6 +280,14 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     if (pollTimer !== undefined) {
       clearInterval(pollTimer)
       pollTimer = undefined
+    }
+  }
+
+  /** Stop the drag follow poll (the drag itself is over or lost its window). */
+  function stopDragPoll(): void {
+    if (dragTimer !== undefined) {
+      clearInterval(dragTimer)
+      dragTimer = undefined
     }
   }
 
@@ -410,7 +428,10 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       } else {
         defaultCorner(win, size)
       }
-      win.on('moved', () => scheduleBallSettle(win))
+      win.on('moved', () => {
+        // A live drag moves the window itself; its settle waits for the end.
+        if (drag === undefined) scheduleBallSettle(win)
+      })
     }
 
     win.on('closed', () => {
@@ -511,6 +532,56 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       return true
     },
 
+    moveBall({ phase }) {
+      const win = windows.get('ball')
+      if (win === undefined || win.isDestroyed()) return false
+      if (phase === 'begin') {
+        if (!win.isVisible()) return false
+        let at: { x: number, y: number }
+        try {
+          const cursor = screen.getCursorScreenPoint()
+          at = { x: cursor.x, y: cursor.y }
+        } catch {
+          return false
+        }
+        const [rawX, rawY] = win.getPosition()
+        drag = { anchorX: at.x - (rawX ?? 0), anchorY: at.y - (rawY ?? 0) }
+        // Leaving the park: the tuck poll would fight the drag, and any dock
+        // slide still in flight would too. The ball is free until the settle
+        // re-parks it from the released position.
+        parked = undefined
+        tuck = initialTuckState(false)
+        stopPolling()
+        if (animTimer !== undefined) {
+          clearInterval(animTimer)
+          animTimer = undefined
+        }
+        publishDock({ edge: null, collapsed: false, visiblePx: ballVisiblePx() })
+        // The cursor is the only truth: pin the window to it at display rate.
+        // Absolute positioning cannot accumulate error, so the ball stays
+        // glued to the pointer no matter how fast the drag is.
+        stopDragPoll()
+        dragTimer = setInterval(() => {
+          if (win.isDestroyed() || !win.isVisible() || drag === undefined) {
+            stopDragPoll()
+            return
+          }
+          try {
+            const cursor = screen.getCursorScreenPoint()
+            win.setPosition(Math.round(cursor.x - drag.anchorX), Math.round(cursor.y - drag.anchorY))
+          } catch {
+            stopDragPoll()
+          }
+        }, 16)
+        return true
+      }
+      const wasDragging = drag !== undefined
+      drag = undefined
+      stopDragPoll()
+      if (wasDragging) scheduleBallSettle(win)
+      return true
+    },
+
     stateOf(surface) {
       const win = surface === 'main' ? main : windows.get(surface)
       const alive = win !== undefined && !win.isDestroyed()
@@ -530,6 +601,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       if (animTimer !== undefined) clearInterval(animTimer)
       if (programmaticTimer !== undefined) clearTimeout(programmaticTimer)
       stopPolling()
+      stopDragPoll()
       screen.removeListener('display-metrics-changed', onDisplaysChanged)
       screen.removeListener('display-removed', onDisplaysChanged)
       for (const win of windows.values()) {

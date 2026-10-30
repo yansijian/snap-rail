@@ -1,21 +1,18 @@
 /**
- * The skin registry and token bridge. A skin is a declared visual
- * implementation of the semantic component contract: token values plus part
- * CSS. Exactly one skin is active; the built-in default is always available
- * as the fallback.
+ * The theme registry and token bridge. A theme is a declared visual
+ * implementation of the semantic component contract: one token set plus
+ * optional part CSS — pure styling. Component definitions and slots live
+ * outside the theme; a theme never shapes behaviour. Exactly one theme is
+ * active; the two factory cobalt themes (day/night) are always registered
+ * and the dark one is the fallback.
  *
  * @module @snap-rail/ui/skins
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react'
-import {
-  PRESENTATION_TARGETS,
-  type PresentationTarget,
-  type PresentationVariant,
-} from './contract.ts'
 
-/** The colour/typography/spacing vocabulary a skin must populate. */
+/** The colour/typography/spacing vocabulary a theme must populate. */
 export interface SkinTokens {
   colorBg: string
   colorSurface: string
@@ -73,153 +70,159 @@ export interface SkinTokens {
   density: string
 }
 
-/** One skin's full definition. */
+/** One theme's full definition: a single complete look. */
 export interface SkinDefinition {
   id: string
   title: string
-  /** Token values for both modes; the active mode picks one set. */
-  tokens: { light: SkinTokens; dark: SkinTokens }
-  /** Presentation defaults the skin chooses for core variants. */
-  presentations?: Partial<Record<PresentationTarget, PresentationVariant>>
-  /** Parts the skin claims to style (coverage diagnostics, optional). */
-  parts?: readonly string[]
+  /** The theme's single token set; picking another theme switches the set. */
+  tokens: SkinTokens
   /** Optional CSS text; the registry injects it scoped by `data-snap-skin`. */
   css?: string
 }
 
-/** The two colour modes. */
-export const SKIN_MODES = ['light', 'dark'] as const
+/** The factory day theme id (cobalt palette, light surfaces). */
+export const DEFAULT_LIGHT_ID = 'default-light'
 
-/** One skin mode. */
-export type SkinMode = (typeof SKIN_MODES)[number]
+/** The factory night theme id (cobalt palette, dark surfaces). */
+export const DEFAULT_DARK_ID = 'default-dark'
 
-/** The built-in default skin id. */
-export const DEFAULT_SKIN_ID = 'default'
+/** The contributor label for the factory themes. */
+const FACTORY_CALLER = '@snap-rail/ui'
 
-/** The factory cobalt/steel skin. Extra skins override it through the registry. */
-export const DEFAULT_SKIN: SkinDefinition = {
-  id: DEFAULT_SKIN_ID,
-  title: '工业钴蓝',
-  presentations: {
-    dialog: 'modal',
-    select: 'popover',
-    tabs: 'inline',
-    toast: 'inline',
-  },
-  tokens: {
-    dark: {
-      colorBg: '#0b0f14',
-      colorSurface: '#11161d',
-      colorSurfaceRaised: '#161b22',
-      colorText: '#ced8e3',
-      colorMuted: '#8b949e',
-      colorPrimary: '#4a6cff',
-      colorOnPrimary: '#ffffff',
-      colorDanger: '#f85149',
-      colorSuccess: '#3fb950',
-      colorWarning: '#d29922',
-      colorBorder: '#1f2933',
-      colorFocus: '#4a6cff',
-      chart1: '#4a6cff',
-      chart2: '#3147a1',
-      chart3: '#667fcd',
-      chart4: '#7d8fa5',
-      chart5: '#55677c',
-      chart6: '#33414f',
-      fontSans: 'system-ui, "Segoe UI", "Microsoft YaHei", sans-serif',
-      fontMono: '"Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace',
-      textXs: '13px',
-      textSm: '15px',
-      textMd: '17px',
-      textLg: '20px',
-      textXl: '24px',
-      weightNormal: '400',
-      weightMedium: '500',
-      weightStrong: '600',
-      leadingTight: '1.2',
-      leadingNormal: '1.55',
-      spaceXs: '4px',
-      spaceSm: '8px',
-      spaceMd: '12px',
-      spaceLg: '20px',
-      spaceXl: '32px',
-      radiusSm: '6px',
-      radiusMd: '8px',
-      radiusLg: '12px',
-      radiusFull: '999px',
-      borderWidth: '1px',
-      shadowSm: '0 1px 2px rgb(0 0 0 / 0.25)',
-      shadowMd: '0 8px 24px rgb(0 0 0 / 0.28)',
-      shadowLg: '0 24px 64px rgb(0 0 0 / 0.36)',
-      durationFast: '120ms',
-      durationNormal: '180ms',
-      durationSlow: '280ms',
-      easeStandard: 'cubic-bezier(0.2, 0, 0, 1)',
-      zOverlay: '50',
-      zModal: '60',
-      zToast: '70',
-      controlHeightSm: '40px',
-      controlHeightMd: '48px',
-      controlHeightLg: '56px',
-      density: 'comfortable',
-    },
-    light: {
-      colorBg: '#e4e9ef',
-      colorSurface: '#f3f6f9',
-      colorSurfaceRaised: '#ffffff',
-      colorText: '#26323e',
-      colorMuted: '#5d6d7e',
-      colorPrimary: '#3857e8',
-      colorOnPrimary: '#ffffff',
-      colorDanger: '#dc2626',
-      colorSuccess: '#15803d',
-      colorWarning: '#b45309',
-      colorBorder: '#c7d0da',
-      colorFocus: '#3857e8',
-      chart1: '#3857e8',
-      chart2: '#7088ee',
-      chart3: '#667dd0',
-      chart4: '#94a3b8',
-      chart5: '#b3c0cd',
-      chart6: '#ccd6e0',
-      fontSans: 'system-ui, "Segoe UI", "Microsoft YaHei", sans-serif',
-      fontMono: '"Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace',
-      textXs: '13px',
-      textSm: '15px',
-      textMd: '17px',
-      textLg: '20px',
-      textXl: '24px',
-      weightNormal: '400',
-      weightMedium: '500',
-      weightStrong: '600',
-      leadingTight: '1.2',
-      leadingNormal: '1.55',
-      spaceXs: '4px',
-      spaceSm: '8px',
-      spaceMd: '12px',
-      spaceLg: '20px',
-      spaceXl: '32px',
-      radiusSm: '6px',
-      radiusMd: '8px',
-      radiusLg: '12px',
-      radiusFull: '999px',
-      borderWidth: '1px',
-      shadowSm: '0 1px 2px rgb(0 0 0 / 0.08)',
-      shadowMd: '0 8px 24px rgb(0 0 0 / 0.12)',
-      shadowLg: '0 24px 64px rgb(0 0 0 / 0.18)',
-      durationFast: '120ms',
-      durationNormal: '180ms',
-      durationSlow: '280ms',
-      easeStandard: 'cubic-bezier(0.2, 0, 0, 1)',
-      zOverlay: '50',
-      zModal: '60',
-      zToast: '70',
-      controlHeightSm: '40px',
-      controlHeightMd: '48px',
-      controlHeightLg: '56px',
-      density: 'comfortable',
-    },
-  },
+const COBALT_DARK_TOKENS: SkinTokens = {
+  colorBg: '#0b0f14',
+  colorSurface: '#11161d',
+  colorSurfaceRaised: '#161b22',
+  colorText: '#ced8e3',
+  colorMuted: '#8b949e',
+  colorPrimary: '#4a6cff',
+  colorOnPrimary: '#ffffff',
+  colorDanger: '#f85149',
+  colorSuccess: '#3fb950',
+  colorWarning: '#d29922',
+  colorBorder: '#1f2933',
+  colorFocus: '#4a6cff',
+  chart1: '#4a6cff',
+  chart2: '#3147a1',
+  chart3: '#667fcd',
+  chart4: '#7d8fa5',
+  chart5: '#55677c',
+  chart6: '#33414f',
+  fontSans: 'system-ui, "Segoe UI", "Microsoft YaHei", sans-serif',
+  fontMono: '"Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace',
+  textXs: '13px',
+  textSm: '15px',
+  textMd: '17px',
+  textLg: '20px',
+  textXl: '24px',
+  weightNormal: '400',
+  weightMedium: '500',
+  weightStrong: '600',
+  leadingTight: '1.2',
+  leadingNormal: '1.55',
+  spaceXs: '4px',
+  spaceSm: '8px',
+  spaceMd: '12px',
+  spaceLg: '20px',
+  spaceXl: '32px',
+  radiusSm: '6px',
+  radiusMd: '8px',
+  radiusLg: '12px',
+  radiusFull: '999px',
+  borderWidth: '1px',
+  shadowSm: '0 1px 2px rgb(0 0 0 / 0.25)',
+  shadowMd: '0 8px 24px rgb(0 0 0 / 0.28)',
+  shadowLg: '0 24px 64px rgb(0 0 0 / 0.36)',
+  durationFast: '120ms',
+  durationNormal: '180ms',
+  durationSlow: '280ms',
+  easeStandard: 'cubic-bezier(0.2, 0, 0, 1)',
+  zOverlay: '50',
+  zModal: '60',
+  zToast: '70',
+  controlHeightSm: '40px',
+  controlHeightMd: '48px',
+  controlHeightLg: '56px',
+  density: 'comfortable',
+}
+
+const COBALT_LIGHT_TOKENS: SkinTokens = {
+  colorBg: '#e4e9ef',
+  colorSurface: '#f3f6f9',
+  colorSurfaceRaised: '#ffffff',
+  colorText: '#26323e',
+  colorMuted: '#5d6d7e',
+  colorPrimary: '#3857e8',
+  colorOnPrimary: '#ffffff',
+  colorDanger: '#dc2626',
+  colorSuccess: '#15803d',
+  colorWarning: '#b45309',
+  colorBorder: '#c7d0da',
+  colorFocus: '#3857e8',
+  chart1: '#3857e8',
+  chart2: '#7088ee',
+  chart3: '#667dd0',
+  chart4: '#94a3b8',
+  chart5: '#b3c0cd',
+  chart6: '#ccd6e0',
+  fontSans: 'system-ui, "Segoe UI", "Microsoft YaHei", sans-serif',
+  fontMono: '"Cascadia Code", "Cascadia Mono", Consolas, ui-monospace, monospace',
+  textXs: '13px',
+  textSm: '15px',
+  textMd: '17px',
+  textLg: '20px',
+  textXl: '24px',
+  weightNormal: '400',
+  weightMedium: '500',
+  weightStrong: '600',
+  leadingTight: '1.2',
+  leadingNormal: '1.55',
+  spaceXs: '4px',
+  spaceSm: '8px',
+  spaceMd: '12px',
+  spaceLg: '20px',
+  spaceXl: '32px',
+  radiusSm: '6px',
+  radiusMd: '8px',
+  radiusLg: '12px',
+  radiusFull: '999px',
+  borderWidth: '1px',
+  shadowSm: '0 1px 2px rgb(0 0 0 / 0.08)',
+  shadowMd: '0 8px 24px rgb(0 0 0 / 0.12)',
+  shadowLg: '0 24px 64px rgb(0 0 0 / 0.18)',
+  durationFast: '120ms',
+  durationNormal: '180ms',
+  durationSlow: '280ms',
+  easeStandard: 'cubic-bezier(0.2, 0, 0, 1)',
+  zOverlay: '50',
+  zModal: '60',
+  zToast: '70',
+  controlHeightSm: '40px',
+  controlHeightMd: '48px',
+  controlHeightLg: '56px',
+  density: 'comfortable',
+}
+
+/** The factory day theme. Always registered; never the first paint though — the night theme is. */
+export const DEFAULT_LIGHT: SkinDefinition = {
+  id: DEFAULT_LIGHT_ID,
+  title: '钴蓝·白天',
+  tokens: COBALT_LIGHT_TOKENS,
+}
+
+/** The factory night theme and the registry's fallback. */
+export const DEFAULT_DARK: SkinDefinition = {
+  id: DEFAULT_DARK_ID,
+  title: '钴蓝·黑夜',
+  tokens: COBALT_DARK_TOKENS,
+}
+
+/** One registered theme as the registry reports it. */
+export interface SkinRow {
+  id: string
+  title: string
+  /** The registering package; factory themes carry `@snap-rail/ui`. */
+  caller: string
 }
 
 /** Turn a token key into its CSS custom property (`chart1` → `--snap-chart-1`). */
@@ -230,23 +233,18 @@ export function skinTokenVar(key: keyof SkinTokens): string {
 
 /** The service exposed as `ctx.skins`. */
 export interface SkinsService {
-  /** Register a skin; disposal removes it and falls back to the default. */
+  /** Register a theme; disposal removes it and falls back to the factory night theme. */
   register(caller: Context, skin: SkinDefinition): () => void
-  /** Activate a registered skin by id. */
-  activate(skinId: string): boolean
-  /** Every registered skin, default first. */
-  list(): readonly SkinDefinition[]
-  /** The active skin. */
+  /** Activate a theme: exact id first, then the id read as a contributor
+   * package (a package's first registered theme), then nothing. */
+  activate(selection: string): boolean
+  /** Every registered theme, factory themes first. */
+  list(): readonly SkinRow[]
+  /** The active theme. */
   active(): SkinDefinition
-  /** Set the colour mode and re-apply the active tokens. */
-  setMode(mode: SkinMode): void
-  /** The current colour mode. */
-  mode(): SkinMode
-  /** The active skin's presentation default for a target, when one is set. */
-  presentation(target: PresentationTarget): PresentationVariant | undefined
-  /** The active skin's token object for the current mode. */
+  /** The active theme's token object. */
   tokens(): SkinTokens
-  /** Subscribe to skin/mode changes. */
+  /** Subscribe to theme changes. */
   subscribe(listener: () => void): () => void
   /** Monotonic change version. */
   version(): number
@@ -258,19 +256,17 @@ declare module '@snap-rail/cordis' {
   }
 
   interface Events {
-    /** The active skin or colour mode changed. */
+    /** The active theme changed. */
     'skins/changed'(): void
   }
 }
 
-/** Apply the active skin to the document root. */
-function applySkin(skin: SkinDefinition, mode: SkinMode): void {
+/** Apply the active theme to the document root. */
+function applySkin(skin: SkinDefinition): void {
   if (typeof document === 'undefined') return
   const root = document.documentElement
   root.dataset['snapSkin'] = skin.id
-  root.dataset['snapMode'] = mode
-  const tokens = skin.tokens[mode]
-  for (const [key, value] of Object.entries(tokens)) {
+  for (const [key, value] of Object.entries(skin.tokens)) {
     root.style.setProperty(skinTokenVar(key as keyof SkinTokens), value)
   }
 }
@@ -280,13 +276,16 @@ const skinsPlugin: Plugin.Object<void> = {
   name: 'snap-rail ui skins',
   apply(ctx: Context): void {
     const skins = new Map<string, SkinDefinition>()
+    const callers = new Map<string, string>()
     const listeners = new Set<() => void>()
     const styleTags = new Map<string, HTMLStyleElement>()
-    let activeId = DEFAULT_SKIN_ID
-    let mode: SkinMode = 'dark'
+    let activeId = DEFAULT_DARK_ID
     let revision = 0
 
-    skins.set(DEFAULT_SKIN_ID, DEFAULT_SKIN)
+    skins.set(DEFAULT_LIGHT_ID, DEFAULT_LIGHT)
+    callers.set(DEFAULT_LIGHT_ID, FACTORY_CALLER)
+    skins.set(DEFAULT_DARK_ID, DEFAULT_DARK)
+    callers.set(DEFAULT_DARK_ID, FACTORY_CALLER)
 
     const notify = (): void => {
       revision += 1
@@ -305,52 +304,54 @@ const skinsPlugin: Plugin.Object<void> = {
     }
 
     const refresh = (): void => {
-      const skin = skins.get(activeId) ?? DEFAULT_SKIN
+      const skin = skins.get(activeId) ?? DEFAULT_DARK
       activeId = skin.id
       ensureStyleTag(skin)
-      applySkin(skin, mode)
+      applySkin(skin)
       notify()
     }
 
     ctx.provide('skins', {
       register(caller: Context, skin: SkinDefinition): () => void {
         skins.set(skin.id, skin)
-        // A pool skin (non-default) becomes active immediately; the default
-        // stays underneath as the fallback when the pool skin is removed.
-        if (skin.id !== DEFAULT_SKIN_ID) activeId = skin.id
+        callers.set(skin.id, caller.fiber.name)
+        // Registration only makes a theme selectable; activation stays with
+        // the operator's stored selection (applied by the runtime).
         refresh()
         const remove = (): void => {
           if (!skins.delete(skin.id)) return
+          callers.delete(skin.id)
           const tag = styleTags.get(skin.id)
           if (tag !== undefined) {
             tag.remove()
             styleTags.delete(skin.id)
           }
-          if (activeId === skin.id) activeId = DEFAULT_SKIN_ID
+          if (activeId === skin.id) activeId = DEFAULT_DARK_ID
           refresh()
         }
         caller.effect(() => remove)
         return remove
       },
-      activate(skinId: string): boolean {
-        if (!skins.has(skinId)) return false
-        activeId = skinId
+      activate(selection: string): boolean {
+        let next = skins.has(selection) ? selection : undefined
+        if (next === undefined) {
+          for (const [id, owner] of callers) {
+            if (id !== selection && owner === selection && skins.has(id)) { next = id; break }
+          }
+        }
+        if (next === undefined) return false
+        if (next === activeId) return true
+        activeId = next
         refresh()
         return true
       },
-      list: () => [skins.get(DEFAULT_SKIN_ID) ?? DEFAULT_SKIN, ...[...skins.values()].filter(skin => skin.id !== DEFAULT_SKIN_ID)],
-      active: () => skins.get(activeId) ?? DEFAULT_SKIN,
-      setMode(next: SkinMode): void {
-        if (mode === next) return
-        mode = next
-        refresh()
-      },
-      mode: () => mode,
-      presentation(target: PresentationTarget): PresentationVariant | undefined {
-        const skin = skins.get(activeId) ?? DEFAULT_SKIN
-        return skin.presentations?.[target]
-      },
-      tokens: () => (skins.get(activeId) ?? DEFAULT_SKIN).tokens[mode],
+      list: (): readonly SkinRow[] => [...skins.values()].map(skin => ({
+        id: skin.id,
+        title: skin.title,
+        caller: callers.get(skin.id) ?? FACTORY_CALLER,
+      })),
+      active: () => skins.get(activeId) ?? DEFAULT_DARK,
+      tokens: () => (skins.get(activeId) ?? DEFAULT_DARK).tokens,
       subscribe(listener: () => void): () => void {
         listeners.add(listener)
         return () => { listeners.delete(listener) }
@@ -358,8 +359,8 @@ const skinsPlugin: Plugin.Object<void> = {
       version: () => revision,
     } satisfies SkinsService)
 
-    // Apply the factory skin immediately so the first paint already carries
-    // the token vocabulary, even before any plugin registers.
+    // Apply the factory night theme immediately so the first paint already
+    // carries the token vocabulary, even before any plugin registers.
     refresh()
   },
 }
@@ -379,21 +380,18 @@ export function useSkins(): SkinsService {
   return service
 }
 
-/** Re-render on skin/mode changes and return the active token set. */
+/** Re-render on theme changes and return the active token set. */
 export function useSkinTokens(): SkinTokens {
   const service = useSkins()
   useSyncExternalStore(service.subscribe, service.version, service.version)
   return service.tokens()
 }
 
-/** Re-render on skin/mode changes and return the active presentation default. */
-export function usePresentation(target: PresentationTarget): PresentationVariant | undefined {
+/** Re-render on theme changes and return the active theme id. */
+export function useSkinId(): string {
   const service = useSkins()
   useSyncExternalStore(service.subscribe, service.version, service.version)
-  return service.presentation(target)
+  return service.active().id
 }
-
-/** Re-export the presentation vocabulary for skin authors. */
-export { PRESENTATION_TARGETS }
 
 export default skinsPlugin

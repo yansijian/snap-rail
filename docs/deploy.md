@@ -44,7 +44,7 @@ URL 形状一致，终端换源只改设置键）：
    （`snap-rail-driver-modbus`），CI 在 install 前执行
    `node scripts/setup-external.mjs`（克隆到 `external/`，可用
    `SNAP_RAIL_EXTERNAL_REF` 固定 ref）——**公开构建不需要任何私有
-   registry**。UI 基座、默认皮肤、设置页与设备管理页已内置，framework
+   registry**。UI 基座、出厂双主题、设置页与设备管理页已内置，framework
    不再是构建依赖、也不再进入 feed。feed 作业把
    `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus / enip）与业务套件仓，
    从源码构建并签名全部一方可安装插件。本地首次构建同样先跑这条命令；

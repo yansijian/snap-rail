@@ -8,7 +8,7 @@
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
-import { Component, useSyncExternalStore, type ReactNode } from 'react'
+import { Component, useState, useSyncExternalStore, type ReactNode } from 'react'
 import {
   Button,
   Dialog,
@@ -19,6 +19,7 @@ import {
 } from './components/index.ts'
 import { UI_SLOT_IDS, type SettingsPageInfo } from './contract.ts'
 import { AppearancePage } from './settings-pages/appearance.tsx'
+import { PluginFeedDialog } from './settings-pages/plugin-feed.tsx'
 import { PluginsPage } from './settings-pages/plugins.tsx'
 import { cn, part } from './utils.ts'
 
@@ -98,6 +99,15 @@ function GearIcon(): ReactNode {
   )
 }
 
+/** The close glyph used by the surface's dismiss control. */
+function CloseIcon(): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  )
+}
+
 /** The default settings trigger; the layout decides placement/presentation. */
 export function SettingsEntry(props: {
   presentation: 'icon' | 'label'
@@ -111,13 +121,14 @@ export function SettingsEntry(props: {
 }
 
 /** The default settings surface. */
-export function SettingsSurface(props: { service: SettingsService }): ReactNode {
-  const { service } = props
+export function SettingsSurface(props: { service: SettingsService, ctx: Context }): ReactNode {
+  const { service, ctx } = props
   useSyncExternalStore(service.subscribe, service.version, service.version)
   const open = service.isOpen()
   const pages = service.listPages()
   const activeId = service.activePage()
   const active = pages.find(page => page.id === activeId)
+  const [feedOpen, setFeedOpen] = useState(false)
 
   const groups = new Map<string, SettingsPageDefinition[]>()
   for (const page of pages) {
@@ -128,44 +139,50 @@ export function SettingsSurface(props: { service: SettingsService }): ReactNode 
   }
 
   return (
-    <Dialog open={open} onOpenChange={next => { if (!next) service.close() }}>
-      <DialogContent presentation="fullscreen" showClose={false}>
-        <div {...part('settings', 'root')} className="snap-settings">
-          <header {...part('settings', 'header')} className="snap-settings-header">
-            <DialogTitle>设置</DialogTitle>
-            <Button intent="neutral" emphasis="ghost" onClick={() => service.close()}>关闭</Button>
-          </header>
-          <div {...part('settings', 'body')} className="snap-settings-body">
-            <nav {...part('settings', 'nav')} className="snap-settings-nav" aria-label="设置页">
-              {[...groups.entries()].map(([group, entries]) => (
-                <div key={group} {...part('settings', 'group')} className="snap-settings-group">
-                  <div {...part('settings', 'group-title')} className="snap-settings-group-title">{group}</div>
-                  {entries.map(page => (
-                    <button
-                      key={page.id}
-                      type="button"
-                      {...part('settings', 'nav-item')}
-                      className={cn('snap-settings-nav-item', page.id === activeId && 'is-active')}
-                      data-active={page.id === activeId || undefined}
-                      aria-current={page.id === activeId ? 'page' : undefined}
-                      onClick={() => service.open(page.id)}
-                    >
-                      {page.icon !== undefined && <span {...part('settings', 'nav-icon')}>{page.icon}</span>}
-                      <span>{page.title}</span>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </nav>
-            <main {...part('settings', 'content')} className="snap-settings-content" data-active-page={activeId}>
-              {active === undefined
-                ? <EmptyState title="暂无设置页" description="安装或启用一个带设置页的插件后，它会出现在这里。" />
-                : <SettingsPageBoundary page={active.id}>{active.render()}</SettingsPageBoundary>}
-            </main>
+    <>
+      <Dialog open={open} onOpenChange={next => { if (!next) service.close() }}>
+        <DialogContent presentation="fullscreen" showClose={false}>
+          <div {...part('settings', 'root')} className="snap-settings">
+            <header {...part('settings', 'header')} className="snap-settings-header">
+              <DialogTitle>设置</DialogTitle>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <IconButton icon={<GearIcon />} label="配置插件源" onClick={() => setFeedOpen(true)} />
+                <IconButton icon={<CloseIcon />} label="关闭" onClick={() => service.close()} />
+              </div>
+            </header>
+            <div {...part('settings', 'body')} className="snap-settings-body">
+              <nav {...part('settings', 'nav')} className="snap-settings-nav" aria-label="设置页">
+                {[...groups.entries()].map(([group, entries]) => (
+                  <div key={group} {...part('settings', 'group')} className="snap-settings-group">
+                    <div {...part('settings', 'group-title')} className="snap-settings-group-title">{group}</div>
+                    {entries.map(page => (
+                      <button
+                        key={page.id}
+                        type="button"
+                        {...part('settings', 'nav-item')}
+                        className={cn('snap-settings-nav-item', page.id === activeId && 'is-active')}
+                        data-active={page.id === activeId || undefined}
+                        aria-current={page.id === activeId ? 'page' : undefined}
+                        onClick={() => service.open(page.id)}
+                      >
+                        {page.icon !== undefined && <span {...part('settings', 'nav-icon')}>{page.icon}</span>}
+                        <span>{page.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </nav>
+              <main {...part('settings', 'content')} className="snap-settings-content" data-active-page={activeId}>
+                {active === undefined
+                  ? <EmptyState title="暂无设置页" />
+                  : <SettingsPageBoundary page={active.id}>{active.render()}</SettingsPageBoundary>}
+              </main>
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <PluginFeedDialog ctx={ctx} open={feedOpen} onOpenChange={setFeedOpen} />
+    </>
   )
 }
 
@@ -262,7 +279,7 @@ const settingsPlugin: Plugin.Object<void> = {
     ctx.ui.contribute(ctx, UI_SLOT_IDS.settingsSurface, {
       id: 'settings.default-surface',
       order: 0,
-      render: () => <SettingsSurface service={service} />,
+      render: () => <SettingsSurface service={service} ctx={ctx} />,
     })
   },
 }

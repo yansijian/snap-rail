@@ -61,7 +61,6 @@ function FallbackShell(props: { ctx: Context }): ReactNode {
             <div style={{ display: 'flex', minHeight: '100%', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
               <EmptyState
                 title="尚未激活业务套件"
-                description="打开设置的「插件管理」页，安装并启用一个业务套件；驱动也在同一处安装。"
                 action={<Button intent="primary" onClick={() => props.ctx.settings.open('plugins')}>打开设置</Button>}
               />
             </div>

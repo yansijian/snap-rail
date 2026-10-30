@@ -145,7 +145,7 @@ function DeviceCard(props: {
       <CardContent>
         <Stack gap="md">
           {device.groups.length === 0
-            ? <EmptyState title="尚无分组" description="先创建一个分组，再添加点位。" />
+            ? <EmptyState title="尚无分组" />
             : device.groups.map(group => (
                 <Section
                   key={group.name}
@@ -367,7 +367,6 @@ export function EquipmentPage(): ReactNode {
   return (
     <Page
       title="设备管理"
-      description="设备、分组与点位来自 equipment 底座；驱动安装后即可建立连接。"
       actions={(
         <div style={{ display: 'flex', gap: 'var(--snap-space-sm)' }}>
           <Button intent="neutral" emphasis="outline" loading={busy} onClick={load}>刷新</Button>
@@ -380,7 +379,13 @@ export function EquipmentPage(): ReactNode {
         {config === undefined
           ? <EmptyState title="正在读取设备配置…" />
           : config.devices.length === 0
-            ? <EmptyState title="尚未配置设备" description={drivers.length === 0 ? '先安装一个通讯驱动，再新增设备。' : '点击「新增设备」选择驱动并填写连接参数。'} />
+            ? (
+                <EmptyState
+                  title="尚未配置设备"
+                  description={drivers.length === 0 ? '尚未安装通讯驱动' : undefined}
+                  action={<Button intent="primary" disabled={drivers.length === 0} onClick={() => openDevice()}>新增设备</Button>}
+                />
+              )
             : (
                 <Grid columns={1} gap="lg">
                   {config.devices.map(device => (

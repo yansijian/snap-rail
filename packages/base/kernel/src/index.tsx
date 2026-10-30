@@ -19,6 +19,7 @@ import { StartupPage } from './StartupPage.tsx'
 import { SurfaceFallback } from './SurfaceFallback.tsx'
 
 export type { HostChannel }
+export { attachBallDrag, type BallDragOptions } from './ballDrag.ts'
 export { SurfaceFallback }
 
 /** Options for {@link bootClient}. */

@@ -70,9 +70,8 @@ async function start(): Promise<void> {
     return
   }
   app.on('second-instance', () => {
-    // Route through the Shell so the ball docks, the state frames broadcast,
-    // and exclusivity holds; the direct show below is only the no-shell
-    // fallback.
+    // Route through the Shell so the ball docks and the state frames
+    // broadcast; the direct show below is only the no-shell fallback.
     const shell = host?.ctx.get('shell')
     if (shell !== undefined && shell.surface.present(host!.ctx, 'main').applied) return
     const win = currentMainWindow()

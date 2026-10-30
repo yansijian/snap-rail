@@ -6,6 +6,81 @@
 （`tests/manifest.spec.ts`）、`.gitignore`，以及 **`AGENTS.md`**——本仓库
 的短规范，动手前先读一遍。
 
+## 先拆解：一个功能 = N 个可复用插件
+
+SKILL.md「先拆解，再选模板」一节的判定依据与协作链路。拆解单位是
+**复用预期**：对每个能力问「换一种设备 / 换一种展示 / 换一个场景，它
+还有没有用」，答案彼此独立 → 各自成包。
+
+### 能力缝 → 包型
+
+| 需求里的能力 | 包型 | 独立复用面 |
+| --- | --- | --- |
+| 接一种协议/设备（采集、读写点） | `driver` | 每种设备一行、多活并存；被所有看板/套件共享 |
+| 通用展示（看板/图表，读底座点数据） | `ui-view` | 换图表形状、换数据源都不动驱动 |
+| 场景私有闭环（跨点聚合 + 持久化 + 专属界面） | `suite` | 单活；场景本身就是交付单位 |
+| 多页面共享的组件/图表卡 | `ui-extension` | `<包>/<键>` 种子跨包同一实例 |
+| 全局存储后端 | `store-provider` | 消费者零改动 |
+| 宿主能力服务（无界面、跨插件协作） | `host-service` | 服务是插件间协作唯一通道 |
+
+布局/主题是替换宿主外观的独立包型，一般不作为功能拆解的产物。
+
+示例提案——「采集欧姆龙 PLC 的数据，并用柱状图显示」：
+
+| 包 | 模板 | 职责 | 复用收益 |
+| --- | --- | --- | --- |
+| `@you/driver-omron` | driver | 欧姆龙协议适配、采样上报 | 再接三菱/西门子各加一行驱动，互不影响 |
+| `@you/dashboard-bar` | ui-view | 订阅底座点帧，画柱状图 | 换折线/仪表盘只换这包；配任何驱动都能用 |
+
+向用户确认后再各自 init——每包一套标准工作流，不要在一个仓库里混构建。
+
+### 拆开之后怎么协作（永不互相 import，通常也互不 requires）
+
+- **驱动 ↔ 看板互不依赖**：都只面向内置 equipment 底座，各自
+  `requires: ['@snap-rail/equipment']`。换驱动、装卸看板互不影响——
+  这正是复用的来源；谁也不该 require 谁。
+- **看板页取数链路**（渲染面，全走 base 种子与契约；`link` 来自
+  `useClient()` 或 `ctx.client.link`）：
+  1. `import '@snap-rail/equipment/contract'`（side-effect 合并方法表），
+     named 导入 `equipmentFrameSchemas` 拿帧 schema——运行时是 base 种子，
+     **不写** `externalSeeds`；npm 侧 `pnpm add -D @snap-rail/equipment`
+     供类型/构建（ui-view 模板默认不带）；
+  2. `link.call('equipment.points.list', {})` 发现点表、
+     `equipment.points.read` 取现值（尚无采样的点返回
+     `{ value: null, time: 0 }`）；
+  3. **先 `link.call('equipment.points.subscribe',
+     { points: [{ device, group, name }, …] })`**（至少一个点）：
+     `equipment/point-updated` 帧按订阅引用计数门禁，不订阅不流动
+     （结构帧 point-added/removed 与 connection-status 恒流，不受门禁）；
+  4. `subscribeFrame(link, 'equipment/point-updated',
+     equipmentFrameSchemas['equipment/point-updated'], cb)`——载荷
+     `{ device, group, name, value, time }`；
+  5. 柱状图包在 `ChartFrame`/`Visualization` 里画（铁律 6/7）；卸载时
+     对称调用 `equipment.points.unsubscribe`。
+- **何时升级成 suite**：需要**场景私有聚合**（跨点计算、按班次持久化）
+  时，聚合逻辑做成 suite 的宿主面——`ctx.on('point/updated',
+  sample => …)` 直接听底座点事件（宿主面进程内事件，无订阅门禁，载荷
+  `{ device, group, name, value, time }`），聚完
+  `rpc.broadcast('<域>/<帧>', …)` 推自己的域帧；看板订聚合帧，纯展示
+  仍留独立 ui-view。自建域帧的 schema 住自己的包，跨包订阅方自备 zod
+  副本（跨插件值导入禁止）。
+
+### 何时合（防过度拆）
+
+- 场景私有宿主逻辑 + 专属界面 = 一个 suite；场景契约住套件包自己的
+  `./<子路径>` 导出，别外置。
+- 设置页不单独成包：页面同包追加 `ctx.settings.registerPage`。
+- 工具互不依赖（门禁强制）；跨包场景逻辑做 suite，不要拆成工具。
+- 判据永远是复用预期：两个能力事实上只在一个场景一起用 → 合；各自会被
+  独立替换/复用 → 拆。
+
+### 多包交付
+
+- 默认每包一仓、各自 feed；也可同仓多包、共用一个 `dist/` 出 feed
+  （feed 按包名收编，同目录同名只留最新版）。
+- 整组交付 / 离线部署做**组合包**（根 `recipe.yml` + 每成员一个已签名
+  zip，用户装一次齐活），见 [publish.md](publish.md) 的「组合包」。
+
 ## 选型速查
 
 | template | kind/layer | 面 | 独占 | 默认依赖锚点 |
@@ -22,6 +97,8 @@
 
 UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 `requires` 条目，
 模板只把它放进 devDependencies 供类型/构建，运行时由终端种子表提供。
+宿主面模板依赖锚点列的「（dev）」只是 init 生成态——动手前按 SKILL.md
+1.5「宿主面构建纪律」把契约包挪进 `dependencies`。
 `--framework <包名[@范围]>` 只对 UI 模板生效，作为类型/构建包覆盖入口保留。
 
 要写宿主 RPC 或渲染帧时不需要新增依赖：宿主类型从
@@ -163,10 +240,11 @@ render })` 声明并编排区域插槽。叠层对话框（如退出确认）**�
 
 ### ui-skin
 
-`ctx.skins.register(ctx, { id, title, tokens, presentations, css })` 注册
-token + part CSS + 展示变体。皮肤单活（`exclusive: 'skin'`），默认皮肤
-永远兜底；所有 CSS 规则必须作用域到 `[data-snap-skin='<id>']`，只命中
-`data-snap-part`。启用后重启生效。
+`ctx.skins.register(ctx, { id, title, tokens, css })` 注册一套完整观感：
+**单套 token + 可选 part CSS，纯样式**（组件定义与槽都不在主题内）。主题
+id 用包名；单活（`exclusive: 'skin'`），出厂「钴蓝·白天/黑夜」永远可选、
+缺失回退黑夜；所有 CSS 规则必须作用域到 `[data-snap-skin='<id>']`，只命中
+`data-snap-part`。启用后主窗自动重载生效，外观页主题列表点选即用。
 
 ## 包名规则
 

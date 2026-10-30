@@ -19,7 +19,7 @@
  * @module @snap-rail/client-kernel/SurfaceFallback
  */
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { subscribeFrame, type HostLink } from '@snap-rail/connection'
 import {
   BALL_SURFACE,
@@ -29,6 +29,7 @@ import {
   type BallState,
   type BallTone,
 } from '@snap-rail/shell/contract'
+import { attachBallDrag } from './ballDrag.ts'
 
 /** The dark-mode token values the fallback palette reproduces. */
 const PALETTE = {
@@ -129,17 +130,21 @@ export interface SurfaceFallbackProps {
 /**
  * The ball fallback: the {@link BALL_SURFACE.orb} orb filling the transparent
  * window, a contained shadow inside the rim, and — while the window is parked
- * and tucked — a compact tab inside the visible strip instead. The whole orb
- * drags the window (`-webkit-app-region: drag`); the core is the click target
- * that summons the operator window.
+ * and tucked — a compact tab inside the visible strip instead. The whole
+ * window is one drag/click surface ({@link attachBallDrag}): press-move drags
+ * it under the pointer over `shell.ball.move`, a press-release summons the
+ * operator window.
  */
 function BallFallback(props: SurfaceFallbackProps): ReactNode {
   const ball = useBallState(props.link)
   const dock = useBallDock(props.link)
-  const parked = dock.edge !== null
-  if (parked && dock.collapsed) {
-    return <DockTab link={props.link} dock={dock} ball={ball} {...props.notice !== undefined ? { notice: props.notice } : {}} />
-  }
+  const tucked = dock.edge !== null && dock.collapsed
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const element = rootRef.current
+    if (element === null) return undefined
+    return attachBallDrag(element, { link: props.link, onClick: () => present(props.link, 'main') })
+  }, [props.link])
 
   const ring = ball.progress === null
     ? PALETTE.border
@@ -148,7 +153,6 @@ function BallFallback(props: SurfaceFallbackProps): ReactNode {
   // to zero before the window edge: a box-shadow here would be clipped into a
   // hard grey band by the transparent window's boundary.
   const shadowLayer: CSSProperties = {
-    position: 'relative',
     width: WINDOW.width,
     height: WINDOW.height,
     background: 'radial-gradient(circle at 50% calc(50% + 2px), rgba(0, 0, 0, 0.32) 0 54px, rgba(0, 0, 0, 0) 61px)',
@@ -164,9 +168,7 @@ function BallFallback(props: SurfaceFallbackProps): ReactNode {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    // The ring drags the window; only the core below opts out to stay clickable.
-    WebkitAppRegion: 'drag',
-  } as CSSProperties
+  }
   const core: CSSProperties = {
     width: BALL_SURFACE.orb - 2 * BALL_SURFACE.inset,
     height: BALL_SURFACE.orb - 2 * BALL_SURFACE.inset,
@@ -182,25 +184,27 @@ function BallFallback(props: SurfaceFallbackProps): ReactNode {
     letterSpacing: 0.5,
     cursor: 'default',
     position: 'relative',
-    WebkitAppRegion: 'no-drag',
-  } as CSSProperties
+  }
   return (
-    <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}>
-      <div style={shadowLayer}>
-        <div style={outer}>
-          <button
-            type="button"
-            title={props.notice ?? '打开 SnapRail 主窗口'}
-            onClick={() => present(props.link, 'main')}
-            style={{ ...core, padding: 0, border: `1px solid ${PALETTE.border}` }}
-          >
-            {ball.label ?? '●'}
-            {props.notice !== undefined
-              ? <span style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%', background: PALETTE.danger }} />
-              : null}
-          </button>
+    <div ref={rootRef} style={{ width: '100vw', height: '100vh', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent' }}>
+      {tucked ? (
+        <TabContent dock={dock} ball={ball} {...props.notice !== undefined ? { notice: props.notice } : {}} />
+      ) : (
+        <div style={shadowLayer}>
+          <div style={outer}>
+            <button
+              type="button"
+              title={props.notice ?? '打开 SnapRail 主窗口'}
+              style={{ ...core, padding: 0, border: `1px solid ${PALETTE.border}` }}
+            >
+              {ball.label ?? '●'}
+              {props.notice !== undefined
+                ? <span style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: '50%', background: PALETTE.danger }} />
+                : null}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -209,9 +213,10 @@ function BallFallback(props: SurfaceFallbackProps): ReactNode {
  * The tucked tab: what the parked ball looks like while only
  * {@link BallDockState.visiblePx} pixels of the window are on screen. A face
  * may render its own tab the same way — the contract is "anchor to the parked
- * edge, fit inside the visible strip, keep a drag region".
+ * edge, fit inside the visible strip"; the drag/click surface wraps the whole
+ * window, so the tab needs no wiring of its own.
  */
-function DockTab(props: { link: HostLink, dock: BallDockState, ball: BallState, notice?: string | undefined }): ReactNode {
+function TabContent(props: { dock: BallDockState, ball: BallState, notice?: string | undefined }): ReactNode {
   const horizontal = props.dock.edge === 'left' || props.dock.edge === 'right'
   const tab: CSSProperties = {
     position: 'absolute',
@@ -230,8 +235,7 @@ function DockTab(props: { link: HostLink, dock: BallDockState, ball: BallState, 
     justifyContent: 'center',
     gap: 4,
     fontFamily: 'system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif',
-    WebkitAppRegion: 'drag',
-  } as CSSProperties
+  }
   const button: CSSProperties = {
     width: '100%',
     height: '100%',
@@ -246,21 +250,17 @@ function DockTab(props: { link: HostLink, dock: BallDockState, ball: BallState, 
     justifyContent: 'center',
     gap: 4,
     cursor: 'default',
-    WebkitAppRegion: 'no-drag',
-  } as CSSProperties
+  }
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative', background: 'transparent' }}>
-      <div style={tab}>
-        <button
-          type="button"
-          title={props.notice ?? '打开 SnapRail 主窗口'}
-          onClick={() => present(props.link, 'main')}
-          style={button}
-        >
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: TONE_COLOR[props.ball.tone] }} />
-          {props.ball.label !== null ? <span style={{ fontSize: 12, fontWeight: 600 }}>{props.ball.label}</span> : null}
-        </button>
-      </div>
+    <div style={tab}>
+      <button
+        type="button"
+        title={props.notice ?? '打开 SnapRail 主窗口'}
+        style={button}
+      >
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: TONE_COLOR[props.ball.tone] }} />
+        {props.ball.label !== null ? <span style={{ fontSize: 12, fontWeight: 600 }}>{props.ball.label}</span> : null}
+      </button>
     </div>
   )
 }

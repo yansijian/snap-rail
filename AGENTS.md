@@ -27,7 +27,7 @@ pnpm app:pack / app:dist  # 打包（目录形态 / NSIS 安装包）；尾接 v
 主仓对拆分驱动仓（driver-modbus）的构建期依赖以 **workspace 链接** 提供：
 `external/` gitignored，由 `node scripts/setup-external.mjs` 克隆（CI 用
 `SNAP_RAIL_EXTERNAL_REF` 固定 ref；本地无 GitHub 访问时用
-`SNAP_RAIL_EXTERNAL_LOCAL=1` 从同级目录拷贝工作树）。UI 基座、默认皮肤、
+`SNAP_RAIL_EXTERNAL_LOCAL=1` 从同级目录拷贝工作树）。UI 基座、出厂双主题、
 设置页与设备管理页已内置，不再有 framework/suite 拆分仓依赖。
 feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
 从源码构建并签名一方插件，不依赖拆分仓自己的 Release 节奏。
@@ -46,8 +46,8 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   **ui 层没有同层缝**：语义 UI 基座 `@snap-rail/ui` 是 base 内置包，
   所有 layout/page/skin 经普通低层 import 使用它，彼此不依赖。
 - **出厂底座**：打包带 base 启动链 + 内置默认的 `store-sqlite`、`equipment`
-  与内置 `@snap-rail/ui`、默认皮肤、设置/插件管理页、设备管理页；
-  驱动/业务页/套件/额外皮肤仍经 zip 安装进 `<home>/plugins/` 池。
+  与内置 `@snap-rail/ui`、出厂双主题、设置/插件管理页、设备管理页；
+  驱动/业务页/套件/额外主题仍经 zip 安装进 `<home>/plugins/` 池。
   硬内置不可禁用；`default: true` 的内置默认可被同互斥组的池插件替换
   （启用替代者时同批停用默认，替代者停用后自动恢复默认；无替代者时
   拒绝停用默认）。保护按**来源**判定（层文件计算，manifest 改变不了），
@@ -60,7 +60,7 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   `@snap-rail/util/semver`）、服务名（`service:store`）；启用正向校验
   （缺/版本不合 → 拒绝）、禁用/卸载反向校验（有依赖方 → 拒绝）。
   `@snap-rail/ui` 是 base 种子，**不是 requires 条目**；UI 插件用
-  `snapRail.uiProfile` 声明皮肤覆盖关系（只做徽标，不做门禁）。
+  `snapRail.uiProfile` 声明主题覆盖关系（只做徽标，不做门禁）。
 - **分类与显示名（`snapRail.category` / `snapRail.title`）**：开放字符串、
   插件作者随意命名（中文可用）；管理页按标记原文动态分组——声明即归组、
   不问来源（dev overlay 住户也各归其标记），未声明落「其他」，无硬编码
@@ -92,11 +92,13 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   点位地址 = (device, group, name) 三元组；wire 名 `equipment.*`、帧 `equipment/*`。
 - **ui 层**：**没有同层缝、没有 framework 插件**。语义 UI 基座
   `@snap-rail/ui` 是 base 内置包，分五层契约——语义组件（`/components`）、
-  类型化区域插槽（`/slots` + `/contract`）、皮肤 token（`/skins`）、内置
+  类型化区域插槽（`/slots` + `/contract`）、主题 token（`/skins`）、内置
   设置外壳与页面注册（`/settings`）、runtime（`/runtime`）。layout/page/
-  feature 通过 `ctx.ui`/`ctx.pages`/`ctx.settings` 组合；skin 通过
-  `ctx.skins` 提供 token + part CSS + 展示变体；默认钴蓝皮肤内置，额外
-  皮肤是 `kind: 'skin'`、`exclusive: 'skin'` 的可安装插件。页面默认组合
+  feature 通过 `ctx.ui`/`ctx.pages`/`ctx.settings` 组合；主题经
+  `ctx.skins` 提供单套 token + 可选 part CSS（**纯样式**——组件定义与槽
+  都不在主题内）；出厂内置「钴蓝·白天/黑夜」两主题，额外主题是
+  `kind: 'skin'`、`exclusive: 'skin'` 的可安装插件（一包可注册多主题，
+  首主题 id 约定用包名）。页面默认组合
   `@snap-rail/ui/components`，禁止裸 Tailwind；第三方图表允许包在
   `Visualization`/`ChartFrame` 内。**没有 UI 插件时 kernel 引导页仍是
   最后恢复面；宿主安全模式（CLI `--safe-mode` / `Ctrl+Shift+F12`）位于
@@ -119,8 +121,11 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   **池插件永不 import `electron`**——Electron 只出现在首方 provider
   `apps/desktop/src-host/main/shell/*`。可点回执（通知按钮、托盘项、退出
   请求）只准宿主面贡献：它活得比任何 renderer 都长；渲染面只有单向 toast、
-  窗口控制与挂起退出的应答。主窗口与球**互斥**、贴边收起（默认左右收 1/3、
-  上下只吸附、悬停滑出）都是底座不变式；活动 layout/suite 可声明
+  窗口控制与挂起退出的应答。主窗口与球**共存显隐**（球随生效 profile 的
+  `enabled` 显隐、启用即与主窗同屏；互斥形态由需要的插件经
+  `shell/surface-changed` 帧 + `shell.surface.present/hide` 自行编排，
+  退出策略 `'ball'` 关窗收进球是底座唯一代办的配对）、贴边收起（默认
+  左右收 1/3、上下只吸附、悬停滑出）都是底座不变式；活动 layout/suite 可声明
   `WindowProfile`/`BallProfile`（尺寸/模式/停泊行为，全部有界），宿主校验
   夹取。球的几何单源 `resolveBallProfile`（默认 128 窗/112 球/8px 余量）：
   **窗口必须方形、8px 余量固定、阴影必须画在余量内**（径向渐变衰减到零；
@@ -144,7 +149,7 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   基础层单源三处一致：种子表 = 客户端入口
   播种 = `clientBundle` external，客户端入口 boot 时 parity fail-loud。
   `@snap-rail/ui` 及其 components/contract/slots/skins/settings/runtime/pages
-  子路径是 base 种子；皮肤/扩展插件经其 client 入口的 `seeds` 映射贡献
+  子路径是 base 种子；主题/扩展插件经其 client 入口的 `seeds` 映射贡献
   额外组件。**种子消费只准
   named/star 导入**——default 导入经 rolldown 的 CJS node-mode interop
   会把 `.default` 变成整个命名空间对象而非模块自身的 default（类形种子
@@ -248,12 +253,26 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   驱动的配置表单用 `SchemaForm`（新交互模式往 UI 基座加字段类型）。
   第三方图表允许包在 `Visualization`/`ChartFrame` 内，从 `useChartTheme`
   取 skin token；`uiProfile` 声明 `native`/`integrated`/`custom`。
-- **主题与图表色单源在 skin token**：明暗由 `html[data-snap-mode]` +
-  `data-mode` 切换（设置键 `ui.theme`），皮肤在 `ctx.skins` 注册
-  `--snap-*` token；页面禁止硬编码色值或 `dark:` 变体；图表系列只用
-  `--snap-chart-1…6`，红/黄/绿是状态语义不进数据系列。触屏基线：数值输入
-  用 `NumberInput`、单选用 `TouchSelect`、滚动容器用 `DragScroll`。
-  细则见 [docs/theme.md](docs/theme.md)。
+- **主题与图表色单源在 theme token**：一个主题 = 单套完整观感（token +
+  可选 part CSS），**没有明暗维度**；激活单源是设置键 `ui.theme = { id }`，
+  已装载主题点选即全窗口热切（主窗 + 悬浮球，无重载），选中主题缺失回退
+  出厂「钴蓝·黑夜」；插件行「启用」对皮肤只表示已装载可选（`exclusive:
+  'skin'` 单装载）。主题只管样式——组件定义与槽不在主题内。页面禁止硬编码
+  色值或 `dark:` 变体；图表系列只用 `--snap-chart-1…6`，红/黄/绿是状态语义
+  不进数据系列。触屏基线：数值输入用 `NumberInput`、单选用 `TouchSelect`、
+  滚动容器用 `DragScroll`。细则见 [docs/theme.md](docs/theme.md)。
+- **界面文案只陈述事实，不写说明书**：好的界面靠控件本身让人一眼会用，不靠
+  一段文字教用户怎么用、为什么这样设计。只允许三类文字——当前状态（含空态
+  标题、徽标、读数）、操作结果、失败/风险原因（安全与数据后果可一句话讲清）。
+  **禁止**：讲实现机制（文件、进程、宿主/渲染端、插件池、层、协议、ABI、
+  `plugins.yml`、recipe）、讲操作步骤（「先…再…」「点击…」「在下方填写」）、
+  讲设计意图（「由…决定」「…不受影响」「始终随底座」）、把内部名词当用户
+  词汇。缺什么让控件自己说：能写成按钮/开关/选项标签的就不要写句子；规则用
+  **禁用态 + 就地原因**表达（如未装驱动则「新增设备」禁用）；状态用徽标或
+  空态标题；下一步用就地动作（「打开设置」「安装驱动」），不用说明文字。
+  `Page`/`Section` 的 `description` 默认为空，确需一句时只讲后果、不超一行；
+  占位符只给格式示例（`本地路径 / https://… / 插件名`），不写操作句。
+  **恢复控制台（安全模式）同样适用**：只说病情与后果，不说怎么操作。
 - **模型可见 ⟺ 有事件**；模型/用户可见行为变更配可运行例子的无 key
   快照式测试（本仓以 vitest 直测装配链路为主）。
 - **协议扩展（开放注册，不改 protocol）**：protocol 只有信封是封闭的；
@@ -284,7 +303,7 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
 - 打包：asar 关闭是决策不是疏忽（见 architecture.md 打包节）；**出厂底座**
   ——desktop 生产依赖包含 base 启动链、`@snap-rail/ui`、内置默认的
   store-sqlite/equipment、equipment-station 页面库 + 共享库；驱动/额外
-  皮肤/业务页/套件仍只经 zip 安装（打包器只收生产依赖）。
+  额外主题/业务页/套件仍只经 zip 安装（打包器只收生产依赖）。
 
 ## Vendoring
 
@@ -304,8 +323,8 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   解析，不能把缺依赖留给下次启动。
 - UI 插件用 `@snap-rail/ui/contract` 的稳定语义：页面用
   `ctx.pages.registerPage`，布局用 `ctx.ui.registerLayout` + `UI_SLOT_IDS`，
-  设置页用 `ctx.settings.registerPage`，皮肤用 `ctx.skins.register`；
-  禁止把某个布局/皮肤包名当作组件依赖。所有 slot 对任意 `uiProfile`
+  设置页用 `ctx.settings.registerPage`，主题用 `ctx.skins.register`；
+  禁止把某个布局/主题包名当作组件依赖。所有 slot 对任意 `uiProfile`
   开放；custom 插件替换宿主界面时自担风险，安全模式/引导页不可覆盖。
 - 独立插件仓库使用 `@snap-rail/plugin-sdk` 和 `snap-rail-plugin` CLI，
   仓库根部必须有自己的 `AGENTS.md`。插件 Agent 只读 SDK 类型和该指南，

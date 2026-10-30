@@ -84,11 +84,11 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
     const assertNotBase = (name: string, allowDefault = false): void => {
       const target = packageNameOf(name)
       if (!allowDefault && (defaultNames.has(target) || defaultNames.has(name))) {
-        throw new RpcBusinessError({ code: 'bad-request', details: { issues: [`内置默认插件禁止删除/改配置：${target}（可被同组池插件替换）`] } })
+        throw new RpcBusinessError({ code: 'bad-request', details: { issues: [`内置默认插件禁止删除/改配置：${target}`] } })
       }
       const shipped = view.shippedNames()
       if (shipped.has(target) || shipped.has(name)) {
-        throw new RpcBusinessError({ code: 'bad-request', details: { issues: [`内置插件禁止删除/修改：${target}（替换经源码重建）`] } })
+        throw new RpcBusinessError({ code: 'bad-request', details: { issues: [`内置插件禁止删除/修改：${target}`] } })
       }
     }
 
@@ -104,9 +104,9 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
       const missingSeeds = view.missingSeeds(name, pool)
       const issues = [
         ...(missing.length > 0
-          ? [`缺少依赖：${missing.join('、')}（请先安装并启用它们）`]
+          ? [`缺少依赖：${missing.join('、')}`]
           : []),
-        ...(missingSeeds.length > 0 ? [`缺少贡献面：${missingSeeds.join('、')}（先安装提供它们的插件）`] : []),
+        ...(missingSeeds.length > 0 ? [`缺少贡献面：${missingSeeds.join('、')}`] : []),
       ]
       if (issues.length > 0) {
         throw new RpcBusinessError({ code: 'bad-request', details: { issues } })
@@ -121,7 +121,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
     const feedUrls = (): readonly string[] => {
       const value = resolvePluginFeedUrls(dirname(layers.handles.userLayerPath), dirname(layers.handles.builtinLayerPath))
       if (value === undefined || value.length === 0) {
-        throw new RpcBusinessError({ code: 'unavailable', details: { what: '未配置插件源：请到 插件管理 页点「⚙ 配置插件源」填写插件源地址' } })
+        throw new RpcBusinessError({ code: 'unavailable', details: { what: '未配置插件源' } })
       }
       return value
     }
@@ -457,7 +457,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
           if (dependents.length > 0) {
             throw new RpcBusinessError({
               code: 'bad-request',
-              details: { issues: [`还有已启用的插件依赖 ${packageNameOf(name)}：${dependents.join('、')}（先禁用它们）`] },
+              details: { issues: [`还有已启用的插件依赖 ${packageNameOf(name)}：${dependents.join('、')}`] },
             })
           }
         }
@@ -496,7 +496,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
             if (defaultNames.has(target) && remaining.length === 0) {
               throw new RpcBusinessError({
                 code: 'bad-request',
-                details: { issues: [`${target} 是内置默认，停用前必须先启用同组替代插件`] },
+                details: { issues: [`${target} 是内置默认，需先启用同组替代插件`] },
               })
             }
             if (remaining.length === 0) {
@@ -554,7 +554,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
           if (combo.missing.length > 0) {
             throw new RpcBusinessError({
               code: 'bad-request',
-              details: { issues: [`组合依赖未满足：${combo.missing.join('、')}（组合预设会立即启用全部行）`] },
+              details: { issues: [`组合依赖未满足：${combo.missing.join('、')}`] },
             })
           }
           // Unique packages in row order; install only what the pool lacks
@@ -663,7 +663,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         if (dependents.length > 0) {
           throw new RpcBusinessError({
             code: 'bad-request',
-            details: { issues: [`还有已启用的插件依赖 ${packageNameOf(name)}：${dependents.join('、')}（先卸载/禁用它们）`] },
+            details: { issues: [`还有已启用的插件依赖 ${packageNameOf(name)}：${dependents.join('、')}`] },
           })
         }
         // A preset row referencing the package would break every future
@@ -675,7 +675,7 @@ const pluginAdminRpcPlugin: Plugin.Object<void> = {
         if (presetHolder !== undefined) {
           throw new RpcBusinessError({
             code: 'conflict',
-            details: { what: `预设引用了 ${name}：请先调整预设再卸载` },
+            details: { what: `预设正在使用 ${name}，无法卸载` },
           })
         }
         // The row goes first (the package unmounts), then the files, then one
@@ -821,4 +821,4 @@ async function mutate(run: () => Promise<void>): Promise<void> {
   }
 }
 
-export default pluginAdminRpcPlugin
+export default pluginAdminRpcPlugin

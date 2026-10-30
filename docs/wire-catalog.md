@@ -49,6 +49,7 @@ hand-written face and are documented statically here.
 | `shell.ball.configure` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"profile":{"type":"object","properties":{"enabled":{"type":"boolean"},"size":{"type":"integer","exclusiveMinimum":0,"maximum":512},"dockable":{"type":"boolean"},"collapse":{"type":"boolean"},"dockEdges":{"minItems":1,"maxItems":4,"type":"array","items":{"type":"string","enum":["left","right","top","bottom"]}},"collapseRatio":{"type":"number","exclusiveMinimum":0,"maximum":1},"hoverDelayMs":{"type":"integer","minimum":0,"maximum":10000}},"additionalProperties":false}},"required":["profile"],"additionalProperties":false} | — |
 | `shell.ball.state` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
 | `shell.ball.dock` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{},"additionalProperties":false} | — |
+| `shell.ball.move` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"phase":{"type":"string","enum":["begin","end"]}},"required":["phase"],"additionalProperties":false} | — |
 | `shell.exit.resolve` | {"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"action":{"type":"string","enum":["ball","tray","quit","cancel"]}},"required":["action"],"additionalProperties":false} | — |
 
 ### Frames

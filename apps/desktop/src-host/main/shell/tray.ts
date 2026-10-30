@@ -1,9 +1,7 @@
 /**
- * The tray icon: one singleton for the whole app, created on demand. The app
- * never starts with a tray icon — a terminal that always parks a glyph in the
- * notification area would be presumptuous — but the moment a plugin
- * contributes a menu item or an auxiliary surface appears, the icon arrives
- * and stays for the session.
+ * The tray icon: one singleton for the whole app, part of the client from
+ * boot — the Shell creates it during startup and it stays for the session.
+ * Plugins never bring it into being; they only contribute menu rows.
  *
  * The menu is rebuilt from the machine's entry list on every change, so the
  * rendering here stays a pure projection: fixed operator rows (show / hide /

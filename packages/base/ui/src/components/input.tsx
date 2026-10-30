@@ -22,7 +22,9 @@ export interface InputProps extends Omit<ComponentPropsWithoutRef<'input'>, 'siz
   componentName?: 'input' | 'number-input'
 }
 
-/** A single-line text field with semantic prefix/suffix slots. */
+/** A single-line text field with semantic prefix/suffix slots. Layout
+ * `style`/`className` dress the wrapper — the visible control; the native
+ * field already stretches inside it. */
 export function Input({
   size = 'md',
   invalid = false,
@@ -31,6 +33,7 @@ export function Input({
   onClear,
   componentName = 'input',
   className,
+  style,
   disabled,
   ...props
 }: InputProps): ReactNode {
@@ -38,6 +41,7 @@ export function Input({
     <div
       {...part(componentName, 'root')}
       className={cn('snap-input', className)}
+      style={style}
       data-size={size}
       data-invalid={invalid || undefined}
       data-disabled={disabled === true || undefined}
@@ -72,11 +76,13 @@ export interface TextareaProps extends Omit<ComponentPropsWithoutRef<'textarea'>
   invalid?: boolean
 }
 
-/** A multi-line text field. */
+/** A multi-line text field. Like {@link Input}, layout `style`/`className`
+ * dress the wrapper; the field stretches inside it. */
 export function Textarea({
   size = 'md',
   invalid = false,
   className,
+  style,
   disabled,
   ...props
 }: TextareaProps): ReactNode {
@@ -84,6 +90,7 @@ export function Textarea({
     <div
       {...part('textarea', 'root')}
       className={cn('snap-textarea', className)}
+      style={style}
       data-size={size}
       data-invalid={invalid || undefined}
       data-disabled={disabled === true || undefined}

@@ -1,20 +1,20 @@
 /**
- * The built-in 外观与显示 page: colour mode, installed skins, the operator
- * window profile, and the floating-ball profile. Everything writes the same
- * settings.json rows the host applies live, so the page is a control surface,
- * not a second source of truth.
+ * The built-in 外观与显示 page: the theme (one flat list — the factory
+ * day/night pair plus every installed skin package), the operator window
+ * profile, and the floating-ball profile. Picking a loaded theme writes one
+ * settings row (`ui.theme {id}`) the runtime applies live; picking an
+ * unloaded skin package enables it first and the window reloads once, so the
+ * selection lands on boot.
  *
  * @module @snap-rail/ui/settings-pages/appearance
  */
 
 import type { HostLink } from '@snap-rail/connection'
-import { rpcErrorText, subscribeFrame } from '@snap-rail/connection'
-import { settingsChangedSchema } from '@snap-rail/station-rpc/contract'
+import { rpcErrorText } from '@snap-rail/connection'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Badge, Button, Page, Row, Section, Stack, Switch, Tabs, TabsList, TabsTrigger } from '../components/index.ts'
+import { Button, Page, Row, Section, Stack, Switch, Tabs, TabsList, TabsTrigger } from '../components/index.ts'
+import { useSkinId, useSkins } from '../skins.tsx'
 import { useClient } from '../runtime.tsx'
-
-type ThemeMode = 'system' | 'light' | 'dark'
 
 const THEME_KEY = 'ui.theme'
 const WINDOW_KEY = 'ui.window'
@@ -29,8 +29,16 @@ const WINDOW_PRESETS = [
 
 const BALL_SIZES = [96, 112, 128, 160, 192] as const
 
-/** One installed skin row from `plugins.list`. */
-interface SkinRow {
+/** One selectable entry in the theme tab strip. */
+interface ThemeTab {
+  id: string
+  title: string
+  /** The skin package to enable first; the selection lands after the reload. */
+  enable?: string
+}
+
+/** One installed skin package row from `plugins.list`. */
+interface SkinPackage {
   name: string
   title: string
   enabled: boolean
@@ -50,25 +58,23 @@ async function writeSetting(link: HostLink, key: string, value: unknown): Promis
 /** The appearance/display page. */
 export function AppearancePage(): ReactNode {
   const { link } = useClient()
-  const [mode, setMode] = useState<ThemeMode>('dark')
+  const skins = useSkins()
+  const activeId = useSkinId()
+  const [packages, setPackages] = useState<readonly SkinPackage[]>([])
   const [windowPreset, setWindowPreset] = useState<string | undefined>(undefined)
   const [ballSize, setBallSize] = useState<number>(128)
   const [ballEnabled, setBallEnabled] = useState(true)
   const [ballDockable, setBallDockable] = useState(true)
   const [ballCollapse, setBallCollapse] = useState(true)
-  const [skins, setSkins] = useState<readonly SkinRow[]>([])
   const [error, setError] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     void Promise.all([
-      readSetting(link, THEME_KEY),
       readSetting(link, WINDOW_KEY),
       readSetting(link, BALL_KEY),
       link.call('plugins.list', {}),
-    ]).then(([theme, windowRow, ballRow, plugins]) => {
-      const themeMode = (theme as { mode?: unknown } | null)?.mode
-      if (themeMode === 'system' || themeMode === 'light' || themeMode === 'dark') setMode(themeMode)
+    ]).then(([windowRow, ballRow, plugins]) => {
       const windowProfile = windowRow as { width?: unknown, height?: unknown } | null | undefined
       if (windowProfile !== null && windowProfile !== undefined && typeof windowProfile.width === 'number' && typeof windowProfile.height === 'number') {
         const preset = WINDOW_PRESETS.find(item => item.width === windowProfile.width && item.height === windowProfile.height)
@@ -80,25 +86,12 @@ export function AppearancePage(): ReactNode {
       if (ballProfile !== null && ballProfile !== undefined && typeof ballProfile.dockable === 'boolean') setBallDockable(ballProfile.dockable)
       if (ballProfile !== null && ballProfile !== undefined && typeof ballProfile.collapse === 'boolean') setBallCollapse(ballProfile.collapse)
       if (plugins.ok) {
-        setSkins(plugins.value.plugins
+        setPackages(plugins.value.plugins
           .filter(plugin => plugin.kind === 'skin' && plugin.source !== 'builtin')
           .map(plugin => ({ name: plugin.packageName, title: plugin.title ?? plugin.packageName, enabled: plugin.enabled })))
       }
     }).catch(cause => { setError(cause instanceof Error ? cause.message : String(cause)) })
-    return subscribeFrame(link, 'settings/changed', settingsChangedSchema, change => {
-      if (change.key === THEME_KEY) {
-        const next = (change.value as { mode?: unknown } | null)?.mode
-        if (next === 'system' || next === 'light' || next === 'dark') setMode(next)
-      }
-    })
   }, [link])
-
-  const saveTheme = (next: ThemeMode): void => {
-    setMode(next)
-    void writeSetting(link, THEME_KEY, { mode: next }).catch(cause => {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    })
-  }
 
   const saveWindow = (width: number, height: number, label: string): void => {
     setWindowPreset(label)
@@ -130,61 +123,56 @@ export function AppearancePage(): ReactNode {
     })
   }
 
-  const toggleSkin = (skin: SkinRow): void => {
+  // Loaded themes select through the settings row alone and the runtime
+  // re-tokens every surface in place. An unloaded package needs its row
+  // enabled first; the row change reloads the window and the stored
+  // selection activates on boot.
+  const tabs: readonly ThemeTab[] = [
+    ...skins.list().map(row => ({ id: row.id, title: row.title })),
+    ...packages.filter(pkg => !pkg.enabled).map(pkg => ({ id: pkg.name, title: pkg.title, enable: pkg.name })),
+  ]
+
+  const selectTheme = (tab: ThemeTab): void => {
+    if (busy) return
+    if (tab.enable === undefined) {
+      void writeSetting(link, THEME_KEY, { id: tab.id }).catch(cause => {
+        setError(cause instanceof Error ? cause.message : String(cause))
+      })
+      return
+    }
     setBusy(true)
-    void link.call('plugins.set-enabled', { name: skin.name, enabled: !skin.enabled })
+    void link.call('plugins.set-enabled', { name: tab.enable, enabled: true })
       .then(result => {
         if (!result.ok) {
           setError(rpcErrorText(result.error))
           return
         }
-        setSkins(current => current.map(item => item.name === skin.name ? { ...item, enabled: !item.enabled } : item))
+        setPackages(current => current.map(pkg => pkg.name === tab.enable ? { ...pkg, enabled: true } : pkg))
+        return writeSetting(link, THEME_KEY, { id: tab.id })
       })
       .catch(cause => { setError(cause instanceof Error ? cause.message : String(cause)) })
       .finally(() => { setBusy(false) })
   }
 
   return (
-    <Page title="外观与显示" description="主题、皮肤、主窗口尺寸和悬浮球外观；保存后立即生效。">
+    <Page title="外观与显示" description="主题、主窗口尺寸和悬浮球外观。">
       <Stack gap="lg">
         {error !== undefined && <div role="alert" style={{ color: 'var(--snap-color-danger)' }}>{error}</div>}
 
-        <Section title="主题模式">
-          <Tabs value={mode} onValueChange={value => saveTheme(value as ThemeMode)}>
-            <TabsList aria-label="主题模式">
-              <TabsTrigger value="system">跟随系统</TabsTrigger>
-              <TabsTrigger value="light">白天</TabsTrigger>
-              <TabsTrigger value="dark">黑夜</TabsTrigger>
+        <Section title="主题">
+          <Tabs value={activeId} onValueChange={value => {
+            const tab = tabs.find(item => item.id === value)
+            if (tab !== undefined) selectTheme(tab)
+          }}>
+            <TabsList aria-label="主题">
+              {tabs.map(tab => (
+                <TabsTrigger key={tab.id} value={tab.id} disabled={busy}>{tab.title}</TabsTrigger>
+              ))}
             </TabsList>
           </Tabs>
         </Section>
 
-        <Section title="界面皮肤" description="皮肤由独立插件提供；启用后需要重启终端。">
-          <Stack gap="sm">
-            <Row gap="sm" align="center">
-              <Badge intent="success">默认（内置）</Badge>
-              <span style={{ color: 'var(--snap-color-muted)', fontSize: 'var(--snap-text-sm)' }}>工业钴蓝，始终可用</span>
-            </Row>
-            {skins.length === 0
-              ? <span style={{ color: 'var(--snap-color-muted)' }}>尚未安装其他皮肤插件。</span>
-              : skins.map(skin => (
-                  <Row key={skin.name} gap="sm" align="center">
-                    <span>{skin.title}</span>
-                    <Badge intent={skin.enabled ? 'success' : 'neutral'}>{skin.enabled ? '已启用' : '未启用'}</Badge>
-                    <Button
-                      size="sm"
-                      emphasis="outline"
-                      disabled={busy}
-                      onClick={() => toggleSkin(skin)}
-                    >
-                      {skin.enabled ? '停用' : '启用'}
-                    </Button>
-                  </Row>
-                ))}
-          </Stack>
-        </Section>
-
-        <Section title="主窗口" description="布局/套件会声明推荐尺寸；这里的选择会覆盖布局推荐。">
+        <Section title="主窗口">
           <Stack gap="sm">
             <Row gap="sm" wrap>
               {WINDOW_PRESETS.map(preset => (
@@ -206,7 +194,7 @@ export function AppearancePage(): ReactNode {
           </Stack>
         </Section>
 
-        <Section title="悬浮球" description="球面尺寸与停泊行为；球内显示内容由业务套件决定。">
+        <Section title="悬浮球" description="球面尺寸与停泊行为。">
           <Stack gap="md">
             <Row gap="sm" wrap align="center">
               {BALL_SIZES.map(size => (

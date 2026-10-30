@@ -482,7 +482,6 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
                               ? `签名 keyId ${phase.archive.plugin.signature.keyId} 不在本机信任名单中，无法验证发布者。`
                               : '这个包没有携带任何签名，也没有任何完整性校验。'}
                           </p>
-                          <p style={{ margin: 0, opacity: 0.75 }}>· 插件将按其声明的权限在宿主内运行（当前声明：{phase.archive.plugin.permissions.length === 0 ? '无' : phase.archive.plugin.permissions.join('、')}）。</p>
                         </>
                       )
                     : (
@@ -500,7 +499,6 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
                           </ul>
                         </>
                       )}
-                  <p style={{ margin: 0, opacity: 0.75 }}>· 请确认来源可信后再继续。</p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <button type="button" style={styleButton} onClick={() => setPhase({ ...phase, risk: false })}>返回</button>
@@ -533,10 +531,9 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
                         })}
                       </span>
                     </div>
-                    <p style={{ margin: 0, opacity: 0.6 }}>组合包本身不签名；每个成员都经与单插件相同的签名校验。</p>
                     {phase.archive.combo.missing.length > 0 && (
                       <p style={{ margin: 0, color: theme.destructive, fontSize: 13 }}>
-                        缺少依赖：{phase.archive.combo.missing.join('、')}——组合会立即启用全部行，装齐后再安装。
+                        缺少依赖：{phase.archive.combo.missing.join('、')}
                       </p>
                     )}
                   </div>
@@ -587,7 +584,7 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
                     <div style={styleField}><span style={styleFieldLabel}>权限</span><span>{phase.archive.plugin.permissions.length === 0 ? '无' : phase.archive.plugin.permissions.join('、')}</span></div>
                     {phase.archive.plugin.missing.length > 0 && (
                       <p style={{ margin: 0, color: theme.destructive, fontSize: 13 }}>
-                        尚未安装的依赖：{phase.archive.plugin.missing.join('、')}——可先安装本包，启用前需装齐。
+                        缺少依赖：{phase.archive.plugin.missing.join('、')}
                       </p>
                     )}
                     {phase.archive.plugin.action === 'blocked' && (
@@ -638,7 +635,7 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
                 </button>
                 <input
                   value={query}
-                  placeholder="粘贴本地/网络地址安装，或输入名称搜索…"
+                  placeholder="本地路径 / https://… / 插件名"
                   style={styleInput}
                   onChange={event => setQuery(event.target.value)}
                   onKeyDown={event => { if (event.key === 'Enter') submitQuery() }}
@@ -699,7 +696,7 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
                                 <button
                                   type="button"
                                   style={styleVersionUpdate}
-                                  title={`当前 ${item.installed?.version} → ${item.version}，点击更新`}
+                                  title={`当前 ${item.installed?.version} → ${item.version}`}
                                   disabled={updatingName === item.name}
                                   onClick={() => requestUpdate({
                                     name: item.name,
@@ -725,7 +722,7 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
                 {rows.length === 0
                   ? (
                       <div style={{ padding: '32px 0', textAlign: 'center', opacity: 0.55, fontSize: 14 }}>
-                        暂无已安装插件 —— 粘贴地址、拖入插件/组合 .zip，或输入名称从插件源搜索安装。
+                        暂无已安装插件
                       </div>
                     )
                   : rows.map(row => {
@@ -749,8 +746,8 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
                                   type="button"
                                   style={styleVersionUpdate}
                                   title={update.keyChanged === true
-                                    ? `当前 ${update.installedVersion} → ${update.feedVersion}，发布者密钥已变更，点击确认更新`
-                                    : `当前 ${update.installedVersion} → ${update.feedVersion}，点击更新`}
+                                    ? `当前 ${update.installedVersion} → ${update.feedVersion} · 发布者密钥已变更`
+                                    : `当前 ${update.installedVersion} → ${update.feedVersion}`}
                                   disabled={updatingName === row.packageName}
                                   onClick={() => requestUpdate(update)}
                                 >
@@ -765,7 +762,7 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
                           <button
                             type="button"
                             style={armed ? { ...styleDanger, background: 'rgba(248,81,73,.2)' } : styleDanger}
-                            title={armed ? '再次点击确认卸载（插件包与数据一并删除）' : '卸载（删除插件包；其数据一并删除）'}
+                            title="插件包与数据一并删除"
                             onClick={() => requestUninstall(row.packageName)}
                           >
                             {armed ? '确认卸载' : '卸载'}
@@ -800,9 +797,9 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
             <div style={{ display: 'grid', gap: 6, fontSize: 13 }}>
               <p style={{ margin: 0 }}>
                 <span style={{ fontFamily: 'ui-monospace, monospace' }}>{keyChange.name}</span>
-                {' '}的新版本由不同的密钥签名。若发布者确实轮换了密钥，更新是安全的；否则不要继续。
+                {' '}的新版本由不同的密钥签名。
               </p>
-              <p style={{ margin: 0, opacity: 0.75 }}>已安装 v{keyChange.installedVersion} → 源上 v{keyChange.feedVersion}。请核对发布者公告中的新 keyId 后再决定。</p>
+              <p style={{ margin: 0, opacity: 0.75 }}>已安装 v{keyChange.installedVersion} → 源上 v{keyChange.feedVersion}。</p>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button type="button" style={styleButton} onClick={() => setKeyChange(undefined)}>取消</button>
@@ -816,7 +813,6 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
           <div style={styleCard} role="dialog" aria-label="插件源" onClick={event => event.stopPropagation()}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>插件源</div>
             <div style={{ display: 'grid', gap: 6, fontSize: 13 }}>
-              <span style={{ opacity: 0.75 }}>搜索与在线更新使用的插件源列表：</span>
               {feedUrls.length === 0 && <span style={{ fontSize: 12, opacity: 0.6 }}>尚未添加自定义源（当前使用出厂默认源）。</span>}
               {feedUrls.map((url, index) => (
                 <div key={url} style={{ ...styleRow, padding: '6px 10px' }}>
@@ -834,7 +830,7 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   value={feedDraft}
-                  placeholder="https://…（指向含 index.json 的目录）"
+                  placeholder="https://…"
                   style={{ ...styleInput, flex: 1 }}
                   onChange={event => setFeedDraft(event.target.value)}
                   onKeyDown={event => { if (event.key === 'Enter') appendFeedUrl() }}
@@ -843,7 +839,6 @@ export function BootstrapPage(props: BootstrapPageProps): ReactNode {
               </div>
             </div>
             {feedError !== undefined && <p style={{ margin: 0, color: theme.destructive, fontSize: 13 }}>{feedError}</p>}
-            <p style={{ margin: 0, fontSize: 12, opacity: 0.6 }}>未修改时使用出厂默认源；修改后保存在本机，仅影响本机。社区插件源就是插件作者自己仓库的 Release 地址。</p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button type="button" style={styleButton} onClick={() => setFeedOpen(false)}>取消</button>
               <button type="button" style={stylePrimary} onClick={saveFeedUrls}>保存</button>

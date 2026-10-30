@@ -521,6 +521,13 @@ export const shellContract = defineContract('shell', {
     'shell.ball.state': method(emptyRequest).ret<BallState>(),
     /** Read the ball window's dock state (parked edge and collapsed flag). */
     'shell.ball.dock': method(emptyRequest).ret<BallDockState>(),
+    /** Drag-drive the ball window. `begin` hands the drag to the host: it
+     * anchors the grab from the live OS cursor and follows it absolutely
+     * until `end`, which hands the window back to the dock settle (snap,
+     * tuck, persist). The renderer never streams coordinates — the cursor is
+     * the host's only truth. */
+    'shell.ball.move': method(z.object({ phase: z.enum(['begin', 'end']) }).strict())
+      .ret<SurfaceActionResult>(),
     /**
      * Answer a held exit request (`shell/exit-requested`). A renderer may only
      * ever resolve — raising the request is the host's (the window's close or

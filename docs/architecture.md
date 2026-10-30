@@ -31,11 +31,11 @@
   可被同互斥组的池插件替换，替代者停用后自动恢复。
 - **出厂底座**：`resources/builtins.cordis.yml` 带 base 启动链 + 内置默认
   store-sqlite/equipment + 内置 UI/设置页/设备管理页；驱动、业务页、套件、
-  额外皮肤仍经 zip 安装进 `<home>/plugins/` 池。保护按「来源」判定；
+  额外主题仍经 zip 安装进 `<home>/plugins/` 池。保护按「来源」判定；
   与内置行重名的 zip 拒绝安装；管理面只显示池行与只读「内置默认」行。
   dev（Vite harness）用 `dev/builtins.dev.cordis.yml` 覆盖底座。
 - **互斥组**（`snapRail.exclusive`）：启用一个成员自动停用同组其他成员
-  （一次批量写）。现组：`suite`（套件默认组）、`skin`（界面皮肤）、
+  （一次批量写）。现组：`suite`（套件默认组）、`skin`（主题）、
   `store-backend`（store 实现包）。池内包都可经界面启停。
 - **依赖预检**（`snapRail.requires`，唯一兼容声明）：包作者声明依赖——
   包名条目（`@snap-rail/equipment`）、带版本范围的包名条目
@@ -102,7 +102,7 @@ Electron Shell + Node Host（当前同进程）        renderer（每窗口一�
 | --- | --- | --- |
 | 启动/组合 | `base/app-boot` | 两层合成、boot()、LayerAdmin 热重载、`./rpc` 管理桥（认领 `plugins` 域；互斥组、requires 正反向预检与按来源的内置保护在这里执行；`./contract` 是方法行与 schema 的家）；池扫描 `./scan`（含 clientOnly/subpath 声音）、解析钩子 `./resolve-hooks`（appRoot 优先、池内回退）；dev 静态住户经 `rendererPackages` 挡板（仅 dev） |
 | 工作站桥 | `base/station-rpc` | `session.*`/`settings.*`/`audit.*`/`client-config.list`（登录态落 settings + 审计；`./contract` 是方法/帧行与 schema 的家，渲染住户 import 它获得类型；行携带 `clientUrl` 与该包**每个辅助 surface 的面 URL**（`surfaceUrls`），渲染端据此决定每个窗口装什么） |
-| 系统外壳 | `base/shell` | **OS 集成缝**：`ctx.shell`（宿主面）与 `./contract`（渲染面）两个面。宿主面 = 通知（含动作按钮与点击回执）、托盘菜单贡献、辅助 surface 的窗口生命周期、悬浮球状态、**操作员窗口的退出策略**（`ctx.shell.window`）；渲染面只有单向 `shell.toast`、`surface.present/hide`、`shell.ball.state`、`shell.ball.dock`、`shell.exit.resolve` 与四个帧。**池插件永不 import Electron**，Electron 只出现在首方 provider（`apps/desktop/src-host/main/shell`） |
+| 系统外壳 | `base/shell` | **OS 集成缝**：`ctx.shell`（宿主面）与 `./contract`（渲染面）两个面。宿主面 = 通知（含动作按钮与点击回执）、托盘菜单贡献、辅助 surface 的窗口生命周期、悬浮球状态、**操作员窗口的退出策略**（`ctx.shell.window`）；渲染面只有单向 `shell.toast`、`surface.present/hide`、`shell.ball.state`、`shell.ball.move`、`shell.ball.dock`、`shell.exit.resolve` 与四个帧。**池插件永不 import Electron**，Electron 只出现在首方 provider（`apps/desktop/src-host/main/shell`） |
 | RPC 协议 | `base/protocol` | **信封封闭、内容开放**：四象限消息模型、RpcMethodMap/FrameMap 两个开放合并基座（只有平台行 `host.*`/`rpc.*`/`window.*` 留在这里）、zod 信封校验、AbstractApiClient 双 overload |
 | RPC 宿主侧 | `base/gateway` | `ctx.rpc`：域名认领（`claimDomain` 首认即得、冲突 fail-loud）、`method`（请求 schema 必须随注册）、`frame`（载荷 schema 注册）、`bridgeEvent`、`rpc.describe` 能力发现、帧泵 |
 | RPC 客户端侧 | `base/connection` | HostLink：两原语之上的类型化客户端；`subscribeFrame(link, method, schema, cb)` 是消费帧的标准姿势；`rpcErrorText` 统一错误文案 |
@@ -115,7 +115,7 @@ Electron Shell + Node Host（当前同进程）        renderer（每窗口一�
 | 工业通讯协议域 | `equipment/equipment` | **equipment 缝 = 规范包，内置默认**：`data/equipment.db` 三表（设备/组/点 + 方言 config blob）+ 点表运行面 + 驱动注册面。`ctx.equipment.registerDriver` 上交 `{id, title, schemas, createConnection, probe?}`——驱动是纯协议适配器（零存储、零渲染端）；`probe` 驱动一次性只读连接测试，`equipment.devices.test` 是其 wire 面。底座编排（reconcile：配置×驱动→连接），驱动决策（update 内热调或重连）。`requires: ['service:store']`，`./rpc` 桥以子路径行（`@snap-rail/equipment/rpc`）一并启用；`equipment.config.list`/`equipment.devices|groups|points.*` CRUD、`equipment/structure-changed` 帧；`equipment.mappings.list` 读底座表投影。`./contract` 是随应用发布的渲染契约（base 种子），`./driver` 是独立驱动仓库只读的纯类型面 |
 | ModbusTCP 驱动 | 独立仓 `snap-rail-driver-modbus` | 范本驱动（新驱动作者的活文档）：纯协议适配器，块轮询/编解码；方言 schema（`.meta` 中文标题 → JSON Schema）；无存储无渲染端；`requires: ['@snap-rail/equipment']` |
 | EtherNet/IP 驱动 | 独立仓 `snap-rail-driver-enip` | 照 modbus 范本的第二个驱动（首期对接 OMRON NX1P2）：自研轻量 ENIP/CIP 编解码（RegisterSession + SendRRData + Read/Write Tag 符号寻址，无第三方协议库），按已发布全局变量名轮询读写；变量级 CIP 失败只 null 单点（设备保持在线），写前经首读自学类型字；`slot>0` 发背板路由段（留 Logix 兼容门） |
-| UI 基座 | `base/ui`（`@snap-rail/ui`） | **base 内置，无 framework 插件**：语义组件 + `data-snap-part` 解剖（`/components`）、类型化区域插槽与 scoped context（`/slots`+`/contract`）、皮肤注册与 token/展示变体（`/skins`，默认钴蓝皮肤内置）、内置设置外壳与页面注册（`/settings`）、页面注册（`/pages`）、图表桥（`/charts` 规划）、renderer runtime（`/runtime`）、fallback 布局。页面/布局/设置页/皮肤均经 `ctx.ui`/`ctx.pages`/`ctx.settings`/`ctx.skins` 组合；`snapRail.uiProfile` 只做 native/integrated/custom 徽标 |
+| UI 基座 | `base/ui`（`@snap-rail/ui`） | **base 内置，无 framework 插件**：语义组件 + `data-snap-part` 解剖（`/components`）、类型化区域插槽与 scoped context（`/slots`+`/contract`）、主题注册与 token（`/skins`，出厂内置钴蓝白天/黑夜两主题）、内置设置外壳与页面注册（`/settings`）、页面注册（`/pages`）、图表桥（`/charts` 规划）、renderer runtime（`/runtime`）、fallback 布局。页面/布局/设置页/主题均经 `ctx.ui`/`ctx.pages`/`ctx.settings`/`ctx.skins` 组合；`snapRail.uiProfile` 只做 native/integrated/custom 徽标 |
 | 统一设备管理页 | `ui/equipment-station` | **内置页面库**（不再是 clientOnly zip）：导出 `EquipmentPage`，由 desktop 在 runtime 启动时注册为 builtin settings page；equipment 缝的渲染面（设备/分组/点位/连接状态；CRUD 持续迁移），只用 `@snap-rail/ui/components` |
 | 业务页面/套件 | 作者自有仓（如驱动仓/套件仓） | 业务页经 `ctx.pages.registerPage`，布局经 `ctx.ui.registerLayout` 并声明 `window`/`ball` profile；套件仍是单包单行、可双面、单活 `exclusive: 'suite'`，场景私有宿主逻辑收在包内；`requires` 只声明真实插件依赖（不再声明 framework） |
 
@@ -135,8 +135,9 @@ provider，消费方零改动。
   `shell/exit-resolved` 是回执。
 - **渲染面**（`./contract`）：单向 `shell.toast`（无按钮、无回调，点击聚焦
   主窗口）、`shell.surface.present/hide`、`shell.ball.state`、
-  `shell.ball.dock`、`shell.exit.resolve` 与四个帧（`shell/surface-changed`、
-  `shell/ball-changed`、`shell/ball-dock-changed`、`shell/exit-requested`）。
+  `shell.ball.move`、`shell.ball.dock`、`shell.exit.resolve` 与四个帧
+  （`shell/surface-changed`、`shell/ball-changed`、`shell/ball-dock-changed`、
+  `shell/exit-requested`）。
   会消失的调用方不得留下无法应答的按钮，也拿不到 OS 句柄。
 
 **窗口**：`main` 永远由 Shell 拥有（应用入口创建、交给 Shell 接管关闭与可见
@@ -146,12 +147,21 @@ provider，消费方零改动。
 角。尺寸固定（球 128×128，几何单源 `BALL_SURFACE`），不接受任意 URL 或任意
 窗口——surface 白名单就是封闭的二元组。
 
-**互斥不变式**：操作员窗口与悬浮球互斥，由底座保证、与路径无关——
-`present('main')` 顺带收起球，`present('ball')` 顺带收起主窗口，任何旁路
-show（任务栏还原、第二实例、通知点击）也会被 `show` 监听扳回。插件的职责只
-有两处：声明"关窗之后去哪"（见退出策略），以及画好两种形态（球与贴边小标签）。
+**共存不变式**：操作员窗口与悬浮球各自独立显隐，底座不互斥——`present`
+只显示与聚焦，旁路 show/hide（任务栏还原、第二实例、通知点击）也以
+`shell/surface-changed` 帧如实广播。球随生效 profile 的 `enabled` 显隐
+（开机即在场，设置热改即时生效；`ui.ball` 用户行优先于布局声明）。互斥
+形态交给需要的插件编排：退出策略 `'ball'` 是底座唯一代办的配对（关窗收
+主窗、留球），其余经 `shell.surface.present/hide` 与状态帧自管。插件的职责
+只有两处：声明"关窗之后去哪"（见退出策略），以及画好两种形态（球与贴边
+小标签）。
 
-**贴边收起**：拖动落点距工作区边缘 ≤16px 即停泊——左右边缘**收起只留 1/3**
+**贴边收起**：拖动由球面发起、宿主执行——`shell.ball.move` 只带 `begin`/
+`end` 两个信号：`begin` 时宿主从 OS 光标记下抓取偏移、脱离停泊，随后以
+16ms 轮询把球窗绝对钉在光标下（渲染端不流式上报坐标——窗动则坐标系动，
+靠事件反馈修位置会停摆抖动；`end` 后贴边结算一次落定。CSS app-region 在
+透明窗上命中不可靠，内核导出的 `attachBallDrag` 是标准画法）。落点距工作区
+边缘 ≤16px 即停泊——左右边缘**收起只留 1/3**
 （`shell/ball-dock-changed` 推 `{edge, collapsed, visiblePx}`），上下边缘只
 吸附不收起（收向上会压别家标题栏、收向下会压任务栏）。停泊后光标进入可见条
 即滑出，移开 600ms 缩回；必须"先离开再进入"才再次滑出（防止放下即弹出），
@@ -181,8 +191,9 @@ CSS `box-shadow` 会被窗口边界硬切成灰边，因此阴影必须以径向
 的落点是通用的"聚焦主窗口"，不做插件路由（将来若需要，走 `toastXml` 携令牌
 预留）。
 
-**托盘**：单例、**懒创建**（首个托盘项或首个辅助 surface 出现时才建图标——
-终端默认不在通知区占位）；固定行（显示主窗口 / 隐藏到托盘 / 退出）+ 贡献行。
+**托盘**：单例、**开机即建**（客户端固有件，随应用启动常驻通知区，失败容忍
+但不静默）；固定行（显示主窗口 / 隐藏到托盘 / 退出）+ 贡献行，插件的全部
+参与方式就是往菜单里加行——托盘与辅助 surface（悬浮球）互不相干。
 托盘项 id 按 `<插件>:<id>` 命名空间化，两个插件可以都叫 `pause` 而互不干扰；
 单插件 12 项、全体 24 项上限；贡献随**调用方 fiber** 回收（`caller.effect`），
 重载/禁用插件不会留下孤儿菜单项。「退出」与窗口关闭走同一条退出策略（无声明
@@ -467,7 +478,7 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
 2. 页面只组合 `@snap-rail/ui/components` 原语，经
    `ctx.pages.registerPage` 注册；布局经 `ctx.ui.registerLayout` 声明
    `provides`/`window`/`ball`；设置页经 `ctx.settings.registerPage`；
-   皮肤经 `ctx.skins.register`。错误文案 `rpcErrorText`；时间
+   主题经 `ctx.skins.register`。错误文案 `rpcErrorText`；时间
    `formatClock`/`formatDuration`；色值用 `useSkinTokens()`。
 3. 流程门控/变量服务仍在 runtime 服务面；第三方图表包在
    `ChartFrame`/`Visualization` 内，用 `useChartTheme()` 取色。
@@ -573,7 +584,7 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
 - **出厂底座**：desktop 生产依赖 = base 启动链 + `@snap-rail/ui` +
   内置默认 store-sqlite/equipment + equipment-station 页面库 + 共享库
   （zod/drizzle-orm/electron-updater）；equipment 的 `./contract` 以 base
-  种子形态随客户端 bundle 发布（场景契约住在套件包内）。驱动、额外皮肤、
+  种子形态随客户端 bundle 发布（场景契约住在套件包内）。驱动、额外主题、
   业务页、套件不在生产依赖里——只能 zip 安装。
 - 发行插件 zip 由 `pnpm run pack:plugins` 产出（`dist-plugins/`），
   **最终格式 = 精简 manifest（含 exports 映射）+ 构建产物，无源码**。

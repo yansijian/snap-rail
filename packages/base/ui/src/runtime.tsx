@@ -8,14 +8,14 @@
  * @module @snap-rail/ui/runtime
  */
 
-import type { ClientHandle } from '@snap-rail/client-kernel'
+import { attachBallDrag, type ClientHandle } from '@snap-rail/client-kernel'
 import { subscribeFrame, type HostLink } from '@snap-rail/connection'
 import { settingsChangedSchema } from '@snap-rail/station-rpc/contract'
 import { Context, type Plugin } from '@snap-rail/cordis'
 import { TimerService as timerPlugin } from '@snap-rail/cordis-plugin-timer'
 import type { SurfaceId } from '@snap-rail/protocol'
 import { shellContract } from '@snap-rail/shell/contract'
-import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import fallbackPlugin from './fallback.tsx'
 import pagesPlugin from './pages.tsx'
@@ -24,7 +24,7 @@ import settingsPlugin from './settings.tsx'
 import { UI_SLOT_IDS, type LayoutContribution } from './contract.ts'
 import { Slot, UiProvider, useActiveLayout, useUiVersion } from './slots.tsx'
 import slotsPlugin from './slots.tsx'
-import { SkinsProvider } from './skins.tsx'
+import { DEFAULT_DARK_ID, DEFAULT_LIGHT_ID, SkinsProvider } from './skins.tsx'
 import skinsPlugin from './skins.tsx'
 
 /** The shared services every occupant may consume. */
@@ -158,15 +158,36 @@ function MainRoot(props: { ctx: Context }): ReactNode {
   )
 }
 
-/** The fallback ball face used when no plugin occupies `shell.ball`. */
+/**
+ * The fallback ball face used when no plugin occupies `shell.ball`: a themed
+ * disc that follows the active skin tokens (visible on any colour mode). The
+ * whole ball is one drag/click surface ({@link attachBallDrag}): press-move
+ * drags the window over `shell.ball.move`, a press-release summons the
+ * operator window — the same anatomy the kernel's crash fallback paints.
+ */
 function BallRoot(props: { ctx: Context }): ReactNode {
   useUiVersion(props.ctx.ui)
   const occupant = props.ctx.ui.list(UI_SLOT_IDS.ball)[0]
+  const link = props.ctx.client.link
+  const hasOccupant = occupant !== undefined
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (hasOccupant) return undefined
+    const element = rootRef.current
+    if (element === null) return undefined
+    return attachBallDrag(element, {
+      link,
+      onClick: () => {
+        void link.call('shell.surface.present', { surface: 'main' })
+      },
+    })
+  }, [hasOccupant, link])
   if (occupant !== undefined) {
     return <div style={{ width: '100%', height: '100%' }}>{occupant.render({ surface: 'ball' })}</div>
   }
   return (
     <div
+      ref={rootRef}
       data-snap-part="ball.root"
       style={{
         display: 'flex',
@@ -174,11 +195,40 @@ function BallRoot(props: { ctx: Context }): ReactNode {
         justifyContent: 'center',
         width: '100%',
         height: '100%',
-        color: 'var(--snap-color-muted)',
-        fontSize: 'var(--snap-text-xs)',
       }}
     >
-      snap-rail
+      <div
+        data-snap-part="ball.orb"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 'calc(100% - 16px)',
+          height: 'calc(100% - 16px)',
+          borderRadius: '50%',
+          background: 'var(--snap-color-surface-raised)',
+          border: 'var(--snap-border-width) solid var(--snap-color-border)',
+        }}
+      >
+        <button
+          type="button"
+          data-snap-part="ball.core"
+          title="打开主窗口"
+          style={{
+            width: 'calc(100% - 16px)',
+            height: 'calc(100% - 16px)',
+            borderRadius: '50%',
+            border: 'none',
+            background: 'var(--snap-color-surface)',
+            color: 'var(--snap-color-text)',
+            fontSize: 'var(--snap-text-xs)',
+            fontWeight: 'var(--snap-weight-medium)',
+            cursor: 'default',
+          }}
+        >
+          snap-rail
+        </button>
+      </div>
     </div>
   )
 }
@@ -213,17 +263,16 @@ export async function createClientRuntime(handle: ClientHandle, options: Runtime
   await ctx.plugin(skinsPlugin)
   await ctx.plugin(settingsPlugin)
 
-  // The operator's theme row is a simple settings.json value; apply it to the
-  // skin service now and follow the settings/changed frame without a reload.
+  // The operator's theme selection is a simple settings.json value (`{id}`);
+  // apply it to the skin service now and follow the settings/changed frame
+  // hot, so every surface (main window and ball alike) re-tokens in place. A
+  // legacy `{mode}` row maps onto the matching factory theme once, on read.
   const applyThemeRow = (value: unknown): void => {
-    const mode = (value as { mode?: unknown } | null)?.mode
-    const choice = mode === 'light' || mode === 'dark' || mode === 'system' ? mode : 'dark'
-    const prefersLight = typeof window !== 'undefined'
-      && typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-color-scheme: light)').matches
-    const resolved = choice === 'system' ? (prefersLight ? 'light' : 'dark') : choice
-    ctx.skins.setMode(resolved)
-    if (typeof document !== 'undefined') document.documentElement.dataset['mode'] = resolved
+    const row = value as { id?: unknown; mode?: unknown } | null
+    const selection = typeof row?.id === 'string' && row.id !== ''
+      ? row.id
+      : row?.mode === 'light' ? DEFAULT_LIGHT_ID : DEFAULT_DARK_ID
+    if (!ctx.skins.activate(selection)) ctx.skins.activate(DEFAULT_DARK_ID)
   }
   void handle.link.call('settings.get', { key: 'ui.theme' })
     .then(result => { if (result.ok) applyThemeRow(result.value.value) })

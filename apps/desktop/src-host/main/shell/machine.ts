@@ -1,10 +1,10 @@
 /**
  * The Shell adapter's Electron-free core: the tray contribution registry, the
  * notification ledger (caps, coalescing, throttling), the host-aggregated
- * ball state, the exit policy fold, and the main-window/ball exclusivity rule.
- * Everything here is plain data and decisions, so the tests drive
- * the exact rules the adapter enforces without ever opening a window — the
- * same split `update-machine.ts` uses for the update channel.
+ * ball state, and the exit policy fold. Everything here is plain data and
+ * decisions, so the tests drive the exact rules the adapter enforces without
+ * ever opening a window — the same split `update-machine.ts` uses for the
+ * update channel.
  *
  * Two rules shape the whole module:
  *
@@ -38,7 +38,6 @@ import {
   type ShellTrayItem,
   type ShellTrayItemPatch,
 } from '@snap-rail/shell'
-import { AUX_SURFACE_IDS, type SurfaceId } from '@snap-rail/protocol'
 
 /** One accepted notification, kept until the record cap evicts it. */
 export interface NotificationRecord {
@@ -122,12 +121,6 @@ export interface ShellMachine {
   resolveExit(action: ShellExitAction): { source: ShellExitSource, action: ShellExitAction } | undefined
   /** Drop a stale hold (the hold timeout fired); false when it was already answered. */
   expireExit(source: ShellExitSource): boolean
-  /**
-   * Which surfaces a `present` must hide first: the operator window and the
-   * floating ball exclude each other, and the rule lives here so tests — not
-   * the Electron glue — own it.
-   */
-  exclusivityHides(target: SurfaceId): readonly SurfaceId[]
 }
 
 /** A refusal answer. */
@@ -367,12 +360,6 @@ export function createShellMachine(options: ShellMachineOptions = {}): ShellMach
       if (heldExit !== source) return false
       heldExit = undefined
       return true
-    },
-
-    exclusivityHides(target) {
-      // The operator window and the ball exclude each other, whatever path
-      // made one of them visible.
-      return target === 'main' ? [...AUX_SURFACE_IDS] : ['main']
     },
   }
 }

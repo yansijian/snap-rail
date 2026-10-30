@@ -90,6 +90,17 @@
       "files": [],
       "assertions": [],
       "result": "待实测：本计划更新 skill 后补跑"
+    },
+    {
+      "id": 5,
+      "name": "decompose-capture-and-display",
+      "status": "draft",
+      "note": "拆解引导（2026-10-30 起，r2 时代锚点）。补跑后把 result 改成实际断言结果。",
+      "prompt": "帮我做一个 snap-rail 插件：采集欧姆龙 PLC 的数据，把几个寄存器值用柱状图显示出来。",
+      "expected_output": "动手 init 之前先向用户提出拆解方案并等确认：@you/driver-omron（driver，多活，只做协议适配与采样上报）+ @you/dashboard-bar（ui-view，clientOnly，requires ['@snap-rail/equipment']，points.list/read/subscribe + 订 equipment/point-updated 帧画柱状图）；两包互不 import、互不 requires，都只面向 equipment 底座；用户坚持单包时给 suite 方案并说明复用代价；确认后每包各走标准工作流",
+      "files": [],
+      "assertions": [],
+      "result": "待实测（真实 init/build 全流程）。2026-10-30 只读 dry-run 已过：三个测试 prompt 行为符合预期——A（欧姆龙+柱状图）先提两包拆解方案并等确认、取数链路叙述正确；B（采集+按班次统计+通知）聚合落 suite 宿主面、协议仍拆 driver、通知走 shell 缝；C（纯 modbus 驱动）不多问直接进工作流。dry-run 同时暴露四个文本缺口已修：subscribe 入参形状、suite 宿主面 ctx.on('point/updated') API、契约包 devDependency 装法、缝调用不触发拆包"
     }
   ]
 }

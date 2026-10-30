@@ -1,6 +1,8 @@
 ---
 name: snap-rail-plugin-dev
-description: 开发、构建、验证、签名与发布 snap-rail 可安装插件的完整指南——在独立插件仓库里用公共 @snap-rail/plugin-sdk 完成，不需要 snap-rail 源码。覆盖全部 9 种模板：设备驱动 driver、存储后端 store-provider、宿主服务 host-service、工具 tool、业务套件 suite、UI 页面 ui-view、布局 ui-layout、共享组件 ui-extension、皮肤 ui-skin，以及宿主 RPC（ctx.rpc / serveContract）、渲染面 link 与帧订阅（subscribeFrame）。只要用户想写/改/发 snap-rail 插件、snap-rail driver、snap-rail suite、snapRail manifest、snap-rail-plugin CLI、插件 zip 签名或 feed 滚动发布，就用本 skill；哪怕用户只说「给 snap-rail 做个××」，也应触发。
+description: 开发、构建、验证、签名与发布 snap-rail 可安装插件的完整指南——在独立插件仓库里用公共 @snap-rail/plugin-sdk 完成，不需要 snap-rail 源码。覆盖全部 9 种模板：设备驱动 driver、存储后端 store-provider、宿主服务 host-service、工具 tool、业务套件 suite、UI 页面 ui-view、布局 ui-layout、共享组件 ui-extension、主题 ui-skin，以及宿主 RPC（ctx.rpc / serveContract）、渲染面 link 与帧订阅（subscribeFrame）。需求横跨多个能力（如「采集欧姆龙
+PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立复用的多个插件
+（驱动 + 看板页等）再选模板。只要用户想写/改/发 snap-rail 插件、snap-rail driver、snap-rail suite、snapRail manifest、snap-rail-plugin CLI、插件 zip 签名或 feed 滚动发布，就用本 skill；哪怕用户只说「给 snap-rail 做个××」，也应触发。
 ---
 
 # snap-rail 插件开发（独立仓库）
@@ -23,10 +25,13 @@ description: 开发、构建、验证、签名与发布 snap-rail 可安装插�
     即 package.json 的 `main`。设备通讯、存储、服务、wire 方法都在这。
   - **渲染面**：浏览器 CJS 工厂包，`clientBundle` 构建 →
     `lib-client/client.js`，焊进 `__ModuleLoader__` 工厂壳执行；`@snap-rail/ui`
-    语义原语、插槽/皮肤/设置/runtime 与契约等**种子模块**运行时从共享种子表
+    语义原语、插槽/主题/设置/runtime 与契约等**种子模块**运行时从共享种子表
     取单实例。
 - 插件之间**永不互相 import**：协作只走 cordis 服务（`ctx.provide` /
   `inject`）、wire 帧和 store 服务缝。
+- **一个功能 ≠ 一个包**：需求横跨多个正交能力（采集 + 展示、协议 + 存储…）
+  时，先拆解成多个可独立复用的插件再动手（见「先拆解，再选模板」）；
+  拆与合的判据是复用预期，不是场景步数。
 - **三张表别混**：npm 依赖表决定 TypeScript 能 resolve 什么；运行时种子表
   决定渲染面能 `require` 什么；`requires` 决定终端里必须装/启用哪些插件。
   种子 id 不是 npm 包，npm 类型包也不是可安装插件。
@@ -83,6 +88,35 @@ description: 开发、构建、验证、签名与发布 snap-rail 可安装插�
     社区包用自己的 scope；冒名包装不上。
 14. **zip 永不带 src**，`pack` 会拒；`main` 必须与构建产物一致。
 
+## 先拆解，再选模板
+
+选型之前先回答「这个需求是几个包」。判定单位是**复用预期**，不是场景
+步数：对需求里的每个能力问一句——**换一种设备 / 换一种展示 / 换一个场景，
+它还有没有用？** 答案彼此独立（正交能力，典型：采集 + 展示）各自成包；
+离开这个场景就没有意义的能力（场景私有聚合）合进 suite。
+
+- **触发**：需求一句话含 ≥2 个正交能力（「采集××并用××显示」「接××
+  并存库」…）时，**先向用户提出拆解方案并等确认，再 init 任何仓库**。
+  方案逐包列：模板、一句话职责、复用收益、依赖关系（requires）。单能力
+  需求（纯驱动、纯主题…）或用户已明确表达单包意图时不问，直接进工作流。
+  通知/托盘/窗口/退出等 OS 能力是 shell **缝调用**，不是包型能力，
+  不触发拆包（在宿主面/套件里直接用）。
+- **示例**——「采集欧姆龙 PLC 的数据，并用柱状图显示」：
+  1. `@you/driver-omron`（**driver**，多活）：只做协议适配与采样上报，
+     设备/点配置住底座表，零界面零存储；
+  2. `@you/dashboard-bar`（**ui-view**，clientOnly）：
+     `requires: ['@snap-rail/equipment']`，订阅底座点帧画柱状图，
+     **不 import、不 requires 驱动**。
+  两包都只面向 equipment 底座、互不依赖——明天接三菱只加一个驱动，
+  后天换折线图只换看板。
+- **反向（何时合）**：要**场景私有聚合**（跨点计算、按班次持久化）时，
+  聚合逻辑 + 专属界面合成一个 **suite**（聚合住宿主面、看板订自己的聚合
+  帧）；设置页在页面同包追加；工具互不依赖。别把「展示底座数据」的通用
+  看板塞进 suite。
+- **落地**：每包各自 init、各走一遍标准工作流与发布前清单；判定表、看板
+  页取数链路（`points.subscribe` 帧门禁等）与多包交付见
+  [references/templates.md](references/templates.md) 的「先拆解」节。
+
 ## 标准工作流
 
 ```sh
@@ -92,6 +126,8 @@ description: 开发、构建、验证、签名与发布 snap-rail 可安装插�
 #    会被压回旧版（可能拿到 r1 时代模板）、装 SDK 也可能被拒。刚发版就追新：
 #    dlx 钉死版本（如 @snap-rail/plugin-sdk@0.2.6），项目 pnpm-workspace.yaml
 #    设 minimumReleaseAge: 0（或 minimumReleaseAgeExclude 列出 @snap-rail/*）。
+# 0.5 多能力需求（采集+展示等）先做拆解确认——见上「先拆解，再选模板」；
+#     以下流程按包各走一遍。
 pnpm dlx @snap-rail/plugin-sdk init my-driver --template driver
 cd my-driver
 pnpm install
@@ -156,7 +192,10 @@ pnpm exec snap-rail-plugin feed dist
 #    终端「插件页 → ⚙ 插件源」，或直接拖 zip 进「安装插件」。
 ```
 
-## 选模板（9 选 1）
+## 选模板（每包 9 选 1）
+
+选型以**包**为单位：上一个环节拆出几个包，就做几次选择；单能力需求只选
+一次。
 
 | template | 面 | 什么时候选 |
 | --- | --- | --- |
@@ -168,7 +207,7 @@ pnpm exec snap-rail-plugin feed dist
 | `ui-view` | 渲染 | 注册进 `ctx.pages` 的页面（React + `@snap-rail/ui/components`）。 |
 | `ui-layout` | 渲染 | 布局：声明 `provides` + `window`/`ball` profile。 |
 | `ui-extension` | 渲染 | 贡献共享组件（`client.seeds`），供其他组件插件复用。 |
-| `ui-skin` | 渲染 | 皮肤：token + part CSS + 展示变体，单活 `exclusive: 'skin'`。 |
+| `ui-skin` | 渲染 | 主题：单套 token + 可选 part CSS（纯样式），单活 `exclusive: 'skin'`。 |
 
 UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires 条目，
 也不需要 framework 绑定。`--framework <包名[@范围]>` 仅作为类型/构建包覆盖
@@ -181,7 +220,7 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
 | 文件 | 何时读 |
 | --- | --- |
 | [references/manifest.md](references/manifest.md) | 动 `package.json` 的 `snapRail` 块之前；拿不准 `requires`/`exclusive`/`client` 字段怎么写时。 |
-| [references/templates.md](references/templates.md) | init 之后、动手实现之前；确认所选模板的 manifest、构建与骨架要点。 |
+| [references/templates.md](references/templates.md) | init 之前判断要不要拆包、拆成哪几种（「先拆解」节）；init 之后确认所选模板的 manifest、构建与骨架要点。 |
 | [references/host-face.md](references/host-face.md) | 写宿主面代码：cordis 纪律、驱动、store、宿主服务、shell 宿主面 API。 |
 | [references/client-face.md](references/client-face.md) | 写渲染面代码：种子纪律、语义原语、页面/布局/扩展/皮肤写法、球面与退出策略。 |
 | [references/faces-and-wire.md](references/faces-and-wire.md) | 写宿主 RPC、渲染面 link/帧，或分不清 npm 包 / 种子 / requires 时。 |
@@ -237,6 +276,8 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
 
 ## 发布前检查清单
 
+- [ ] 需求拆成了几个包的话，每个包都独立走完本清单（拆解见「先拆解，
+      再选模板」）
 - [ ] 包名用了自己的 scope（非 `@local/`、非 `@snap-rail/*`）；改名四处
       （package.json / 入口 name / 测试断言 / tsdown 包名字符串）都改了
 - [ ] 宿主面运行时契约包在 dependencies（非 devDependencies）；host.js

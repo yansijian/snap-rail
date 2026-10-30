@@ -360,15 +360,3 @@ export const UI_COMPONENTS = {
 
 /** One semantic component name. */
 export type UiComponentName = keyof typeof UI_COMPONENTS
-
-/** The presentation targets a skin may tune. */
-export const PRESENTATION_TARGETS = ['dialog', 'select', 'tabs', 'toast'] as const
-
-/** One presentation target. */
-export type PresentationTarget = (typeof PRESENTATION_TARGETS)[number]
-
-/** The presentation variants the core implements. */
-export const PRESENTATION_VARIANTS = ['modal', 'sheet', 'fullscreen', 'popover', 'segmented', 'inline'] as const
-
-/** One presentation variant. */
-export type PresentationVariant = (typeof PRESENTATION_VARIANTS)[number]

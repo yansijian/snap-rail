@@ -1,12 +1,22 @@
+// @vitest-environment happy-dom
+
 import { Context } from '@snap-rail/cordis'
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
+import type { HostLink } from '@snap-rail/connection'
 import slotsPlugin from '../src/slots.tsx'
-import settingsPlugin from '../src/settings.tsx'
+import settingsPlugin, { SettingsSurface } from '../src/settings.tsx'
 import { UI_SLOT_IDS } from '../src/contract.ts'
 
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
 const contexts: Context[] = []
+const roots: Root[] = []
 
 afterEach(async () => {
+  for (const root of roots.splice(0)) root.unmount()
+  document.body.innerHTML = ''
   for (const ctx of contexts.splice(0)) await ctx.fiber.dispose()
 })
 
@@ -80,5 +90,28 @@ describe('ctx.settings', () => {
     expect(ctx.ui.list(UI_SLOT_IDS.settingsEntry).map(item => item.id)).toEqual(['custom-entry'])
     await fiber.dispose()
     expect(ctx.ui.list(UI_SLOT_IDS.settingsEntry).map(item => item.id)).toEqual(['settings.default-entry'])
+  })
+
+  it('surface header hosts the feed entry beside the icon close', async () => {
+    const ctx = await makeSettings()
+    const link: HostLink = {
+      call: async () => ({ ok: false, error: { code: 'internal', details: { what: 'stub' } } }),
+    } as unknown as HostLink
+    ctx.provide('client', { link, surface: 'main' })
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    roots.push(root)
+    await act(async () => {
+      root.render(<SettingsSurface service={ctx.settings} ctx={ctx} />)
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+    await act(async () => {
+      ctx.settings.open()
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+    expect(document.querySelector('button[aria-label="关闭"]')).not.toBeNull()
+    expect(document.querySelector('button[aria-label="配置插件源"]')).not.toBeNull()
+    expect(document.body.textContent).not.toContain('关闭')
   })
 })

@@ -204,7 +204,7 @@ electron**。
 | --- | --- |
 | `ctx.shell.notify(ctx, {title, body, actions?, tag?, silent?})` | 带按钮通知；返回 `{applied, id}` 或 `{applied:false, reason, message}`。上限单源 `SHELL_LIMITS`：标题 120 / 正文 512 / 动作标题 20 / 动作 id 64 / 最多 3 个按钮；全局节流 5 条/10s；超限回 `{applied:false}` 不抛。同 `tag` 替换不堆叠。点击回执 `ctx.on('shell/notification-action', (id, actionId) => …)`。 |
 | `ctx.shell.tray.addItem / updateItem / removeItem(ctx, …)` | 托盘菜单项（单插件 12、全体 24）；点击回执 `ctx.on('shell/tray-clicked', key)`；key 自动按 `包名:id` 命名空间化。 |
-| `ctx.shell.surface.present / hide / state(ctx, …)` | 立起/隐藏/查询窗口（`main` = 显示并聚焦；按需创建辅助窗）。主窗口与球互斥由底座保证。 |
+| `ctx.shell.surface.present / hide / state(ctx, …)` | 立起/隐藏/查询窗口（`main` = 显示并聚焦；按需创建辅助窗）。主窗口与球各自独立显隐，底座不互斥；显隐变化经 `shell/surface-changed` 帧广播（宿主面 `ctx.on` 同样可收）。 |
 | `ctx.shell.ball.setState(ctx, patch)` | 宿主聚合的球内容态：`{progress 0..1|null, label ≤8字|null, tone}`。 |
 | `ctx.shell.window.setExitPolicy(ctx, {close, quit})` | 关窗/托盘退出行为声明（登记即 effect，fiber 回收即回退默认 `quit`）。值：`'ball' \| 'tray' \| 'quit' \| 'hold'`。 |
 

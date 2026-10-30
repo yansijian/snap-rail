@@ -620,24 +620,23 @@ export default { name: ${JSON.stringify(packageName)}, apply() {} } satisfies Pl
 function clientSource(template: PluginTemplate, packageName: string, ui: UiBinding): string {
   const fw = ui.name
   if (template === 'ui-skin') {
-    const skinId = `${packageName}-skin`
-    return `import { DEFAULT_SKIN } from '${fw}/skins'
+    return `import { DEFAULT_DARK } from '${fw}/skins'
 import type { Plugin } from '@snap-rail/cordis'
 
-/** 皮肤：token + part CSS + 展示变体。默认皮肤永远兜底；本皮肤单活
- * （snapRail.exclusive: 'skin'），启用后重启生效。先用默认 token 起步，
- * 再逐项替换为你的色板与尺寸；所有规则必须作用域到 data-snap-skin。 */
+/** 主题：一套完整观感 = 单套 token + 可选 part CSS，纯样式（组件定义与槽
+ * 都不在主题内）。主题 id 用包名——外观页点选未装载的包时按包名解析。
+ * 单活（snapRail.exclusive: 'skin'），启用后主窗自动重载生效。先用出厂
+ * 黑夜 token 起步，再逐项替换为你的色板与尺寸；所有规则必须作用域到
+ * data-snap-skin。 */
 export default {
   name: ${JSON.stringify(packageName)},
   inject: ['skins'],
   apply(ctx) {
     ctx.skins.register(ctx, {
-      id: ${JSON.stringify(skinId)},
-      title: 'Generated skin',
-      tokens: DEFAULT_SKIN.tokens,
-      presentations: { dialog: 'sheet' },
-      parts: ['button.root', 'dialog.panel'],
-      css: '[data-snap-skin="${skinId}"] [data-snap-part="button.root"] { border-radius: 4px; }',
+      id: ${JSON.stringify(packageName)},
+      title: 'Generated theme',
+      tokens: { ...DEFAULT_DARK.tokens },
+      css: '[data-snap-skin="${packageName}"] [data-snap-part="button.root"] { border-radius: 4px; }',
     })
   },
 } satisfies Plugin

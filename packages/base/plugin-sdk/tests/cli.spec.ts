@@ -118,7 +118,8 @@ describe('snap-rail-plugin init', () => {
       expect(source.devDependencies['@snap-rail/ui']).toBe('^0.1.0')
       const client = readFileSync(join(dir, 'src', 'client.tsx'), 'utf8')
       expect(client).toContain('ctx.skins.register')
-      expect(client).toContain('DEFAULT_SKIN.tokens')
+      expect(client).toContain('DEFAULT_DARK.tokens')
+      expect(client).toContain('id: "@local/skin"')
       expect(readFileSync(join(dir, 'tsdown.config.ts'), 'utf8')).toContain('clientBundle')
     } finally {
       rmSync(root, { recursive: true, force: true })

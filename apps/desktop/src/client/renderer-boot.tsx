@@ -215,11 +215,7 @@ async function runSurfaceRenderer(options: {
     const detail = cause instanceof Error ? cause.message : String(cause)
     console.error(`client: the UI runtime failed on ${surface}`, cause)
     if (surface === 'main') {
-      showBootstrapAfterFailure(
-        handle,
-        `插件异常：界面基座启动失败\n${detail}\n\n`
-        + '可在下方禁用或卸载出问题的插件后重启；插件管理、搜索与安装不受影响。',
-      )
+      showBootstrapAfterFailure(handle, `插件异常：界面基座启动失败\n${detail}`)
     } else {
       showSurfaceAfterFailure(handle, `插件界面加载失败\n${detail}`)
     }

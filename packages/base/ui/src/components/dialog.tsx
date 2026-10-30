@@ -7,15 +7,15 @@
  */
 
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import type { ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 import { cn, part } from '../utils.ts'
 
 /** The presentation variants the core implements for overlays. */
 export type DialogPresentation = 'modal' | 'sheet' | 'fullscreen'
 
-/** Props of {@link DialogContent}. */
-export interface DialogContentProps {
-  children?: ReactNode
+/** Props of {@link DialogContent}. Panel-level attributes (drag handlers,
+ * `aria-describedby`, tests hooks) ride through to the dialog panel. */
+export interface DialogContentProps extends HTMLAttributes<HTMLDivElement> {
   className?: string
   /** `auto` currently resolves to the skin default; explicit values win. */
   presentation?: DialogPresentation | 'auto'
@@ -39,6 +39,7 @@ export function DialogContent({
   presentation = 'auto',
   size = 'md',
   showClose = true,
+  ...rest
 }: DialogContentProps): ReactNode {
   const resolved = presentation === 'auto' ? 'modal' : presentation
   return (
@@ -49,6 +50,7 @@ export function DialogContent({
         className={cn('snap-dialog-panel', className)}
         data-presentation={resolved}
         data-size={size}
+        {...rest}
       >
         {children}
         {showClose && (

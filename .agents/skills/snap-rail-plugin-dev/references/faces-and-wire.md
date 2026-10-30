@@ -40,8 +40,9 @@
 | --- | --- | --- | --- |
 | 拿宿主链接 | `ctx.client.link`；`inject: ['client']`；`import type {} from '@snap-rail/ui/runtime'` 引入 `ctx.client` 增强 | `@snap-rail/ui` runtime `ctx.provide('client', { link, surface })` | 不写（type-only） |
 | 订阅宿主帧 | `import { subscribeFrame, rpcErrorText } from '@snap-rail/plugin-sdk/api/client'`；`import type { HostLink } from '@snap-rail/plugin-sdk/api/client'` | base 种子 `@snap-rail/connection` | **不写**（base 种子） |
+| 读设备点实时值 | `import '@snap-rail/equipment/contract'`（合并方法表）+ named 导入 `equipmentFrameSchemas`；`link.call('equipment.points.list' / 'read' / 'subscribe')` + 订 `equipment/point-updated` 帧 | equipment 插件（方法/帧）+ base 种子契约 | **不写**（契约是 base 种子）；`requires` 写 `@snap-rail/equipment` |
 | 时间/时长格式化 | `import { formatClock, formatDuration } from '@snap-rail/util'`（模板未带则 `pnpm add -D @snap-rail/util`） | base 种子 `@snap-rail/util` | **不写**（base 种子） |
-| 语义组件/插槽/契约/皮肤 | `import … from '@snap-rail/ui/components'` / `/slots` / `/contract` / `/skins` | base 种子 | **不写** |
+| 语义组件/插槽/契约/主题 | `import … from '@snap-rail/ui/components'` / `/slots` / `/contract` / `/skins` | base 种子 | **不写** |
 | 页面/布局版本 tick | `usePagesVersion()` / `useUiVersion()` | base 种子 | **不写** |
 | 消费其他插件的组件 | `import … from '<包名>/<子路径>'` | 对方贡献种子 | 写 `<包名>/<子路径>` |
 
@@ -207,6 +208,7 @@ export default {
 | `Property 'rpc' does not exist on type 'Context'` | 没引入 gateway 类型增强 | 从 `@snap-rail/plugin-sdk/api` 导入 `GatewayService`；不要直接 import gateway |
 | `Property 'client' does not exist on type 'Context'` | 没引入 UI runtime 增强 | `import type {} from '@snap-rail/ui/runtime'` |
 | `Cannot find module '@snap-rail/connection'` | 绕过 SDK 直接 import 了未安装的包 | 改用 `@snap-rail/plugin-sdk/api/client` |
+| 订了 `equipment/point-updated` 却收不到帧 | 该帧按订阅引用计数门禁，不调 `equipment.points.subscribe` 不流动（结构帧/连接状态帧恒流，不受门禁） | 先 `link.call('equipment.points.subscribe', { points: [...] })`；退订对称调 unsubscribe |
 | 渲染面构建报 node 内置错误 | client 文件里 import 了 `@snap-rail/settings` / `@snap-rail/gateway` | 这两个是宿主面包，只能 type-only 在宿主用 |
 | host.js 上百 kB | 入口 value import 了 `@snap-rail/plugin-sdk`（`definePlugin`） | 改 `satisfies Plugin` + type-only 导入 cordis |
 | `Cannot find module '@snap-rail/client-kernel'`（UI d.ts 里） | 未发布的内部包被 UI d.ts 引用 | `skipLibCheck` 会跳过；不要直接 import kernel |

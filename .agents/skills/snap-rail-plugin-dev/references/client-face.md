@@ -1,4 +1,4 @@
-# 渲染面：种子纪律、语义原语、页面/布局/皮肤与多窗口
+# 渲染面：种子纪律、语义原语、页面/布局/主题与多窗口
 
 渲染面跑在浏览器/Electron renderer 里，构建产物是 **CJS 工厂包**（焊进
 `__ModuleLoader__` 执行）。入口导出 `{ name, inject, apply } satisfies Plugin`
@@ -45,8 +45,8 @@ Field / Switch / Select / ScrollArea…。缺原语时**不要在页面里手写
 | `rpcErrorText` / `subscribeFrame` / `HostLink` | `@snap-rail/plugin-sdk/api/client` |
 | `formatClock` / `formatDuration` | `@snap-rail/util`（插件自加 devDependency） |
 
-色值一律 skin token（`data-snap-mode` 切换明暗，禁止硬编码色值和 `dark:`
-变体；图表系列只用 `--snap-chart-1…6`，红/黄/绿是状态语义不进数据系列）。
+色值一律 theme token（禁止硬编码色值和 `dark:` 变体；图表系列只用
+`--snap-chart-1…6`，红/黄/绿是状态语义不进数据系列）。
 
 ## link 与帧
 
@@ -107,7 +107,7 @@ export default {
 - 槽位诊断在 `ctx.ui.diagnostics()`（unknown-slot / missing-provider /
   declared-not-rendered 等），页面里不要自己发明全局槽。
 
-## UI 插件写法（页面 / 布局 / 共享组件 / 皮肤，+ 设置页）
+## UI 插件写法（页面 / 布局 / 共享组件 / 主题，+ 设置页）
 
 ### ui-view：注册一个页面
 
@@ -196,10 +196,10 @@ export default { seeds: { widget } }
 manifest `client.seeds: ['widget']` → 其他插件在 `externalSeeds` 声明
 `<你的包>/widget` 后可 require 到**同一实例**；组件必须建在内置原语上。
 
-### ui-skin：贡献皮肤
+### ui-skin：贡献主题
 
 ```ts
-import { DEFAULT_SKIN } from '@snap-rail/ui/skins'
+import { DEFAULT_DARK } from '@snap-rail/ui/skins'
 import type { Plugin } from '@snap-rail/cordis'
 
 export default {
@@ -207,28 +207,27 @@ export default {
   inject: ['skins'],
   apply(ctx) {
     ctx.skins.register(ctx, {
-      id: '@my-scope/my-skin',
-      title: '我的皮肤',
-      tokens: DEFAULT_SKIN.tokens,          // 换成你的 light/dark token
-      presentations: { dialog: 'sheet' },
+      id: '@my-scope/my-skin',              // 主题 id 用包名
+      title: '我的主题',
+      tokens: { ...DEFAULT_DARK.tokens },   // 换成你的单套 token
       css: '[data-snap-skin="@my-scope/my-skin"] [data-snap-part="button.root"] { … }',
     })
   },
 } satisfies Plugin
 ```
 
-皮肤单活（`exclusive: 'skin'`），启用后重启生效；默认皮肤永远兜底。
-CSS 必须作用域到 `[data-snap-skin='<id>']`，只命中 `data-snap-part`。
+主题 = **单套完整观感，纯样式**：单活（`exclusive: 'skin'`），启用后主窗
+自动重载生效；出厂「钴蓝·白天/黑夜」两主题永远可选，选中的主题缺失回退
+黑夜。CSS 必须作用域到 `[data-snap-skin='<id>']`，只命中 `data-snap-part`。
 
-- `tokens` 必须是 **light + dark 两套完整 `SkinTokens`**（颜色/字体/字号/
-  间距/圆角/边框/阴影/动效/z-index/控件高度/密度），不用写 `--snap-*`
-  前缀——注册后按 `skinTokenVar` 映射注入 `<html>`。
-- `presentations` 只选核心实现的展示变体：目标 `dialog` / `select` /
-  `tabs` / `toast`；变体 `modal` / `sheet` / `fullscreen` / `popover` /
-  `segmented` / `inline`。页面仍可显式覆盖某一处。
-- `parts` 可声明本皮肤覆盖的 part 清单（覆盖诊断用，可选）；组件与 part
-  的完整目录在 `@snap-rail/ui/contract` 的 `UI_COMPONENTS`，最小覆盖
-  root / label / field / panel。
+- `tokens` 是**一套**完整 `SkinTokens`（颜色/字体/字号/间距/圆角/边框/
+  阴影/动效/z-index/控件高度/密度），不用写 `--snap-*` 前缀——注册后按
+  `skinTokenVar` 映射注入 `<html>`。没有明暗两套、没有跟随系统；想给
+  白天/黑夜各出一个主题就在同一包里 `register` 两次（每个主题一个 id，
+  首主题 id 用包名——外观页点选未装载的包时按包名解析到它）。
+- 组件定义与槽都不在主题内：主题不选组件形态、不占插槽，只提供 token 值
+  与 part CSS。组件与 part 的完整目录在 `@snap-rail/ui/contract` 的
+  `UI_COMPONENTS`；最小覆盖 root / label / field / panel。
 
 ## 多窗口：surface 与悬浮球
 
@@ -247,8 +246,11 @@ clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),  /
 - 主面模块 id = 包名；辅助面 = `<包名>/<surface>`；`outName` 只决定文件名。
 - `main` 不出现在 `surfaces`；没出面又开了窗 → kernel 回退页，不会白屏。
 - **辅助面不订阅工业点**：要显示的信息由宿主面聚合后推帧。
-- 主窗口与球互斥由底座保证：`present('main')` 收球、`present('ball')` 收
-  主窗——面只画两种形态，不做互斥逻辑。
+- 主窗口与球**各自独立显隐**，底座不互斥：`present`/`hide` 只作用于自己
+  点名的面，所有显隐（含任务栏还原等旁路）都以 `shell/surface-changed` 帧
+  广播。需要「窗口与球二选一」就自己编排：订阅 `shell/surface-changed`，
+  见 `main` 可见 `hide('ball')`、见 `main` 隐藏 `present('ball')`
+  （`present('ball')` 受 `enabled` 门禁）。
 
 ### 球面几何与贴边
 
@@ -260,8 +262,14 @@ clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),  /
    径向渐变把阴影画进 8px 余量并衰减到零。
 2. **贴边态读 `shell.ball.dock` + 订阅 `shell/ball-dock-changed`**：
    球拖到左右边缘自动收起，悬停滑出；面在 `collapsed` 时按 `edge` 画
-   收起形态，并自留拖拽区（`-webkit-app-region: drag`）。
-3. 球出生时可能不在主窗——先 `shell.surface.state` 读当前可见面再画；
+   收起形态。
+3. **拖拽用内核导出的 `attachBallDrag`**（`@snap-rail/client-kernel`）：
+   整球一个 drag/click 表面——按住拖过 4px 阈值发 `shell.ball.move`
+   `begin`，松开发 `end`；宿主从 OS 光标取锚、16ms 轮询让球窗绝对跟随，
+   贴边/收起/位置记忆全在宿主。**不要**用 CSS `-webkit-app-region`（透明
+   窗命中不可靠），**不要**自己流式上报坐标（窗动则坐标系动，必然停摆
+   抖动）。
+4. 球出生时可能不在主窗——先 `shell.surface.state` 读当前可见面再画；
    `present('main')` 是回退圆球唯一的动作。
 
 ## 退出策略（套件的渲染面 + 宿主面配合）

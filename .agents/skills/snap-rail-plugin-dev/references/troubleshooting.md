@@ -66,7 +66,8 @@ warning = 建议（放行但要逐条确认）。
 | 分类落「其他」 | 没声明 `category` | manifest 补 `category`（开放词汇，声明即归组） |
 | 驱动表单没有字段 | zod 字段缺 `.meta({ title })` | 每个字段补 `.meta({ title: '中文标签' })`，SchemaForm 才有得渲染 |
 | 「测试连接」按钮不存在 | 驱动没实现 `probe`，或安装的 equipment 版本类型里还没有 probe（发布滞后） | 先按 SKILL.md「已知发布滞后」查安装的类型；有字段再实现 |
-| 球拖到边缘拽不回来 | 收起形态没自留拖拽区 | collapsed 形态加 `-webkit-app-region: drag` |
+| 球拖不动 / 拖动抖动不跟手 | 拖拽用了 CSS `-webkit-app-region`（透明窗命中不可靠）或自己流式上报坐标（窗动则坐标系动） | 换内核导出的 `attachBallDrag`（`@snap-rail/client-kernel`）：整球一个 drag/click 表面，只发 `shell.ball.move` 的 `begin`/`end`，宿主以光标为锚接管跟随与贴边落定 |
+| 球拖到边缘拽不回来 | 拖拽没有交给宿主（`shell.ball.move` 未接） | 同上用 `attachBallDrag`；贴边、收起、滑出全由宿主负责，面只按 `shell/ball-dock-changed` 画形态 |
 | 球阴影出现灰色硬边 | 用了 `box-shadow`（被窗口边界切） | 改径向渐变画进 8px 余量并衰减到零 |
 | 退出确认框 10s 后自己退了 | 渲染面没应答 `shell.exit.resolve` | 确认订阅 `shell/exit-requested` 并应答；10s 兜底是设计行为 |
 | 通知没弹出来 | 触发全局节流（5 条/10s）或超 `SHELL_LIMITS` | 看 `{applied:false, reason}` 返回值；同 tag 合并、控制频率 |

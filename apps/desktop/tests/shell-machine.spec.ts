@@ -5,9 +5,9 @@ import { createShellMachine } from '../src-host/main/shell/machine.ts'
 /**
  * The Shell adapter's rules, driven without a window: the tray contribution
  * caps and ownership model, the notification ledger (throttle, coalescing,
- * eviction), the ball state merge, the exit policy fold with its hold
- * ledger, and the main-window/ball exclusivity rule. The Electron glue is
- * deliberately out of scope — everything decidable is decided here.
+ * eviction), the ball state merge, and the exit policy fold with its hold
+ * ledger. The Electron glue is deliberately out of scope — everything
+ * decidable is decided here.
  */
 
 /** A machine with a controllable clock. */
@@ -241,13 +241,5 @@ describe('exit hold', () => {
   it('answers nothing when no request is held', () => {
     const { machine } = machineAt()
     expect(machine.resolveExit('quit')).toBeUndefined()
-  })
-})
-
-describe('surface exclusivity', () => {
-  it('hides the ball when the operator window is presented, and vice versa', () => {
-    const { machine } = machineAt()
-    expect(machine.exclusivityHides('main')).toEqual(['ball'])
-    expect(machine.exclusivityHides('ball')).toEqual(['main'])
   })
 })
