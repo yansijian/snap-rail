@@ -40,7 +40,6 @@ import {
   clampDock,
   clampPosition,
   dockedPosition,
-  edgeCollapses,
   initialTuckState,
   settleDock,
   tickTuck,
@@ -334,16 +333,12 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     }
     parked = { dock: landed, work }
     options.saveBallPosition({ kind: 'docked', edge: landed.edge, offset: landed.offset })
-    if (ball.collapse && edgeCollapses(landed.edge)) {
-      tuckBall(win)
-      startPolling(win)
-    } else {
-      // Top/bottom edges only snap flush — tucking would cover the taskbar or
-      // neighbouring title bars.
-      tuck = initialTuckState(false)
-      applyDock(win, false)
-      publishDock({ edge: landed.edge, collapsed: false, visiblePx: ballVisiblePx() })
-    }
+    // A park lands flush: the cursor is on the ball right after the drop, so
+    // it stays fully out and tucks only once the pointer moves on.
+    tuck = initialTuckState(false)
+    applyDock(win, false)
+    publishDock({ edge: landed.edge, collapsed: false, visiblePx: ballVisiblePx() })
+    if (ball.collapse) startPolling(win)
   }
 
   /** Settle only after the drag has truly gone quiet (a paused hand is still a drag). */
@@ -413,14 +408,16 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       if (saved?.kind === 'docked' && ball.dockable && ball.dockEdges.includes(saved.edge)) {
         // A parked ball re-parks on the primary display's work area (the park
         // is stored as an edge plus an offset, so it survives resolution
-        // changes better than raw coordinates would).
+        // changes better than raw coordinates would). It comes back tucked
+        // only when collapsing is on — with the pointer elsewhere, a parked
+        // ball belongs to its edge.
         const work = screen.getPrimaryDisplay().workArea
         const dock = clampDock({ edge: saved.edge, offset: saved.offset }, size, work)
         parked = { dock, work }
-        const at = dockedPosition(dock, size, work, true, ballVisiblePx())
+        const at = dockedPosition(dock, size, work, ball.collapse, ballVisiblePx())
         win.setPosition(at.x, at.y)
-        tuck = initialTuckState(true)
-        dockState = { edge: dock.edge, collapsed: true, visiblePx: ballVisiblePx() }
+        tuck = initialTuckState(ball.collapse)
+        dockState = { edge: dock.edge, collapsed: ball.collapse, visiblePx: ballVisiblePx() }
       } else if (saved !== undefined && saved.kind === 'free') {
         const placed = clampToDisplay({ x: saved.x, y: saved.y }, size)
         if (placed !== undefined) win.setPosition(placed.x, placed.y)
@@ -478,7 +475,11 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       ball = resolveBallProfile(profile)
       const win = windows.get('ball')
       if (win !== undefined && !win.isDestroyed()) {
+        // Windows refuses to shrink a window created with `resizable: false`;
+        // flip it around the resize like the operator window's profile dance.
+        win.setResizable(true)
         win.setSize(ball.size, ball.size)
+        win.setResizable(false)
         if (!ball.enabled) {
           win.hide()
           stopPolling()
@@ -486,7 +487,16 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
           const [rawX, rawY] = win.getPosition()
           const work = workAreaNear({ x: rawX ?? 0, y: rawY ?? 0 }, ballSize())
           parked = { dock: clampDock(parked.dock, ballSize(), work), work }
-          applyDock(win, tuck.collapsed)
+          if (ball.collapse) {
+            applyDock(win, tuck.collapsed)
+            startPolling(win)
+          } else {
+            // Collapse switched off while parked: the ball comes fully out
+            // and the tuck machine stops running.
+            tuck = initialTuckState(false)
+            applyDock(win, false)
+            stopPolling()
+          }
         } else if (isVisible(win)) {
           const [x, y] = win.getPosition()
           const clamped = clampToDisplay({ x: x ?? 0, y: y ?? 0 }, ballSize())
@@ -509,8 +519,8 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
         const win = auxWindow(surface)
         win.showInactive()
         // An explicit summon slides a parked ball out; it keeps its edge and
-        // tucks back once the operator has used it and moved on.
-        if (surface === 'ball' && ball.collapse && parked !== undefined && edgeCollapses(parked.dock.edge)) {
+        // tucks back once the pointer moves on.
+        if (surface === 'ball' && ball.collapse && parked !== undefined) {
           tuck = { collapsed: false, inside: false, outsideSince: undefined }
           applyDock(win, false)
           publishDock({ edge: parked.dock.edge, collapsed: false, visiblePx: ballVisiblePx() })
@@ -568,7 +578,13 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
           }
           try {
             const cursor = screen.getCursorScreenPoint()
-            win.setPosition(Math.round(cursor.x - drag.anchorX), Math.round(cursor.y - drag.anchorY))
+            // The chase is clamped to the work area under the cursor: the
+            // dragged ball can press flush against an edge but never leave
+            // the screen.
+            const target = { x: Math.round(cursor.x - drag.anchorX), y: Math.round(cursor.y - drag.anchorY) }
+            const work = workAreaNear(target, ballSize())
+            const at = clampPosition(target, ballSize(), work)
+            win.setPosition(at.x, at.y)
           } catch {
             stopDragPoll()
           }

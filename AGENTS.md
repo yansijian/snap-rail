@@ -124,8 +124,9 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   窗口控制与挂起退出的应答。主窗口与球**共存显隐**（球随生效 profile 的
   `enabled` 显隐、启用即与主窗同屏；互斥形态由需要的插件经
   `shell/surface-changed` 帧 + `shell.surface.present/hide` 自行编排，
-  退出策略 `'ball'` 关窗收进球是底座唯一代办的配对）、贴边收起（默认
-  左右收 1/3、上下只吸附、悬停滑出）都是底座不变式；活动 layout/suite 可声明
+  退出策略 `'ball'` 关窗收进球是底座唯一代办的配对）、贴边收起（拖动全程
+  不出屏、四边贴边停泊、指针离开缩 2/3 留 1/3、悬停滑出，缩起态经
+  `shell/ball-dock-changed` 帧给插件）都是底座不变式；活动 layout/suite 可声明
   `WindowProfile`/`BallProfile`（尺寸/模式/停泊行为，全部有界），宿主校验
   夹取。球的几何单源 `resolveBallProfile`（默认 128 窗/112 球/8px 余量）：
   **窗口必须方形、8px 余量固定、阴影必须画在余量内**（径向渐变衰减到零；
@@ -273,6 +274,17 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   `Page`/`Section` 的 `description` 默认为空，确需一句时只讲后果、不超一行；
   占位符只给格式示例（`本地路径 / https://… / 插件名`），不写操作句。
   **恢复控制台（安全模式）同样适用**：只说病情与后果，不说怎么操作。
+- **第三方插件兼容审计（每次改动必过，提交前自检）**：动手先问一句——独立
+  仓里只依赖 `@snap-rail/plugin-sdk` 的插件作者，这次改动会不会编译不过、
+  装不上、启用被拒或行为突变？插件可见面 = 公共 npm 闭包
+  （`scripts/publish-npm.mjs` 的 `closure` 清单）+ wire 契约（方法/帧/schema，
+  `gen:wire-catalog --check` 看守）+ 种子表 `SEED_MODULES` + 宿主面 `ctx.*`
+  注册 API 与内置页面行为。改到可见面：破坏性变更走既有闸门——种子类型
+  （如 `SkinDefinition`）变化升 `SEED_ABI_REVISION`（pack 盖章、安装期/boot
+  双向拒旧 zip）、契约 schema 变更留过渡宽限、SDK 模板与 doctor 同步；行为
+  变更同步 docs/ 与 skill。纯内部改动（`apps/desktop/src-host`、内置页源码、
+  dev/打包脚本、测试）不要求迁移，但要对照 diff grep 一遍确认没碰导出面与
+  契约 schema。
 - **模型可见 ⟺ 有事件**；模型/用户可见行为变更配可运行例子的无 key
   快照式测试（本仓以 vitest 直测装配链路为主）。
 - **协议扩展（开放注册，不改 protocol）**：protocol 只有信封是封闭的；

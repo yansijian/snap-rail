@@ -184,9 +184,9 @@ export default defineConfig([
 - **阴影画在余量内**：CSS `box-shadow` 会被透明窗口边界硬切成灰边；用径向
   渐变把阴影画进 8px 余量并衰减到零。
 - **贴边状态读 `shell.ball.dock` + 订阅 `shell/ball-dock-changed`**
-  （`{edge, collapsed, visiblePx}`）：球被拖到左右边缘会自动收起只留 1/3，
-  悬停自动滑出——底座负责一切几何与时机；面在 `collapsed` 时按 `edge` 在
-  可见条里画**收起形态**（贴边小标签）。
+  （`{edge, collapsed, visiblePx}`）：球贴边停泊后指针离开即收起只留 1/3
+  （四边一律），悬停自动滑出——底座负责一切几何与时机；面在 `collapsed`
+  时按 `edge` 在可见条里画**收起形态**（贴边小标签）。
 - **拖拽用内核导出的 `attachBallDrag`**（`@snap-rail/client-kernel`）：球面
   只向 `shell.ball.move` 发 `begin`/`end` 两个信号——宿主从 OS 光标取锚、
   16ms 轮询让球窗绝对跟随，松手后的贴边、收起、位置记忆也全在宿主；按住

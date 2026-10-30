@@ -6,8 +6,8 @@ import {
   clampDock,
   clampPosition,
   dockedPosition,
-  edgeCollapses,
   initialTuckState,
+  isVerticalEdge,
   settleDock,
   tickTuck,
   visiblePxOf,
@@ -18,9 +18,9 @@ import {
 
 /**
  * The floating ball's docking math: a settled drag near an edge parks the
- * ball; left/right edges tuck it to a third, top/bottom edges only snap
- * flush; the cursor-driven machine reveals on hover and tucks after the
- * pointer leaves — never before it was seen away from the ball once.
+ * ball flush; every edge tucks it to a third once the pointer leaves (the
+ * focus leaving), and hovering the visible strip slides it back out — but
+ * only after the pointer was seen away from the strip once.
  */
 
 const SIZE = { width: BALL_SURFACE.size, height: BALL_SURFACE.size }
@@ -36,11 +36,11 @@ describe('visible strip', () => {
     expect(visiblePxOf(SIZE)).toBe(43)
   })
 
-  it('tucks only the vertical edges', () => {
-    expect(edgeCollapses('left')).toBe(true)
-    expect(edgeCollapses('right')).toBe(true)
-    expect(edgeCollapses('top')).toBe(false)
-    expect(edgeCollapses('bottom')).toBe(false)
+  it('tells the vertical edges from the horizontal ones', () => {
+    expect(isVerticalEdge('left')).toBe(true)
+    expect(isVerticalEdge('right')).toBe(true)
+    expect(isVerticalEdge('top')).toBe(false)
+    expect(isVerticalEdge('bottom')).toBe(false)
   })
 })
 
@@ -105,26 +105,31 @@ describe('dockedPosition', () => {
     expect(dockedPosition(dock, SIZE, WORK, true, 43)).toEqual({ x: flushX + (SIZE.width - 43), y: WORK.y + 100 })
   })
 
-  it('snaps top/bottom flush and never hangs them over the edge', () => {
-    // The adapter passes `collapsed: false` for these edges (only left/right
-    // tuck), so a snapped ball stays fully inside the work area.
+  it('tucks top and bottom into the edge like every other side', () => {
     const top = { edge: 'top' as const, offset: 100 }
     expect(dockedPosition(top, SIZE, WORK, false, 43)).toEqual({ x: WORK.x + 100, y: WORK.y })
+    expect(dockedPosition(top, SIZE, WORK, true, 43)).toEqual({ x: WORK.x + 100, y: WORK.y - (SIZE.height - 43) })
     const bottom = { edge: 'bottom' as const, offset: 100 }
-    expect(dockedPosition(bottom, SIZE, WORK, false, 43)).toEqual({
-      x: WORK.x + 100,
-      y: WORK.y + WORK.height - SIZE.height,
-    })
+    const flushY = WORK.y + WORK.height - SIZE.height
+    expect(dockedPosition(bottom, SIZE, WORK, false, 43)).toEqual({ x: WORK.x + 100, y: flushY })
+    expect(dockedPosition(bottom, SIZE, WORK, true, 43)).toEqual({ x: WORK.x + 100, y: flushY + (SIZE.height - 43) })
   })
 
   it('names the on-screen strip of a tucked ball', () => {
     // Tucked left, the window's right slice shows (flush with the work area's
-    // left edge); tucked right, its left slice.
+    // left edge); tucked right, its left slice; tucked top/bottom, the
+    // window's bottom/top slice.
     expect(visibleRect({ edge: 'left', offset: 0 }, SIZE, WORK, 43)).toEqual({
       x: WORK.x, y: WORK.y, width: 43, height: SIZE.height,
     })
     expect(visibleRect({ edge: 'right', offset: 0 }, SIZE, WORK, 43)).toEqual({
       x: WORK.x + WORK.width - 43, y: WORK.y, width: 43, height: SIZE.height,
+    })
+    expect(visibleRect({ edge: 'top', offset: 0 }, SIZE, WORK, 43)).toEqual({
+      x: WORK.x, y: WORK.y, width: SIZE.width, height: 43,
+    })
+    expect(visibleRect({ edge: 'bottom', offset: 0 }, SIZE, WORK, 43)).toEqual({
+      x: WORK.x, y: WORK.y + WORK.height - 43, width: SIZE.width, height: 43,
     })
   })
 })
@@ -178,12 +183,14 @@ describe('tickTuck', () => {
     expect(waited.state).toEqual(initialTuckState(true))
   })
 
-  it('never tucks a ball the operator has not hovered since the summon', () => {
-    // `present('ball')` reveals without hover: the pointer sits elsewhere, so
-    // the summoned ball stays out until it is actually used.
+  it('tucks an unhovered parked ball once the pointer has been away long enough', () => {
+    // A parked ball belongs to its edge: the pointer moving on is the focus
+    // leaving, hovered or not.
     const summoned = { collapsed: false, inside: false, outsideSince: undefined as number | undefined }
     const first = tickTuck(summoned, away, windowRect, strip, 1_000, DOCK_TUCK_DELAY_MS)
-    const muchLater = tickTuck(first.state, away, windowRect, strip, 9_000, DOCK_TUCK_DELAY_MS)
-    expect(muchLater.action).toBeUndefined()
+    expect(first.action).toBeUndefined()
+    const waited = tickTuck(first.state, away, windowRect, strip, 1_000 + DOCK_TUCK_DELAY_MS, DOCK_TUCK_DELAY_MS)
+    expect(waited.action).toBe('tuck')
+    expect(waited.state).toEqual(initialTuckState(true))
   })
 })

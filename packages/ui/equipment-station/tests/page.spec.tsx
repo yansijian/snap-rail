@@ -16,8 +16,9 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 
-function fakeLink(): HostLink {
-  return {
+function fakeLink(): { link: HostLink, frames: Map<string, (payload: unknown) => void> } {
+  const frames = new Map<string, (payload: unknown) => void>()
+  const link = {
     call: vi.fn(async (method: string) => {
       if (method === 'equipment.config.list') return { ok: true, value: { config: { devices: [] } } }
       if (method === 'equipment.connections.list') return { ok: true, value: { connections: [] } }
@@ -38,18 +39,23 @@ function fakeLink(): HostLink {
       }
       return { ok: true, value: {} }
     }),
-  } as unknown as HostLink
+    subscribe: vi.fn((method: string, listener: (payload: unknown) => void) => {
+      frames.set(method, listener)
+      return (): void => { frames.delete(method) }
+    }),
+  }
+  return { link: link as unknown as HostLink, frames }
 }
 
 describe('equipment settings page', () => {
-  it('mounts the empty state and enables the add-device action with a driver', async () => {
+  it('mounts the empty state with a title-side add button and no refresh', async () => {
     const element = document.createElement('div')
     document.body.append(element)
     const root = createRoot(element)
     roots.push(root)
     await act(async () => {
       root.render(
-        <ClientProvider service={{ link: fakeLink(), surface: 'main' }}>
+        <ClientProvider service={{ link: fakeLink().link, surface: 'main' }}>
           <EquipmentPage />
         </ClientProvider>,
       )
@@ -57,8 +63,35 @@ describe('equipment settings page', () => {
     })
     expect(document.body.textContent).toContain('尚未配置设备')
     expect(document.body.textContent).toContain('设备管理')
-    const add = [...document.querySelectorAll('button')].find(button => button.textContent?.includes('新增设备'))
-    expect(add).toBeDefined()
-    expect(add?.hasAttribute('disabled')).toBe(false)
+    const plus = document.querySelector<HTMLButtonElement>('button[aria-label="新增设备"]')
+    expect(plus).toBeDefined()
+    expect(plus?.hasAttribute('disabled')).toBe(false)
+    const refresh = [...document.querySelectorAll('button')].find(button => button.textContent === '刷新')
+    expect(refresh).toBeUndefined()
+  })
+
+  it('follows the equipment wire: a structure frame re-pulls the lists', async () => {
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    roots.push(root)
+    const { link, frames } = fakeLink()
+    await act(async () => {
+      root.render(
+        <ClientProvider service={{ link, surface: 'main' }}>
+          <EquipmentPage />
+        </ClientProvider>,
+      )
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+    const call = link.call as unknown as { mock: { calls: string[][] } }
+    const pulls = (): number => call.mock.calls.filter(entry => entry[0] === 'equipment.config.list').length
+    expect(pulls()).toBe(1)
+
+    await act(async () => {
+      frames.get('equipment/structure-changed')?.({})
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+    expect(pulls()).toBe(2)
   })
 })

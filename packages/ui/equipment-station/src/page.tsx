@@ -16,8 +16,8 @@ import type {
   DriverInfo,
   PointType,
 } from '@snap-rail/equipment/contract'
-import { rpcErrorText } from '@snap-rail/connection'
-import '@snap-rail/equipment/contract'
+import { rpcErrorText, subscribeFrame } from '@snap-rail/connection'
+import { equipmentFrameSchemas } from '@snap-rail/equipment/contract'
 import {
   Badge,
   Button,
@@ -34,6 +34,7 @@ import {
   EmptyState,
   Field,
   Grid,
+  IconButton,
   Input,
   Led,
   Page,
@@ -67,6 +68,15 @@ const POINT_TYPES: readonly { value: PointType, label: string }[] = [
   { value: 'float', label: '浮点 (float)' },
   { value: 'string', label: '字符串 (string)' },
 ]
+
+/** The plus glyph for the page's add-device entry. */
+function PlusIcon(): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
 
 function defaultsOf(schema: JsonSchemaNode): Record<string, unknown> {
   const values: Record<string, unknown> = {}
@@ -212,14 +222,12 @@ export function EquipmentPage(): ReactNode {
   const [connections, setConnections] = useState<readonly ConnectionSnapshot[]>([])
   const [drivers, setDrivers] = useState<readonly DriverInfo[]>([])
   const [error, setError] = useState<string | undefined>(undefined)
-  const [busy, setBusy] = useState(false)
   const [deviceDraft, setDeviceDraft] = useState<DeviceDraft | undefined>(undefined)
   const [groupDraft, setGroupDraft] = useState<GroupDraft | undefined>(undefined)
   const [pointDraft, setPointDraft] = useState<PointDraft | undefined>(undefined)
   const [saving, setSaving] = useState(false)
 
   const load = (): void => {
-    setBusy(true)
     setError(undefined)
     void Promise.all([
       link.call('equipment.config.list', {}),
@@ -235,10 +243,23 @@ export function EquipmentPage(): ReactNode {
       setDrivers(driversResult.ok ? driversResult.value.drivers : [])
     }).catch(cause => {
       setError(errorText(cause))
-    }).finally(() => { setBusy(false) })
+    })
   }
 
   useEffect(load, [])
+
+  // The wire keeps the page live: a structure change (device/group/point CRUD
+  // anywhere) or a connection lifecycle event re-pulls the lists.
+  useEffect(() => {
+    const frames = [
+      'equipment/structure-changed',
+      'equipment/connection-added',
+      'equipment/connection-removed',
+      'equipment/connection-status',
+    ] as const
+    const drops = frames.map(frame => subscribeFrame(link, frame, equipmentFrameSchemas[frame], () => { load() }))
+    return () => { for (const drop of drops) drop() }
+  }, [link])
 
   const connectionOf = (device: ConfigDevice): ConnectionSnapshot | undefined =>
     connections.find(connection => connection.id === device.id)
@@ -367,12 +388,7 @@ export function EquipmentPage(): ReactNode {
   return (
     <Page
       title="设备管理"
-      actions={(
-        <div style={{ display: 'flex', gap: 'var(--snap-space-sm)' }}>
-          <Button intent="neutral" emphasis="outline" loading={busy} onClick={load}>刷新</Button>
-          <Button intent="primary" disabled={drivers.length === 0} onClick={() => openDevice()}>新增设备</Button>
-        </div>
-      )}
+      titleExtra={<IconButton icon={<PlusIcon />} label="新增设备" disabled={drivers.length === 0} onClick={() => openDevice()} />}
     >
       <Stack gap="lg">
         {error !== undefined && <div role="alert" style={{ color: 'var(--snap-color-danger)' }}>{error}</div>}

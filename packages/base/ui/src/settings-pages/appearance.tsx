@@ -64,7 +64,6 @@ export function AppearancePage(): ReactNode {
   const [windowPreset, setWindowPreset] = useState<string | undefined>(undefined)
   const [ballSize, setBallSize] = useState<number>(128)
   const [ballEnabled, setBallEnabled] = useState(true)
-  const [ballDockable, setBallDockable] = useState(true)
   const [ballCollapse, setBallCollapse] = useState(true)
   const [error, setError] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState(false)
@@ -80,10 +79,9 @@ export function AppearancePage(): ReactNode {
         const preset = WINDOW_PRESETS.find(item => item.width === windowProfile.width && item.height === windowProfile.height)
         setWindowPreset(preset?.label)
       }
-      const ballProfile = ballRow as { size?: unknown, enabled?: unknown, dockable?: unknown, collapse?: unknown } | null | undefined
+      const ballProfile = ballRow as { size?: unknown, enabled?: unknown, collapse?: unknown } | null | undefined
       if (ballProfile !== null && ballProfile !== undefined && typeof ballProfile.size === 'number') setBallSize(ballProfile.size)
       if (ballProfile !== null && ballProfile !== undefined && typeof ballProfile.enabled === 'boolean') setBallEnabled(ballProfile.enabled)
-      if (ballProfile !== null && ballProfile !== undefined && typeof ballProfile.dockable === 'boolean') setBallDockable(ballProfile.dockable)
       if (ballProfile !== null && ballProfile !== undefined && typeof ballProfile.collapse === 'boolean') setBallCollapse(ballProfile.collapse)
       if (plugins.ok) {
         setPackages(plugins.value.plugins
@@ -107,16 +105,14 @@ export function AppearancePage(): ReactNode {
     })
   }
 
-  const saveBall = (patch: { size?: number, enabled?: boolean, dockable?: boolean, collapse?: boolean }): void => {
+  const saveBall = (patch: { size?: number, enabled?: boolean, collapse?: boolean }): void => {
     const next = {
       size: patch.size ?? ballSize,
       enabled: patch.enabled ?? ballEnabled,
-      dockable: patch.dockable ?? ballDockable,
       collapse: patch.collapse ?? ballCollapse,
     }
     if (patch.size !== undefined) setBallSize(patch.size)
     if (patch.enabled !== undefined) setBallEnabled(patch.enabled)
-    if (patch.dockable !== undefined) setBallDockable(patch.dockable)
     if (patch.collapse !== undefined) setBallCollapse(patch.collapse)
     void writeSetting(link, BALL_KEY, next).catch(cause => {
       setError(cause instanceof Error ? cause.message : String(cause))
@@ -211,8 +207,7 @@ export function AppearancePage(): ReactNode {
             </Row>
             <Row gap="lg" wrap align="center">
               <Switch label="启用悬浮球" checked={ballEnabled} onCheckedChange={enabled => saveBall({ enabled })} />
-              <Switch label="允许贴边" checked={ballDockable} onCheckedChange={dockable => saveBall({ dockable })} />
-              <Switch label="贴边后收起" checked={ballCollapse} onCheckedChange={collapse => saveBall({ collapse })} />
+              <Switch label="允许贴边收起" checked={ballCollapse} onCheckedChange={collapse => saveBall({ collapse })} />
             </Row>
           </Stack>
         </Section>

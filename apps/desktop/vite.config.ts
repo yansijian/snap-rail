@@ -97,6 +97,9 @@ export default defineConfig({
   // loadFile (file://), where the default root-absolute "/assets/..." lands
   // on the drive root and the renderer stays a blank frame forever.
   base: './',
+  server: {
+    port: 6543,
+  },
   plugins: [react(), tailwindcss(), snapRailSources(), productionCsp()],
   build: {
     outDir: join(import.meta.dirname, 'dist/client'),

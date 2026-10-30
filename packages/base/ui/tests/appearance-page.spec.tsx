@@ -168,3 +168,35 @@ describe('外观页的主题条', () => {
     expect(tabByTitle('钴蓝·白天')?.getAttribute('data-state')).toBe('active')
   })
 })
+
+describe('外观页的悬浮球区', () => {
+  it('is one merged dock-collapse switch beside the enable switch, the old pair gone', async () => {
+    const { link } = fakeLink({})
+    const { skins } = await makeSkins()
+    await mountPage(link, skins)
+
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('启用悬浮球')
+    expect(text).toContain('允许贴边收起')
+    expect(text).toContain('128px')
+    expect(text).not.toContain('贴边后收起')
+    expect(document.querySelectorAll('[role="switch"]').length).toBe(2)
+  })
+
+  it('toggling the dock-collapse switch writes the ui.ball row without dockable', async () => {
+    const { link, calls } = fakeLink({})
+    const { skins } = await makeSkins()
+    await mountPage(link, skins)
+
+    const label = [...document.querySelectorAll('label')].find(item => item.textContent === '允许贴边收起')
+    const toggle = label?.querySelector('[role="switch"]')
+    expect(toggle).toBeDefined()
+    await act(async () => {
+      ;(toggle as HTMLElement).click()
+      await new Promise(resolve => setTimeout(resolve, 0))
+    })
+
+    const set = calls.find(item => item.method === 'settings.set')
+    expect(set?.payload).toEqual({ key: 'ui.ball', value: { size: 128, enabled: true, collapse: false } })
+  })
+})

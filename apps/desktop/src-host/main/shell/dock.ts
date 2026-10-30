@@ -1,17 +1,18 @@
 /**
  * The floating ball's docking math — pure, Electron-free, tested. The ball can
- * be dragged anywhere; when a drag settles near a work-area edge the ball
- * **parks** there: on the left/right edges it tucks itself in until only
+ * be dragged anywhere on screen (the host clamps the drag to the work area it
+ * is over, so the ball never leaves the screen); when a drag settles near a
+ * work-area edge the ball **parks** there, flush with the edge. Once the
+ * pointer leaves a parked ball it tucks itself into the edge until only
  * {@link BALL_SURFACE.dockVisibleRatio} of the window remains on screen (the
- * familiar floating-ball sliver), while the top/bottom edges only snap flush —
- * tucking upward would cover neighbouring title bars and tucking downward
- * would hang the ball over the taskbar.
+ * familiar floating-ball sliver) — on every edge alike; hovering the visible
+ * strip slides it back out.
  *
  * Reveal and tuck are decided by a tiny cursor-driven machine
- * ({@link tickTuck}): hovering the visible strip slides the ball out; moving
- * away tucks it back — but only after the pointer was seen away from the ball
- * at least once, so dropping it at the edge (or summoning it with `present`)
- * never pops it straight back out.
+ * ({@link tickTuck}): hovering the visible strip slides the ball out; the
+ * pointer leaving it tucks it back after a delay — but only after the pointer
+ * was seen away from the strip at least once, so a ball tucked under a
+ * resting pointer does not pop straight back out.
  *
  * @module @snap-rail/desktop/main/shell/dock
  */
@@ -56,12 +57,13 @@ export function visiblePxOf(size: Size, ratio: number = BALL_SURFACE.dockVisible
 }
 
 /**
- * Whether an edge tucks the ball into a sliver. Left/right do; top/bottom
- * only snap flush (see the module doc).
+ * Whether the edge is one of the screen's vertical sides (left/right): the
+ * parked ball's cross axis then is the work area's height, and the tucked
+ * position slides along X instead of Y.
  *
  * @param edge - the parked edge.
  */
-export function edgeCollapses(edge: BallDockEdge): boolean {
+export function isVerticalEdge(edge: BallDockEdge): boolean {
   return edge === 'left' || edge === 'right'
 }
 
@@ -77,7 +79,7 @@ export function clampPosition(position: Point, size: Size, work: Rect): Point {
 
 /** Keep a dock's cross-axis offset inside the work area. */
 export function clampDock(dock: BallDock, size: Size, work: Rect): BallDock {
-  const vertical = edgeCollapses(dock.edge)
+  const vertical = isVerticalEdge(dock.edge)
   const span = vertical ? work.height : work.width
   const windowSpan = vertical ? size.height : size.width
   const max = Math.max(0, span - windowSpan)
@@ -115,7 +117,7 @@ export function settleDock(position: Point, size: Size, work: Rect): BallDock | 
  */
 export function dockedPosition(dock: BallDock, size: Size, work: Rect, collapsed: boolean, visiblePx: number): Point {
   const d = clampDock(dock, size, work)
-  const vertical = edgeCollapses(d.edge)
+  const vertical = isVerticalEdge(d.edge)
   const slack = (vertical ? size.width : size.height) - visiblePx
   const flushX = work.x + work.width - size.width
   const flushY = work.y + work.height - size.height
@@ -130,7 +132,7 @@ export function dockedPosition(dock: BallDock, size: Size, work: Rect, collapsed
 /** The on-screen strip of a tucked ball — what the operator can still point at. */
 export function visibleRect(dock: BallDock, size: Size, work: Rect, visiblePx: number): Rect {
   const at = dockedPosition(dock, size, work, true, visiblePx)
-  if (edgeCollapses(dock.edge)) {
+  if (isVerticalEdge(dock.edge)) {
     // Tucked left, only the window's right slice is on screen; tucked right,
     // its left slice.
     return {
@@ -181,11 +183,11 @@ function insideRect(point: Point, rect: Rect): boolean {
  * Advance the parked ball's reveal/tuck machine by one cursor tick.
  *
  * - Tucked: the pointer entering the visible strip reveals the ball — but
- *   only after the pointer was seen away from the strip once, so the drop
- *   that parked it does not immediately undo itself.
+ *   only after the pointer was seen away from the strip once, so a ball
+ *   tucked under a resting pointer does not pop straight back out.
  * - Slid out: the pointer leaving the whole window tucks the ball back after
- *   `tuckDelayMs` — and only if it was hovered since the reveal, so a ball
- *   summoned by `present` stays out until the operator actually uses it.
+ *   `tuckDelayMs` — hovered or not: a parked ball belongs to its edge, and
+ *   the pointer moving on is exactly the focus leaving.
  *
  * @param state - the machine state.
  * @param pointer - the cursor position; `undefined` ticks nothing (no observation).
@@ -214,7 +216,7 @@ export function tickTuck(
     return { state: { ...state, inside: true, outsideSince: undefined } }
   }
   const since = state.outsideSince ?? now
-  if (state.inside && now - since >= tuckDelayMs) {
+  if (now - since >= tuckDelayMs) {
     return { state: initialTuckState(true), action: 'tuck' }
   }
   return { state: { ...state, outsideSince: since } }

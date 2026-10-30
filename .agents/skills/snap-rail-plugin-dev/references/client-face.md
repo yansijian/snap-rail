@@ -261,8 +261,8 @@ clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),  /
 1. **阴影画在余量内**：CSS `box-shadow` 会被透明窗口边界硬切成灰边；用
    径向渐变把阴影画进 8px 余量并衰减到零。
 2. **贴边态读 `shell.ball.dock` + 订阅 `shell/ball-dock-changed`**：
-   球拖到左右边缘自动收起，悬停滑出；面在 `collapsed` 时按 `edge` 画
-   收起形态。
+   球贴边停泊后指针离开即收起（四边一律，缩 2/3 留 1/3），悬停滑出；面在
+   `collapsed` 时按 `edge` 画收起形态。
 3. **拖拽用内核导出的 `attachBallDrag`**（`@snap-rail/client-kernel`）：
    整球一个 drag/click 表面——按住拖过 4px 阈值发 `shell.ball.move`
    `begin`，松开发 `end`；宿主从 OS 光标取锚、16ms 轮询让球窗绝对跟随，
