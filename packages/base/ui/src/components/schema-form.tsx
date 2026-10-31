@@ -1,9 +1,9 @@
 /**
  * A small JSON-Schema form renderer for driver dialect schemas. It covers the
  * flat object shapes drivers commonly declare: string, number/integer,
- * boolean, and enum. Nested objects/arrays fall back to a JSON textarea; a
- * driver that needs a bespoke interaction should ship a registered component
- * instead of growing this renderer.
+ * boolean, enum, and unions of literals. Nested objects/arrays fall back to a
+ * JSON textarea; a driver that needs a bespoke interaction should ship a
+ * registered component instead of growing this renderer.
  *
  * @module @snap-rail/ui/components/schema-form
  */
@@ -22,9 +22,33 @@ export interface JsonSchemaNode {
   properties?: Readonly<Record<string, JsonSchemaNode>>
   required?: readonly string[]
   enum?: readonly unknown[]
+  /** `z.toJSONSchema` projects a union of literals (`z.union([z.literal(1), …])`)
+   * as an `anyOf` of `const` branches instead of an `enum` — see
+   * {@link literalValuesOf}. */
+  anyOf?: readonly JsonSchemaNode[]
+  const?: unknown
   default?: unknown
   minimum?: number
   maximum?: number
+}
+
+/** The closed literal set a property may take: its `enum`, or — for a union of
+ * scalar literals — the flattened `const` values of the `anyOf` branches, in
+ * declaration order. `undefined` when the property is not a closed literal set
+ * (open unions, non-scalar consts, absent both fields). */
+export function literalValuesOf(property: JsonSchemaNode): readonly unknown[] | undefined {
+  if (Array.isArray(property.enum)) return property.enum
+  const branches = property.anyOf
+  if (!Array.isArray(branches) || branches.length === 0) return undefined
+  const values: unknown[] = []
+  for (const branch of branches) {
+    if (branch === null || typeof branch !== 'object' || branch.anyOf !== undefined) return undefined
+    if (!('const' in branch)) return undefined
+    const value = branch.const
+    if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') return undefined
+    values.push(value)
+  }
+  return values
 }
 
 /** Props of {@link SchemaForm}. */
@@ -60,8 +84,8 @@ export function SchemaForm({ schema, value, onChange, idPrefix = 'schema' }: Sch
           ...(property.description !== undefined ? { help: property.description } : {}),
           ...(required.has(key) ? { required: true } : {}),
         }
-        if (Array.isArray(property.enum)) {
-          const values = property.enum
+        const values = literalValuesOf(property)
+        if (values !== undefined) {
           const options: SelectOption[] = values.map(item => ({ value: String(item), label: String(item) }))
           return (
             <Field key={key} {...common}>

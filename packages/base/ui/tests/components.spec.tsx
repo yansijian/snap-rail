@@ -14,6 +14,7 @@ import {
   Row,
   SchemaForm,
   Stack,
+  literalValuesOf,
   Table,
   TableBody,
   TableCell,
@@ -46,6 +47,48 @@ describe('schema-driven forms', () => {
     expect(html).toContain('字序')
     expect(html).toContain('启用')
     expect(html).toContain('data-snap-component="number-input"')
+  })
+
+  it('renders a union of literals as a select (the wire shape z.toJSONSchema emits)', () => {
+    // z.toJSONSchema projects z.union([z.literal(1), …]) as an anyOf of const
+    // branches, not an enum — the modbus 功能码 field is exactly this shape.
+    const html = renderToStaticMarkup(
+      <SchemaForm
+        schema={{
+          type: 'object',
+          properties: {
+            fc: {
+              title: '功能码',
+              anyOf: [
+                { type: 'number', const: 1 },
+                { type: 'number', const: 2 },
+                { type: 'number', const: 3 },
+                { type: 'number', const: 4 },
+              ],
+            },
+          },
+        }}
+        value={{ fc: 3 }}
+        onChange={() => {}}
+      />,
+    )
+    expect(html).toContain('功能码')
+    expect(html).toContain('aria-haspopup="dialog"')
+    expect(html).toContain('data-snap-component="button"')
+    // The select replaces the string-input fallback (which stored raw strings
+    // the driver schema then rejected).
+    expect(html).not.toContain('data-snap-component="input"')
+  })
+
+  it('flattens anyOf const branches into a closed literal set', () => {
+    expect(literalValuesOf({ anyOf: [{ type: 'number', const: 1 }, { type: 'number', const: 3 }] })).toEqual([1, 3])
+    // Scalar type is preserved so the stored value passes the driver schema.
+    expect(literalValuesOf({ anyOf: [{ const: 'a' }, { const: 1 }] })).toEqual(['a', 1])
+    expect(literalValuesOf({ enum: ['x', 'y'] })).toEqual(['x', 'y'])
+    // Open unions and non-literal branches are not a closed set.
+    expect(literalValuesOf({ anyOf: [{ type: 'string' }, { type: 'null' }] })).toBeUndefined()
+    expect(literalValuesOf({ anyOf: [] })).toBeUndefined()
+    expect(literalValuesOf({ type: 'string' })).toBeUndefined()
   })
 
   it('renders a touch select as a modal list trigger', () => {
