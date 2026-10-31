@@ -47,19 +47,28 @@ function joinUrl(base: string, file: string): string {
 const REQUEST_TIMEOUT_MS = 15_000
 
 async function probe(url: string): Promise<ProbeResult> {
-  let response: Response
-  try {
-    response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
-  } catch (cause) {
-    throw new Error(`check-feed-endpoint: 请求失败 ${url}（${cause instanceof Error ? cause.message : String(cause)}）`)
+  const message = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause))
+  /** 网络层失败（DNS/TLS 冷启动、抖动）实测存在——刚同步完的域名偶发一次
+   * `fetch failed`，重试即过：重试一次；HTTP 状态错误不重试（4xx/5xx 是
+   * 有意义的探测结果）。 */
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
+      const bytes = response.ok ? new Uint8Array(await response.arrayBuffer()) : undefined
+      const headers: Record<string, string> = {}
+      for (const header of ['content-type', 'content-length', 'cache-control', 'etag', 'last-modified', 'accept-ranges', 'content-disposition']) {
+        const value = response.headers.get(header)
+        if (value !== null) headers[header] = value
+      }
+      return { ok: response.ok, status: response.status, contentType: response.headers.get('content-type') ?? '', contentLength: response.headers.get('content-length') ?? '', headers, ...(bytes === undefined ? {} : { bytes }) }
+    } catch (cause) {
+      if (attempt >= 2) {
+        throw new Error(`check-feed-endpoint: 请求失败 ${url}（${message(cause)}）`)
+      }
+      console.log(`check-feed-endpoint: ${url} 网络层失败（${message(cause)}）——10s 后重试一次。`)
+      await new Promise(resolve => setTimeout(resolve, 10_000))
+    }
   }
-  const headers: Record<string, string> = {}
-  for (const header of ['content-type', 'content-length', 'cache-control', 'etag', 'last-modified', 'accept-ranges', 'content-disposition']) {
-    const value = response.headers.get(header)
-    if (value !== null) headers[header] = value
-  }
-  const bytes = response.ok ? new Uint8Array(await response.arrayBuffer()) : undefined
-  return { ok: response.ok, status: response.status, contentType: response.headers.get('content-type') ?? '', contentLength: response.headers.get('content-length') ?? '', headers, ...(bytes === undefined ? {} : { bytes }) }
 }
 
 function report(label: string, url: string, result: ProbeResult): void {
