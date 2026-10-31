@@ -145,6 +145,8 @@ jobs:
         env:
           SNAP_RAIL_OSS_BUCKET: oss://snap-rail-feed
           SNAP_RAIL_OSS_ENDPOINT: oss-cn-shenzhen.aliyuncs.com
+          SNAP_RAIL_OSS_AK_ID: ${{ secrets.OSS_AK_ID }}
+          SNAP_RAIL_OSS_AK_SECRET: ${{ secrets.OSS_AK_SECRET }}
         run: |
           curl -fsSL -o /tmp/ossutil.zip https://gosspublic.alicdn.com/ossutil/1.7.19/ossutil-v1.7.19-linux-amd64.zip
           unzip -o /tmp/ossutil.zip -d /tmp/ossutil
