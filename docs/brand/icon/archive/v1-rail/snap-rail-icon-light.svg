@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="snap-rail">
+  <title>snap-rail</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E7EDF5"/><stop offset="1" stop-color="#D1DAE7"/></linearGradient>
+    <linearGradient id="rail" x1="0" y1="0" x2="0.28" y2="1"><stop offset="0" stop-color="#4A6CFF"/><stop offset="1" stop-color="#2F49D6"/></linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B2430"/><stop offset="1" stop-color="#0D131A"/></linearGradient>
+    <mask id="seat" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect x="0" y="392" width="1024" height="240" fill="#fff"/>
+      <rect x="288" y="238" width="448" height="548" rx="90" fill="#000"/>
+    </mask>
+    <clipPath id="tile"><rect width="1024" height="1024" rx="228"/></clipPath>
+    <filter id="shade" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#000" flood-opacity="0.36"/>
+    </filter>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="1024" height="1024" fill="url(#tile)"/>
+    <rect x="0" y="392" width="1024" height="240" fill="url(#rail)" mask="url(#seat)"/>
+    <rect x="0" y="392" width="1024" height="6" fill="#fff" fill-opacity="0.18" mask="url(#seat)"/>
+    <rect x="0" y="626" width="1024" height="6" fill="#000" fill-opacity="0.2" mask="url(#seat)"/>
+    <rect x="322" y="272" width="380" height="480" rx="56" fill="url(#face)" filter="url(#shade)"/>
+    <circle cx="378" cy="328" r="11" fill="#3FB950"/>
+    <rect x="1" y="1" width="1022" height="1022" rx="227" fill="none" stroke="#000" stroke-opacity="0.08" stroke-width="2"/>
+  </g>
+</svg>
