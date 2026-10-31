@@ -51,6 +51,7 @@ import {
   type Size,
   type TuckState,
 } from './dock.ts'
+import { placeBall } from './ball-place.ts'
 
 /** The factory ball bounds, kept as a stable export for tests/tools. */
 export const SURFACE_BOUNDS: Readonly<Record<AuxSurfaceId, { width: number, height: number }>> = {
@@ -223,7 +224,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
   function positionProgrammatically(win: BrowserWindow, at: Point): void {
     programmatic += 1
     if (programmaticTimer !== undefined) clearTimeout(programmaticTimer)
-    win.setPosition(at.x, at.y)
+    placeBall(win, ballSize(), at.x, at.y)
     // Outlive the settle debounce so `moved` events from the animation's tail
     // are all ignored, then hand control back to the operator.
     programmaticTimer = setTimeout(() => {
@@ -415,12 +416,12 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
         const dock = clampDock({ edge: saved.edge, offset: saved.offset }, size, work)
         parked = { dock, work }
         const at = dockedPosition(dock, size, work, ball.collapse, ballVisiblePx())
-        win.setPosition(at.x, at.y)
+        placeBall(win, size, at.x, at.y)
         tuck = initialTuckState(ball.collapse)
         dockState = { edge: dock.edge, collapsed: ball.collapse, visiblePx: ballVisiblePx() }
       } else if (saved !== undefined && saved.kind === 'free') {
         const placed = clampToDisplay({ x: saved.x, y: saved.y }, size)
-        if (placed !== undefined) win.setPosition(placed.x, placed.y)
+        if (placed !== undefined) placeBall(win, size, placed.x, placed.y)
         else defaultCorner(win, size)
       } else {
         defaultCorner(win, size)
@@ -453,7 +454,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
   /** The ball's default parking spot: the work area's bottom-right corner. */
   function defaultCorner(win: BrowserWindow, size: Size): void {
     const area = screen.getPrimaryDisplay().workArea
-    win.setPosition(area.x + area.width - size.width - 24, area.y + area.height - size.height - 24)
+    placeBall(win, size, area.x + area.width - size.width - 24, area.y + area.height - size.height - 24)
   }
 
   function auxWindow(surface: AuxSurfaceId): BrowserWindow {
@@ -569,7 +570,10 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
         publishDock({ edge: null, collapsed: false, visiblePx: ballVisiblePx() })
         // The cursor is the only truth: pin the window to it at display rate.
         // Absolute positioning cannot accumulate error, so the ball stays
-        // glued to the pointer no matter how fast the drag is.
+        // glued to the pointer no matter how fast the drag is. The writes go
+        // through placeBall: this poll is the heaviest position hammer we
+        // own, and the OS's resizable:false rounding grows the window a
+        // pixel per unguarded write (electron/electron#41675).
         stopDragPoll()
         dragTimer = setInterval(() => {
           if (win.isDestroyed() || !win.isVisible() || drag === undefined) {
@@ -584,7 +588,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
             const target = { x: Math.round(cursor.x - drag.anchorX), y: Math.round(cursor.y - drag.anchorY) }
             const work = workAreaNear(target, ballSize())
             const at = clampPosition(target, ballSize(), work)
-            win.setPosition(at.x, at.y)
+            placeBall(win, ballSize(), at.x, at.y)
           } catch {
             stopDragPoll()
           }
