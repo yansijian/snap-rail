@@ -40,3 +40,4 @@ deploy.config.json
 website/public/site-assets/
 website/public/plugin-development.md
 collect-local/
+__pycache__/
