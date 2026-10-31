@@ -49,6 +49,9 @@ jobs:
       # cadence. The UI substrate and business pages are built in and never
       # ship as plugins.
       SNAP_RAIL_EXTERNAL_REPOS: snap-rail-driver-modbus,snap-rail-driver-enip
+      # 国内 OSS 镜像凭据（RAM 子账号仅 OSS 权限）：未配置时 OSS 收尾步骤整体跳过。
+      OSS_AK_ID: ${{ secrets.OSS_AK_ID }}
+      OSS_AK_SECRET: ${{ secrets.OSS_AK_SECRET }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -133,3 +136,23 @@ jobs:
           path: website/dist
       - id: deploy
         uses: actions/deploy-pages@v4
+
+      # 国内 OSS 镜像（docs/deploy.md「云基址」）：滚动源资产 → <bucket>/feed/，
+      # 官网（feed-base.json 基址，即 OSS 域名）→ 桶根；收尾跑一次线上验收。
+      # secrets 未配置时整段跳过，GitHub Pages 镜像不受影响。
+      - name: mirror the rolling release + site to OSS (domestic source)
+        if: env.OSS_AK_ID != ''
+        env:
+          SNAP_RAIL_OSS_BUCKET: oss://snap-rail-feed
+          SNAP_RAIL_OSS_ENDPOINT: oss-cn-shenzhen.aliyuncs.com
+        run: |
+          curl -fsSL -o /tmp/ossutil.zip https://gosspublic.alicdn.com/ossutil/1.7.19/ossutil-v1.7.19-linux-amd64.zip
+          unzip -o /tmp/ossutil.zip -d /tmp/ossutil
+          sudo install /tmp/ossutil/ossutil-v1.7.19-linux-amd64/ossutil /usr/local/bin/ossutil
+          pnpm run feed:sync-oss
+          pnpm run site:build
+          pnpm run site:sync-oss
+          pnpm exec tsx scripts/check-feed-endpoint.ts \
+            --update https://www.snap-rail.top/feed/ \
+            --plugins https://www.snap-rail.top/feed/ \
+            --site https://www.snap-rail.top/

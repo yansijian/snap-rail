@@ -113,7 +113,24 @@ const run = (label, command) => {
   }
 }
 
-run(`sync ${flatDir} → ${bucketBase}`, ['sync', flatDir, bucketBase, '--delete', '-f'])
+/** CDN 默认遵循源站 Cache-Control：滚动源里清单类（index/catalog/latest）
+ * 必须短缓存（新版本发布及时可见），zip/exe/blockmap 内容寻址、长缓存。
+ * meta 值不含空格：Windows 下 spawnSync 走 shell 拼参，空格会拆散参数。
+ * 实测 1.7.19：sync 会忽略 --meta，且 sync --delete 会把 cp 上传的对象
+ * 当作不同而整组重传（无 meta）——所以顺序必须是：先 sync（上传+滚动
+ * 清理），后 cp 按类型重写缓存头。匹配文件会双传一次（清单 KB 级、
+ * 安装包 ~20s，可接受）。 */
+const SHORT_CACHE = 'Cache-Control:public,max-age=300'
+const LONG_CACHE = 'Cache-Control:public,max-age=2592000'
+run(`sync 滚动上传与清理 → ${bucketBase}`, ['sync', flatDir, bucketBase, '--delete', '-f'])
+run(`cp 清单（短缓存） → ${bucketBase}`, [
+  'cp', '-r', '-f', '--meta', SHORT_CACHE,
+  '--include', '*.json', '--include', '*.yml', flatDir, bucketBase,
+])
+run(`cp 安装包与插件 zip（长缓存） → ${bucketBase}`, [
+  'cp', '-r', '-f', '--meta', LONG_CACHE,
+  '--include', '*.zip', '--include', '*.exe', '--include', '*.blockmap', flatDir, bucketBase,
+])
 const prefixPath = bucketBase.replace(/^oss:\/\/[^/]+/, '')
 console.log(`\nsync-feed-oss: 完成。基址 = https://<bucket 域名>${prefixPath}（公共读 Bucket 即桶默认域名）`)
 console.log('验收：pnpm exec tsx scripts/check-feed-endpoint.ts --update <基址> --plugins <基址> --site https://<桶域名>/')

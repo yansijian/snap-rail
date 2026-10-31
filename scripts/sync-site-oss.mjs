@@ -66,12 +66,33 @@ if (process.env.SNAP_RAIL_OSS_AK_ID !== undefined && process.env.SNAP_RAIL_OSS_A
 }
 
 console.log(`sync-site-oss: sync ${distDir} → ${bucketRoot}（不删除——feed/ 前缀在桶根之下，本脚本永不 delete）`)
-const result = spawnSync(ossutil, [...args, 'sync', distDir, bucketRoot, '-f'], { stdio: 'inherit', shell: process.platform === 'win32' })
-if (result.error !== undefined && result.error !== null) {
-  throw new Error(`sync-site-oss: 无法运行 ${ossutil}（${result.error.message}）——用 SNAP_RAIL_OSSUTIL 指向可执行文件`)
+/** CDN 默认遵循源站 Cache-Control：上传时按文件类型写缓存头——页面与
+ * 清单短缓存（改版及时可见），带哈希/媒体的长缓存（内容寻址，换名发布）。
+ * meta 值不含空格：Windows 下 spawnSync 走 shell 拼参，空格会拆散参数。
+ * 实测 1.7.19：sync 会忽略 --meta，且随后的 cp 对象会被兜底 sync 视为
+ * 不同而重传（无 meta）——顺序必须是：先 sync 上传，后 cp 按类型重写
+ * 缓存头。匹配文件双传一次（站点总体 < 1MB，可接受）。本脚本永不 delete。 */
+const LONG_CACHE = 'Cache-Control:public,max-age=2592000'
+const SHORT_CACHE = 'Cache-Control:public,max-age=300'
+const run = (label, command) => {
+  console.log(`sync-site-oss: ${label}`)
+  const result = spawnSync(ossutil, [...args, ...command], { stdio: 'inherit', shell: process.platform === 'win32' })
+  if (result.error !== undefined && result.error !== null) {
+    throw new Error(`sync-site-oss: 无法运行 ${ossutil}（${result.error.message}）——用 SNAP_RAIL_OSSUTIL 指向可执行文件`)
+  }
+  if (result.status !== 0) {
+    throw new Error(`sync-site-oss: ossutil ${label} 失败（exit ${result.status}）`)
+  }
 }
-if (result.status !== 0) {
-  throw new Error(`sync-site-oss: ossutil 同步失败（exit ${result.status}）`)
-}
+run(`sync 上传 → ${bucketRoot}`, ['sync', distDir, bucketRoot, '-f'])
+run(`cp 长缓存静态资源 → ${bucketRoot}`, [
+  'cp', '-r', '-f', '--meta', LONG_CACHE,
+  '--include', '*.js', '--include', '*.css', '--include', '*.webp',
+  '--include', '*.png', '--include', '*.svg', '--include', '*.ico', distDir, bucketRoot,
+])
+run(`cp 页面与清单（短缓存） → ${bucketRoot}`, [
+  'cp', '-r', '-f', '--meta', SHORT_CACHE,
+  '--include', '*.html', '--include', '*.txt', '--include', '*.xml', '--include', '*.md', distDir, bucketRoot,
+])
 console.log('\nsync-site-oss: 完成（桶根若有历史残留的哈希旧资源会保留，可手动清理，勿动 feed/ 前缀）。')
 console.log('验收（备案后自定义域名才能内联浏览）：pnpm exec tsx scripts/check-feed-endpoint.ts --site https://<桶域名>/')

@@ -209,7 +209,9 @@ Windows PowerShell 没有行内环境变量前缀，先写
 OSS 下行流量包（约 5–6 折）；上 CDN 后改买 CDN 流量包（≈ ¥0.2/GB 起）+
 小额回源流量。不需要传输加速/低频归档/请求包。缓存规则：`index.json`、
 `catalog.json`、`latest.yml` 短 TTL（≈ 5 分钟，保证新版本及时可见），
-zip/exe/blockmap 长缓存（内容寻址，换文件名发布）。
+zip/exe/blockmap 长缓存（内容寻址，换文件名发布）。两个 sync 脚本在
+上传时已按类型写好 `Cache-Control`（清单/页面 5 分钟，zip/exe/哈希资源
+30 天），CDN 默认遵循源站——无需在控制台配置缓存规则。
 
 ### 备案与域名绑定（上线运行手册）
 

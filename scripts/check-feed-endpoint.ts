@@ -10,6 +10,10 @@
  *    download). OSS's default domain stamps HTML with
  *    `Content-Disposition: attachment` (ICP policy) — reported as a WARN,
  *    resolved only by the 备案'd custom domain.
+ * 5. `--update` + `--site` together: the website's advertised version
+ *    (ld+json `softwareVersion`) must equal the feed's (`latest.yml`) — a
+ *    staged-but-not-redeployed site drifts silently otherwise (the OSS
+ *    source once lagged five releases behind GitHub).
  *
  * Usage:
  *   pnpm exec tsx scripts/check-feed-endpoint.ts --update <desktop-feed-url> [--plugins <plugins-feed-url>] [--site <site-base-url>]
@@ -113,6 +117,9 @@ async function main(): Promise<void> {
     throw new Error('usage: check-feed-endpoint --update <desktop-feed-url> [--plugins <plugins-feed-url>] [--site <site-base-url>]')
   }
   let hardFailure = false
+  /** latest.yml's `version:` — compared against the website's advertised
+   * `softwareVersion` when both channels are probed (see header note 5). */
+  let feedVersion: string | undefined
 
   if (update !== undefined) {
     const yml = await probeWithAlternatives('latest.yml（应用更新清单）', joinUrl(update, 'latest.yml'))
@@ -120,6 +127,8 @@ async function main(): Promise<void> {
       hardFailure = true
     } else {
       const text = new TextDecoder().decode(yml.bytes)
+      const versionMatch = /version:\s*([^\s"']+)/i.exec(text)
+      if (versionMatch !== undefined) feedVersion = versionMatch[1]
       if (!/version:/i.test(text)) {
         console.log('  [WARN] latest.yml 内容不像 electron-builder 清单（缺 version 字段）——确认不是 HTML 错误页伪装 200。')
         hardFailure = true
@@ -197,6 +206,15 @@ async function main(): Promise<void> {
       if (result.headers['content-disposition'] !== undefined) {
         console.log('  [WARN] 带 Content-Disposition —— OSS 默认域名对 HTML 强制下载（ICP 策略）。')
         console.log('         备案通过并在 OSS 控制台绑定自定义域名后才会内联浏览（docs/deploy.md「备案与域名绑定」）。')
+      }
+      if (page === '' && result.bytes !== undefined) {
+        const siteVersion = /"softwareVersion":\s*"([^"]+)"/.exec(new TextDecoder().decode(result.bytes))?.[1]
+        if (feedVersion !== undefined && siteVersion !== undefined && siteVersion !== feedVersion) {
+          console.log(`  [FAIL] 官网版本（${siteVersion}）与 feed 版本（${feedVersion}）不一致 —— 官网数据落后于滚动源：重建官网后重传。`)
+          hardFailure = true
+        } else if (siteVersion !== undefined && feedVersion !== undefined) {
+          console.log(`  [PASS] 官网版本与 feed 版本一致（${feedVersion}）`)
+        }
       }
     }
   }
