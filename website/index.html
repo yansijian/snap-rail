@@ -26,10 +26,10 @@
         "name": "snap-rail",
         "applicationCategory": "Industrial Automation Software",
         "operatingSystem": "Windows 10, Windows 11",
-        "softwareVersion": "0.3.0",
+        "softwareVersion": "0.5.2",
         "license": "https://www.apache.org/licenses/LICENSE-2.0",
         "description": "可组装的工业终端 / HMI：ModbusTCP / EtherNet/IP、设备管理、点位与离线场景包。",
-        "downloadUrl": "https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/snap-rail-0.2.0-x64-setup.exe",
+        "downloadUrl": "https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/snap-rail-0.5.2-x64-setup.exe",
         "screenshot": "https://www.snap-rail.top/og.png",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" }
       }
@@ -397,9 +397,9 @@
               <p>插件带 Ed25519 发布签名；安装预览显示来源、版本与验证状态，组合包逐成员校验。</p>
             </article>
             <article class="proof">
-              <span class="num">04 / OPEN</span>
-              <h3>不被一家锁死</h3>
-              <p>Apache-2.0 源码可审计；插件源可以自己加，场景包可以自己打，没有集中市场。</p>
+              <span class="num">04 / UNIFIED</span>
+              <h3>现场归一化</h3>
+              <p>驱动、画面、作业流程跑在同一块终端上——少装几套软件、少几块触摸屏，生产管理和现场都更整洁。</p>
             </article>
           </div>
           <div class="reveal" style="margin-top:22px;display:flex;flex-wrap:wrap;gap:12px;align-items:center">
@@ -428,13 +428,13 @@
             <article class="role reveal">
               <span class="tag">OEM / EQUIPMENT VENDOR</span>
               <h3>设备厂商 / OEM</h3>
-              <p>把软件和机器一起交付：场景包、自己的插件源、离线更新。客户要改画面时，不必每次重做一套定制软件。</p>
+              <p>基于开源代码自行集成：场景包、自己的插件源、离线更新。设备软件要改画面时，不必每次重做一套软件。</p>
               <a class="link-arrow" href="./plugins.html">看插件怎么发布</a>
             </article>
             <article class="role reveal">
               <span class="tag">PLANT LEADER</span>
               <h3>工厂老板 / 生产负责人</h3>
-              <p>先在一个工位花小钱看到产量、状态和停机；数据在本机，不被一家厂商锁死，再决定要不要扩。</p>
+              <p>现场少装几套软件、少几块触摸屏：产量、状态和停机归到一块屏上看，生产管理与现场都更清爽。</p>
               <a class="link-arrow" href="./scenarios.html">看场景效果</a>
             </article>
           </div>
@@ -475,7 +475,7 @@
               <p class="kicker">before you install</p>
               <h2>先把丑话说在前面。</h2>
             </div>
-            <p>能做什么、需要什么、哪里会卡，写在下载之前，比写在合同里有用。</p>
+            <p>能做什么、需要什么、哪里会卡，写在下载之前，比装完才发现有用。</p>
           </div>
           <div class="faq-list">
             <details class="faq-item">
@@ -495,20 +495,12 @@
               <div class="faq-body">安装包目前没有做商业代码签名，Windows SmartScreen 会提示。点“更多信息 → 仍要运行”即可。企业部署可以自行签名；插件本身另有 Ed25519 发布签名与安装预览。</div>
             </details>
             <details class="faq-item">
-              <summary>免费吗？能商用吗？</summary>
-              <div class="faq-body">Apache-2.0 开源，可商用；保留版权与许可声明。没有按点授权费。后续如果我们需要提供商业服务，会单独说明范围，不影响你现在的使用。</div>
-            </details>
-            <details class="faq-item">
               <summary>能不能做 HMI / SCADA / 控制器？</summary>
-              <div class="faq-body">同一个内核，形态由插件决定。今天默认交付终端 / HMI；SCADA 工作站、专用 HMI 面板、边缘控制器都可以由插件组合与项目定制长出来。具体实时性、现场总线和安全等级，取决于运行平台与项目定义——我们不在官网上给你画能力上限。</div>
+              <div class="faq-body">同一个内核，形态由插件决定。今天默认交付终端 / HMI；SCADA 工作站、专用 HMI 面板、边缘控制器都可以由插件组合自行扩展长出来。具体实时性、现场总线和安全等级，取决于运行平台与项目定义——我们不在官网上给你画能力上限。</div>
             </details>
             <details class="faq-item">
               <summary>没有 PLC 能试吗？</summary>
               <div class="faq-body">可以先用 Modbus 仿真器或模拟设备把“建设备 → 测试 → 建点 → 看值”走通；真实设备仍需现场核对地址、单元号和字节序。</div>
-            </details>
-            <details class="faq-item">
-              <summary>特殊设备 / 工艺 / 画面怎么定制？</summary>
-              <div class="faq-body">从插件 SDK 开始：驱动、界面、场景逻辑都可以做成独立插件，用你自己的密钥签名、发布到你自己的插件源。服务与合作入口会在产品成熟后开放，本期官网不预设范围。</div>
             </details>
           </div>
         </div>
@@ -571,6 +563,8 @@
           <span>© 2026 snap-rail contributors</span>
           <span>Windows 10/11 x64</span>
           <span>数据留在本机 · 当前版本不含遥测</span>
+          <span>个人开发的开源项目</span>
+          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">粤ICP备2026167367号-1</a>
         </div>
       </div>
     </footer>

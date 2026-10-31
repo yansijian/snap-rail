@@ -64,6 +64,23 @@ for (const page of ['index.html', 'scenarios.html', 'plugins.html', 'start.html'
 requireText('public/sitemap.xml', 'https://www.snap-rail.top/dev.html', 'dev page in sitemap')
 requireText('public/robots.txt', 'https://www.snap-rail.top/sitemap.xml', 'robots sitemap origin')
 
+// ICP 备案号展示是境内上线合规项（非可选）：每一页的 footer-bottom 都必须
+// 带指向工信部备案系统的链接，页面重设计不得悄悄丢掉它。
+for (const page of pages) {
+  requireText(page, 'beian.miit.gov.cn', 'ICP 备案链接')
+  requireText(page, '粤ICP备2026167367号-1', 'ICP 备案号')
+}
+
+// 站点以「个人开发的开源项目」署名（与当前备案性质一致）；同时按现阶段
+// 「不出现经营性表述」的要求反向把关——未来变更备案性质补充商业信息时，
+// 随新文案一并调整这份清单。
+for (const page of pages) {
+  requireText(page, '个人开发的开源项目', '开源项目署名')
+  for (const needle of ['商业服务', '服务与合作入口', '花小钱', '不被一家', '合同里']) {
+    if (read(page).includes(needle)) errors.push(`${page}: 出现阶段不应出现的经营性表述 (${needle})`)
+  }
+}
+
 // The generated doc body must carry the contract every reader needs: the
 // one-command start, all nine templates, and the publish flow.
 const devPage = read('src/generated/dev-page.ts')
@@ -107,6 +124,13 @@ const version = /"desktop":\s*\{[\s\S]*?"version":\s*"([^"]+)"/.exec(catalogSour
 const ldVersion = /"softwareVersion":\s*"([^"]+)"/.exec(read('index.html'))?.[1]
 if (version !== undefined && ldVersion !== undefined && ldVersion !== version) {
   errors.push(`index.html: ld+json softwareVersion ${ldVersion} ≠ feed ${version}（下载按钮跟 feed，结构化数据会漂）`)
+}
+// The ld+json downloadUrl is a full installer filename; its version drifts the
+// same way softwareVersion does (the live site once shipped a 0.2.0 link while
+// the feed served 0.3.0).
+const ldDownload = /"downloadUrl":\s*"[^"]*snap-rail-([^"]+)-x64-setup\.exe"/.exec(read('index.html'))?.[1]
+if (version !== undefined && ldDownload !== undefined && ldDownload !== version) {
+  errors.push(`index.html: ld+json downloadUrl ${ldDownload} ≠ feed ${version}（下载直链会漂）`)
 }
 if (version !== undefined && version.localeCompare('0.3.0', undefined, { numeric: true }) < 0) {
   console.warn(`verify-website — RELEASE GATE: feed is ${version}, hero shows the 0.3.0 connection-test wizard; do not deploy until the installer is published`)
