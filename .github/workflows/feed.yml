@@ -128,6 +128,12 @@ jobs:
           SNAP_RAIL_FEED_BASE: ${{ env.FEED_BASE }}
         run: pnpm run site:build
 
+      # The site's static ld+json (softwareVersion / downloadUrl) is a manual
+      # bump; against the just-published feed this is where a stale one fails,
+      # before anything is deployed or mirrored.
+      - name: verify the site against the fresh feed
+        run: pnpm run verify:website
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
