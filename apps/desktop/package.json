@@ -20,6 +20,7 @@
     "@snap-rail/equipment": "workspace:^",
     "@snap-rail/equipment-station": "workspace:^",
     "@snap-rail/store-sqlite": "workspace:^",
+    "@snap-rail/client-kernel": "workspace:^",
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
     "@snap-rail/cordis-plugin-group": "workspace:^",
@@ -40,7 +41,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@snap-rail/client-kernel": "workspace:^",
     "@snap-rail/client-modules": "workspace:^",
     "@snap-rail/connection": "workspace:^",
     "@snap-rail/cordis": "workspace:^",
