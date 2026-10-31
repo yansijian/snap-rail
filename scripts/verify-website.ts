@@ -119,16 +119,18 @@ for (const asset of [
 // deploying a promise the download cannot keep.
 const catalogSource = read('src/generated/catalog.ts')
 const version = /"desktop":\s*\{[\s\S]*?"version":\s*"([^"]+)"/.exec(catalogSource)?.[1]
-// Structured data is static HTML; it must not advertise a version the feed
-// no longer serves (the download buttons follow the catalog automatically).
-const ldVersion = /"softwareVersion":\s*"([^"]+)"/.exec(read('index.html'))?.[1]
+// Structured data is injected at build time from the packaged app version
+// (vite transformIndexHtml ← apps/desktop/package.json), so the gate checks
+// the built page — the deployable artifact — against the feed catalog the
+// download buttons follow. A stale build therefore still fails here.
+const ldVersion = /"softwareVersion":\s*"([^"]+)"/.exec(read('dist/index.html'))?.[1]
 if (version !== undefined && ldVersion !== undefined && ldVersion !== version) {
   errors.push(`index.html: ld+json softwareVersion ${ldVersion} ≠ feed ${version}（下载按钮跟 feed，结构化数据会漂）`)
 }
 // The ld+json downloadUrl is a full installer filename; its version drifts the
 // same way softwareVersion does (the live site once shipped a 0.2.0 link while
 // the feed served 0.3.0).
-const ldDownload = /"downloadUrl":\s*"[^"]*snap-rail-([^"]+)-x64-setup\.exe"/.exec(read('index.html'))?.[1]
+const ldDownload = /"downloadUrl":\s*"[^"]*snap-rail-([^"]+)-x64-setup\.exe"/.exec(read('dist/index.html'))?.[1]
 if (version !== undefined && ldDownload !== undefined && ldDownload !== version) {
   errors.push(`index.html: ld+json downloadUrl ${ldDownload} ≠ feed ${version}（下载直链会漂）`)
 }
