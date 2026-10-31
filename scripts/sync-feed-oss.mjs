@@ -113,24 +113,18 @@ const run = (label, command) => {
   }
 }
 
-/** CDN 默认遵循源站 Cache-Control：滚动源里清单类（index/catalog/latest）
- * 必须短缓存（新版本发布及时可见），zip/exe/blockmap 内容寻址、长缓存。
+/** CDN 默认遵循源站 Cache-Control：feed 前缀里**所有文件统一短缓存**
+ * （5 分钟）——清单必须短缓存保证新版本及时可见；驱动 zip 文件名跨版本
+ * 不变且构建不可复现（同名重发字节不同），安装包也存在同版本重发
+ * （0.5.2 一天重发过两次），长缓存会让 CDN 吐旧字节、客户端 sha512
+ * 校验失败。长缓存只适用于网站带哈希的静态资源（sync-site-oss）。
  * meta 值不含空格：Windows 下 spawnSync 走 shell 拼参，空格会拆散参数。
  * 实测 1.7.19：sync 会忽略 --meta，且 sync --delete 会把 cp 上传的对象
  * 当作不同而整组重传（无 meta）——所以顺序必须是：先 sync（上传+滚动
- * 清理），后 cp 按类型重写缓存头。匹配文件会双传一次（清单 KB 级、
- * 安装包 ~20s，可接受）。 */
+ * 清理），后 cp 重写缓存头。匹配文件会双传一次（安装包 ~20s，可接受）。 */
 const SHORT_CACHE = 'Cache-Control:public,max-age=300'
-const LONG_CACHE = 'Cache-Control:public,max-age=2592000'
 run(`sync 滚动上传与清理 → ${bucketBase}`, ['sync', flatDir, bucketBase, '--delete', '-f'])
-run(`cp 清单（短缓存） → ${bucketBase}`, [
-  'cp', '-r', '-f', '--meta', SHORT_CACHE,
-  '--include', '*.json', '--include', '*.yml', flatDir, bucketBase,
-])
-run(`cp 安装包与插件 zip（长缓存） → ${bucketBase}`, [
-  'cp', '-r', '-f', '--meta', LONG_CACHE,
-  '--include', '*.zip', '--include', '*.exe', '--include', '*.blockmap', flatDir, bucketBase,
-])
+run(`cp 重写缓存头（短缓存） → ${bucketBase}`, ['cp', '-r', '-f', '--meta', SHORT_CACHE, flatDir, bucketBase])
 const prefixPath = bucketBase.replace(/^oss:\/\/[^/]+/, '')
 console.log(`\nsync-feed-oss: 完成。基址 = https://<bucket 域名>${prefixPath}（公共读 Bucket 即桶默认域名）`)
 console.log('验收：pnpm exec tsx scripts/check-feed-endpoint.ts --update <基址> --plugins <基址> --site https://<桶域名>/')
