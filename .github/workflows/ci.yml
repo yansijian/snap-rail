@@ -3,7 +3,9 @@ name: ci
 on:
   push:
     branches: [master]
-    tags-ignore: ['v*']
+    # v* 是版本发布 tag；feed 是 publish 滚动重建的插件源/更新源 tag——
+    # 发布管线自带 verify:feed 与 verify:packaged-app，tag 级 CI 是重复噪声。
+    tags-ignore: ['v*', 'feed']
   pull_request:
 
 permissions:
