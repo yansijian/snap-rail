@@ -3,8 +3,8 @@
 `init` 生成的仓库自带：`package.json`（manifest 与依赖已配好）、`src/`
 骨架、`tsdown.config.ts`、`tsconfig.json`（extends
 `@snap-rail/plugin-sdk/tsconfig.plugin.json`）、一个能通过的冒烟测试
-（`tests/manifest.spec.ts`）、`.gitignore`，以及 **`AGENTS.md`**——本仓库
-的短规范，动手前先读一遍。
+（`tests/manifest.spec.ts`）、`.gitignore`、`README.md`，以及
+**`AGENTS.md`**——本仓库的短规范，动手前先读一遍。
 
 ## 先拆解：一个功能 = N 个可复用插件
 
@@ -242,9 +242,11 @@ render })` 声明并编排区域插槽。叠层对话框（如退出确认）**�
 
 `ctx.skins.register(ctx, { id, title, tokens, css })` 注册一套完整观感：
 **单套 token + 可选 part CSS，纯样式**（组件定义与槽都不在主题内）。主题
-id 用包名；单活（`exclusive: 'skin'`），出厂「钴蓝·白天/黑夜」永远可选、
-缺失回退黑夜；所有 CSS 规则必须作用域到 `[data-snap-skin='<id>']`，只命中
-`data-snap-part`。启用后主窗自动重载生效，外观页主题列表点选即用。
+id 用包名；`exclusive: 'skin'` 单装载，出厂 `default-light` / `default-dark`
+（钴蓝·白天/黑夜）永远可选、缺失回退黑夜；所有 CSS 规则必须作用域到
+`[data-snap-skin='<id>']`，只命中 `data-snap-part`。`register` 只登记——激活
+走设置键 `ui.theme = { id }`，已装载主题在外观页点选即全窗口热切（零
+重载）；仅首次启用未装载的皮肤包重载一次。
 
 ## 包名规则
 

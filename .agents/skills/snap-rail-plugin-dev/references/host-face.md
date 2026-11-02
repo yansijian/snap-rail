@@ -29,8 +29,11 @@ type-only 导入）；`apply(ctx)` 里完成一切注册。
 ## 驱动（driver 模板）
 
 驱动是**纯协议适配器**，注册进设备底座：设备/组/点住在 `data/equipment.db`
-底座表，经统一「设备管理」设置页管理；驱动**零自有存储**、没有自己的 RPC
-子命名空间和渲染端页面，**多活并存**。`requires: ['@snap-rail/equipment']`。
+底座表，经统一「设备管理」设置页管理；驱动**零自有存储**、零渲染端页面，
+**多活并存**。`requires: ['@snap-rail/equipment']`。纪律上驱动也不开自己的
+wire 域——底座为确需的驱动预留了 `equipment.<driverId>.*` 子命名空间
+（驱动 `id` 兼作前缀），默认不用；真要用就是普通的
+`claimDomain` / `serveContract` 写法。
 
 ```ts
 import { z } from 'zod'
@@ -83,11 +86,17 @@ export default {
 - **写路径 await 到 I/O 完成**再返回/上报，不要 fire-and-forget。
 - **驱动永不注册点表**——点表是底座的事（DriverHandle 上根本没有
   setPoints）；驱动只经 handle 上报 status / sample / write。
-- `probe` 返回 `{ ok, latencyMs, detail?, sample?, error? }`；没有
-  `probe` 驱动照常工作，只是设置页没有「测试连接」入口（注意上面的发布
-  滞后警告）。
-- 方言表单由设备管理页的 SchemaForm 按 JSON Schema 投影渲染——字段没标签
-  就是你忘了 `.meta({ title })`。
+- `probe` 返回 `DeviceProbeResult`：`{ ok, latencyMs, detail?, sample?: { label,
+  value }, error?: { code, message, hint? } }`。底座给 probe 包了 **10s 硬
+  超时**（超时回 `error.code: 'timeout'`），抛出的异常映射为
+  `'probe-failed'`——所以 probe 内部不必自己兜超时，但必须是一次性只读探测、
+  不建长连接。没有 `probe` 驱动照常工作，只是设置页没有「测试连接」入口。
+  连接状态枚举 `'connecting' | 'online' | 'offline'`；点 ref 三元组各段非空、
+  ≤128 字符、不含 `/`。
+- 方言表单由设备管理页的 `SchemaForm` 按 JSON Schema 投影渲染：
+  `.meta({ title })` 是标签（缺省回退键名）、`.describe()` 是说明、
+  `z.enum` / 字面量联合渲染成单选、`z.boolean` 成开关、数字带上下限——
+  完整映射见 [client-face.md](client-face.md) 的「SchemaForm」节。
 
 ## 构建纪律（宿主面）
 
@@ -152,7 +161,12 @@ export default {
 ```
 
 settings 是 base 内置服务：类型从 SDK `/api` 转出，不要把
-`@snap-rail/settings` 写进 `requires` 或单独安装。
+`@snap-rail/settings` 写进 `requires` 或单独安装。`get<T>(key)` /
+`set<T>(key, value)` 都是**同步**的、不做 schema 校验（值形状是消费方的
+契约）；`set` 原子落盘后 `ctx.emit('settings/changed', key, value)`，宿主面
+`ctx.on('settings/changed', (key, value) => …)` 即可热应用。键形**照 wire
+的规则写** `域.名`（`^[a-z0-9][a-z0-9-]*\.[A-Za-z0-9_.-]+$`，3–128 字符）——
+宿主面直调不校验，但渲染面经 `settings.get/set` 读同一键时会被 wire 拒。
 
 ## wire 方法与帧（host-service / suite 的宿主面）
 
@@ -194,19 +208,38 @@ export default {
   [faces-and-wire.md](faces-and-wire.md)。
 - 配方测试：schema 拒坏载荷、disposer 随插件卸载。
 
+## 可订阅的宿主事件（`ctx.on`，进程内，无订阅门禁）
+
+| 域 | 事件 → 载荷 |
+| --- | --- |
+| equipment | `point/updated` → `PointSample { device, group, name, value, time }`（套件聚合的首选入口）；`point/added` → `PointDescriptor`；`point/removed` → `PointRef`；`connection/added` → `ConnectionSnapshot`；`connection/removed` → connectionId；`connection/status` → `{ …, status: 'connecting' \| 'online' \| 'offline' }`；`equipment/mappings-changed` / `equipment/structure-changed` → 无载荷 |
+| settings | `settings/changed` → `(key, value)` |
+| shell | `shell/notification-clicked` → `(id)`；`shell/notification-action` → `(id, actionId)`；`shell/tray-clicked` → `(key)`；`shell/surface-changed`、`shell/ball-changed`、`shell/ball-dock-changed`、`shell/window-profile-changed`、`shell/ball-profile-changed` → 与同名 wire 帧同载荷；`shell/exit-requested` → `{ source: 'window' \| 'tray' }`；`shell/exit-resolved` → `(request, action)` |
+
+事件名的类型增强随对应包的 `declare module '@snap-rail/cordis' { interface
+Events … }` 进来：equipment 的在 `@snap-rail/equipment`（宿主面 value
+import 即可），shell 的在 `@snap-rail/shell`，settings 的在
+`@snap-rail/plugin-sdk/api`。
+
 ## `ctx.shell`（宿主面，OS 集成缝）
 
 要用就 `requires: ['service:shell']` + `import '@snap-rail/shell'`（类型
 `import type { ShellService } from '@snap-rail/shell'`）。**永不 import
-electron**。
+electron**。所有写操作回 `{ applied: true, … }` 或
+`{ applied: false, reason, message }`（reason：`no-shell` / `no-tray` /
+`limit-reached` / `duplicate` / `not-found` / `not-controllable` /
+`unavailable`），溢出不抛。
 
 | API | 说明 |
 | --- | --- |
-| `ctx.shell.notify(ctx, {title, body, actions?, tag?, silent?})` | 带按钮通知；返回 `{applied, id}` 或 `{applied:false, reason, message}`。上限单源 `SHELL_LIMITS`：标题 120 / 正文 512 / 动作标题 20 / 动作 id 64 / 最多 3 个按钮；全局节流 5 条/10s；超限回 `{applied:false}` 不抛。同 `tag` 替换不堆叠。点击回执 `ctx.on('shell/notification-action', (id, actionId) => …)`。 |
-| `ctx.shell.tray.addItem / updateItem / removeItem(ctx, …)` | 托盘菜单项（单插件 12、全体 24）；点击回执 `ctx.on('shell/tray-clicked', key)`；key 自动按 `包名:id` 命名空间化。 |
-| `ctx.shell.surface.present / hide / state(ctx, …)` | 立起/隐藏/查询窗口（`main` = 显示并聚焦；按需创建辅助窗）。主窗口与球各自独立显隐，底座不互斥；显隐变化经 `shell/surface-changed` 帧广播（宿主面 `ctx.on` 同样可收）。 |
-| `ctx.shell.ball.setState(ctx, patch)` | 宿主聚合的球内容态：`{progress 0..1|null, label ≤8字|null, tone}`。 |
-| `ctx.shell.window.setExitPolicy(ctx, {close, quit})` | 关窗/托盘退出行为声明（登记即 effect，fiber 回收即回退默认 `quit`）。值：`'ball' \| 'tray' \| 'quit' \| 'hold'`。 |
+| `ctx.shell.notify(ctx, {title, body?, actions?, tag?, silent?})` | 带按钮通知；成功回 `{applied: true, id}`。上限单源 `SHELL_LIMITS`：标题 120 / 正文 512 / 动作标题 20 / 动作 id 64 / `tag` 64 / 最多 3 个按钮；全局节流 5 条/10s。同 `tag` 替换不堆叠。回执 `shell/notification-action` `(id, actionId)`、无按钮点击 `shell/notification-clicked` `(id)`；冷启动期间的点击回退为聚焦主窗。 |
+| `ctx.shell.tray.addItem / updateItem / removeItem(ctx, …)`；`tray.available`；`tray.entries()` | 托盘菜单项 `{ id, label ≤40, checked? }`（单插件 12、全体 24；`checked` 画勾选态）；点击回执 `shell/tray-clicked` `(key)`，key 自动按 `包名:id` 命名空间化。 |
+| `ctx.shell.surface.present / hide(ctx, surface)`；`surface.state()` | 立起/隐藏/查询窗口（`present('main')` = 显示并聚焦；`hide` 只接受辅助面 `'ball'`；按需创建辅助窗）。主窗口与球各自独立显隐，底座不互斥；显隐变化经 `shell/surface-changed`（事件 + 帧）广播。 |
+| `ctx.shell.ball.setState(ctx, patch)`；`ball.state()` | 宿主聚合的球内容态：`{ progress: 0..1 \| null, label: ≤8 字 \| null, tone: 'neutral' \| 'accent' \| 'warning' \| 'danger' }`，变化经 `shell/ball-changed` 广播。 |
+| `ctx.shell.ball.setProfile(ctx, profile)`；`ball.profile()` | 宿主面请求球形态（`BallProfile`，字段见 client-face.md 布局节），宿主夹取后回 `{ applied, profile, source, reason? }`；布局/用户声明优先于面。 |
+| `ctx.shell.window.setProfile(ctx, profile)`；`window.profile()` | 同上，操作员窗口形态（`WindowProfile`）。 |
+| `ctx.shell.window.setExitPolicy(ctx, {close?, quit?})`；`window.exitPolicy()` | 关窗/托盘退出行为声明（登记即 effect，fiber 回收即回退默认 `quit/quit`）。值：`'ball' \| 'tray' \| 'quit' \| 'hold'`。 |
+| `ctx.shell.window.resolve(ctx, action)` | 宿主面应答挂起的退出请求（与渲染面的 `shell.exit.resolve` 等价；确认框仍必须由渲染面画，这里只是宿主侧兜底/自动决策）。 |
 
 `'hold'` 流程：Shell 冻结请求 → 广播 `shell/exit-requested`（载荷
 `{source: 'window' | 'tray'}`）→ **你的渲染面**弹确认框（底座从不画 UI）→

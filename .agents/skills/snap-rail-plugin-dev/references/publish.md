@@ -5,7 +5,7 @@
 | 命令 | 作用 |
 | --- | --- |
 | `doctor <目录>` | 校验仓库契约（manifest、requires 形态、构建入口落盘）。红 = 契约违约（阻断），warning = 建议（放行）。 |
-| `pack <目录> --out dist --sign-key <pem> --key-id <id> [--publisher <名>]` | 装配并签名发行 zip。**拒绝无签名**（缺 key 参数直接报错）；输出 sha256 与 size。zip 内容 = 精简 manifest + 构建面，永不带 src。 |
+| `pack <目录> --out dist --sign-key <pem> --key-id <id> [--publisher <名>]` | 装配并签名发行 zip。**拒绝无签名**（缺 key 参数直接报错）；输出 sha256 与 size。产物名 = 包名把 `/` 换成 `__`（`@my-scope/my-driver` → `dist/@my-scope__my-driver.zip`）。zip 内容 = 精简 manifest + 构建面，永不带 src。 |
 | `feed <zip目录> [--out <目录>] [--repository <url>]` | 读目录内**已签名** zip，产出 `index.json`（条目含包名/版本/文件名/sha256/size/签名 keyId）。拒绝未签名 zip 与重名包——**同目录每个包名只留最新版**。 |
 | `inspect <zip>` | 身份、面、文件数、签名 keyId 概览（无需公钥）。收货方快速查验用。 |
 | `verify <zip> --public-key <pem> --key-id <id>` | 用发布者公钥完整验签（摘要/身份/publisher）。 |
@@ -67,10 +67,15 @@ openssl pkey -in .keys/release.private.pem -pubout -out .keys/release.public.pem
    加进终端「插件页 → ⚙ 插件源」。
 
 - 没有集中市场、没有 PR 上架、官方不转存你的字节；任何聚合列表只是发现层，
-  完整性锚永远是你的签名。
+  完整性锚永远是你的签名。出厂默认源
+  `https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/` **只收一方
+  产物**（终端 `plugins.feedUrls` 列表的默认项，用户可追加任意静态源）——
+  社区包一律走自己的 Release 地址，不要指望被收进官方源。
 - `index.json` 条目可用绝对 `url` 指回你的 Release（联邦形态）；客户端下载
-  先验哈希。
-- 用户手填直链安装走 `plugins.inspect-from-url`（有界 + 同样过三态判定）。
+  先验哈希。条目必带 `sha256`（64 hex）/ `size` / `signature.keyId`，`file`
+  与 `url` 二选一。
+- 用户手填直链安装走 `plugins.inspect-from-url`：只接受 http(s)、下载超时
+  120s、单包上限 256 MiB，字节落地后同样过三态判定。
 - 同目录同名 zip 覆盖前确认版本号真的变了；旧版本想留档就删掉本地 dist 或
   归档到别处，feed 目录里永远只有最新。
 
@@ -85,17 +90,27 @@ openssl pkey -in .keys/release.private.pem -pubout -out .keys/release.public.pem
 
 ## 组合包（combo，可选）
 
-一次交付一组插件（离线/整厂部署用）：
+一次交付一组插件（离线/整厂部署用）。**CLI 没有 combo 命令**——组合包就是
+手打的 zip（任何 zip 工具），schema 可用 `@snap-rail/plugin-kit/recipe` 的
+`recipeDocumentSchema` 在脚本里校验：
 
-- zip 根目录 `recipe.yml`：`id` / `version` / `title` / `kind` /
-  `description` / `plugins`（行与 `plugins.yml` 同形，子路径行归其包）；
-- `plugins/` 下每个被引用包一个**已签名**成员 zip；
-- 可选 `readme.md`；**没有 `bundle.json`；组合包本身不签名**（信任随成员
-  走，任一成员 unverified 就多一步组合级确认）。
+- zip 根目录 `recipe.yml`（或 `recipe.yaml`）：`id`（`^[a-z0-9-]+$`）/
+  `version` / `title` / `kind`（`'base' | 'scenario'`）/ `description?` /
+  `plugins`（≥1 行，每行 `{ name, enabled?, config? }` strict，与
+  `plugins.yml` 同形；子路径行如 `@x/suite/stats` 归其包）；
+- `plugins/` 下每个被引用包**恰好一个已签名**成员 zip（`pack` 的产物原样
+  放入），不许多余、重复或缺失；
+- 可选 `readme.md` / `README.md`；根目录只允许这三类内容。**没有
+  `bundle.json`；组合包本身不签名**（信任随成员走，任一成员 unverified 就
+  多一步组合级确认）。
+- 上限：组合 zip ≤ 256 MiB，成员解压总量 ≤ 512 MiB。
 - 客户端按内容识别：根有 `package.json` 且无 `recipe.yml` = 插件；有
   `recipe.yml` 且无 `package.json` = 组合；两者都有/都没有 = 报错。
-- 安装 = 一个池事务装齐缺失/需更新成员 + 原子写 `<home>/presets/recipe-<id>.yml`
-  并热应用；删预设文件即停用（没有组合管理 UI）。
+- 安装 = 一个池事务只装缺失/需更新的成员（同版本或本机更新者保留）+ 原子写
+  `<home>/presets/recipe-<id>.yml` 并热应用；任何失败回滚池与旧预设。删预设
+  文件即停用（没有组合管理 UI）。
+- **预设引用的包拒绝卸载**（`预设正在使用 <name>，无法卸载`）：用户要卸载
+  你的成员包，得先删/改预设文件——交付文档里讲清楚这一步。
 - 和插件 zip 放进同一个 Release 即可。
 
 ## 用户侧验证回路（发布后自己做一遍）

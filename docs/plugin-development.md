@@ -99,9 +99,12 @@ zip 里残留的字段在 manifest 校验时被剥离，宿主永不再读它们
 - **种子消费只准 named/star 导入**：default 导入经 CJS interop 会把
   `.default` 变成整个命名空间对象，运行时挂载即崩——构建期护栏会硬错。
 - `clientBundle` 打包时自动盖 `snapRail.client.seedAbi` 章（构建时真实
-  require 到的种子与其版本 + 当前 `SEED_ABI_REVISION`，现为 r2），安装期与
-  渲染端 boot 双向校验，作者永不手写。**终端升级后要重新 build + pack**：
-  旧章的 zip 会被拒（报「插件构建于种子 ABI r1，宿主为 r2」）。
+  require 到的种子与其版本 + 当前 `SEED_ABI_REVISION`，现为 **r3**），安装期与
+  渲染端 boot 双向校验，作者永不手写。三条判定：无章放行（存量 zip 宽限
+  期）；修订号不等即拒（报「插件构建于种子 ABI r2，宿主为 r3 —— 请更新插件
+  包或桌面应用」）；共享 base 种子主版本漂移同样拒。**终端升级后要用 r3 闭包
+  的 plugin-kit（≥ 0.2.4）重新 build + pack**：npm `plugin-kit 0.2.3` 盖的是
+  r2 章，装进 ≥ v0.5.3 的终端一律被拒。
 - 页面组件只组合 `@snap-rail/ui/components` 的语义原语
   （Button/Card/Dialog/Table/Tabs/Page/Stack/Grid…）；缺原语补进
   `@snap-rail/ui`，不在页面里手搓交互组件或写裸 Tailwind。触屏基线：
@@ -187,7 +190,9 @@ export default defineConfig([
   （`{edge, collapsed, visiblePx}`）：球贴边停泊后指针离开即收起只留 1/3
   （四边一律），悬停自动滑出——底座负责一切几何与时机；面在 `collapsed`
   时按 `edge` 在可见条里画**收起形态**（贴边小标签）。
-- **拖拽用内核导出的 `attachBallDrag`**（`@snap-rail/client-kernel`）：球面
+- **拖拽用 `attachBallDrag`**（`import { attachBallDrag } from
+  '@snap-rail/ui/runtime'`，ui ≥ 0.1.1；kernel 是 app-internal，插件不
+  import）：球面
   只向 `shell.ball.move` 发 `begin`/`end` 两个信号——宿主从 OS 光标取锚、
   16ms 轮询让球窗绝对跟随，松手后的贴边、收起、位置记忆也全在宿主；按住
   不动松开算点击。不要自己流式上报坐标（窗动则坐标系动，必然停摆抖动），
@@ -239,7 +244,7 @@ OS 资源只走这条缝，插件**永不 import Electron**。所有权按点击
 | `shell.toast` | 渲染面 | 单向通知（无按钮、无回调，点击聚焦主窗口） |
 | `shell.surface.present/hide/state` | 渲染面 | 立起/收起窗口；`state` 读当前可见面（球在主窗隐藏时出生，必须先读再画）；`present('main')` 是回退圆球唯一的动作 |
 | `shell.ball.state` / `shell.ball.dock` | 渲染面 | 读宿主聚合的球内容态与窗口贴边态；帧 `shell/ball-changed`、`shell/ball-dock-changed` 负责推送 |
-| `shell.ball.move` | 渲染面 | 球面拖动信号（`begin`/`end`）：宿主从 OS 光标取锚、16ms 轮询绝对跟随，松手贴边落定；经内核 `attachBallDrag` 使用，不要自己流式上报坐标 |
+| `shell.ball.move` | 渲染面 | 球面拖动信号（`begin`/`end`）：宿主从 OS 光标取锚、16ms 轮询绝对跟随，松手贴边落定；经 `@snap-rail/ui/runtime` 的 `attachBallDrag` 使用，不要自己流式上报坐标 |
 | `shell.exit.resolve` | 渲染面 | 应答一个挂起的退出请求（`shell/exit-requested` 帧到达后） |
 
 ```ts
@@ -316,7 +321,7 @@ export default {
       demoContract.frames['demo/pinged'],
       frame => { /* frame 已按 schema 解析 */ },
     ))
-    ctx.pages.registerPage(ctx, { id: 'demo', title: '演示', render: () => <Page title="演示" /> })
+    ctx.pages.registerPage(ctx, { id: 'demo', title: '演示', order: 100, render: () => <Page title="演示" /> })
   },
 } satisfies Plugin
 ```
@@ -446,12 +451,13 @@ SDK 的传递依赖与 base 运行时包：不需要单独安装，也不要写�
   缺少 shebang，npm 生成的 bin shim 会把 `.js` 当文档交给 Windows。
   升级到 0.2.3+（或临时用 `node node_modules/@snap-rail/plugin-sdk/lib/cli.js`）。
 - **渲染面构建后无法 require UI 组件**：`@snap-rail/ui` 及其
-  components/contract/slots/skins/settings/runtime/pages/charts 是 base 种子，
-  **不要**写进 `client.externalSeeds`；只有其他插件贡献的
+  components/contract/slots/skins/settings/runtime/pages/fallback/charts 是
+  base 种子，**不要**写进 `client.externalSeeds`；只有其他插件贡献的
   `<包>/<子路径>` 才写。
-- **渲染面被拒：`插件构建于种子 ABI r1，宿主为 r2`**：zip 是用旧 plugin-kit
-  打的。用当前 `@snap-rail/plugin-kit` 重新 `pnpm run build` + `pack`
-  （`seedAbi` 由 pack 自动盖章，永不手写）。
+- **安装/渲染面被拒：`插件构建于种子 ABI r2，宿主为 r3 —— 请更新插件包或桌面应用`**：
+  zip 是用 r2 时代工具链（npm `plugin-kit 0.2.3`）打的。升到 r3 闭包
+  （`plugin-kit ^0.2.4` / `plugin-sdk ^0.2.7` / `ui ^0.1.1`）后重新
+  `pnpm run build` + `pack`（`seedAbi` 由 pack 自动盖章，永不手写）。
 - **`Cannot find module '@snap-rail/plugin-sdk/api'`**：SDK 低于 0.2.5，
   升级 `@snap-rail/plugin-sdk`。
 - **`Property 'rpc' does not exist on type 'Context'`**：宿主类型从

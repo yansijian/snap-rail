@@ -11,8 +11,8 @@
   贡献的种子（`client.seeds`）∪ 消费方 manifest `client.externalSeeds`
   声明的贡献 id。
 - **base 种子由 shell 自动播种，不能写 `externalSeeds`**：connection、
-  protocol、util、shell/contract、equipment/contract、react、zod，以及
-  `@snap-rail/ui` 的 components / contract / slots / skins / settings /
+  protocol、util、shell/contract、equipment/contract、react、react-dom、zod，
+  以及 `@snap-rail/ui` 的 components / contract / slots / skins / settings /
   runtime / pages / fallback / charts。写了启用预检会报“提供方未安装”。
 - **只有其他插件贡献的种子才写 `externalSeeds`**：`<包>/<子路径>`。只
   type-only 导入的贡献种子不产生运行时 require，不用写。
@@ -30,28 +30,65 @@
 
 ## 语义原语（只组合，不手搓）
 
-页面组件只组合 `@snap-rail/ui/components` 的内置原语：
-Button / Card / Dialog / Table / Tabs / Page / Stack / Grid / Form /
-Field / Switch / Select / ScrollArea…。缺原语时**不要在页面里手写交互
-组件**——改用现有原语组合，或把原语补进 `@snap-rail/ui`（一方职责）。
+页面组件只组合 `@snap-rail/ui/components` 的内置原语（`@snap-rail/ui`
+0.1.x 实际导出，按文件分组）：
+
+| 组 | 导出 |
+| --- | --- |
+| 按钮 | `Button`（`intent`: neutral/primary/danger/success/warning；`emphasis`: solid/soft/outline/ghost/link；`size`: sm/md/lg）、`IconButton`、`Spinner` |
+| 控件 | `Label`、`Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`、`Switch`、`Checkbox`、`RadioGroup`/`RadioGroupItem`、`TouchSelect`、`Select` |
+| 输入 | `Input`、`Textarea`、`NumberInput` |
+| 表单 | `Form`、`Field`、`SchemaForm`（见下节） |
+| 对话 | `Dialog`/`DialogTrigger`/`DialogClose`/`DialogContent`/`DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogBody`/`DialogFooter`、`Sheet`（`presentation`: modal/sheet/fullscreen） |
+| 反馈 | `Badge`、`Led`、`Progress`、`EmptyState` |
+| 容器 | `Card`/`CardHeader`/`CardTitle`/`CardDescription`/`CardContent`/`CardFooter`、`Panel`、`Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`/`TableEmpty` |
+| 布局 | `Stack`、`Row`、`Grid`、`Split`、`AppShell`、`Page`、`Section`、`Toolbar`、`ScrollArea`、`DragScroll` |
+
+缺原语时**不要在页面里手写交互组件**——改用现有原语组合，或把原语补进
+`@snap-rail/ui`（一方职责）。`@snap-rail/ui/contract` 的 `UI_COMPONENTS`
+目录里 `popover` / `tooltip` / `menu` / `toast` 目前只有解剖词汇、没有 React
+组件。
 
 | 助手 | import |
 | --- | --- |
 | 语义组件 / 布局 | `@snap-rail/ui/components` |
-| `UI_SLOT_IDS` / slot 定义 | `@snap-rail/ui/contract` |
-| `Slot` / `ctx.ui` / `useUi` | `@snap-rail/ui/slots` |
-| `ctx.skins` / `useSkinTokens` | `@snap-rail/ui/skins` |
-| `ChartFrame` / `useChartTheme` | `@snap-rail/ui/charts` |
+| `UI_SLOT_IDS` / `UI_SLOT_MODES` / slot 定义 / `UI_COMPONENTS` | `@snap-rail/ui/contract` |
+| `Slot` / `ctx.ui` / `useUi` / `useUiVersion(ctx.ui)` | `@snap-rail/ui/slots` |
+| `ctx.pages` / `usePagesVersion(ctx)` | `@snap-rail/ui/pages` |
+| `ctx.settings` / `SettingsPageDefinition` | `@snap-rail/ui/settings` |
+| `ctx.skins` / `useSkinTokens` / `useSkinId` / `DEFAULT_LIGHT` / `DEFAULT_DARK` | `@snap-rail/ui/skins` |
+| `ChartFrame` / `Visualization`（同一组件的别名）/ `useChartTheme` / `chartThemeOf` | `@snap-rail/ui/charts`（根 `@snap-rail/ui` 也转出） |
+| `ctx.client` 增强 / `useClient()` / `attachBallDrag` | `@snap-rail/ui/runtime` |
 | `rpcErrorText` / `subscribeFrame` / `HostLink` | `@snap-rail/plugin-sdk/api/client` |
 | `formatClock` / `formatDuration` | `@snap-rail/util`（插件自加 devDependency） |
 
 色值一律 theme token（禁止硬编码色值和 `dark:` 变体；图表系列只用
 `--snap-chart-1…6`，红/黄/绿是状态语义不进数据系列）。
 
+## SchemaForm（schema 驱动表单）
+
+`SchemaForm` 是 **JSON-Schema 渲染器**（props `{ schema, value, onChange,
+idPrefix? }`），设备管理页用它渲染驱动方言表单，自己的设置页也可以用。宿主
+侧经 `z.toJSONSchema(schema, { io: 'input' })` 投影 zod，所以 zod 怎么写决定
+控件长什么样：
+
+| zod 写法 | JSON Schema | 控件 |
+| --- | --- | --- |
+| `z.enum(['a', 'b'])` 或 `z.union([z.literal('a'), z.literal('b')])`（全部分支为字符串/数字/布尔字面量） | `enum` / `anyOf[].const` | `TouchSelect` 单选，回写原字面量类型 |
+| `z.boolean()` | `type: 'boolean'` | `Switch`（开启/关闭） |
+| `z.number()` / `z.int()`（`.min/.max` → `minimum/maximum`） | `type: 'number' \| 'integer'` | `NumberInput` 带上下限 |
+| `z.object` / `z.array` | `type: 'object' \| 'array'` | JSON 文本框（失焦解析） |
+| 其余（`z.string()` 等） | — | `Input` |
+
+- `.meta({ title })` → 字段标签（**缺省用键名**，不会不渲染）；`.describe()`
+  → 字段说明；`.default()` → 初始值；必填来自 `required`。
+- 联合分支混进非字面量（如 `z.object`）就退回 JSON 文本框。
+
 ## link 与帧
 
 - `ctx.client` 由内置 `@snap-rail/ui/runtime` 提供（`{ link, surface }`）；
-  `inject: ['client']`。
+  `inject: ['client']`。组件树内部也可用 `useClient()`（同模块导出）取同一
+  对象，不必把 `ctx` 透传到叶子组件。
 - 类型增强：`import type {} from '@snap-rail/ui/runtime'`——只为把
   `ctx.client` 的 `Context` 增强带进程序，不产生运行时代码。
 - 订阅：`import { subscribeFrame, rpcErrorText } from
@@ -131,6 +168,9 @@ export default {
 
 页面由活动布局渲染：布局里调用 `ctx.pages.active()?.render()`，并用
 `usePagesVersion(ctx)` 订阅页面注册/切换触发的重渲染（内置回退布局即此写法）。
+`PageDefinition` 只有 `id` / `title` / `order`（必填）/ `render`；
+`ctx.pages.list()` 列全部、`ctx.pages.setActive(id)` 切页（未知 id 无操作），
+首个注册的页面自动成为活动页。
 
 ### ui-view：也可以注册设置页（不新增模板）
 
@@ -151,7 +191,11 @@ ctx.settings.registerPage(ctx, {
 - `SettingsPageDefinition`：`id` / `title` / `group?`（缺省「其他」）/
   `order` / `keywords?`（搜索词）/ `icon?` / `render`。
 - 插件 `inject: ['settings']`；打开指定页 `ctx.settings.open(id)`，程序内
-  开关 `open` / `close` / `toggle`。
+  开关 `open` / `close` / `toggle`；查询 `listPages()` / `isOpen()` /
+  `activePage()`。
+- 内建页 id 可直接 `open`：`plugins`（插件管理，组「系统」）、`appearance`
+  （外观与显示，组「系统」）、`equipment`（设备管理，组「设备」）——例如
+  「未装驱动」空态的就地动作 `ctx.settings.open('plugins')`。
 - 设置页同样是纯渲染面：配置读写走 `ctx.client.link`（如 `settings.get/set`），
   写后 `settings/changed` 帧热应用；页面只组合语义原语。
 
@@ -179,9 +223,22 @@ export default {
 ```
 
 - `provides` 必须列全布局实际渲染的槽；未列出的槽视为未提供，runtime 会
-  用 fallback/诊断补位。
-- `window`/`ball` 是布局推荐档案，宿主会夹取边界；用户可在「外观与显示」
-  覆盖。
+  用 fallback/诊断补位（`Slot` 对未声明的槽渲染 `null`）。
+- **布局选举**：`precedence` 降序 → `order` 升序 → 后注册胜。内置回退布局
+  是 `precedence: 0, order: 200`，所以插件布局 `order < 200` 或
+  `precedence ≥ 1` 都能接管；`LayoutContribution` 字段 = `id` / `order` /
+  `precedence?` / `provides` / `window?` / `ball?` / `render`。
+- `window`/`ball` 是布局推荐档案（`WindowProfile` / `BallProfile`，类型来自
+  `@snap-rail/shell/contract`），宿主会夹取边界；用户可在「外观与显示」
+  覆盖（来源优先级 user > persisted > layout > face > default）：
+  - `WindowProfile`：`mode?`（`'windowed' | 'maximized' | 'fullscreen'`）、
+    `width?` / `height?`（≥ 960×600，≤ 7680×4320，默认 1280×800）、
+    `minWidth?` / `minHeight?`、`resizable?` / `center?` / `remember?`
+    （默认皆 true）。
+  - `BallProfile`：`enabled?` / `size?`（96–192，默认 128；球体 = size − 16）/
+    `dockable?` / `collapse?`（默认皆 true）/ `dockEdges?`（四边子集，默认
+    全部）/ `collapseRatio?`（收起后留在屏内的比例，1/4–1/2，默认 1/3）/
+    `hoverDelayMs?`（指针离开到收起的延迟，300–1200，默认 600）。
 - 叠层（退出确认等）**不要**为此注册高 order 的布局——贡献到
   `shell.overlay`（见上节「区域插槽与贡献」）；底座不画任何业务 UI。
 
@@ -216,15 +273,27 @@ export default {
 } satisfies Plugin
 ```
 
-主题 = **单套完整观感，纯样式**：单活（`exclusive: 'skin'`），启用后主窗
-自动重载生效；出厂「钴蓝·白天/黑夜」两主题永远可选，选中的主题缺失回退
-黑夜。CSS 必须作用域到 `[data-snap-skin='<id>']`，只命中 `data-snap-part`。
+主题 = **单套完整观感，纯样式**：`exclusive: 'skin'` 单装载（池里同时
+只能启用一个皮肤包）。**`register` 只登记、不激活**：激活单源是设置键
+`ui.theme = { id }`，所有已装载主题在主窗 + 悬浮球上**热切、零重载**
+（`settings/changed` 到达即换 token）；只有外观页点选**尚未装载**的皮肤包
+时，底座先 `plugins.set-enabled` 再写 `ui.theme`，渲染窗经
+`ui.rendererAutoReload`（默认开）重载一次。出厂两主题 id 为
+`default-light`（钴蓝·白天）/ `default-dark`（钴蓝·黑夜）永远可选，选中
+的主题缺失回退 `default-dark`。CSS 必须作用域到 `[data-snap-skin='<id>']`，
+只命中 `data-snap-part`。
 
 - `tokens` 是**一套**完整 `SkinTokens`（颜色/字体/字号/间距/圆角/边框/
-  阴影/动效/z-index/控件高度/密度），不用写 `--snap-*` 前缀——注册后按
-  `skinTokenVar` 映射注入 `<html>`。没有明暗两套、没有跟随系统；想给
-  白天/黑夜各出一个主题就在同一包里 `register` 两次（每个主题一个 id，
-  首主题 id 用包名——外观页点选未装载的包时按包名解析到它）。
+  阴影/动效/z-index/控件高度 `controlHeightSm/Md/Lg` = 40/48/56px/密度），
+  不用写 `--snap-*` 前缀——注册后按 `skinTokenVar` 映射注入 `<html>`
+  （camelCase → `--snap-kebab`，`chart1` → `--snap-chart-1`）。起稿可展开
+  `DEFAULT_DARK.tokens` 或 `DEFAULT_LIGHT.tokens`（两者都从
+  `@snap-rail/ui/skins` 导出）。没有明暗两套、没有跟随系统；想给白天/黑夜
+  各出一个主题就在同一包里 `register` 两次（每个主题一个 id，首主题 id 用
+  包名——`ctx.skins.activate(selection)` 先按精确 id 找，找不到再把
+  selection 当包名解析到该包首个注册的主题；外观页点选未装载的包走的就是
+  这条）。`ctx.skins.list()` / `active()` / `tokens()` 供查询，
+  `useSkinId()` / `useSkinTokens()` 供组件订阅。
 - 组件定义与槽都不在主题内：主题不选组件形态、不占插槽，只提供 token 值
   与 part CSS。组件与 part 的完整目录在 `@snap-rail/ui/contract` 的
   `UI_COMPONENTS`；最小覆盖 root / label / field / panel。
@@ -255,20 +324,25 @@ clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),  /
 ### 球面几何与贴边
 
 几何单源 `resolveBallProfile`（`@snap-rail/shell/contract`）：默认窗口
-128×128、球体 112、四周 8px 余量；尺寸可被布局/用户覆盖，但方形、8px
-余量固定。三条硬规则：
+128×128、球体 112、四周 8px 余量；尺寸可被布局/用户覆盖（96–192），但
+方形、8px 余量固定——面里 `100% × 100%` 恒等于 `size × size`。四条硬规则：
 
 1. **阴影画在余量内**：CSS `box-shadow` 会被透明窗口边界硬切成灰边；用
    径向渐变把阴影画进 8px 余量并衰减到零。
-2. **贴边态读 `shell.ball.dock` + 订阅 `shell/ball-dock-changed`**：
-   球贴边停泊后指针离开即收起（四边一律，缩 2/3 留 1/3），悬停滑出；面在
+2. **贴边态读 `shell.ball.dock` + 订阅 `shell/ball-dock-changed`**：载荷
+   `{ edge: 'left' | 'right' | 'top' | 'bottom' | null, collapsed: boolean,
+   visiblePx: number }`。球贴边停泊后指针离开 `hoverDelayMs` 即收起（四边
+   一律；留在屏内的像素 = `visiblePx`，默认 size × 1/3 ≈ 43），悬停滑出；
+   停泊先发一次 `collapsed: false`，收起再发 `collapsed: true`。面在
    `collapsed` 时按 `edge` 画收起形态。
-3. **拖拽用内核导出的 `attachBallDrag`**（`@snap-rail/client-kernel`）：
-   整球一个 drag/click 表面——按住拖过 4px 阈值发 `shell.ball.move`
-   `begin`，松开发 `end`；宿主从 OS 光标取锚、16ms 轮询让球窗绝对跟随，
-   贴边/收起/位置记忆全在宿主。**不要**用 CSS `-webkit-app-region`（透明
-   窗命中不可靠），**不要**自己流式上报坐标（窗动则坐标系动，必然停摆
-   抖动）。
+3. **拖拽用 `attachBallDrag`（`import { attachBallDrag } from
+   '@snap-rail/ui/runtime'`，ui ≥ 0.1.1）**：整球一个 drag/click 表面——
+   按住拖过 4px 阈值（`threshold` 可调）发 `shell.ball.move` `begin`，松开发
+   `end`，原地按放回调 `onClick`；宿主从 OS 光标取锚、16ms 轮询让球窗绝对
+   跟随，贴边/收起/位置记忆全在宿主。**不要** import
+   `@snap-rail/client-kernel`（app-internal，npm 上没有类型），**不要**用
+   CSS `-webkit-app-region`（透明窗命中不可靠），**不要**自己流式上报坐标
+   （窗动则坐标系动，必然停摆抖动）。
 4. 球出生时可能不在主窗——先 `shell.surface.state` 读当前可见面再画；
    `present('main')` 是回退圆球唯一的动作。
 

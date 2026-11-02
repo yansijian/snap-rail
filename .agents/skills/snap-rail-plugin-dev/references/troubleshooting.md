@@ -28,7 +28,8 @@ warning = 建议（放行但要逐条确认）。
 | `Property 'rpc' does not exist on type 'Context'` | 没引入 gateway 类型增强 | `import type { GatewayService } from '@snap-rail/plugin-sdk/api'`；不要直接 import gateway |
 | `Property 'client' does not exist on type 'Context'` | 没引入 UI runtime 的 `Context` 增强 | `import type {} from '@snap-rail/ui/runtime'`（type-only，不产生运行时代码） |
 | `Cannot find module '@snap-rail/connection'` | 绕过 SDK 直接 import 了未单列的包 | 改用 `@snap-rail/plugin-sdk/api/client`；确实要直接用时才加 devDependency |
-| `Cannot find module '@snap-rail/client-kernel'`（UI d.ts 里） | 内置 UI 的 d.ts 引用了内部包 | `skipLibCheck` 会跳过；**不要** import kernel——`ClientHandle` 是 app-internal，插件不需要也不应引用（容器启动由内置 runtime 负责） |
+| `Cannot find module '@snap-rail/client-kernel'`（UI d.ts 里） | 内置 UI 的 d.ts 引用了内部包 | `skipLibCheck` 会跳过；**不要** import kernel——`ClientHandle` 是 app-internal，插件不需要也不应引用（容器启动由内置 runtime 负责）；球拖拽从 `@snap-rail/ui/runtime` 导入 `attachBallDrag` |
+| `Module '"@snap-rail/ui/runtime"' has no exported member 'attachBallDrag'` | 安装的 `@snap-rail/ui` < 0.1.1（r3 闭包前的发布没有这个转出） | `pnpm add -D @snap-rail/ui@^0.1.1`；连带把 plugin-sdk/plugin-kit 升到 r3 闭包（见 SKILL.md 时代分界） |
 
 ## init / 安装依赖
 
@@ -64,14 +65,15 @@ warning = 建议（放行但要逐条确认）。
 | 卸载/禁用被拒 | 还有别的包依赖它 | 先停用依赖方 |
 | 管理页找不到我的包 | clientOnly 行不在宿主树 | 正常：纯渲染包经渲染端下发行展示；检查 `client-config.list` |
 | 分类落「其他」 | 没声明 `category` | manifest 补 `category`（开放词汇，声明即归组） |
-| 驱动表单没有字段 | zod 字段缺 `.meta({ title })` | 每个字段补 `.meta({ title: '中文标签' })`，SchemaForm 才有得渲染 |
-| 「测试连接」按钮不存在 | 驱动没实现 `probe`，或安装的 equipment 版本类型里还没有 probe（发布滞后） | 先按 SKILL.md「已知发布滞后」查安装的类型；有字段再实现 |
-| 球拖不动 / 拖动抖动不跟手 | 拖拽用了 CSS `-webkit-app-region`（透明窗命中不可靠）或自己流式上报坐标（窗动则坐标系动） | 换内核导出的 `attachBallDrag`（`@snap-rail/client-kernel`）：整球一个 drag/click 表面，只发 `shell.ball.move` 的 `begin`/`end`，宿主以光标为锚接管跟随与贴边落定 |
-| 球拖到边缘拽不回来 | 拖拽没有交给宿主（`shell.ball.move` 未接） | 同上用 `attachBallDrag`；贴边、收起、滑出全由宿主负责，面只按 `shell/ball-dock-changed` 画形态 |
+| 驱动表单字段标签显示成键名（如 `host`） | zod 字段缺 `.meta({ title })`——字段仍渲染，只是没中文标签 | 每个字段补 `.meta({ title: '中文标签' })`；枚举/字面量联合想要下拉就写 `z.enum` 或 `z.union([z.literal…])`（映射见 client-face.md「SchemaForm」） |
+| 「测试连接」按钮不存在 | 驱动没实现 `probe`，或安装的 equipment 版本类型里还没有 probe（发布滞后） | 先按 SKILL.md「版本陷阱」查安装的类型；有字段再实现 |
+| 「测试连接」总是超时 | probe 内部建了长连接/等待无上限；底座硬超时 10s | probe 只做一次性只读探测并在 10s 内返回；需要更长的握手就缩短或返回 `ok:false` + `error.hint` |
+| 球拖不动 / 拖动抖动不跟手 | 拖拽用了 CSS `-webkit-app-region`（透明窗命中不可靠）或自己流式上报坐标（窗动则坐标系动） | 换 `attachBallDrag`（`import { attachBallDrag } from '@snap-rail/ui/runtime'`，ui ≥ 0.1.1）：整球一个 drag/click 表面，只发 `shell.ball.move` 的 `begin`/`end`，宿主以光标为锚接管跟随与贴边落定 |
+| 球拖到边缘拽不回来 | 拖拽没有交给宿主（`shell.ball.move` 未接） | 同上用 `attachBallDrag`；贴边、收起、滑出全由宿主负责，面只按 `shell/ball-dock-changed`（`{ edge, collapsed, visiblePx }`）画形态 |
 | 球阴影出现灰色硬边 | 用了 `box-shadow`（被窗口边界切） | 改径向渐变画进 8px 余量并衰减到零 |
 | 退出确认框 10s 后自己退了 | 渲染面没应答 `shell.exit.resolve` | 确认订阅 `shell/exit-requested` 并应答；10s 兜底是设计行为 |
 | 通知没弹出来 | 触发全局节流（5 条/10s）或超 `SHELL_LIMITS` | 看 `{applied:false, reason}` 返回值；同 tag 合并、控制频率 |
-| 渲染面根本没加载：控制台 fail-loud「插件构建于种子 ABI r1，宿主为 r2」 | zip 是用旧 plugin-kit 打的，种子 ABI 章与当前宿主不符（终端升级后最常见） | 用当前 `@snap-rail/plugin-kit` 重新 `pnpm run build` + `pack`；**不要**手改 `seedAbi`（pack 自动盖章，手写会被拒） |
+| 安装被拒「<包> 的种子依赖与宿主不匹配：插件构建于种子 ABI r2，宿主为 r3 —— 请更新插件包或桌面应用」，或渲染面没加载、控制台 `client: face "<包>" refused — …` | zip 是用 r2 时代工具链（npm `plugin-kit 0.2.3` / `plugin-sdk 0.2.6`，锁文件钉住最常见）打的，章与 ≥ v0.5.3 终端不符 | 升到 r3 闭包（`plugin-kit ^0.2.4` / `plugin-sdk ^0.2.7` / `ui ^0.1.1`，`pnpm update` 让锁文件跟上）后重新 `pnpm run build` + `pack`；**不要**手改 `seedAbi`（pack 自动盖章，手写会被拒）。同一报错族还有「插件构建于 <id>@<ver>，宿主提供 <live>（主版本不一致）」= 某个 base 种子主版本漂移，同样重打 |
 | 设置页不出现 | 没注册、注册在 `apply` 之外，或插件没 `inject: ['settings']` | 在 `apply(ctx)` 里 `ctx.settings.registerPage(ctx, { id, title, group, order, render })`；确认 `inject` 含 `settings` |
 | 更新了但自动更新没生效 | 版本号没变，或换 key 触发 keyChanged 拦截 | 升版本号重发；换 key 走手动更新确认 |
 

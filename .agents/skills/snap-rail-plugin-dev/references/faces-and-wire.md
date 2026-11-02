@@ -41,10 +41,17 @@
 | 拿宿主链接 | `ctx.client.link`；`inject: ['client']`；`import type {} from '@snap-rail/ui/runtime'` 引入 `ctx.client` 增强 | `@snap-rail/ui` runtime `ctx.provide('client', { link, surface })` | 不写（type-only） |
 | 订阅宿主帧 | `import { subscribeFrame, rpcErrorText } from '@snap-rail/plugin-sdk/api/client'`；`import type { HostLink } from '@snap-rail/plugin-sdk/api/client'` | base 种子 `@snap-rail/connection` | **不写**（base 种子） |
 | 读设备点实时值 | `import '@snap-rail/equipment/contract'`（合并方法表）+ named 导入 `equipmentFrameSchemas`；`link.call('equipment.points.list' / 'read' / 'subscribe')` + 订 `equipment/point-updated` 帧 | equipment 插件（方法/帧）+ base 种子契约 | **不写**（契约是 base 种子）；`requires` 写 `@snap-rail/equipment` |
+| 写点 / 读结构 / 改配置 | `equipment.points.write`（`{ point, value }` → `{ accepted }`）；`equipment.config.list`（设备树）/ `connections.list` / `drivers.list` / `mappings.list`；`equipment.devices.upsert / test / remove`、`groups.upsert / remove`、`points.upsert / remove`；结构帧 `equipment/point-added | point-removed | connection-added | connection-removed | connection-status | mappings-changed | structure-changed`（恒流，不受订阅门禁） | 同上 | 同上 |
 | 时间/时长格式化 | `import { formatClock, formatDuration } from '@snap-rail/util'`（模板未带则 `pnpm add -D @snap-rail/util`） | base 种子 `@snap-rail/util` | **不写**（base 种子） |
 | 语义组件/插槽/契约/主题 | `import … from '@snap-rail/ui/components'` / `/slots` / `/contract` / `/skins` | base 种子 | **不写** |
-| 页面/布局版本 tick | `usePagesVersion()` / `useUiVersion()` | base 种子 | **不写** |
+| 页面/布局版本 tick | `usePagesVersion(ctx)` / `useUiVersion(ctx.ui)` | base 种子 | **不写** |
+| 窗口 / 球 / 退出的 wire 面 | `import { shellContract } from '@snap-rail/shell/contract'`；方法 `shell.toast`、`shell.surface.present / hide / state`、`shell.window.profile / configure`、`shell.ball.profile / configure / state / dock / move`、`shell.exit.resolve`；帧 `shell/surface-changed`、`shell/ball-changed`、`shell/ball-dock-changed`、`shell/window-profile-changed`、`shell/ball-profile-changed`、`shell/exit-requested`、`shell/settings-open-requested` | base shell（builtin） | **不写**（契约是 base 种子） |
 | 消费其他插件的组件 | `import … from '<包名>/<子路径>'` | 对方贡献种子 | 写 `<包名>/<子路径>` |
+
+- **宿主面与渲染面的 shell 词汇别混**：`ctx.shell.notify / tray / ball.setState /
+  window.setExitPolicy` 与事件 `shell/notification-action`、`shell/tray-clicked`
+  只在**宿主面**（`ctx.shell` / `ctx.on`）；渲染面只有上表的 wire 行——
+  `shell.toast` 是无按钮的单向提示，带按钮的通知必须由宿主面发。
 
 - **base 种子**由 shell 在 boot 时播种，任何 client bundle 都能 `require`；
   它们**不属于** `externalSeeds`。
@@ -78,6 +85,9 @@ import { defineContract, method, type FrameRows, type MethodRows } from '@snap-r
 
 export const demoContract = defineContract('demo', {
   methods: {
+    // .ret<T>() 只声明响应类型（零运行时）；要运行时自检响应就换
+    // .res(z.object({ pong: z.number() }))——响应不合 schema 时 gateway 回
+    // internal 错误，并把 JSON Schema 挂进 rpc.describe()
     'demo.ping': method(z.object({}).strict()).ret<{ pong: number }>(),
   },
   frames: {
@@ -115,7 +125,12 @@ export default {
 ```
 
 `serveContract` 同时注册方法行和帧行，不需要再逐个 `rpc.method` /
-`rpc.frame`。注册随 `ctx` 的 fiber 回收。
+`rpc.frame`。注册随 `ctx` 的 fiber 回收。handler 形参是 `(payload, rpcId)`
+——载荷已按请求 schema 解析，`rpcId` 是本次调用 id（通常不用）；业务失败
+`throw new RpcBusinessError(code, message)`，未知方法 gateway 回
+`bad-request`、响应不合 `.res()` schema 回 `internal`。`rpc.describe()`
+返回当前已注册的 `{ domains, methods, frames }`，调试「我到底挂上了什么」
+用它。
 
 ### 渲染面 `src/client.tsx`
 
@@ -183,10 +198,12 @@ export default {
 
 ### 可给插件作者用（有公共类型包或 SDK 门面）
 
-`react`、`react/jsx-runtime`、`react-dom/client`、`@snap-rail/cordis`、
-`@snap-rail/connection`（经 SDK `/api/client`）、`@snap-rail/protocol`、
-`@snap-rail/shell/contract`、`@snap-rail/equipment/contract`、
-`@snap-rail/util`、`zod`。
+`react`、`react/jsx-runtime`、`react-dom`、`react-dom/client`、
+`@snap-rail/cordis`、`@snap-rail/connection`（经 SDK `/api/client`）、
+`@snap-rail/protocol`、`@snap-rail/shell/contract`、
+`@snap-rail/equipment/contract`、`@snap-rail/util`、`zod`，以及
+`@snap-rail/ui` 根与 components / charts / contract / slots / skins /
+settings / runtime / pages / fallback 九个子路径。
 
 ### app-internal，不要 import
 
@@ -194,6 +211,10 @@ export default {
 `@snap-rail/cordis-plugin-timer`、`@snap-rail/station-rpc/contract`、
 `@snap-rail/app-boot/contract`。
 
+- 它们是种子（运行时 `require` 得到）但**不在公共 npm 闭包**——独立仓拿不到
+  类型，`tsc` 直接报 `Cannot find module`。需要的能力都已从已发布的面转
+  出：球拖拽 `attachBallDrag` 走 `@snap-rail/ui/runtime`（ui ≥ 0.1.1），
+  settings 帧 schema 走 `settings/changed` 的载荷 `{ key, value }` 自备 zod。
 - `ClientHandle` 是 app-internal 类型（内置 runtime 的启动入口用它）：插件
   不需要引用，也**不要**从 `@snap-rail/client-kernel` import——`skipLibCheck`
   会跳过 UI d.ts 里的内部引用。

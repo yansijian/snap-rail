@@ -14,13 +14,13 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
 | `category` | string ≤64 | 开放分类标记，声明即归组（管理页按原文分组，无枚举校验）；缺省落「其他」。 |
 | `exclusive` | string | 互斥组：启用本包自动停用同组其他已启用包。`suite` 默认 `'suite'`，skin 必须 `'skin'`，store 后端必须 `'store-backend'`。 |
 | `uiProfile` | `native \| integrated \| custom` | 渲染面与皮肤契约的关系声明；管理页徽标，不做门禁。 |
-| `window` | object | 布局/套件偏好的操作员窗口形态（`WindowProfile`：尺寸/模式，boot 提示）；宿主校验夹取，全部有界。 |
-| `ball` | object | 布局/套件或球面包偏好的悬浮球形态（`BallProfile`：窗口/球尺寸/停泊行为）；几何单源 `resolveBallProfile`（默认 128 窗/112 球/8px 余量），宿主夹取。 |
+| `window` | object | 布局/套件偏好的操作员窗口形态 `WindowProfile`：`mode?`（`windowed \| maximized \| fullscreen`）、`width?` / `height?`（960×600 ≤ … ≤ 7680×4320，默认 1280×800）、`minWidth?` / `minHeight?`、`resizable?` / `center?` / `remember?`；宿主校验夹取，全部有界。 |
+| `ball` | object | 布局/套件或球面包偏好的悬浮球形态 `BallProfile`：`enabled?`、`size?`（96–192，默认 128；球体 = size − 16、8px 余量固定）、`dockable?`、`collapse?`、`dockEdges?`（四边子集）、`collapseRatio?`（1/4–1/2，默认 1/3）、`hoverDelayMs?`（300–1200，默认 600）；几何单源 `resolveBallProfile`，宿主夹取。 |
 | `requires` | string[] | **唯一兼容声明**，见下节。 |
 | `clientOnly` | boolean | 纯渲染包（无宿主面）：行不进宿主树，经 `client-config.list` 下发给渲染端。必须声明 `client.entry`。 |
 | `client` | object | 渲染面声明：`entry`（CJS 工厂包路径；schema 默认 `lib/client.js`，init 模板显式写 `lib-client/client.js`，以模板/doctor 为准）、`surfaces`（辅助面映射）、`seeds`（贡献的种子子路径）、`externalSeeds`（消费的贡献种子 id）。`seedAbi` 由 pack 盖章，**永不手写**。 |
 | `permissions` | string[] | 安装期展示用（如 `shell:notify` / `shell:tray` / `shell:surface`），暂不强制。 |
-| `engines` | object | 兼容的宿主/协议/渲染端版本范围：`snapRail` / `hostProtocol` / `renderer`。 |
+| `engines` | object | 兼容的宿主/协议/渲染端版本范围：`snapRail` / `hostProtocol` / `renderer`；安装期对宿主锚校验（当前宿主 `snapRail 0.1.0` / `hostProtocol 1.0.0` / `renderer 1.0.0`），不合即拒装。不写 = 不校验。 |
 
 ## `requires` 三种条目
 

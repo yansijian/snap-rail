@@ -48,12 +48,16 @@
   不进数据系列。
 - 第三方图表必须包在 `ChartFrame`/`Visualization` 内，从 `useChartTheme()`
   取 ECharts/D3 主题；主题覆盖外框/标题/图例容器与色板，不覆盖图表库内部 DOM。
-- 数字读数统一 `font-mono tabular-nums`；主角数字用 `glow-number` 类。
+- 数字读数用等宽字体 token（`fontMono` → `--snap-font-mono`）防跳动；没有
+  专用的「主角数字」part 或类名——要强调就用字号/字重 token（`textXl` /
+  `weightStrong`），不自造 CSS 类。
 
 ## 触控基线
 
-一体机触屏，最小点击目标 48px：`Button` default h-12 / lg h-14 / icon 48×48；
-`Input` h-12；表格行 py-3。数值输入用 `NumberInput`，单选用 `TouchSelect`，
+一体机触屏，最小点击目标 48px：控件高度是主题 token
+`controlHeightSm/Md/Lg` = 40/48/56px，`Button`/`Input` 默认 `md`（48）即满足
+基线、`lg`（56）给主操作，`sm`（40）低于触控基线只用于非主要触控路径；
+表格行间距走 `spaceMd`。数值输入用 `NumberInput`，单选用 `TouchSelect`，
 滚动容器用 `DragScroll`。这些组件的 part 由出厂主题保证触控尺寸；custom
 主题必须维持最小目标，`uiProfile: custom` 的插件自担其责。
 

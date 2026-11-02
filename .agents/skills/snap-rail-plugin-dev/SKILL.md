@@ -47,16 +47,19 @@ PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立�
 2. **种子消费只准 named/star 导入，且分 base / 贡献两层**。default 导入经
    CJS interop 会把 `.default` 变成整个命名空间对象，运行时挂载即崩——
    `clientBundle` 构建期会故意硬错。base 种子（connection / protocol /
-   util / shell-contract / equipment-contract / react / zod、`@snap-rail/ui`
-   及其 components/charts/contract/slots/skins/settings/runtime/pages/fallback
-   子路径等）由 shell 自动播种，**不能写** `client.externalSeeds`（写了启用
-   预检会报“提供方未安装”）；
+   util / shell-contract / equipment-contract / react / react-dom / zod、
+   `@snap-rail/ui` 及其 components/charts/contract/slots/skins/settings/
+   runtime/pages/fallback 子路径等）由 shell 自动播种，**不能写**
+   `client.externalSeeds`（写了启用预检会报“提供方未安装”）；
    只有其他插件贡献的 `<包>/<子路径>` 才写。只 type-only 导入的贡献
    种子不产生运行时 require，也不用写。自己贡献给别人的组件进 `client.seeds`。
 3. **`snapRail.client.seedAbi` 永不手写**——pack 时自动盖章，安装期与渲染
-   端 boot 双向校验。**终端升级后必须用当前 plugin-kit 重新 build + pack**：
-   旧包带的种子 ABI 章（如 r1）与宿主修订号（当前 r2）不符时，安装期拒装、
-   渲染端 skip + fail-loud（报「插件构建于种子 ABI r1，宿主为 r2」）。
+   端 boot 双向校验，三条判定：无章放行（存量 zip 宽限期）；修订号与宿主
+   **不等即拒**（当前宿主 **r3**，报「插件构建于种子 ABI r2，宿主为 r3 ——
+   请更新插件包或桌面应用」）；共享 base 种子**主版本**漂移同样拒（报
+   「插件构建于 <id>@<ver>，宿主提供 <live>（主版本不一致）」）。**终端升级
+   后必须用 r3 闭包的 plugin-kit（≥ 0.2.4）重新 build + pack**；锁文件钉在
+   plugin-kit 0.2.3 的仓库打出来的 zip 盖 r2，装进 ≥ v0.5.3 的终端一律被拒。
 4. **注册皆 effect，缝方法自带回收**。缝注册方法（首参 caller 上下文，如
    `ctx.equipment.registerDriver(ctx, driver)`）的处置随 caller 的 fiber 自
    动跟踪——插件停用/卸载时自动回收，**模板骨架的裸调用就是完整写法**，
@@ -123,8 +126,9 @@ PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立�
 # 0. 环境：Node 22+，pnpm 或 npm。国内镜像同步新版本有延迟，
 #    pnpm dlx 报 404 / ETARGET 时：npm config set registry https://registry.npmjs.org/
 #    pnpm 11 默认给刚发布 24h 内的版本冷却（minimumReleaseAge=1440）：latest
-#    会被压回旧版（可能拿到 r1 时代模板）、装 SDK 也可能被拒。刚发版就追新：
-#    dlx 钉死版本（如 @snap-rail/plugin-sdk@0.2.6），项目 pnpm-workspace.yaml
+#    会被压回旧版（可能拿到 r2 时代工具链，打出的 zip 被 ≥ v0.5.3 终端拒装）、
+#    装 SDK 也可能被拒。刚发版就追新：
+#    dlx 钉死版本（如 @snap-rail/plugin-sdk@0.2.7），项目 pnpm-workspace.yaml
 #    设 minimumReleaseAge: 0（或 minimumReleaseAgeExclude 列出 @snap-rail/*）。
 # 0.5 多能力需求（采集+展示等）先做拆解确认——见上「先拆解，再选模板」；
 #     以下流程按包各走一遍。
@@ -179,10 +183,11 @@ openssl pkey -in .keys/release.private.pem -pubout -out .keys/release.public.pem
 #    没有 openssl 的 Windows 可用 node:crypto 的 generateKeyPairSync('ed25519')，
 #    私钥导出 pkcs8 PEM、公钥导出 spki PEM。
 
-# 5. 打包签名（无签名 zip 不可安装）：
+# 5. 打包签名（无签名 zip 不可安装）；产物名 = 包名把 `/` 换成 `__`，
+#    如 dist/@my-scope__my-driver.zip：
 pnpm exec snap-rail-plugin pack . --out dist --sign-key .keys/release.private.pem --key-id my-key
-pnpm exec snap-rail-plugin inspect dist/<包名>.zip        # 身份/面/签名概览
-pnpm exec snap-rail-plugin verify dist/<包名>.zip --public-key .keys/release.public.pem --key-id my-key
+pnpm exec snap-rail-plugin inspect dist/<scope>__<name>.zip        # 身份/面/签名概览
+pnpm exec snap-rail-plugin verify dist/<scope>__<name>.zip --public-key .keys/release.public.pem --key-id my-key
 
 # 6. 产出 feed 清单并发布：
 pnpm exec snap-rail-plugin feed dist
@@ -237,21 +242,28 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
   存在但类型包没装 → 按地图升级 SDK；地图里没有的才是真的没有。不要从已装
   插件的编译产物反推 API，也不要在插件里 `as any`——那是 skill/闭包缺口的
   信号。
-- **版本锚**（本 skill 快照对应）：plugin-sdk `^0.2.6`、plugin-kit `^0.2.3`、
-  cordis `^4.0.1`、equipment `^0.1.6`、store `^0.1.0`、`@snap-rail/ui`
-  `^0.1.0`（已随 r2 闭包发布到公共 npm）、zod `^4`、react `^19`、
-  tsdown `^0.22`。`@snap-rail/shell` 随公共闭包发布（当前 0.2.2），
-  `npm view @snap-rail/shell version` 查最新。
+- **版本锚**（本 skill 快照 = **r3 闭包**）：plugin-sdk `^0.2.7`、plugin-kit
+  `^0.2.4`、`@snap-rail/ui` `^0.1.1`、`@snap-rail/shell` `^0.2.3`、
+  cordis `^4.0.1`、equipment `^0.1.6`、store `^0.1.0`、zod `^4`、react `^19`、
+  tsdown `^0.22`。`npm view @snap-rail/plugin-kit version` 查最新。
   base 服务门面 `@snap-rail/plugin-sdk/api` 与 `/api/client` 从 `0.2.5`
   起提供；底层 gateway/connection/settings 由 SDK 传递安装，作者不单列。
-  `SEED_ABI_REVISION` 当前为 **r2**（以 `@snap-rail/plugin-kit` 导出为准）；
-  终端升级后旧 zip 需用当前 plugin-kit 重打包才能过渲染端 ABI 校验。
-- **时代分界（先查这个）**：npm 的 `plugin-sdk ≤ 0.2.5` / `plugin-kit ≤
-  0.2.2` 是 UI 基座内置化**之前**的旧时代产物——没有 `ui-skin` 模板、UI
-  模板默认依赖已退役的 `@snap-rail/framework-shadcn`、pack 盖 seed ABI r1
-  章（当前宿主安装期拒装）。r2 时代从 `plugin-sdk 0.2.6` / `plugin-kit
-  0.2.3` 起：9 模板齐、UI 模板默认内置 `@snap-rail/ui`。装到旧版按上面
-  版本锚升级重装，不要照旧骨架写。
+  `SEED_ABI_REVISION` 当前为 **r3**（以 `@snap-rail/plugin-kit` 导出为准；
+  r2→r3 = 主题契约收敛为单套 token）。球面拖拽 `attachBallDrag` 从
+  `@snap-rail/ui/runtime` 导入，需 ui ≥ 0.1.1。
+- **时代分界（先查这个，决定 zip 能装进哪些终端）**：
+  - **r1**：npm `plugin-sdk ≤ 0.2.5` / `plugin-kit ≤ 0.2.2`——UI 基座内置化
+    之前，没有 `ui-skin` 模板、UI 模板默认依赖已退役的
+    `@snap-rail/framework-shadcn`；盖 r1 章，**任何现行终端都拒装**。
+  - **r2**：`plugin-sdk 0.2.6` / `plugin-kit 0.2.3` / `ui 0.1.0` / `shell
+    0.2.2`——9 模板齐、UI 模板默认内置 `@snap-rail/ui`，但盖 **r2** 章，
+    只能装进终端 **v0.5.0–v0.5.2**。
+  - **r3**：`plugin-sdk 0.2.7` / `plugin-kit 0.2.4` / `ui 0.1.1` / `shell
+    0.2.3` 起——盖 r3 章，对应终端 **≥ v0.5.3**（当前线）。
+  - 只有带渲染面的包（ui-*/suite）会被盖章；纯宿主包（driver/
+    store-provider/host-service/tool）无章放行，不受时代影响。
+  - 装到旧版按版本锚升级重装（锁文件里的 plugin-kit 版本决定盖哪一章），
+    不要照旧骨架写。
 - **版本陷阱（以 plugin-sdk 0.2.3 / equipment 0.1.4 为界，之后消除）**：
   - `probe`（驱动「测试连接」）：主仓已实现，但 npm
     `@snap-rail/equipment@0.1.4` 的类型里**没有**该字段——`0.1.5` 起恢复；
@@ -297,7 +309,9 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
 - [ ] `lib-host/host.js` 不含 plugin-sdk（入口是 `satisfies Plugin`）；
       `lib-client/client.js` 不含 plugin-sdk / node 内置
 - [ ] vitest 冒烟测试通过（manifest 校验 + 装配链路）
-- [ ] pack 产出 sha256/size；`verify` 用公钥验签通过
+- [ ] pack 产出 sha256/size；`verify` 用公钥验签通过；zip 文件名是
+      `<包名>.zip` 且 `/` 换成 `__`（`@my-scope/my-driver` →
+      `@my-scope__my-driver.zip`），feed 的 `file` 字段按此命名
 - [ ] dist 里同包名只保留最新版（feed 拒绝重名）
 - [ ] Release 资产平铺（index.json + zip 同级）、tag `feed`、topic
       `snap-rail-plugin` 已打
