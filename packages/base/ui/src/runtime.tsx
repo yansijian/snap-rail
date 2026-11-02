@@ -8,7 +8,7 @@
  * @module @snap-rail/ui/runtime
  */
 
-import { attachBallDrag, type ClientHandle } from '@snap-rail/client-kernel'
+import { attachBallDrag as kernelAttachBallDrag, type ClientHandle } from '@snap-rail/client-kernel'
 import { subscribeFrame, type HostLink } from '@snap-rail/connection'
 import { settingsChangedSchema } from '@snap-rail/station-rpc/contract'
 import { Context, type Plugin } from '@snap-rail/cordis'
@@ -55,6 +55,30 @@ export function useClient(): ClientServices {
   if (service === null) throw new Error('useClient: no ClientProvider in the tree')
   return service
 }
+
+/**
+ * Options for {@link attachBallDrag}. Declared here (not re-exported from the
+ * kernel) so the published substrate's d.ts stands alone: the kernel is
+ * app-internal and never reaches npm, while this module is a base seed every
+ * pool face can `require` at runtime.
+ */
+export interface BallDragOptions {
+  /** The surface's host link; the drag rides `shell.ball.move`. */
+  link: HostLink
+  /** Answered when a press-release never turned into a drag. */
+  onClick: () => void
+  /** Pointer travel in px beyond which a press becomes a drag (default 4). */
+  threshold?: number
+}
+
+/**
+ * Wire an element as a ball face's single drag/click surface. Past the travel
+ * threshold the face only signals `shell.ball.move` `begin`/`end`; the host
+ * anchors the grab from the OS cursor and runs the dock settle, so the face
+ * never streams coordinates. A press-release inside the threshold is the
+ * click. Returns the disposer removing every listener.
+ */
+export const attachBallDrag: (element: HTMLElement, options: BallDragOptions) => () => void = kernelAttachBallDrag
 
 /** One occupant seat. */
 export interface OccupantSpec {
