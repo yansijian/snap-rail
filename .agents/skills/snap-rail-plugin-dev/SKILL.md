@@ -69,13 +69,16 @@ PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立�
 5. **状态放构造期闭包，不放 Service 子类字段**。cordis 可追踪代理每次访问
    重绑 `this`，字段状态会「每读一次一个世界」。
 6. **页面组件只用内置语义原语**（`@snap-rail/ui/components` 的
-   Button/Card/Dialog/Table/Tabs/Page/Stack/Grid…）。缺原语补进
-   `@snap-rail/ui`，不要在页面里手搓交互组件、不要写裸 Tailwind。
+   Button/Card/Dialog/Table/Tabs/Page/Stack/Grid/Tooltip/Popover/Menu/
+   toast/Alert/List/Slider…，全目录见 client-face.md）。缺原语补进
+   `@snap-rail/ui`，不要在页面里手搓交互组件、不要写裸 Tailwind。表单
+   校验用 RHF 复合件（FormField 等，hooks 从组件面导入，见 client-face.md
+   的 RHF 节）。
 7. **主题只用 skin token**。页面禁止硬编码色值和 `dark:` 变体；图表系列
    只用 `--snap-chart-1…6`；红/黄/绿是状态语义，不进数据系列。第三方图表
    包在 `ChartFrame`/`Visualization` 内，用 `useChartTheme()` 取色。
-8. **触屏基线**：数值输入用 `NumberInput`，单选用 `TouchSelect`，滚动容器
-   用 `DragScroll`。
+8. **触屏基线**：数值输入用 `NumberInput`（带步进钮），单选用
+   `TouchSelect`，滚动容器用 `DragScroll`（指针拖拽平移）。
 9. **OS 资源只走 shell 缝，插件永不 import `electron`**。通知、托盘、窗口
    surface、悬浮球、退出策略一律经 `ctx.shell`（宿主面）或
    `@snap-rail/shell/contract`（渲染面）。

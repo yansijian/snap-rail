@@ -31,23 +31,25 @@
 ## 语义原语（只组合，不手搓）
 
 页面组件只组合 `@snap-rail/ui/components` 的内置原语（`@snap-rail/ui`
-0.1.x 实际导出，按文件分组）：
+0.2.x 实际导出，按文件分组）：
 
 | 组 | 导出 |
 | --- | --- |
 | 按钮 | `Button`（`intent`: neutral/primary/danger/success/warning；`emphasis`: solid/soft/outline/ghost/link；`size`: sm/md/lg）、`IconButton`、`Spinner` |
-| 控件 | `Label`、`Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`、`Switch`、`Checkbox`、`RadioGroup`/`RadioGroupItem`、`TouchSelect`、`Select` |
-| 输入 | `Input`、`Textarea`、`NumberInput` |
-| 表单 | `Form`、`Field`、`SchemaForm`（见下节） |
+| 控件 | `Label`、`Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`、`Switch`（`labelPosition`/`description`）、`Checkbox`（同）、`RadioGroup`（`label`/`description`）/`RadioGroupItem`、`TouchSelect`、`Select`（`options` 数据驱动**或** `SelectItem` children 组合；`defaultValue`/`name`/`required`/`side`/`align`）与 `SelectTrigger`/`SelectValue`/`SelectContent`/`SelectItem`/`SelectGroup`/`SelectLabel` |
+| 输入 | `Input`、`Textarea`、`NumberInput`（触屏 `＋/－` 步进钮，尊重 `min/max`）；三者均支持 `fieldClassName` 直达原生元素 |
+| 表单 | `Form`（`orientation`: stack/inline/grid + `columns`；可选 `form`/`onValid` 接 React Hook Form）、`Field`（`orientation`: vertical/horizontal、`labelWidth`、`labelAlign`）、RHF 复合件 `FormField`/`FormItem`/`FormLabel`/`FormControl`/`FormDescription`/`FormMessage`（见下节）、`SchemaForm` |
 | 对话 | `Dialog`/`DialogTrigger`/`DialogClose`/`DialogContent`/`DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogBody`/`DialogFooter`、`Sheet`（`presentation`: modal/sheet/fullscreen） |
+| 浮层 | `Tooltip`/`TooltipTrigger`/`TooltipContent`、`Popover`/`PopoverTrigger`/`PopoverContent`/`PopoverClose`/`PopoverAnchor`、`Menu`/`MenuTrigger`/`MenuContent`/`MenuItem`/`MenuCheckboxItem`/`MenuLabel`/`MenuGroup`/`MenuSeparator`、`toast()`/`dismissToast()` + `Toaster`（runtime 已挂，直接调 `toast({ title, description?, intent?, duration? })`）与 `Toast` 原语族 |
 | 反馈 | `Badge`、`Led`、`Progress`、`EmptyState` |
+| 注意力 | `Alert`/`AlertTitle`/`AlertDescription`（`intent` 语义色）、`Separator`、`Skeleton`（block/text/circle）、`List`/`ListItem`（`leading`/`trailing` 槽、`divided`/`selected`/`disabled`）、`Slider`（触屏粗调） |
 | 容器 | `Card`/`CardHeader`/`CardTitle`/`CardDescription`/`CardContent`/`CardFooter`、`Panel`、`Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`/`TableEmpty` |
-| 布局 | `Stack`、`Row`、`Grid`、`Split`、`AppShell`、`Page`、`Section`、`Toolbar`、`ScrollArea`、`DragScroll` |
+| 布局 | `Stack`、`Row`、`Grid`、`Split`、`AppShell`、`Page`、`Section`、`Toolbar`（children 渲染于 start/end 之间）、`ScrollArea`（主题化滚动条，`scrollbarType`: hover/scroll/always）、`DragScroll`（指针拖拽平移，触屏走原生滚动） |
+| 解剖助手 | `part`/`cn`/`space`/`controlHeight`——ui-extension 自定义组件用 `part('my-widget', 'root')` 对齐 `data-snap-part`，皮肤才能覆盖 |
 
 缺原语时**不要在页面里手写交互组件**——改用现有原语组合，或把原语补进
-`@snap-rail/ui`（一方职责）。`@snap-rail/ui/contract` 的 `UI_COMPONENTS`
-目录里 `popover` / `tooltip` / `menu` / `toast` 目前只有解剖词汇、没有 React
-组件。
+`@snap-rail/ui`（一方职责）。`UI_COMPONENTS`（`@snap-rail/ui/contract`）
+是组件与 part 解剖的完整目录。
 
 | 助手 | import |
 | --- | --- |
@@ -68,21 +70,61 @@
 ## SchemaForm（schema 驱动表单）
 
 `SchemaForm` 是 **JSON-Schema 渲染器**（props `{ schema, value, onChange,
-idPrefix? }`），设备管理页用它渲染驱动方言表单，自己的设置页也可以用。宿主
-侧经 `z.toJSONSchema(schema, { io: 'input' })` 投影 zod，所以 zod 怎么写决定
-控件长什么样：
+idPrefix?, columns? }`，`columns` 把字段排成栅格），设备管理页用它渲染驱动
+方言表单，自己的设置页也可以用。宿主侧经 `z.toJSONSchema(schema, { io:
+'input' })` 投影 zod，所以 zod 怎么写决定控件长什么样：
 
 | zod 写法 | JSON Schema | 控件 |
 | --- | --- | --- |
 | `z.enum(['a', 'b'])` 或 `z.union([z.literal('a'), z.literal('b')])`（全部分支为字符串/数字/布尔字面量） | `enum` / `anyOf[].const` | `TouchSelect` 单选，回写原字面量类型 |
-| `z.boolean()` | `type: 'boolean'` | `Switch`（开启/关闭） |
-| `z.number()` / `z.int()`（`.min/.max` → `minimum/maximum`） | `type: 'number' \| 'integer'` | `NumberInput` 带上下限 |
+| `z.boolean()` | `type: 'boolean'` | `Switch`（标签即字段标题，不重复开关文案） |
+| `z.number()` / `z.int()`（`.min/.max` → `minimum/maximum`） | `type: 'number' \| 'integer'` | `NumberInput` 带上下限与步进钮 |
 | `z.object` / `z.array` | `type: 'object' \| 'array'` | JSON 文本框（失焦解析） |
 | 其余（`z.string()` 等） | — | `Input` |
 
 - `.meta({ title })` → 字段标签（**缺省用键名**，不会不渲染）；`.describe()`
   → 字段说明；`.default()` → 初始值；必填来自 `required`。
 - 联合分支混进非字面量（如 `z.object`）就退回 JSON 文本框。
+
+## React Hook Form（shadcn 形状复合件）
+
+需要校验/多字段联动时用 RHF 复合件。**hooks 只从 `@snap-rail/ui/components`
+导入**（`useForm`/`useFormContext`/`useFormState`/`useFieldArray`/
+`useController`/`useWatch`/`FormProvider`/`zodResolver` 都从种子面再导出）——
+RHF 的 context 是模块级的，插件 zip 里自带的副本与宿主种子不是同一实例，
+自 `react-hook-form` 导入会拿不到表单状态（构建能过、运行必崩）。
+
+```tsx
+import {
+  Form, FormField, FormItem, FormLabel, FormControl, FormMessage,
+  Input, Button, useForm, zodResolver,
+} from '@snap-rail/ui/components'
+import { z } from 'zod'
+
+const schema = z.object({ host: z.string().min(1, '主机不能为空') })
+
+function DeviceForm({ onSave }: { onSave: (values: { host: string }) => void }) {
+  const form = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    defaultValues: { host: '' },
+  })
+  return (
+    <Form form={form} onValid={onSave}>
+      <FormField name="host" render={({ field }) => (
+        <FormItem>
+          <FormLabel>主机</FormLabel>
+          <FormControl><Input {...field} /></FormControl>
+          <FormMessage />
+        </FormItem>
+      )} />
+      <Button type="submit">保存</Button>
+    </Form>
+  )
+}
+```
+
+`FormItem` 支持 `orientation="horizontal"`（与 `Field` 同款横排布局）。
+校验错误经 `FormMessage` 渲染（`field.error` 解剖、`role="alert"`）。
 
 ## link 与帧
 
