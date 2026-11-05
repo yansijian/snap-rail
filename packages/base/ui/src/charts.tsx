@@ -46,25 +46,25 @@ export function ChartFrame({
         <header {...part('chart-frame', 'header')} className="snap-chart-frame-header">
           <div>
             {title !== undefined && <div {...part('chart-frame', 'title')}>{title}</div>}
-            {description !== undefined && <div className="snap-chart-frame-description">{description}</div>}
+            {description !== undefined && <div {...part('chart-frame', 'description')} className="snap-chart-frame-description">{description}</div>}
           </div>
           {actions !== undefined && <div {...part('chart-frame', 'actions')}>{actions}</div>}
         </header>
       )}
       <div {...part('chart-frame', 'body')} className="snap-chart-frame-body" data-state={state}>
         {state === 'loading'
-          ? loading ?? <div {...part('visualization', 'loading')}>加载中…</div>
+          ? loading ?? <div {...part('chart-frame', 'loading')}>加载中…</div>
           : state === 'empty'
-            ? empty ?? <div {...part('visualization', 'empty')}>暂无数据</div>
+            ? empty ?? <div {...part('chart-frame', 'empty')}>暂无数据</div>
             : state === 'error'
-              ? error ?? <div {...part('visualization', 'error')} role="alert">图表加载失败</div>
+              ? error ?? <div {...part('chart-frame', 'error')} role="alert">图表加载失败</div>
               : children}
       </div>
     </section>
   )
 }
 
-/** A chart frame that exposes the `visualization.*` anatomy as well. */
+/** An alias of {@link ChartFrame} for pages that prefer the generic name. */
 export function Visualization(props: ChartFrameProps): ReactNode {
   return <ChartFrame {...props} />
 }

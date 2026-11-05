@@ -6,7 +6,7 @@
  * @module @snap-rail/ui/components/layout
  */
 
-import type { CSSProperties, ReactNode } from 'react'
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { cn, part, space } from '../utils.ts'
 
 /** A spacing token. */
@@ -232,8 +232,8 @@ export interface ToolbarProps extends LayoutProps {
   end?: ReactNode
 }
 
-/** A compact action bar. */
-export function Toolbar({ start, end, className, style }: ToolbarProps): ReactNode {
+/** A compact action bar; `children` renders between the start and end groups. */
+export function Toolbar({ start, end, children, className, style }: ToolbarProps): ReactNode {
   return (
     <div
       {...part('toolbar', 'root')}
@@ -241,6 +241,9 @@ export function Toolbar({ start, end, className, style }: ToolbarProps): ReactNo
       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space('sm'), ...style }}
     >
       <div {...part('toolbar', 'start')} style={{ display: 'flex', alignItems: 'center', gap: space('sm'), minWidth: 0 }}>{start}</div>
+      {children !== undefined && (
+        <div {...part('toolbar', 'center')} style={{ display: 'flex', alignItems: 'center', gap: space('sm'), minWidth: 0 }}>{children}</div>
+      )}
       <div {...part('toolbar', 'end')} style={{ display: 'flex', alignItems: 'center', gap: space('sm'), flexShrink: 0 }}>{end}</div>
     </div>
   )
@@ -270,15 +273,85 @@ export function ScrollArea({ direction = 'vertical', className, style, children 
   )
 }
 
+/** Options for {@link attachDragPan}. */
+export interface DragPanOptions {
+  /** Which axes the pan may move (default `vertical`). */
+  direction?: 'vertical' | 'horizontal' | 'both'
+  /** Pointer travel in px beyond which a press becomes a pan (default 4). */
+  threshold?: number
+}
+
+/**
+ * Wire an element as a drag-pan surface over its own scroll viewport. Touch
+ * pointers keep native scrolling; mouse/stylus presses pan `scrollLeft`/
+ * `scrollTop` directly once the pointer travels past `threshold`, so child
+ * clicks survive a press-release. While panning the element carries
+ * `data-dragging="true"`. Returns the disposer removing every listener.
+ */
+export function attachDragPan(element: HTMLElement, options: DragPanOptions = {}): () => void {
+  const direction = options.direction ?? 'vertical'
+  const threshold = options.threshold ?? 4
+  let anchor: { x: number, y: number, left: number, top: number } | null = null
+  let panned = false
+  const onPointerDown = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch' || event.button !== 0) return
+    anchor = { x: event.clientX, y: event.clientY, left: element.scrollLeft, top: element.scrollTop }
+    panned = false
+  }
+  const onPointerMove = (event: PointerEvent): void => {
+    if (anchor === null) return
+    const dx = event.clientX - anchor.x
+    const dy = event.clientY - anchor.y
+    if (!panned && Math.hypot(dx, dy) < threshold) return
+    panned = true
+    element.setAttribute('data-dragging', 'true')
+    if (direction !== 'vertical') element.scrollLeft = anchor.left - dx
+    if (direction !== 'horizontal') element.scrollTop = anchor.top - dy
+  }
+  const endPan = (): void => {
+    anchor = null
+    element.removeAttribute('data-dragging')
+  }
+  const onClickCapture = (event: MouseEvent): void => {
+    if (!panned) return
+    panned = false
+    event.preventDefault()
+    event.stopPropagation()
+  }
+  element.addEventListener('pointerdown', onPointerDown)
+  element.addEventListener('pointermove', onPointerMove)
+  element.addEventListener('pointerup', endPan)
+  element.addEventListener('pointercancel', endPan)
+  element.addEventListener('pointerleave', endPan)
+  element.addEventListener('click', onClickCapture, true)
+  return () => {
+    element.removeEventListener('pointerdown', onPointerDown)
+    element.removeEventListener('pointermove', onPointerMove)
+    element.removeEventListener('pointerup', endPan)
+    element.removeEventListener('pointercancel', endPan)
+    element.removeEventListener('pointerleave', endPan)
+    element.removeEventListener('click', onClickCapture, true)
+  }
+}
+
 /** Props of {@link DragScroll}. */
 export interface DragScrollProps extends LayoutProps {
   direction?: 'vertical' | 'horizontal' | 'both'
 }
 
-/** A touch-friendly scroll container; pointer dragging pans the viewport. */
+/** A scroll container any pointer can pan by dragging; touch keeps native
+ * scrolling, mouse/stylus drags pan the viewport past a small travel
+ * threshold, and child clicks survive a press-release. */
 export function DragScroll({ direction = 'vertical', className, style, children }: DragScrollProps): ReactNode {
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const root = rootRef.current
+    if (root === null) return
+    return attachDragPan(root, { direction })
+  }, [direction])
   return (
     <div
+      ref={rootRef}
       {...part('drag-scroll', 'root')}
       className={cn('snap-drag-scroll', className)}
       style={{

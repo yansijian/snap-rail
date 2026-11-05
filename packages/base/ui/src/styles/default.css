@@ -621,7 +621,6 @@
     font-weight: var(--snap-weight-medium);
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='visualization.root'],
   :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='chart-frame.root'] {
     border: var(--snap-border-width) solid var(--snap-color-border);
     border-radius: var(--snap-radius-lg);
@@ -630,7 +629,6 @@
     gap: var(--snap-space-sm);
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='visualization.title'],
   :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='chart-frame.title'] {
     font-size: var(--snap-text-md);
     font-weight: var(--snap-weight-medium);
@@ -643,7 +641,7 @@
     gap: var(--snap-space-md);
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) .snap-chart-frame-description {
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='chart-frame.description'] {
     margin-top: var(--snap-space-xs);
     color: var(--snap-color-muted);
     font-size: var(--snap-text-sm);
@@ -653,9 +651,9 @@
     min-height: 180px;
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='visualization.empty'],
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='visualization.error'],
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='visualization.loading'] {
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='chart-frame.empty'],
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='chart-frame.error'],
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='chart-frame.loading'] {
     display: flex;
     align-items: center;
     justify-content: center;

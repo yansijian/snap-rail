@@ -12,7 +12,7 @@ import * as RadioGroupPrimitive from '@radix-ui/react-radio-group'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import * as SwitchPrimitive from '@radix-ui/react-switch'
 import * as TabsPrimitive from '@radix-ui/react-tabs'
-import { useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
+import { useId, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import { cn, part } from '../utils.ts'
 import { Button } from './button.tsx'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './dialog.tsx'
@@ -23,7 +23,9 @@ export function Label({ className, children, ...props }: ComponentPropsWithoutRe
 }
 
 /** The tabs root. */
-export const Tabs = TabsPrimitive.Root
+export function Tabs({ className, children, ...props }: ComponentPropsWithoutRef<typeof TabsPrimitive.Root>): ReactNode {
+  return <TabsPrimitive.Root {...part('tabs', 'root')} className={cn('snap-tabs', className)} {...props}>{children}</TabsPrimitive.Root>
+}
 
 /** The tabs list. */
 export function TabsList({ className, children, ...props }: ComponentPropsWithoutRef<typeof TabsPrimitive.List>): ReactNode {
@@ -76,9 +78,35 @@ export function Checkbox({ className, label, ...props }: CheckboxProps): ReactNo
   )
 }
 
-/** The radio group root. */
-export function RadioGroup({ className, children, ...props }: ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>): ReactNode {
-  return <RadioGroupPrimitive.Root {...part('radio-group', 'root')} className={cn('snap-radio-group', className)} {...props}>{children}</RadioGroupPrimitive.Root>
+/** Props of {@link RadioGroup}. */
+export interface RadioGroupProps extends ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root> {
+  /** A label above the group; linked via `aria-labelledby`. */
+  label?: ReactNode
+  /** Helper text below the group. */
+  description?: ReactNode
+}
+
+/** A labelled group of radio items. */
+export function RadioGroup({ className, label, description, children, ...props }: RadioGroupProps): ReactNode {
+  const labelId = useId()
+  const group = (
+    <RadioGroupPrimitive.Root
+      {...part('radio-group', 'root')}
+      className={cn('snap-radio-group', className)}
+      {...label !== undefined ? { 'aria-labelledby': labelId } : {}}
+      {...props}
+    >
+      {children}
+    </RadioGroupPrimitive.Root>
+  )
+  if (label === undefined && description === undefined) return group
+  return (
+    <div {...part('radio-group', 'block')} className="snap-radio-group-block">
+      {label !== undefined && <Label id={labelId} {...part('radio-group', 'label')}>{label}</Label>}
+      {group}
+      {description !== undefined && <div {...part('radio-group', 'description')} className="snap-field-help">{description}</div>}
+    </div>
+  )
 }
 
 /** One radio item. */
@@ -131,7 +159,7 @@ export function TouchSelect({
   const [open, setOpen] = useState(false)
   const selected = options.find(option => option.value === value)
   return (
-    <>
+    <span {...part('touch-select', 'root')} className="snap-touch-select">
       <Button
         type="button"
         size={size}
@@ -142,12 +170,13 @@ export function TouchSelect({
         aria-invalid={invalid || undefined}
         aria-haspopup="dialog"
         onClick={() => setOpen(true)}
+        {...part('touch-select', 'trigger')}
       >
         <span style={{ flex: 1, textAlign: 'left' }}>{selected?.label ?? placeholder}</span>
         <span aria-hidden="true">▾</span>
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent presentation="modal" size="sm">
+        <DialogContent presentation="modal" size="sm" {...part('touch-select', 'sheet')}>
           <DialogHeader><DialogTitle>{title ?? ariaLabel ?? '请选择'}</DialogTitle></DialogHeader>
           <div {...part('touch-select', 'options')} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--snap-space-sm)' }}>
             {options.map(option => (
@@ -162,6 +191,7 @@ export function TouchSelect({
                   onValueChange?.(option.value)
                   setOpen(false)
                 }}
+                {...part('touch-select', 'option')}
               >
                 {option.label}
               </Button>
@@ -170,7 +200,7 @@ export function TouchSelect({
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </span>
   )
 }
 
@@ -187,42 +217,44 @@ export function Select({
   'aria-label': ariaLabel,
 }: SelectProps): ReactNode {
   return (
-    <SelectPrimitive.Root
-      {...value !== undefined ? { value } : {}}
-      {...onValueChange !== undefined ? { onValueChange } : {}}
-      disabled={disabled}
-    >
-      <SelectPrimitive.Trigger
-        {...part('select', 'trigger')}
-        className={cn('snap-select-trigger', className)}
-        data-size={size}
-        data-invalid={invalid || undefined}
-        data-disabled={disabled || undefined}
-        aria-label={ariaLabel}
-        aria-invalid={invalid || undefined}
+    <span {...part('select', 'root')} className="snap-select">
+      <SelectPrimitive.Root
+        {...value !== undefined ? { value } : {}}
+        {...onValueChange !== undefined ? { onValueChange } : {}}
+        disabled={disabled}
       >
-        <SelectPrimitive.Value {...part('select', 'value')} placeholder={placeholder} />
-        <SelectPrimitive.Icon {...part('select', 'chevron')} className="snap-select-chevron">▾</SelectPrimitive.Icon>
-      </SelectPrimitive.Trigger>
-      <SelectPrimitive.Portal>
-        <SelectPrimitive.Content {...part('select', 'content')} className="snap-select-content" position="popper" sideOffset={4}>
-          <SelectPrimitive.Viewport>
-            {options.map(option => (
-              <SelectPrimitive.Item
-                key={option.value}
-                {...part('select', 'item')}
-                className="snap-select-item"
-                value={option.value}
-                disabled={option.disabled === true}
-              >
-                <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
-                <SelectPrimitive.ItemIndicator {...part('select', 'item-indicator')} className="snap-select-item-indicator">✓</SelectPrimitive.ItemIndicator>
-              </SelectPrimitive.Item>
-            ))}
-            {options.length === 0 && <div {...part('select', 'empty')} className="snap-select-empty">无可选项</div>}
-          </SelectPrimitive.Viewport>
-        </SelectPrimitive.Content>
-      </SelectPrimitive.Portal>
-    </SelectPrimitive.Root>
+        <SelectPrimitive.Trigger
+          {...part('select', 'trigger')}
+          className={cn('snap-select-trigger', className)}
+          data-size={size}
+          data-invalid={invalid || undefined}
+          data-disabled={disabled || undefined}
+          aria-label={ariaLabel}
+          aria-invalid={invalid || undefined}
+        >
+          <SelectPrimitive.Value {...part('select', 'value')} placeholder={placeholder} />
+          <SelectPrimitive.Icon {...part('select', 'chevron')} className="snap-select-chevron">▾</SelectPrimitive.Icon>
+        </SelectPrimitive.Trigger>
+        <SelectPrimitive.Portal>
+          <SelectPrimitive.Content {...part('select', 'content')} className="snap-select-content" position="popper" sideOffset={4}>
+            <SelectPrimitive.Viewport>
+              {options.map(option => (
+                <SelectPrimitive.Item
+                  key={option.value}
+                  {...part('select', 'item')}
+                  className="snap-select-item"
+                  value={option.value}
+                  disabled={option.disabled === true}
+                >
+                  <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
+                  <SelectPrimitive.ItemIndicator {...part('select', 'item-indicator')} className="snap-select-item-indicator">✓</SelectPrimitive.ItemIndicator>
+                </SelectPrimitive.Item>
+              ))}
+              {options.length === 0 && <div {...part('select', 'empty')} className="snap-select-empty">无可选项</div>}
+            </SelectPrimitive.Viewport>
+          </SelectPrimitive.Content>
+        </SelectPrimitive.Portal>
+      </SelectPrimitive.Root>
+    </span>
   )
 }

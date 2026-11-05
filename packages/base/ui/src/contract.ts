@@ -218,14 +218,14 @@ export const UI_COMPONENTS = {
   select: {
     parts: ['select.root', 'select.trigger', 'select.value', 'select.chevron', 'select.content', 'select.item', 'select.item-indicator', 'select.empty'],
     slots: ['empty'],
-    props: ['size', 'invalid', 'disabled', 'presentation'],
+    props: ['size', 'invalid', 'disabled'],
   },
   'touch-select': {
     parts: ['touch-select.root', 'touch-select.trigger', 'touch-select.sheet', 'touch-select.option'],
     props: ['invalid', 'disabled'],
   },
   checkbox: {
-    parts: ['checkbox.root', 'checkbox.box', 'checkbox.indicator', 'checkbox.label'],
+    parts: ['checkbox.root', 'checkbox.indicator', 'checkbox.label'],
     slots: ['label'],
     props: ['checked', 'invalid', 'disabled'],
   },
@@ -235,13 +235,13 @@ export const UI_COMPONENTS = {
     props: ['checked', 'disabled'],
   },
   'radio-group': {
-    parts: ['radio-group.root', 'radio-group.item', 'radio-group.indicator', 'radio-group.label'],
-    props: ['value', 'disabled'],
+    parts: ['radio-group.root', 'radio-group.item', 'radio-group.indicator', 'radio-group.label', 'radio-group.block', 'radio-group.description'],
+    props: ['value', 'disabled', 'label', 'description'],
   },
   tabs: {
     parts: ['tabs.root', 'tabs.list', 'tabs.trigger', 'tabs.content'],
     slots: ['list', 'content'],
-    props: ['value', 'presentation'],
+    props: ['value'],
   },
   table: {
     parts: ['table.root', 'table.header', 'table.body', 'table.row', 'table.head', 'table.cell', 'table.empty'],
@@ -305,7 +305,7 @@ export const UI_COMPONENTS = {
   field: {
     parts: ['field.root', 'field.label', 'field.control', 'field.help', 'field.error'],
     slots: ['label', 'control', 'help', 'error'],
-    props: ['invalid', 'required', 'disabled'],
+    props: ['invalid', 'required'],
   },
   'schema-form': {
     parts: ['schema-form.root', 'schema-form.field'],
@@ -324,7 +324,7 @@ export const UI_COMPONENTS = {
     slots: ['header', 'title', 'actions', 'body'],
   },
   toolbar: {
-    parts: ['toolbar.root', 'toolbar.start', 'toolbar.end'],
+    parts: ['toolbar.root', 'toolbar.start', 'toolbar.center', 'toolbar.end'],
     slots: ['start', 'end'],
   },
   stack: { parts: ['stack.root'], props: ['gap', 'padding', 'align'] },
@@ -333,14 +333,10 @@ export const UI_COMPONENTS = {
   split: { parts: ['split.root', 'split.start', 'split.end'], slots: ['start', 'end'] },
   'scroll-area': { parts: ['scroll-area.root', 'scroll-area.viewport', 'scroll-area.scrollbar'] },
   'drag-scroll': { parts: ['drag-scroll.root', 'drag-scroll.viewport'] },
-  visualization: {
-    parts: ['visualization.root', 'visualization.header', 'visualization.title', 'visualization.actions', 'visualization.body', 'visualization.empty', 'visualization.error', 'visualization.loading'],
-    slots: ['header', 'title', 'actions', 'body', 'empty', 'error', 'loading'],
-    props: ['state'],
-  },
   'chart-frame': {
-    parts: ['chart-frame.root', 'chart-frame.header', 'chart-frame.title', 'chart-frame.actions', 'chart-frame.body'],
-    slots: ['header', 'title', 'actions', 'body'],
+    parts: ['chart-frame.root', 'chart-frame.header', 'chart-frame.title', 'chart-frame.description', 'chart-frame.actions', 'chart-frame.body', 'chart-frame.loading', 'chart-frame.empty', 'chart-frame.error'],
+    slots: ['header', 'title', 'description', 'actions', 'body', 'empty', 'error', 'loading'],
+    props: ['state'],
   },
   settings: {
     parts: [

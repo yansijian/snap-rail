@@ -10,18 +10,28 @@ import {
   Grid,
   Input,
   Led,
+  NumberInput,
   Progress,
+  RadioGroup,
+  RadioGroupItem,
   Row,
   SchemaForm,
+  Select,
   Stack,
-  literalValuesOf,
+  Switch,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Toolbar,
   TouchSelect,
+  literalValuesOf,
 } from '../src/components/index.ts'
 
 describe('schema-driven forms', () => {
@@ -170,5 +180,83 @@ describe('semantic component anatomy', () => {
     expect(html).toContain('aria-valuenow="50"')
     expect(html).toContain('data-snap-part="field.label"')
     expect(html).toContain('data-required="true"')
+  })
+
+  it('renders the declared anatomy the contract promises', () => {
+    const html = renderToStaticMarkup(
+      <>
+        <Tabs defaultValue="a">
+          <TabsList><TabsTrigger value="a">甲</TabsTrigger></TabsList>
+          <TabsContent value="a">内容</TabsContent>
+        </Tabs>
+        <Select options={[{ value: 'a', label: '甲' }]} aria-label="选择" />
+        <TouchSelect value="a" options={[{ value: 'a', label: '甲' }]} onValueChange={() => {}} aria-label="选择" />
+        <Switch checked label="启用" />
+      </>,
+    )
+    expect(html).toContain('data-snap-part="tabs.root"')
+    expect(html).toContain('data-snap-part="select.root"')
+    expect(html).toContain('data-snap-part="touch-select.root"')
+    // The modal sheet renders only when open; the trigger carries the anatomy.
+    expect(html).toContain('data-snap-part="touch-select.trigger"')
+  })
+
+  it('renders number-input steppers clamped by min/max', () => {
+    const html = renderToStaticMarkup(
+      <NumberInput value={10} min={0} max={10} onChange={() => {}} />,
+    )
+    expect(html).toContain('data-snap-part="number-input.step-up"')
+    expect(html).toContain('data-snap-part="number-input.step-down"')
+    // At the upper bound the step-up control is disabled.
+    expect(html).toMatch(/data-snap-part="number-input.step-up"[^>]*disabled/)
+  })
+
+  it('renders a labelled radio group with the declared label part', () => {
+    const html = renderToStaticMarkup(
+      <RadioGroup label="采集模式" description="决定轮询的触发方式">
+        <RadioGroupItem value="poll" />
+      </RadioGroup>,
+    )
+    expect(html).toContain('data-snap-part="radio-group.block"')
+    expect(html).toContain('data-snap-part="radio-group.label"')
+    expect(html).toContain('采集模式')
+    expect(html).toContain('aria-labelledby')
+  })
+
+  it('renders toolbar children between the start and end groups', () => {
+    const html = renderToStaticMarkup(
+      <Toolbar start={<span>开始</span>} end={<span>结束</span>}>中段</Toolbar>,
+    )
+    expect(html).toContain('data-snap-part="toolbar.center"')
+    expect(html.indexOf('toolbar.center')).toBeGreaterThan(html.indexOf('toolbar.start'))
+    expect(html.indexOf('toolbar.center')).toBeLessThan(html.indexOf('toolbar.end'))
+    // Without children the DOM stays exactly start + end.
+    const bare = renderToStaticMarkup(<Toolbar start={<span>开始</span>} end={<span>结束</span>} />)
+    expect(bare).not.toContain('toolbar.center')
+  })
+
+  it('renders schema-form anatomy instead of bare layout divs', () => {
+    const html = renderToStaticMarkup(
+      <SchemaForm
+        schema={{ type: 'object', properties: { host: { type: 'string', title: '主机' } } }}
+        value={{}}
+        onChange={() => {}}
+      />,
+    )
+    expect(html).toContain('data-snap-part="schema-form.root"')
+    expect(html).toContain('data-snap-part="schema-form.field"')
+  })
+
+  it('leaves the boolean switch unlabeled instead of repeating on/off captions', () => {
+    const html = renderToStaticMarkup(
+      <SchemaForm
+        schema={{ type: 'object', properties: { enabled: { type: 'boolean', title: '启用' } } }}
+        value={{ enabled: true }}
+        onChange={() => {}}
+      />,
+    )
+    expect(html).toContain('启用')
+    expect(html).not.toContain('开启')
+    expect(html).not.toContain('关闭')
   })
 })

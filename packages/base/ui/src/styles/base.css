@@ -92,7 +92,9 @@
   }
 
   [data-snap-component='select'] {
-    display: inline-flex;
+    display: flex;
+    width: 100%;
+    min-width: 0;
   }
 
   [data-snap-part='select.trigger'] {
@@ -257,7 +259,6 @@
     text-align: center;
   }
 
-  [data-snap-part='visualization.root'],
   [data-snap-part='chart-frame.root'] {
     display: flex;
     flex-direction: column;
@@ -310,10 +311,52 @@
     text-align: left;
   }
 
-  [data-snap-part='visualization.body'],
   [data-snap-part='chart-frame.body'] {
     flex: 1;
     min-height: 0;
+  }
+
+  [data-snap-component='touch-select'] {
+    display: inline-flex;
+    max-width: 100%;
+  }
+
+  [data-snap-part='radio-group.block'] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--snap-space-xs);
+    min-width: 0;
+  }
+
+  .snap-number-input-steps {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  [data-snap-part='number-input.step-up'],
+  [data-snap-part='number-input.step-down'] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    padding: 0 var(--snap-space-xs);
+  }
+
+  [data-snap-part='number-input.step-up']:disabled,
+  [data-snap-part='number-input.step-down']:disabled {
+    cursor: default;
+  }
+
+  [data-snap-part='drag-scroll.root'] {
+    cursor: grab;
+  }
+
+  [data-snap-part='drag-scroll.root'][data-dragging='true'] {
+    cursor: grabbing;
+    user-select: none;
   }
 
   [data-snap-component='button']:focus-visible,

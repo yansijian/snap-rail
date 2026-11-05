@@ -5,7 +5,7 @@
  * @module @snap-rail/ui/components/input
  */
 
-import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import { useRef, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import { cn, part } from '../utils.ts'
 
 /** The control size shared by single-line inputs. */
@@ -113,17 +113,85 @@ export interface NumberInputProps extends Omit<InputProps, 'type' | 'prefix' | '
   step?: number
 }
 
-/** A numeric field with the numeric keyboard hint and native stepping. */
-export function NumberInput({ min, max, step, ...props }: NumberInputProps): ReactNode {
+/** A numeric field with touch steppers: `step-up`/`step-down` commit through
+ * the normal `onChange` (a native input event on the field), clamped to
+ * `min`/`max`. */
+export function NumberInput({
+  min,
+  max,
+  step = 1,
+  size = 'md',
+  invalid = false,
+  className,
+  style,
+  disabled,
+  value,
+  onChange,
+  ...props
+}: NumberInputProps): ReactNode {
+  const fieldRef = useRef<HTMLInputElement>(null)
+  const current = typeof value === 'number' ? value : undefined
+  const stepBy = (delta: number): void => {
+    const field = fieldRef.current
+    if (field === null || disabled === true) return
+    const parsed = typeof value === 'number' ? value : Number(field.value)
+    let next = (Number.isFinite(parsed) ? parsed : (min ?? 0)) + delta * step
+    if (min !== undefined && next < min) next = min
+    if (max !== undefined && next > max) next = max
+    // Commit through the native setter + input event so controlled consumers
+    // observe a regular change event on the field itself.
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+    setter?.call(field, String(next))
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  }
   return (
-    <Input
-      {...props}
-      componentName="number-input"
-      type="number"
-      inputMode="decimal"
-      {...min !== undefined ? { min } : {}}
-      {...max !== undefined ? { max } : {}}
-      {...step !== undefined ? { step } : {}}
-    />
+    <div
+      {...part('number-input', 'root')}
+      className={cn('snap-input', 'snap-number-input', className)}
+      style={style}
+      data-size={size}
+      data-invalid={invalid || undefined}
+      data-disabled={disabled === true || undefined}
+    >
+      <input
+        ref={fieldRef}
+        {...part('number-input', 'field')}
+        className="snap-input-field"
+        type="number"
+        inputMode="decimal"
+        disabled={disabled}
+        aria-invalid={invalid || undefined}
+        value={value}
+        onChange={onChange}
+        {...min !== undefined ? { min } : {}}
+        {...max !== undefined ? { max } : {}}
+        {...step !== undefined ? { step } : {}}
+        {...props}
+      />
+      <span className="snap-number-input-steps">
+        <button
+          {...part('number-input', 'step-up')}
+          type="button"
+          tabIndex={-1}
+          className="snap-number-input-step"
+          aria-label="增大"
+          disabled={disabled === true || (current !== undefined && max !== undefined && current >= max)}
+          onClick={() => stepBy(1)}
+        >
+          ＋
+        </button>
+        <button
+          {...part('number-input', 'step-down')}
+          type="button"
+          tabIndex={-1}
+          className="snap-number-input-step"
+          aria-label="减小"
+          disabled={disabled === true || (current !== undefined && min !== undefined && current <= min)}
+          onClick={() => stepBy(-1)}
+        >
+          －
+        </button>
+      </span>
+    </div>
   )
 }

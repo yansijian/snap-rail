@@ -9,6 +9,7 @@
  */
 
 import type { ReactNode } from 'react'
+import { part } from '../utils.ts'
 import { Field } from './form.tsx'
 import { Input, NumberInput, Textarea } from './input.tsx'
 import { Switch, TouchSelect } from './controls.tsx'
@@ -72,86 +73,95 @@ export function SchemaForm({ schema, value, onChange, idPrefix = 'schema' }: Sch
   const update = (key: string, next: unknown): void => {
     onChange({ ...value, [key]: next })
   }
+  const renderField = (key: string, property: JsonSchemaNode): ReactNode => {
+    const id = `${idPrefix}-${key}`
+    const current = value[key] ?? property.default
+    const label = property.title ?? key
+    const common = {
+      label,
+      htmlFor: id,
+      ...(property.description !== undefined ? { help: property.description } : {}),
+      ...(required.has(key) ? { required: true } : {}),
+    }
+    const values = literalValuesOf(property)
+    if (values !== undefined) {
+      const options: SelectOption[] = values.map(item => ({ value: String(item), label: String(item) }))
+      return (
+        <Field {...common}>
+          <TouchSelect
+            {...current !== undefined ? { value: String(current) } : {}}
+            options={options}
+            onValueChange={next => {
+              update(key, values.find(item => String(item) === next) ?? next)
+            }}
+            aria-label={String(label)}
+          />
+        </Field>
+      )
+    }
+    if (property.type === 'boolean') {
+      // The field title is the label; the switch itself stays unlabeled so
+      // the row does not repeat a hardcoded on/off caption.
+      return (
+        <Field {...common}>
+          <Switch checked={current === true} onCheckedChange={next => update(key, next)} aria-label={String(label)} />
+        </Field>
+      )
+    }
+    if (property.type === 'number' || property.type === 'integer') {
+      return (
+        <Field {...common}>
+          <NumberInput
+            id={id}
+            value={typeof current === 'number' ? current : ''}
+            {...property.minimum !== undefined ? { min: property.minimum } : {}}
+            {...property.maximum !== undefined ? { max: property.maximum } : {}}
+            onChange={event => {
+              const raw = event.target.value
+              update(key, raw === '' ? undefined : Number(raw))
+            }}
+          />
+        </Field>
+      )
+    }
+    if (property.type === 'object' || property.type === 'array') {
+      return (
+        <Field {...common} help={property.description ?? 'JSON 值'}>
+          <Textarea
+            id={id}
+            rows={4}
+            defaultValue={JSON.stringify(current ?? (property.type === 'array' ? [] : {}), null, 2)}
+            onBlur={event => {
+              try {
+                update(key, JSON.parse(event.target.value))
+              } catch {
+                // Keep the invalid draft in the textarea; the driver's
+                // schema rejects it on submit with a readable error.
+              }
+            }}
+          />
+        </Field>
+      )
+    }
+    return (
+      <Field {...common}>
+        <Input
+          id={id}
+          value={typeof current === 'string' || typeof current === 'number' ? String(current) : ''}
+          onChange={event => update(key, event.target.value)}
+        />
+      </Field>
+    )
+  }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--snap-space-md)' }}>
-      {Object.entries(properties).map(([key, property]) => {
-        const id = `${idPrefix}-${key}`
-        const current = value[key] ?? property.default
-        const label = property.title ?? key
-        const common = {
-          label,
-          htmlFor: id,
-          ...(property.description !== undefined ? { help: property.description } : {}),
-          ...(required.has(key) ? { required: true } : {}),
-        }
-        const values = literalValuesOf(property)
-        if (values !== undefined) {
-          const options: SelectOption[] = values.map(item => ({ value: String(item), label: String(item) }))
-          return (
-            <Field key={key} {...common}>
-              <TouchSelect
-                {...current !== undefined ? { value: String(current) } : {}}
-                options={options}
-                onValueChange={next => {
-                  update(key, values.find(item => String(item) === next) ?? next)
-                }}
-                aria-label={String(label)}
-              />
-            </Field>
-          )
-        }
-        if (property.type === 'boolean') {
-          return (
-            <Field key={key} {...common}>
-              <Switch checked={current === true} onCheckedChange={next => update(key, next)} label={current === true ? '开启' : '关闭'} />
-            </Field>
-          )
-        }
-        if (property.type === 'number' || property.type === 'integer') {
-          return (
-            <Field key={key} {...common}>
-              <NumberInput
-                id={id}
-                value={typeof current === 'number' ? current : ''}
-                {...property.minimum !== undefined ? { min: property.minimum } : {}}
-                {...property.maximum !== undefined ? { max: property.maximum } : {}}
-                onChange={event => {
-                  const raw = event.target.value
-                  update(key, raw === '' ? undefined : Number(raw))
-                }}
-              />
-            </Field>
-          )
-        }
-        if (property.type === 'object' || property.type === 'array') {
-          return (
-            <Field key={key} {...common} help={property.description ?? 'JSON 值'}>
-              <Textarea
-                id={id}
-                rows={4}
-                defaultValue={JSON.stringify(current ?? (property.type === 'array' ? [] : {}), null, 2)}
-                onBlur={event => {
-                  try {
-                    update(key, JSON.parse(event.target.value))
-                  } catch {
-                    // Keep the invalid draft in the textarea; the driver's
-                    // schema rejects it on submit with a readable error.
-                  }
-                }}
-              />
-            </Field>
-          )
-        }
-        return (
-          <Field key={key} {...common}>
-            <Input
-              id={id}
-              value={typeof current === 'string' || typeof current === 'number' ? String(current) : ''}
-              onChange={event => update(key, event.target.value)}
-            />
-          </Field>
-        )
-      })}
+    <div
+      {...part('schema-form', 'root')}
+      className="snap-schema-form"
+      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--snap-space-md)' }}
+    >
+      {Object.entries(properties).map(([key, property]) => (
+        <div key={key} {...part('schema-form', 'field')}>{renderField(key, property)}</div>
+      ))}
       {Object.keys(properties).length === 0 && (
         <span style={{ color: 'var(--snap-color-muted)' }}>该驱动没有额外配置项。</span>
       )}
