@@ -245,8 +245,8 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
   存在但类型包没装 → 按地图升级 SDK；地图里没有的才是真的没有。不要从已装
   插件的编译产物反推 API，也不要在插件里 `as any`——那是 skill/闭包缺口的
   信号。
-- **版本锚**（本 skill 快照 = **r3 闭包**）：plugin-sdk `^0.2.7`、plugin-kit
-  `^0.2.4`、`@snap-rail/ui` `^0.1.1`、`@snap-rail/shell` `^0.2.3`、
+- **版本锚**（本 skill 快照 = **r3 闭包 · ui 0.2**）：plugin-sdk `^0.2.8`、
+  plugin-kit `^0.2.4`、`@snap-rail/ui` `^0.2.0`、`@snap-rail/shell` `^0.2.3`、
   cordis `^4.0.1`、equipment `^0.1.6`、store `^0.1.0`、zod `^4`、react `^19`、
   tsdown `^0.22`。`npm view @snap-rail/plugin-kit version` 查最新。
   base 服务门面 `@snap-rail/plugin-sdk/api` 与 `/api/client` 从 `0.2.5`
@@ -263,6 +263,12 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
     只能装进终端 **v0.5.0–v0.5.2**。
   - **r3**：`plugin-sdk 0.2.7` / `plugin-kit 0.2.4` / `ui 0.1.1` / `shell
     0.2.3` 起——盖 r3 章，对应终端 **≥ v0.5.3**（当前线）。
+  - **r3 · ui 0.2**：`plugin-sdk 0.2.8` / `ui 0.2.0` 起——仍盖 r3 章（种子
+    ABI 不变、只增导出），组件面镜像 shadcn：浮层 Tooltip/Popover/Menu/
+    `toast()`、Alert/List/Slider、Form/Field 横排栅格、RHF 复合件。用到这些
+    新组件的插件**需终端 ≥ v0.6.0**：章只比主版本，0.x 跨 minor 不拦截，
+    装进 v0.5.3–v0.5.5 不会被拒、渲染新组件时才失败——插件 README 写明
+    最低终端版本。只用 0.1 组件的插件照旧覆盖全部 r3 终端。
   - 只有带渲染面的包（ui-*/suite）会被盖章；纯宿主包（driver/
     store-provider/host-service/tool）无章放行，不受时代影响。
   - 装到旧版按版本锚升级重装（锁文件里的 plugin-kit 版本决定盖哪一章），
@@ -278,6 +284,11 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
     devDependencies 供类型/构建，运行时由 base 种子提供。`ClientServices`
     由内置 runtime 提供（`ctx.client.link` / `surface`），不再有可替换的
     独立 UI 框架插件；
+  - `@snap-rail/ui` 0.1.x 的类型里没有 0.2 组件（`Tooltip`/`FormField`/
+    `Alert`/`toast`/`SelectItem`…）——报 has no exported member 就升
+    `^0.2.0`；RHF hooks（`useForm`/`useFormContext`/`zodResolver`…）只从
+    `@snap-rail/ui/components` 导入，**不装** `react-hook-form`（私有副本
+    的 context 与种子不是同一实例）；
   - npmmirror 元数据同步滞后还可能让版本范围解析到旧版本——遇到「文档说有、
     类型说没有」，先切官方 registry 重装再判断；
   - 对策恒定：**以安装的 d.ts/schema 为准**——

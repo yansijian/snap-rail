@@ -26,9 +26,12 @@ const sdkVersion = createRequire(import.meta.url)('../package.json').version as 
 
 /** The built-in UI substrate a renderer template compiles against. It is a
  * base seed, not a pool package, so it never appears in `requires`; the
- * generated repository only needs it as a dependency for types and build. */
+ * generated repository only needs it as a dependency for types and build.
+ * The 0.2 line (overlays, Alert/List/Slider, the React Hook Form composites)
+ * ships with terminal v0.6.0 — the runtime value always comes from the
+ * terminal's own seed. */
 const DEFAULT_UI_PACKAGE = '@snap-rail/ui'
-const UI_PACKAGE_RANGE = '^0.1.0'
+const UI_PACKAGE_RANGE = '^0.2.0'
 
 interface UiBinding {
   name: string
@@ -496,6 +499,18 @@ snap-rail checkout or copy host internals.
   equipment-contract/ui/react/zod) are always seeded — never declare them in
   \`externalSeeds\`. UI pages compose \`${framework.name}/components\`, never
   hand-rolled widgets.
+- Forms with validation use the React Hook Form composites of
+  \`${framework.name}/components\` (\`useForm\`, \`zodResolver\`, \`FormField\`,
+  \`FormItem\`, \`FormMessage\`…) and import every RHF hook from there — never
+  install \`react-hook-form\` itself: its context is module-scoped, so a bundled
+  private copy cannot see the seed's form state. The terminal runtime already
+  mounts the tooltip provider and the toaster on every surface: use
+  \`Tooltip\`/\`Popover\`/\`Menu\` and call \`toast()\` directly — never add a
+  provider or toaster of your own.
+- The UI substrate the terminal ships is the runtime truth: components of the
+  0.2 line (overlays, \`Alert\`, \`List\`, \`Slider\`, the form composites) need
+  terminal v0.6.0 or newer — state that minimum in your README when you use
+  them.
 - Release archives contain the trimmed manifest and built faces only —
   never \`src/\`. \`pack\` refuses to ship one.
 

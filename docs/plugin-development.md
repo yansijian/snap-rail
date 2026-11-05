@@ -108,8 +108,23 @@ zip 里残留的字段在 manifest 校验时被剥离，宿主永不再读它们
 - 页面组件只组合 `@snap-rail/ui/components` 的语义原语
   （Button/Card/Dialog/Table/Tabs/Page/Stack/Grid…）；缺原语补进
   `@snap-rail/ui`，不在页面里手搓交互组件或写裸 Tailwind。触屏基线：
-  数值输入用 `NumberInput`，单选用 `TouchSelect`，滚动容器用 `DragScroll`。
+  数值输入用 `NumberInput`（带步进钮），单选用 `TouchSelect`，滚动容器用
+  `DragScroll`（指针拖拽平移）。
   第三方图表包在 `ChartFrame`/`Visualization` 内，用 `useChartTheme()` 取色。
+- **组件面镜像 shadcn（`@snap-rail/ui` 0.2，终端 v0.6.0 起）**：浮层
+  `Tooltip`/`Popover`/`Menu` 与 `toast()`（runtime 已挂 Provider 与
+  Toaster，插件直接用）；`Alert`/`Separator`/`Skeleton`/`List`/`Slider`；
+  `Form` 的 stack/inline/grid 布局与 `Field` 横排（`orientation`/
+  `labelWidth`/`labelAlign`）；`Select` 的 `options` 快捷形态与
+  `SelectItem` children 组合形态；`Switch`/`Checkbox` 的 `labelPosition`/
+  `description`。需要校验的表单用 React Hook Form 复合件
+  （`useForm` + `zodResolver` + `FormField`/`FormItem`/`FormLabel`/
+  `FormControl`/`FormMessage`），**hooks 一律从 `@snap-rail/ui/components`
+  导入**——RHF 的 context 是模块级的，插件自带的 `react-hook-form` 副本与
+  终端种子不是同一实例，构建能过、运行读不到表单状态。
+- **最低终端版本**：种子 ABI 章只比主版本，0.x 的 UI 基座跨 minor 不在安装期
+  拦截——用到 0.2 新组件的插件装进 v0.6.0 以前的终端会在渲染时失败。用到时
+  在插件 README 写明「需要 snap-rail v0.6.0+」。
 
 驱动骨架说明：驱动只上交 zod schema（`.meta({ title })` 做表单标签）+
 可选 `probe`（一次性只读连接测试，设置页的「测试连接」按钮）+
@@ -458,6 +473,17 @@ SDK 的传递依赖与 base 运行时包：不需要单独安装，也不要写�
   zip 是用 r2 时代工具链（npm `plugin-kit 0.2.3`）打的。升到 r3 闭包
   （`plugin-kit ^0.2.4` / `plugin-sdk ^0.2.7` / `ui ^0.1.1`）后重新
   `pnpm run build` + `pack`（`seedAbi` 由 pack 自动盖章，永不手写）。
+- **`Module '"@snap-rail/ui/components"' has no exported member 'Tooltip'`**
+  （或 `FormField`/`Alert`/`toast`/`SelectItem` 等）：装的是 `@snap-rail/ui`
+  0.1.x。`pnpm add -D @snap-rail/ui@^0.2.0`（plugin-sdk ≥ 0.2.8 的 `init`
+  已默认生成该区间）。
+- **页面在部分终端上渲染失败（`Element type is invalid … got: undefined`）**：
+  插件用了 0.2 新组件，装在 v0.6.0 以前的终端上——旧终端的 UI 基座没有这些
+  导出。升级终端；插件 README 写明最低终端版本。
+- **表单读不到状态（`useFormContext()` 为 null、`Cannot read properties of
+  null (reading 'control')`）**：hooks 是从 `react-hook-form` 直接导入的。改为
+  `import { useForm, zodResolver, … } from '@snap-rail/ui/components'`，并从
+  `package.json` 删掉 `react-hook-form`。
 - **`Cannot find module '@snap-rail/plugin-sdk/api'`**：SDK 低于 0.2.5，
   升级 `@snap-rail/plugin-sdk`。
 - **`Property 'rpc' does not exist on type 'Context'`**：宿主类型从

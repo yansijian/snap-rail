@@ -23,6 +23,10 @@ files from the snap-rail workspace.
   (`ctx.pages`), layouts (`ctx.ui`), settings pages (`ctx.settings`) and skins
   (`ctx.skins`) through `@snap-rail/ui` and use its shared semantic
   components; `@snap-rail/ui` is a base seed, not a plugin dependency.
+  Generated UI repositories pin `@snap-rail/ui@^0.2.0` (terminal v0.6.0+);
+  React Hook Form hooks and composites come only from
+  `@snap-rail/ui/components` — a bundled `react-hook-form` copy has its own
+  context and never sees the seed's form state.
 - Store providers implement the store seam and are globally exclusive
   (`snapRail.exclusive: 'store-backend'`); use the pure `@snap-rail/store`
   `StoreService` type and let the provider own its backend. Consumers depend on

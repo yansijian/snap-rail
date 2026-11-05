@@ -479,7 +479,11 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
    `ctx.pages.registerPage` 注册；布局经 `ctx.ui.registerLayout` 声明
    `provides`/`window`/`ball`；设置页经 `ctx.settings.registerPage`；
    主题经 `ctx.skins.register`。错误文案 `rpcErrorText`；时间
-   `formatClock`/`formatDuration`；色值用 `useSkinTokens()`。
+   `formatClock`/`formatDuration`；色值用 `useSkinTokens()`。组件面镜像
+   shadcn（ui 0.2 / 终端 v0.6.0 起）：浮层 Tooltip/Popover/Menu/`toast()`
+   由 runtime 在每个 surface 根挂好 Provider 与 Toaster；校验表单用 React
+   Hook Form 复合件，hooks 只从组件面取（RHF context 是模块级的，种子单
+   实例才共享表单状态）。
 3. 流程门控/变量服务仍在 runtime 服务面；第三方图表包在
    `ChartFrame`/`Visualization` 内，用 `useChartTheme()` 取色。
 4. 调 station 域方法（audit/settings/session）的住户 import
@@ -631,11 +635,14 @@ contract: typed region slots (`ctx.ui`, `UI_SLOT_IDS`, scoped context,
 diagnostics), page registration (`ctx.pages`), settings pages (`ctx.settings`)
 and the skin registry (`ctx.skins`). Layouts declare which region slots they
 provide plus their preferred `WindowProfile`/`BallProfile`; pages compose
-`@snap-rail/ui/components`; skins register tokens, part CSS and presentation
-variants. All slots are open to native/integrated/custom profiles — the
-profile is a management badge, not a gate. A custom plugin may replace any UI
-surface, but the host recovery path (kernel bootstrap page, `--safe-mode`,
-`Ctrl+Shift+F12`) lives outside the UI contract and cannot be overridden.
+`@snap-rail/ui/components` (a shadcn-shaped surface: overlays, alerts, lists,
+sliders, and React Hook Form composites whose hooks are re-exported so every
+plugin shares the seed's single RHF instance); skins register tokens, part CSS
+and presentation variants. All slots are open to native/integrated/custom
+profiles — the profile is a management badge, not a gate. A custom plugin may
+replace any UI surface, but the host recovery path (kernel bootstrap page,
+`--safe-mode`, `Ctrl+Shift+F12`) lives outside the UI contract and cannot be
+overridden.
 Malformed or undeclared slots produce a diagnostic and never become an
 implicit global vocabulary.
 

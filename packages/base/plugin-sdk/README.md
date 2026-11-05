@@ -4,7 +4,7 @@
 发布 snap-rail 插件，不需要克隆 snap-rail 源码。
 
 The public authoring surface for [snap-rail](https://github.com/yansijian/snap-rail)
-plugins: an `init` scaffold for all eight plugin shapes, a `doctor` for the
+plugins: an `init` scaffold for all nine plugin shapes, a `doctor` for the
 repository contract, the release packer, and the Ed25519 signing helpers —
 everything an independent plugin repository needs, from public npm only.
 
@@ -45,6 +45,14 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它随应用内置，
 `requires` 条目，也不需要 framework 绑定。`--framework <pkg[@range]>` 仅作为
 类型/构建包的覆盖入口保留。渲染面插件用 `snapRail.uiProfile` 声明
 native/integrated/custom（管理页徽标，不做门禁）。
+
+生成的 UI 仓库依赖 `@snap-rail/ui@^0.2.0`：shadcn 形状的组件面——浮层
+（`Tooltip`/`Popover`/`Menu`/`toast()`）、`Alert`/`List`/`Slider` 等原语、
+`Form`/`Field` 横排与栅格布局，以及 React Hook Form 复合件
+（`useForm`/`zodResolver`/`FormField`/`FormMessage`…，**一律从
+`@snap-rail/ui/components` 导入**，不要单独安装 `react-hook-form`——私有副本
+与终端种子不是同一个 context）。这些 0.2 新能力需要终端 v0.6.0 及以上；
+用到时在插件 README 写明最低终端版本。
 
 ## CLI / 命令
 

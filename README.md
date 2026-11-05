@@ -40,6 +40,10 @@ HMI——界面创新留给社区与 Agent。
   drizzle 查询构建器即规范；简单配置走 settings.json，都不依赖云端。
 - **主题热切 + 悬浮球** —— token 级主题全窗口即时切换（无重载）；128px 悬浮球
   与主窗共存显隐、四边贴边停泊、指针离开自动收起。
+- **shadcn 形状的组件基座** —— 内置 `@snap-rail/ui` 的语义组件对齐 shadcn/ui
+  的 props 与插槽：表单横排/栅格与 React Hook Form 复合件、Tooltip / Popover /
+  Menu / Toast 浮层、Alert / List / Slider 等原语，第三方插件直接组合，主题按
+  `data-snap-part` 解剖统一换肤。
 - **多源插件源 & 去中心化发布** —— 插件源是静态 feed 列表（OSS / Gitea / GitHub
   任意加）；插件作者自持 Ed25519 密钥、发自己的滚动 Release，仓库打上 GitHub
   topic [`snap-rail-plugin`](https://github.com/topics/snap-rail-plugin) 即可被发现——

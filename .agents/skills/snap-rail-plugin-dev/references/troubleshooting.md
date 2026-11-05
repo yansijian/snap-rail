@@ -30,6 +30,8 @@ warning = 建议（放行但要逐条确认）。
 | `Cannot find module '@snap-rail/connection'` | 绕过 SDK 直接 import 了未单列的包 | 改用 `@snap-rail/plugin-sdk/api/client`；确实要直接用时才加 devDependency |
 | `Cannot find module '@snap-rail/client-kernel'`（UI d.ts 里） | 内置 UI 的 d.ts 引用了内部包 | `skipLibCheck` 会跳过；**不要** import kernel——`ClientHandle` 是 app-internal，插件不需要也不应引用（容器启动由内置 runtime 负责）；球拖拽从 `@snap-rail/ui/runtime` 导入 `attachBallDrag` |
 | `Module '"@snap-rail/ui/runtime"' has no exported member 'attachBallDrag'` | 安装的 `@snap-rail/ui` < 0.1.1（r3 闭包前的发布没有这个转出） | `pnpm add -D @snap-rail/ui@^0.1.1`；连带把 plugin-sdk/plugin-kit 升到 r3 闭包（见 SKILL.md 时代分界） |
+| `Module '"@snap-rail/ui/components"' has no exported member 'Tooltip'/'FormField'/'Alert'/'toast'` | 安装的 `@snap-rail/ui` 是 0.1.x，没有 0.2 组件 | `pnpm add -D @snap-rail/ui@^0.2.0`（plugin-sdk ≥ 0.2.8 的 init 默认生成）；用到 0.2 组件的插件需终端 ≥ v0.6.0，README 写明 |
+| 表单读不到状态：`useFormContext()` 为 null、`Cannot read properties of null (reading 'control')` | RHF hooks 从 `react-hook-form` 直接导入——私有副本与终端种子不是同一 context | hooks 改从 `@snap-rail/ui/components` 导入（`useForm`/`zodResolver`/`FormField`…），`package.json` 删掉 `react-hook-form` |
 
 ## init / 安装依赖
 

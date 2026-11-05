@@ -57,9 +57,33 @@
 一体机触屏，最小点击目标 48px：控件高度是主题 token
 `controlHeightSm/Md/Lg` = 40/48/56px，`Button`/`Input` 默认 `md`（48）即满足
 基线、`lg`（56）给主操作，`sm`（40）低于触控基线只用于非主要触控路径；
-表格行间距走 `spaceMd`。数值输入用 `NumberInput`，单选用 `TouchSelect`，
-滚动容器用 `DragScroll`。这些组件的 part 由出厂主题保证触控尺寸；custom
-主题必须维持最小目标，`uiProfile: custom` 的插件自担其责。
+表格行间距走 `spaceMd`。数值输入用 `NumberInput`（`number-input.step-up/
+step-down` 步进钮），单选用 `TouchSelect`，滚动容器用 `DragScroll`，设定值
+粗调用 `Slider`（`slider.thumb` 是触控目标）。这些组件的 part 由出厂主题保证
+触控尺寸；custom 主题必须维持最小目标，`uiProfile: custom` 的插件自担其责。
+戴手套的终端可让 `ScrollArea` 的滚动条常显（`scrollbarType="always"`），
+主题经 `scroll-area.scrollbar/thumb` 定粗细。
+
+## 状态、浮层与表单布局
+
+`@snap-rail/ui` 0.2 起组件面镜像 shadcn，主题要覆盖的 part 随之增加
+（全表见 `UI_COMPONENTS`）：
+
+- **语义色走 `data-intent`**：`button.root`、`badge.root`、`alert.root`、
+  `toast.root` 都带 `data-intent`（`neutral`/`primary`/`danger`/`success`/
+  `warning`），主题按属性选择器映射到 `--snap-color-*`，不自造类名。
+- **浮层**：`tooltip.content`、`popover.content`、`menu.content`/`menu.item`
+  （高亮态 `[data-highlighted]`）、`toast.viewport`/`toast.root`；层级只用
+  `--snap-z-overlay`（提示/弹出/菜单）与 `--snap-z-modal`（对话框/通知），
+  不写裸 z-index。浮层经 portal 挂在 `<body>` 下，`data-snap-skin` 在
+  `<html>` 上，`[data-snap-skin='<id>'] …` 作用域照常命中。
+- **注意力原语**：`alert.root/title/description`、`separator.root`
+  （`data-orientation`）、`skeleton.root`（`data-variant`：block/text/circle）、
+  `list.root`（`data-divided`）/`list.item`（`data-selected`/`data-disabled`，
+  `list.leading/content/trailing` 三槽）、`slider.track/range/thumb`。
+- **表单排布是结构不是皮肤**：`field.root[data-orientation='horizontal']` 的
+  横排与 `form.root[data-orientation]` 的 stack/inline/grid 排布由 base 结构层
+  给出；主题只调 `field.label` 的字号/颜色与间距 token，不改排布方向。
 
 ## 窗口与悬浮球
 
@@ -79,4 +103,4 @@
 3. 所有规则作用域到 `[data-snap-skin='<id>']`（主题 id 用包名）；
 4. 设置 `snapRail.kind: 'skin'`、`exclusive: 'skin'`、`clientOnly: true`；
 5. 在「外观与显示」主题列表点选——已装载即时热切，首启经主窗自动重载；
-   用出厂双主题做对照验证设置/设备/表单/对话框。
+   用出厂双主题做对照验证设置/设备/表单/对话框，以及提示/菜单/通知等浮层。

@@ -254,6 +254,12 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   交互组件或裸 Tailwind。横切物不手搓：重渲染 tick 用 UI 服务订阅，错误
   文案用 `rpcErrorText`，时间用 `formatClock`/`formatDuration`；schema
   驱动的配置表单用 `SchemaForm`（新交互模式往 UI 基座加字段类型）。
+  组件面镜像 shadcn 的 props/插槽：浮层 Tooltip/Popover/Menu/`toast()`
+  （runtime 在每个 surface 根挂 Provider 与 Toaster，页面不自挂）、
+  Alert/List/Slider 等原语、Form/Field 的横排与栅格；需要校验的表单用 React
+  Hook Form 复合件（`FormField`…），**RHF hooks 只经
+  `@snap-rail/ui/components` 再导出**——RHF context 是模块级的，种子单实例
+  才共享表单状态，插件自带副本即失配。
   第三方图表允许包在 `Visualization`/`ChartFrame` 内，从 `useChartTheme`
   取 skin token；`uiProfile` 声明 `native`/`integrated`/`custom`。
 - **主题与图表色单源在 theme token**：一个主题 = 单套完整观感（token +
