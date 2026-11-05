@@ -395,6 +395,44 @@
     user-select: none;
   }
 
+  [data-snap-part='tooltip.content'],
+  [data-snap-part='popover.content'],
+  [data-snap-part='menu.content'] {
+    z-index: var(--snap-z-overlay);
+  }
+
+  [data-snap-part='menu.item'],
+  [data-snap-part='menu.checkbox-item'] {
+    display: flex;
+    align-items: center;
+    gap: var(--snap-space-sm);
+    cursor: pointer;
+  }
+
+  [data-snap-part='menu.separator'] {
+    height: var(--snap-border-width);
+    background: var(--snap-color-border);
+  }
+
+  [data-snap-part='toast.viewport'] {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    z-index: var(--snap-z-modal);
+    display: flex;
+    flex-direction: column;
+    gap: var(--snap-space-sm);
+    margin: 0;
+    padding: var(--snap-space-md);
+    list-style: none;
+  }
+
+  [data-snap-part='toast.root'] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--snap-space-xs);
+  }
+
   [data-snap-component='button']:focus-visible,
   [data-snap-component='icon-button']:focus-visible,
   [data-snap-part='select.trigger']:focus-visible,

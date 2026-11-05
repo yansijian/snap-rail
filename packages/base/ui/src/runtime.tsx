@@ -18,6 +18,7 @@ import { shellContract } from '@snap-rail/shell/contract'
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import fallbackPlugin from './fallback.tsx'
+import { Toaster, TooltipProvider } from './components/overlay.tsx'
 import pagesPlugin from './pages.tsx'
 import type { SettingsPageDefinition } from './settings.tsx'
 import settingsPlugin from './settings.tsx'
@@ -174,10 +175,13 @@ function MainRoot(props: { ctx: Context }): ReactNode {
   const layout = useActiveLayout()
   return (
     <>
-      <StageProfiles ctx={props.ctx} layout={layout} />
-      {layout === undefined ? <div style={{ padding: 24 }}>没有已加载的布局插件。</div> : layout.render()}
-      <OverlayHost ctx={props.ctx} />
-      <SettingsFallbackHost ctx={props.ctx} />
+      <TooltipProvider>
+        <StageProfiles ctx={props.ctx} layout={layout} />
+        {layout === undefined ? <div style={{ padding: 24 }}>没有已加载的布局插件。</div> : layout.render()}
+        <OverlayHost ctx={props.ctx} />
+        <SettingsFallbackHost ctx={props.ctx} />
+        <Toaster />
+      </TooltipProvider>
     </>
   )
 }
@@ -207,7 +211,12 @@ function BallRoot(props: { ctx: Context }): ReactNode {
     })
   }, [hasOccupant, link])
   if (occupant !== undefined) {
-    return <div style={{ width: '100%', height: '100%' }}>{occupant.render({ surface: 'ball' })}</div>
+    return (
+      <TooltipProvider>
+        <div style={{ width: '100%', height: '100%' }}>{occupant.render({ surface: 'ball' })}</div>
+        <Toaster />
+      </TooltipProvider>
+    )
   }
   return (
     <div

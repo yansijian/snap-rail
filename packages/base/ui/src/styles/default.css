@@ -501,6 +501,84 @@
     cursor: pointer;
   }
 
+  /* Overlays: tooltip / popover / menu / toast ------------------------- */
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='tooltip.content'] {
+    border-radius: var(--snap-radius-md);
+    background: var(--snap-color-surface-raised);
+    padding: var(--snap-space-xs) var(--snap-space-sm);
+    font-size: var(--snap-text-sm);
+    box-shadow: var(--snap-shadow-md);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='popover.content'],
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='menu.content'] {
+    border: var(--snap-border-width) solid var(--snap-color-border);
+    border-radius: var(--snap-radius-md);
+    background: var(--snap-color-surface-raised);
+    padding: var(--snap-space-xs);
+    box-shadow: var(--snap-shadow-lg);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='menu.item'],
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='menu.checkbox-item'] {
+    min-height: var(--snap-control-height-sm);
+    border-radius: var(--snap-radius-sm);
+    padding: 0 var(--snap-space-sm);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='menu.item'][data-highlighted],
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='menu.checkbox-item'][data-highlighted] {
+    background: var(--snap-color-surface);
+    outline: none;
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='menu.label'] {
+    padding: 0 var(--snap-space-sm);
+    color: var(--snap-color-muted);
+    font-size: var(--snap-text-xs);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.root'] {
+    min-width: 280px;
+    max-width: 360px;
+    border: var(--snap-border-width) solid var(--snap-color-border);
+    border-radius: var(--snap-radius-md);
+    background: var(--snap-color-surface-raised);
+    padding: var(--snap-space-md);
+    box-shadow: var(--snap-shadow-lg);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.root'][data-intent='danger'] {
+    border-color: var(--snap-color-danger);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.root'][data-intent='success'] {
+    border-color: var(--snap-color-success);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.root'][data-intent='warning'] {
+    border-color: var(--snap-color-warning);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.title'] {
+    font-weight: var(--snap-weight-medium);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.description'] {
+    color: var(--snap-color-muted);
+    font-size: var(--snap-text-sm);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.close'] {
+    position: absolute;
+    top: var(--snap-space-sm);
+    right: var(--snap-space-sm);
+    border: 0;
+    background: transparent;
+    color: var(--snap-color-muted);
+    cursor: pointer;
+  }
+
   /* Feedback ----------------------------------------------------------- */
   :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='badge.root'] {
     min-height: 24px;

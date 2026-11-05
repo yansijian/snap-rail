@@ -256,29 +256,29 @@ export const UI_COMPONENTS = {
     slots: ['header', 'title', 'body', 'footer'],
   },
   dialog: {
-    parts: ['dialog.root', 'dialog.overlay', 'dialog.panel', 'dialog.header', 'dialog.title', 'dialog.description', 'dialog.body', 'dialog.footer', 'dialog.close'],
+    parts: ['dialog.overlay', 'dialog.panel', 'dialog.header', 'dialog.title', 'dialog.description', 'dialog.body', 'dialog.footer', 'dialog.close'],
     slots: ['header', 'title', 'description', 'body', 'footer'],
     props: ['open', 'presentation', 'size'],
   },
   sheet: {
-    parts: ['sheet.root', 'sheet.overlay', 'sheet.panel', 'sheet.header', 'sheet.body', 'sheet.footer'],
+    parts: ['dialog.overlay', 'dialog.panel', 'dialog.header', 'dialog.title', 'dialog.description', 'dialog.body', 'dialog.footer'],
     slots: ['header', 'body', 'footer'],
     props: ['open', 'presentation'],
   },
   popover: {
-    parts: ['popover.root', 'popover.trigger', 'popover.content'],
+    parts: ['popover.trigger', 'popover.content'],
     slots: ['trigger', 'content'],
   },
   tooltip: {
-    parts: ['tooltip.root', 'tooltip.trigger', 'tooltip.content'],
+    parts: ['tooltip.trigger', 'tooltip.content'],
     slots: ['trigger', 'content'],
   },
   menu: {
-    parts: ['menu.root', 'menu.trigger', 'menu.content', 'menu.item', 'menu.separator'],
+    parts: ['menu.trigger', 'menu.content', 'menu.item', 'menu.checkbox-item', 'menu.item-indicator', 'menu.separator'],
     slots: ['trigger', 'content'],
   },
   toast: {
-    parts: ['toast.root', 'toast.title', 'toast.description', 'toast.action', 'toast.close'],
+    parts: ['toast.root', 'toast.title', 'toast.description', 'toast.action', 'toast.close', 'toast.viewport'],
     slots: ['action'],
   },
   progress: {
