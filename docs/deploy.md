@@ -228,9 +228,12 @@ OSS 桶默认域名对 HTML 强制 `Content-Disposition: attachment`（ICP 政�
    签发）；推荐 CDN（境内加速 + 流量单价减半）：
    新建加速域名 `www.snap-rail.top` → 源站选本 Bucket → 回源 Host =
    `<bucket>.oss-<region>-*.aliyuncs.com` → 缓存规则按上节 → 强制 HTTPS 跳转；
-3. **验证**：
+3. **验证（境内机器手动跑）**：
    `pnpm exec tsx scripts/check-feed-endpoint.ts --update https://www.snap-rail.top/feed/ --plugins https://www.snap-rail.top/feed/ --site https://www.snap-rail.top/`
-   —— 页面 200 且无强制下载（WARN 消失）、feed 摘要一致、exe 支持 Range；
+   —— 页面 200 且无强制下载（WARN 消失）、feed 摘要一致、exe 支持 Range。
+   注意必须在**境内**跑：境内 CDN 对境外解析返回黑洞 IP（RFC 5737
+   `192.0.2.1`），海外机器（含 GitHub 托管 runner）连不上是预期行为，不是
+   故障——feed workflow 的 CI 验收因此固定走桶默认域名；
 4. **切基址**：`pnpm exec tsx scripts/stamp-feed-default.ts https://www.snap-rail.top/feed/`
    → `pnpm run site:build && SNAP_RAIL_OSS_BUCKET=oss://<bucket> pnpm run site:sync-oss`
    → 重出一版安装包（release workflow 打 tag），让新装机内置域名基址；

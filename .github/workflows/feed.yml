@@ -160,7 +160,12 @@ jobs:
           pnpm run feed:sync-oss
           pnpm run site:build
           pnpm run site:sync-oss
+          # 收尾验收固定走桶默认域名：境内 CDN 域名（www.snap-rail.top）对境外
+          # 解析返回黑洞 IP（RFC 5737 192.0.2.1），GitHub 托管 runner 永远连不
+          # 上——内容/头部/摘要校验与桶默认域名同源等价；备案域名的线上验收是
+          # 备案后在境内机器跑的手动步骤（docs/deploy.md「备案与域名绑定」）。
+          # 桶默认域名对 HTML 强制下载 attachment，probe 只记 WARN 不失败。
           pnpm exec tsx scripts/check-feed-endpoint.ts \
-            --update https://www.snap-rail.top/feed/ \
-            --plugins https://www.snap-rail.top/feed/ \
-            --site https://www.snap-rail.top/
+            --update https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/ \
+            --plugins https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/feed/ \
+            --site https://snap-rail-feed.oss-cn-shenzhen.aliyuncs.com/
