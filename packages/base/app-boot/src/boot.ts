@@ -32,6 +32,10 @@ declare module '@snap-rail/cordis' {
     /** The composed entry list was rewritten and the include refreshed.
      * @param composed - the entry list now mounted. */
     'plugin-layers/applied'(composed: readonly unknown[]): void
+    /** The renderer-visible projection changed without a host recomposition
+     * (a client-face swap into the pool, a client-only row edit). Bridges to
+     * the renderer as the same reload nudge `plugin-layers/applied` rides. */
+    'client-faces/changed'(): void
   }
 }
 

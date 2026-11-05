@@ -5,13 +5,17 @@
 | 命令 | 作用 |
 | --- | --- |
 | `doctor <目录>` | 校验仓库契约（manifest、requires 形态、构建入口落盘）。红 = 契约违约（阻断），warning = 建议（放行）。 |
+| `dev <目录> [--launch [exe]] [--home <目录>] [--no-watch] [--reset]` | **本地迭代**用（不属于发布链）：持续构建并把产物热同步进终端插件池，免打包免签名；Ctrl+C 恢复原状。细节见 SKILL.md 步骤 3.5 与 docs/plugin-development.md「dev 模式」。 |
 | `pack <目录> --out dist --sign-key <pem> --key-id <id> [--publisher <名>]` | 装配并签名发行 zip。**拒绝无签名**（缺 key 参数直接报错）；输出 sha256 与 size。产物名 = 包名把 `/` 换成 `__`（`@my-scope/my-driver` → `dist/@my-scope__my-driver.zip`）。zip 内容 = 精简 manifest + 构建面，永不带 src。 |
 | `feed <zip目录> [--out <目录>] [--repository <url>]` | 读目录内**已签名** zip，产出 `index.json`（条目含包名/版本/文件名/sha256/size/签名 keyId）。拒绝未签名 zip 与重名包——**同目录每个包名只留最新版**。 |
 | `inspect <zip>` | 身份、面、文件数、签名 keyId 概览（无需公钥）。收货方快速查验用。 |
 | `verify <zip> --public-key <pem> --key-id <id>` | 用发布者公钥完整验签（摘要/身份/publisher）。 |
 
-npm scripts 里 init 已预置 `doctor` / `pack` / `feed`（pack 的 key-id 记得
-改成自己的）。
+dev 与发布链的关系：dev 副本无签名、无 `seedAbi` 章（渲染端按缺章宽限加载），
+**只用于本机迭代**；发布以 `pack` 产物 + `verify` 为准，两者不互相替代。
+
+npm scripts 里 init 已预置 `dev` / `doctor` / `pack` / `feed`（pack 的
+key-id 记得改成自己的）。
 
 ## zip 里有什么
 

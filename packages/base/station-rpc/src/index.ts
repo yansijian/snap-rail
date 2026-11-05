@@ -176,6 +176,10 @@ const stationRpcPlugin: Plugin.Object<void> = {
     // Every hot-applied row change nudges renderer windows to reload (the
     // kernel's auto-reload debounces and honors the settings toggle).
     rpc.bridgeEvent(ctx, 'plugin-layers/applied', 'client-config/changed', () => ({}))
+    // Renderer-only changes (client-face swaps, client-only row edits) never
+    // recompose the host tree — the layer admin emits this alongside/instead
+    // and the renderer takes the same reload nudge.
+    rpc.bridgeEvent(ctx, 'client-faces/changed', 'client-config/changed', () => ({}))
   },
 }
 

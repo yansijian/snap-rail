@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url'
 import { load } from 'js-yaml'
 import { applyEntryPatches, type PatchOptions } from '@snap-rail/cordis-plugin-include'
 import type { EntryOptions } from '@snap-rail/cordis-plugin-loader'
-import { poolSubpathFile, type PluginDescriptor } from './scan.ts'
+import { poolEntryUrl, poolSubpathFile, type PluginDescriptor } from './scan.ts'
 
 /** One row of the user layer (`plugins.yml`). */
 export interface UserPluginRow {
@@ -243,7 +243,10 @@ export function resolveModuleSpecifier(
     const poolPackage = pool.get(packageName)
     if (poolPackage !== undefined && name !== packageName) {
       const file = poolSubpathFile(poolPackage.dir, `./${name.slice(packageName.length + 1)}`)
-      if (file !== undefined) return pathToFileURL(file).href
+      // Same content-addressed query as the package's own entryUrl: the
+      // subpath face re-imports after a rebuild and shares the pool's single
+      // module instance with every other resolution of the same file.
+      if (file !== undefined) return poolEntryUrl(file)
     }
   }
   if (name.startsWith('cordis:') || name.startsWith('.') || name.startsWith('file:')) return name

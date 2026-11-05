@@ -32,7 +32,7 @@ import { existsSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { poolSubpathFile } from './scan.ts'
+import { poolEntryUrl, poolSubpathFile } from './scan.ts'
 
 /** Bare specifiers that resolve against the application root. Anchored ids
  * anchor as a whole scope — subpaths (`zod/v4`, `drizzle-orm/sqlite-core`)
@@ -104,7 +104,11 @@ export function anchorSpineResolution(appRoot: string, poolDirs: readonly string
         } catch (appRootError) {
           const file = poolEntryFile(specifier)
           if (file === undefined) throw appRootError
-          return { url: pathToFileURL(file).href, shortCircuit: true }
+          // The same content-addressed query the composition derives for the
+          // package's entry: a rebuilt face resolves to a fresh module, and
+          // the package keeps one module instance across every importer
+          // (the entry import and pool-resident importers share the URL).
+          return { url: poolEntryUrl(file), shortCircuit: true }
         }
       }
       return nextResolve(specifier, context)

@@ -82,4 +82,7 @@ pnpm run publish -- --collect collect-out --sign-key … --key-id … --skip-syn
 - `pnpm test`：层依赖、wire-catalog、feed-base 门禁全绿；
 - `pnpm app:pack`：`verify-packaged-app` 必须 clean（内置 UI/默认
   store/equipment 都在生产依赖里）；
-- 新驱动仓 `snap-rail-plugin doctor` 全绿；zip 经 `inspect`/`verify` 通过。
+- 新驱动仓 `snap-rail-plugin doctor` 全绿；zip 经 `inspect`/`verify` 通过；
+- 开发期看效果：驱动仓 `snap-rail-plugin dev . --home <dev home>`——
+  构建产物热同步进插件池，宿主面改动免重启热重载（见
+  docs/plugin-development.md「dev 模式」）。

@@ -348,7 +348,9 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   开放；custom 插件替换宿主界面时自担风险，安全模式/引导页不可覆盖。
 - 独立插件仓库使用 `@snap-rail/plugin-sdk` 和 `snap-rail-plugin` CLI，
   仓库根部必须有自己的 `AGENTS.md`。插件 Agent 只读 SDK 类型和该指南，
-  不需要进入本仓库或复制 `packages/*/src`。
+  不需要进入本仓库或复制 `packages/*/src`。迭代看效果走
+  `snap-rail-plugin dev`（构建产物整目录热同步进终端 home 的池、免打包免签名，
+  会话结束恢复原状）——与生产同一条池挂载路径，不另造 harness。
 - **签名是身份锚与防篡改，不是准入门槛**：发行 zip 携带 Ed25519
   `META-INF/release.json`、`META-INF/signature.json`（一方发布链强制签名；
   社区作者自持钥签名）。Host 信任 `<home>/trusted-release-keys.json` ∪

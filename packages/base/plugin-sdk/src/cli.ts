@@ -20,6 +20,7 @@ import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { zipSync, unzipSync } from 'fflate'
 import { catalogEntryFromZip, definePluginManifest, PLUGIN_TEMPLATES, releaseFiles, signReleaseFiles, verifyReleaseFiles, zipFileName, type PluginTemplate, type ReleaseSpec, type TrustedReleaseKey } from './index.ts'
+import { runDev } from './dev.ts'
 
 /** The SDK's own published version — generated repos pin this as `^<version>`. */
 const sdkVersion = createRequire(import.meta.url)('../package.json').version as string
@@ -45,6 +46,11 @@ Commands:
       [--framework <package[@range]>] [--force]
   doctor <directory>
       Validate the repository contract (manifest, faces, built entries).
+  dev <directory> [--home <dir>] [--launch [exe]] [--no-watch] [--reset]
+      Watch-build and hot-sync into a terminal home's plugin pool (no zip, no
+      signing). Ctrl+C restores the home — an installed release copy of the
+      same package moves back into the pool and the row returns to its
+      pre-session state.
   pack <directory> --out <dir> --sign-key <key.pem> --key-id <id> [--publisher <name>]
       Assemble and sign the installable zip (unsigned archives are not installable).
   feed <zip-directory> [--out <dir>] [--repository <url>]
@@ -88,6 +94,19 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (command === 'doctor') {
     if (target === undefined) throw new Error('doctor requires a plugin directory')
     doctorPlugin(target)
+    return
+  }
+  if (command === 'dev') {
+    if (target === undefined) throw new Error('dev requires a plugin directory')
+    // The same contract check as a standalone doctor run: a broken repository
+    // never reaches the home.
+    doctorPlugin(target)
+    await runDev(target, {
+      home: option(argv, '--home'),
+      launch: launchOption(argv),
+      reset: hasFlag(argv, '--reset'),
+      noWatch: hasFlag(argv, '--no-watch'),
+    })
     return
   }
   if (command === 'pack') {
@@ -299,6 +318,15 @@ function hasFlag(argv: readonly string[], name: string): boolean {
   return argv.includes(name)
 }
 
+/** `--launch` with an optional value: the next argument is the exe path
+ * unless it is another flag or absent. */
+function launchOption(argv: readonly string[]): boolean | string | undefined {
+  const index = argv.indexOf('--launch')
+  if (index < 0) return undefined
+  const next = argv[index + 1]
+  return next !== undefined && !next.startsWith('--') ? next : true
+}
+
 /**
  * Resolve a zip's file map, normalizing away an optional single top-level
  * directory (macOS archives and manual uploads often nest one).
@@ -346,6 +374,7 @@ async function initPlugin(directory: string | undefined, template: PluginTemplat
     ...(isHost ? { main: 'lib-host/host.js' } : {}),
     scripts: {
       build: 'tsdown',
+      dev: 'snap-rail-plugin dev . --launch',
       test: 'vitest run',
       doctor: 'snap-rail-plugin doctor .',
       pack: 'snap-rail-plugin pack . --out dist --sign-key .keys/release.private.pem --key-id my-key',
@@ -450,6 +479,11 @@ pnpm run test
 pnpm run doctor   # 发布前的仓库契约自检
 \`\`\`
 
+边写边看效果（免打包免签名）：\`pnpm run dev\` 把构建产物热同步进终端插件池，
+客户端（需已安装）自动拉起并热生效；Ctrl+C 结束时终端恢复原状。
+\`snap-rail-plugin dev . --home <dir>\` 指定其它 home（如开发仓的
+\`%APPDATA%\\@snap-rail\\desktop\`），\`--reset\` 清理残留会话。
+
 ## 打包与发布
 
 \`\`\`sh
@@ -540,6 +574,10 @@ snap-rail checkout or copy host internals.
 ## Local workflow
 
 \`pnpm install && pnpm run build\` builds this repository without snap-rail.
+To see changes live while iterating, \`pnpm run dev\` (\`snap-rail-plugin dev\`)
+watch-builds and hot-syncs the built faces into an installed terminal's plugin
+pool — no zip, no signing; Ctrl+C restores the terminal to its pre-session
+state. It is the same pool-mounting path production uses, never a harness.
 Before publishing: \`pnpm run doctor\`, \`pnpm run pack\` (signed with your own
 Ed25519 key), \`pnpm run feed\` (the \`index.json\` your rolling Release serves),
 and \`snap-rail-plugin verify <zip> --public-key <key.pem> --key-id <id>\`.

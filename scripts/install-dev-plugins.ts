@@ -8,6 +8,10 @@
  * (framework, drivers, suites — build them there first). Run after packing:
  * `pnpm run build && pnpm run pack:plugins && pnpm exec tsx scripts/install-dev-plugins.ts <home>`
  *
+ * First-party only: this script needs a snap-rail checkout. External plugin
+ * repositories iterate with `snap-rail-plugin dev` instead (watch-build +
+ * hot-sync into the pool, no zip) — see docs/plugin-development.md「dev 模式」.
+ *
  * @module snap-rail/scripts/install-dev-plugins
  */
 

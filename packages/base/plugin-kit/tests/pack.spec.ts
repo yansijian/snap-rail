@@ -382,8 +382,10 @@ describe('install round-trip', () => {
     expect(suite?.title).toBe('夹具套件')
     expect(suite?.clientEntry).toBe('lib-client/client.js')
     expect(suite?.requires).toEqual(['@fixture/frame', '@snap-rail/equipment', 'service:store'])
-    // The pool mounts exactly one host entry per package: the manifest main.
-    expect(suite?.entryUrl.endsWith('/lib/stats.js')).toBe(true)
+    // The pool mounts exactly one host entry per package: the manifest main,
+    // carrying the content-addressed query that busts the ESM import cache
+    // when the face is rebuilt in place.
+    expect(suite?.entryUrl).toMatch(/\/lib\/stats\.js\?v=[0-9a-f]{12}$/)
     const driver = scanned.get('@fixture/host')
     expect(driver?.kind).toBe('driver')
     expect(driver?.clientEntry).toBeUndefined()

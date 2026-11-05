@@ -259,9 +259,17 @@ CSS `box-shadow` 会被窗口边界硬切成灰边，因此阴影必须以径向
   行带 kind/category/贡献种子（行变更经 `client-config/changed` 帧通知，
   渲染窗自动 reload——kernel 的 `installRendererAutoReload` 去抖 500ms，
   设置键 `ui.rendererAutoReload` 可关）——用户只认识一个文件、
-  一套按包名寻址的语义。**子路径行**（`@snap-rail/equipment/rpc`）经
+  一套按包名寻址的语义。帧有两个来源：宿主组合变化
+  （`plugin-layers/applied`），以及**渲染面投影变化**（`client-faces/changed`
+  ——clientOnly 行不进组合文件，换包/启停组合字节不变，由 LayerAdmin 的
+  投影摘要察觉：行 × client 面 URL/标记 × bundle 文件指纹）。**子路径行**（`@snap-rail/equipment/rpc`）经
   池包 release manifest 的 exports 映射解析为对应入口文件。
-- LayerAdmin 串行化所有变更；watch 层文件与池目录（150ms 去抖）。
+- LayerAdmin 串行化所有变更；watch 层文件与池目录（150ms 去抖；池目录只认
+  成员增删——整目录换入/移除，池内文件原地改写不触发）。池包 `entryUrl`
+  带内容寻址查询 `?v=<digest>`（面目录内脚本字节的摘要）：Node ESM 按完整
+  URL 缓存模块，同路径重建的宿主面靠新 URL 让 entry.update 释放旧 fiber 并
+  重导入新模块；字节不变则 URL 不变、不重挂。组合子路径行与 resolve-hooks
+  池回退对同一文件算出同一 URL，包始终单实例。
 - 包是管理单元：`plugins.list` 给每行带 `packageName`、`kind`、
   `title`、`category`、`exclusive`、`uiProfile`、`requires`、`clientOnly`
   （经池清单或 appRoot 解析 manifest），插件管理页条目平铺——一个包
@@ -489,8 +497,10 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
 4. 调 station 域方法（audit/settings/session）的住户 import
    `@snap-rail/station-rpc/contract`；调 plugins 域的 import
    `@snap-rail/app-boot/contract`（都是 base 种子）。
-5. dev 调试：与生产同路——把 zip 装进 dev home（设置页「安装插件」，或
-   `pnpm exec tsx scripts/install-dev-plugins.ts <home>`）；不再有
+5. dev 调试：与生产同路——都经池挂载。独立插件仓用
+   `snap-rail-plugin dev`（构建产物整目录热同步进 home 的池，Ctrl+C 恢复
+   原状，见 docs/plugin-development.md「dev 模式」）；主仓一方 zip 用设置页
+   「安装插件」或 `pnpm exec tsx scripts/install-dev-plugins.ts <home>`。不再有
    `renderer-packages.ts` / `dev-harness.tsx` 这类静态住户挡板。
 
 ### 五、打包发布一个可安装插件
@@ -517,7 +527,7 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
    `plugins.install`（fflate 解压进 `<home>/plugins/<包名>`；**与内置行
    重名的 zip 解压前拒绝**——冒充内置的第二道闸，第一道是保护集本身
    按层文件来源计算）→ 池扫描；启用经 `plugins.set-enabled`（requires
-   正向预检），渲染行重启生效。
+   正向预检），渲染行经 `client-config/changed` 帧自动重载生效。
 4. 运行期解析：宿主侧 `module.registerHooks` 仅对**池内文件**的
    `zod`/`drizzle-orm`/`@snap-rail/*`（含子路径）裸导入生效，顺序
    **appRoot 优先、池内回退**——应用自带的规范与库永不被 zip 遮蔽
@@ -542,7 +552,9 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
   **appRoot 优先、池内回退**解析——应用树先答（自带规范与共享库永不被
   zip 遮蔽），应用不带的 id 落到 `<pool>/<pkg__>/` 的 release exports/
   main 声音（纯文件系统查找，钩子永不自递归）。池插件之间因此共享
-  已装包的单一实例（第二份 equipment 会撕裂服务身份）。
+  已装包的单一实例（第二份 equipment 会撕裂服务身份）。池回退返回与组合
+  相同的内容寻址 URL（`poolEntryUrl`），重装/重建后导入方与入口拿到同一个
+  新模块。
 - **渲染端模块系统**（`base/modules` + desktop 客户端入口）：种子两层。
   **base 层**（`SEED_MODULES`）由客户端入口静态播种并 parity fail-loud
   ——react 家族、cordis、timer、kernel/modules、connection/protocol、

@@ -208,4 +208,17 @@ describe('station-rpc', () => {
     expect(next.done).toBe(false)
     expect(next.value?.method).toBe('client-config/changed')
   })
+
+  it('broadcasts the same nudge for renderer-only changes (no host recompose)', async () => {
+    const { host, client } = await makeWorld()
+    const pumped: string[] = []
+    host.rpc.attachDownlink(frame => {
+      pumped.push(frame.method)
+      client.pushFrame(frame)
+    })
+    // A client-face swap or client-only row edit composes identically; the
+    // layer admin emits this instead of `plugin-layers/applied`.
+    host.emit('client-faces/changed')
+    expect(pumped).toEqual(['client-config/changed'])
+  })
 })

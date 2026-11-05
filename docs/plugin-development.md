@@ -18,6 +18,7 @@ pnpm install
 pnpm build          # 宿主面 → lib-host/，渲染面 → lib-client/
 pnpm run test
 pnpm run doctor     # 发布前的仓库契约自检
+pnpm run dev        # 边写边看效果：热同步进已安装的客户端（见「dev 模式」）
 ```
 
 生成项目包含 `package.json`（manifest 与依赖已配好）、`src/` 骨架、
@@ -353,11 +354,59 @@ export default {
 - 完整骨架（contract、宿主、渲染面、manifest）见仓库 skill：
   `.agents/skills/snap-rail-plugin-dev/references/faces-and-wire.md`。
 
+## dev 模式：边写边看效果
+
+迭代时不必每次打包、签名、拖 zip 安装：`dev` 把构建产物直接热同步进终端的
+插件池，用真实的已安装客户端看效果。池本身就是目录，zip 只是发行的运输
+形态——dev 与生产走同一条挂载路径。
+
+```sh
+pnpm run dev                              # = snap-rail-plugin dev . --launch
+snap-rail-plugin dev . --home <home 目录>  # 指定其它 home（如主仓开发版）
+snap-rail-plugin dev . --reset            # 恢复崩溃/杀进程留下的残留会话
+snap-rail-plugin dev . --no-watch         # 只同步一次并保留 dev 副本（脚本用）
+```
+
+一次会话：
+
+1. 契约自检（同 `doctor`）+ 首次构建；失败时 home 不被改动。
+2. 池里已有同名正式版时先挪到终端数据目录的 `.dev-stage/backup/`，并记下
+   `plugins.yml` 里该行的原状（会话日志 `.dev-stage/<包名>.session.json`）。
+3. 精简 manifest + `lib-host/` + `lib-client/` 整目录换入插件池
+   `plugins/<包名，/ 换成 __>/`，该行置为启用。
+4. `--launch` 拉起已安装客户端：Windows 从安装器写的注册表项找安装目录
+   （安装时可自选目录），找不到再试默认的 `%LOCALAPPDATA%\Programs\snap-rail`；
+   客户端已在运行时只聚焦现有窗口；其它平台用 `--launch <可执行文件路径>`。
+5. `tsdown --watch` 持续构建，产物稳定（约 300ms 无新写入）后整目录重新换入。
+
+| 改动 | 客户端的反应 |
+| --- | --- |
+| 渲染面（`lib-client/`） | 渲染窗自动重载（设置键 `ui.rendererAutoReload` 可关） |
+| 宿主面（`lib-host/`） | 插件就地卸载、以新代码重新挂载，应用不重启 |
+
+**结束即恢复**：Ctrl+C 删除 dev 副本、把正式版挪回池、该行恢复会话前原状，
+运行中的客户端自动跟随。崩溃或直接关掉终端留下的残留，下次 `dev` 启动时或
+`--reset` 自动恢复。会话中经管理页启停或卸载该插件，结束时仍回到会话前状态。
+
+注意：
+
+- **home**：缺省是安装版客户端的 home（Windows `%APPDATA%\snap-rail`）。
+  `--launch` 只对这个 home 可用——安装版的 home 是固定的，同步到别处它看不见。
+  主仓开发版（`pnpm app:dev`）的 home 是 `%APPDATA%\@snap-rail\desktop`：
+  用 `--home` 指过去，开发版自己启动。
+- **免签名**：签名只在安装门（`plugins.install`）检查，池装载不校验，所以
+  dev 副本无需签名；它在管理页显示为普通池行。
+- **seedAbi 章**：dev 副本没有 `pack` 盖的 `snapRail.client.seedAbi` 章，渲染端
+  按缺章宽限加载；发布前以 `pack` 产物 + 安装验证为准。
+- 同步永远是整目录替换：宿主的池 watcher 只认池里目录的出现/消失，手工改池内
+  文件不会触发热重载。
+
 ## 本地命令
 
 | 命令 | 作用 |
 | --- | --- |
 | `snap-rail-plugin doctor .` | 校验 manifest、requires 形态、构建入口落盘；警告写为 warnings，不阻断 |
+| `snap-rail-plugin dev . [--launch] [--home 目录]` | 持续构建并热同步进终端插件池（免打包免签名）；Ctrl+C 恢复原状 |
 | `snap-rail-plugin pack . --out dist --sign-key release.private.pem --key-id my-key` | 装配并签名发行 zip；拒绝无签名发布，输出 sha256 与 size |
 | `snap-rail-plugin feed dist` | 读目录内已签名 zip，产出 `index.json`（含 sha256/size/签名 keyId）；拒绝未签名与重名包 |
 | `snap-rail-plugin inspect dist/xxx.zip` | 身份、面、文件数、签名 keyId 概览（无需公钥） |
@@ -455,6 +504,9 @@ SDK 的传递依赖与 base 运行时包：不需要单独安装，也不要写�
 
 ## 排错
 
+- **dev 会话里的行为异常**：先看 `dev` 自己的输出（目标 home、每次同步与
+  恢复动作都打印）；客户端没反应先确认客户端在运行、该行在管理页是启用态。
+  怀疑是 dev 副本因素时，Ctrl+C 恢复原状后用发布链（pack → 安装）复测。
 - **pack 报 missing its host face**：先 `pnpm run build`；`main` 必须与
   产物一致（模板默认 `lib-host/host.js`）。
 - **构建期「种子默认导入」硬错**：把 `import x from 'seed'` 改成

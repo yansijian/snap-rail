@@ -5,8 +5,9 @@
  * @module @snap-rail/app-boot/scan
  */
 
+import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 /** Manifest fields snap-rail reads beyond the npm baseline. */
@@ -118,6 +119,50 @@ const stringArrayOrUndefined = (value: unknown): readonly string[] | undefined =
     : undefined
 
 /**
+ * Build the loadable URL for a pool entry script with a content-addressed
+ * query. The loader imports entries by URL and Node keys the ESM module cache
+ * on the full URL, so a rebuilt face at the same path would keep serving the
+ * cached module forever — both the reinstall-update path (uninstall + install
+ * while the app runs) and the dev sync loop hit this. The query changes
+ * exactly when the face's script bytes change (the entry update then disposes
+ * the old fiber and re-imports the fresh module) and stays put otherwise, so
+ * unchanged packages never re-mount.
+ *
+ * The digest covers every script file under the entry's directory (shared
+ * chunks land beside the entry); assets never affect host imports. The
+ * computation is deterministic, so every consumer resolving the same file
+ * (the composition, the resolve-hook pool fallback) derives the same URL and
+ * the package keeps a single module instance.
+ *
+ * @param entryFile - absolute path of the entry script inside a pool package.
+ * @returns the `file://` URL with `?v=<digest>`; a plain URL when the
+ * directory is unreadable (the import then fails loudly on its own).
+ */
+export function poolEntryUrl(entryFile: string): string {
+  const href = pathToFileURL(entryFile).href
+  try {
+    const hash = createHash('sha1')
+    const walk = (dir: string, prefix: string): void => {
+      const entries = readdirSync(dir, { withFileTypes: true })
+        .sort((a, b) => a.name.localeCompare(b.name))
+      for (const entry of entries) {
+        const rel = prefix === '' ? entry.name : `${prefix}/${entry.name}`
+        if (entry.isDirectory()) {
+          walk(join(dir, entry.name), rel)
+        } else if (entry.isFile() && /\.(?:js|mjs|cjs)$/.test(entry.name)) {
+          hash.update(rel)
+          hash.update(readFileSync(join(dir, entry.name)))
+        }
+      }
+    }
+    walk(dirname(entryFile), '')
+    return `${href}?v=${hash.digest('hex').slice(0, 12)}`
+  } catch {
+    return href
+  }
+}
+
+/**
  * Resolve one subpath (`'./rpc'`) inside a pool package directory: the
  * release manifest's `exports` voice when present, else `<subpath>.js` /
  * `<subpath>/index.js` on disk. Pure filesystem + JSON — never a nested
@@ -188,7 +233,7 @@ export function scanPluginPool(dirs: readonly string[]): Map<string, PluginDescr
         name: manifest.name,
         version: typeof manifest.version === 'string' ? manifest.version : '0.0.0',
         dir: pluginDir,
-        entryUrl: pathToFileURL(join(pluginDir, main)).href,
+        entryUrl: poolEntryUrl(join(pluginDir, main)),
         permissions: snapRail?.permissions ?? [],
       }
       const kind = stringOrUndefined(snapRail?.kind)

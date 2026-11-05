@@ -1,8 +1,8 @@
 ---
 name: snap-rail-plugin-dev
-description: 开发、构建、验证、签名与发布 snap-rail 可安装插件的完整指南——在独立插件仓库里用公共 @snap-rail/plugin-sdk 完成，不需要 snap-rail 源码。覆盖全部 9 种模板：设备驱动 driver、存储后端 store-provider、宿主服务 host-service、工具 tool、业务套件 suite、UI 页面 ui-view、布局 ui-layout、共享组件 ui-extension、主题 ui-skin，以及宿主 RPC（ctx.rpc / serveContract）、渲染面 link 与帧订阅（subscribeFrame）。需求横跨多个能力（如「采集欧姆龙
+description: 开发、构建、验证、签名与发布 snap-rail 可安装插件的完整指南——在独立插件仓库里用公共 @snap-rail/plugin-sdk 完成，不需要 snap-rail 源码。覆盖全部 9 种模板：设备驱动 driver、存储后端 store-provider、宿主服务 host-service、工具 tool、业务套件 suite、UI 页面 ui-view、布局 ui-layout、共享组件 ui-extension、主题 ui-skin，以及宿主 RPC（ctx.rpc / serveContract）、渲染面 link 与帧订阅（subscribeFrame）。本地迭代看效果用 dev 模式（snap-rail-plugin dev：构建产物热同步进终端插件池，免打包免签名）。需求横跨多个能力（如「采集欧姆龙
 PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立复用的多个插件
-（驱动 + 看板页等）再选模板。只要用户想写/改/发 snap-rail 插件、snap-rail driver、snap-rail suite、snapRail manifest、snap-rail-plugin CLI、插件 zip 签名或 feed 滚动发布，就用本 skill；哪怕用户只说「给 snap-rail 做个××」，也应触发。
+（驱动 + 看板页等）再选模板。只要用户想写/改/发/调试 snap-rail 插件、snap-rail driver、snap-rail suite、snapRail manifest、snap-rail-plugin CLI、插件 zip 签名或 feed 滚动发布，就用本 skill；哪怕用户只说「给 snap-rail 做个××」，也应触发。
 ---
 
 # snap-rail 插件开发（独立仓库）
@@ -15,9 +15,11 @@ PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立�
 
 ## 一分钟心智模型
 
-- 插件 = 一个 npm 包；发行形态是**签名的 zip**：精简 manifest
+- 插件 = 一个 npm 包；**发行**形态是**签名的 zip**：精简 manifest
   （`package.json` 的 `snapRail` 块 + `main`/`exports`）+ 构建好的运行面，
-  **永不带 src/**。
+  **永不带 src/**。**本地迭代**不需要 zip：`pnpm run dev` 把构建产物整目录
+  热同步进终端插件池（免打包免签名，Ctrl+C 恢复原状，见标准工作流 3.5）——
+  与生产同一条池挂载路径，不是另一套 harness。
 - 安装后住进终端的插件池 `<home>/plugins/<包名>/`；启用/禁用/卸载都过
   `requires` 依赖解析，缺依赖当场被拒，不留到下次开机。
 - 两种运行面：
@@ -180,6 +182,20 @@ pnpm add -D typescript && pnpm exec tsc --noEmit
 # 3. 快速反馈环（写循环里随时跑；红 = 契约违约，warning = 建议）：
 pnpm run doctor
 
+# 3.5 看运行效果（免打包免签名；写→看循环的主力；需 plugin-sdk ≥ 0.2.8，
+#     更早版本没有 dev 子命令——见下方「版本锚」）：
+pnpm run dev        # = snap-rail-plugin dev . --launch
+#    doctor 自检 + 首次构建后，产物整目录热同步进安装版终端的插件池
+#    （%APPDATA%\snap-rail\plugins），客户端自动拉起（已运行则只聚焦）；
+#    之后 tsdown --watch 每次重建自动再同步：渲染面改动 → 渲染窗自动重载，
+#    宿主面改动 → 插件就地以新代码重挂，不重启应用。
+#    Ctrl+C 结束 = 恢复原状（同名正式版挪回池、plugins.yml 行回到会话前）；
+#    崩溃/关终端的残留：下次 dev 启动或 `snap-rail-plugin dev . --reset` 自动恢复。
+#    主仓开发版：snap-rail-plugin dev . --home %APPDATA%\@snap-rail\desktop
+#    （--launch 只认安装版 home；开发版自己 pnpm app:dev）。
+#    dev 副本没有 pack 盖的 seedAbi 章（渲染端按缺章宽限加载）——发布前仍以
+#    pack 产物 + 安装验证为准。
+
 # 4. 一次性建立发布者身份（Ed25519；.keys/ 已被 .gitignore）：
 openssl genpkey -algorithm ed25519 -out .keys/release.private.pem
 openssl pkey -in .keys/release.private.pem -pubout -out .keys/release.public.pem
@@ -251,6 +267,9 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
   tsdown `^0.22`。`npm view @snap-rail/plugin-kit version` 查最新。
   base 服务门面 `@snap-rail/plugin-sdk/api` 与 `/api/client` 从 `0.2.5`
   起提供；底层 gateway/connection/settings 由 SDK 传递安装，作者不单列。
+  本地迭代命令 `dev`（`snap-rail-plugin dev .`）从 plugin-sdk **0.2.8** 起
+  ——更早版本没有该子命令，`pnpm add @snap-rail/plugin-sdk@^0.2.8` 升级
+  （init 模板的 `dev` script 同版本起生成，旧仓手动加即可）。
   `SEED_ABI_REVISION` 当前为 **r3**（以 `@snap-rail/plugin-kit` 导出为准；
   r2→r3 = 主题契约收敛为单套 token）。球面拖拽 `attachBallDrag` 从
   `@snap-rail/ui/runtime` 导入，需 ui ≥ 0.1.1。

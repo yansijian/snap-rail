@@ -34,6 +34,10 @@ files from the snap-rail workspace.
 - Build with `hostBundle` and/or `clientBundle`; the release packer includes
   only built faces and the trimmed manifest, never `src/`. `clientBundle`
   stamps `snapRail.client.seedAbi`; never hand-write it.
+- Local iteration runs `snap-rail-plugin dev` (`src/dev.ts`): watch-build +
+  hot-sync into a terminal home's pool, restorative session (release copy
+  moves back on exit). It rides the same pool-mounting path as production —
+  keep it that way; no harness, no dev-only loading path.
 - Publish to your own repository's rolling `feed` release and tag the repo
   `snap-rail-plugin` — there is no central market repo and no PR gate.
 - Before publishing, run `snap-rail-plugin doctor .`, `pnpm build`, `snap-rail-plugin inspect <zip>`, and

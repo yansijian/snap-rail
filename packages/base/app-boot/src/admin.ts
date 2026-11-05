@@ -11,13 +11,14 @@
  * @module @snap-rail/app-boot/admin
  */
 
-import { existsSync, readFileSync, renameSync, watch, writeFileSync } from 'node:fs'
-import { basename, dirname } from 'node:path'
+import { createHash } from 'node:crypto'
+import { existsSync, readFileSync, renameSync, statSync, watch, writeFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { dump } from 'js-yaml'
 import type { Context } from '@snap-rail/cordis'
 import { composeEntries, loadBuiltinLayer, loadPresetLayers, loadUserLayer } from './compose.ts'
 import type { UserLayer, UserPluginRow } from './compose.ts'
-import { scanPluginPool } from './scan.ts'
+import { scanPluginPool, type PluginDescriptor } from './scan.ts'
 import type { EntryOptions } from '@snap-rail/cordis-plugin-loader'
 
 /** Everything the administrator needs to reach the layers and the tree. */
@@ -60,6 +61,92 @@ function retryableWriteError(error: unknown): boolean {
   return code === 'EACCES' || code === 'EBUSY' || code === 'EPERM'
 }
 
+/** One pool client face as the renderer sees it (mirrors the
+ * `client-config.list` projection): the bundle URL plus the manifest markers
+ * and a stat fingerprint of the bundle bytes. */
+interface RendererFaceRecord {
+  clientUrl: string
+  surfaceUrls?: Record<string, string>
+  kind?: string
+  category?: string
+  seeds?: readonly string[]
+  seedAbi?: NonNullable<PluginDescriptor['clientSeedAbi']>
+  bundle: string
+}
+
+/**
+ * Digest the renderer-visible projection of the layers. Client-only rows
+ * never join the host composition, so a change that only affects what
+ * renderers see (a client-face swap into the pool, a client-only row edit)
+ * leaves the composed artifact byte-identical — without this digest the
+ * reload nudge would never fire for them and the change would wait for the
+ * next app start.
+ *
+ * The projection mirrors `client-config.list`: rows from the raw user layer
+ * whose package carries a client face (or is a renderer occupant), plus
+ * face-carrying pool packages without a row (listed disabled). Field order is
+ * fixed, so the digest is deterministic for identical on-disk state.
+ *
+ * @param options - the plugin pool, the raw user layer, renderer occupants.
+ * @returns an opaque digest that changes exactly when the projection does.
+ */
+export function rendererFacesDigest(options: {
+  pool: ReadonlyMap<string, PluginDescriptor>
+  userLayer: UserLayer
+  rendererPackages: readonly string[]
+}): string {
+  const bundleStat = (descriptor: PluginDescriptor, entry: string): string => {
+    try {
+      const stat = statSync(join(descriptor.dir, entry))
+      return `${stat.size}:${Math.round(stat.mtimeMs)}`
+    } catch {
+      return 'missing'
+    }
+  }
+  const faces = new Map<string, RendererFaceRecord>()
+  for (const [name, descriptor] of options.pool) {
+    if (descriptor.clientEntry === undefined) continue
+    // The mounted directory name, exactly like the scheme handler mapping.
+    const poolDir = descriptor.dir.split(/[\\/]/).at(-1) ?? name
+    const record: RendererFaceRecord = {
+      clientUrl: `snap-plugin://pool/${poolDir}/${descriptor.clientEntry}`,
+      bundle: bundleStat(descriptor, descriptor.clientEntry),
+    }
+    const surfaces = descriptor.clientSurfaces ?? {}
+    const surfaceUrls: Record<string, string> = {}
+    for (const [surface, entry] of Object.entries(surfaces)) {
+      if (entry === undefined) continue
+      surfaceUrls[surface] = `snap-plugin://pool/${poolDir}/${entry}`
+      record.bundle = `${record.bundle}|${surface}:${bundleStat(descriptor, entry)}`
+    }
+    if (Object.keys(surfaceUrls).length > 0) record.surfaceUrls = surfaceUrls
+    if (descriptor.kind !== undefined) record.kind = descriptor.kind
+    if (descriptor.category !== undefined) record.category = descriptor.category
+    if (descriptor.clientSeeds !== undefined && descriptor.clientSeeds.length > 0) record.seeds = descriptor.clientSeeds
+    if (descriptor.clientSeedAbi !== undefined) record.seedAbi = descriptor.clientSeedAbi
+    faces.set(name, record)
+  }
+  const rendererOccupants = new Set(options.rendererPackages)
+  const rows: Array<{ name: string, enabled: boolean, config?: unknown, face?: RendererFaceRecord }> = []
+  const seen = new Set<string>()
+  for (const row of options.userLayer.plugins) {
+    const face = faces.get(row.name)
+    if (!rendererOccupants.has(row.name) && face === undefined) continue
+    seen.add(row.name)
+    rows.push({
+      name: row.name,
+      enabled: row.enabled !== false,
+      ...row.config !== undefined ? { config: row.config } : {},
+      ...face !== undefined ? { face } : {},
+    })
+  }
+  for (const [name, face] of faces) {
+    if (seen.has(name)) continue
+    rows.push({ name, enabled: false, face })
+  }
+  return createHash('sha1').update(JSON.stringify(rows)).digest('hex')
+}
+
 /**
  * Write a file atomically: land the bytes in a sibling temp file, then
  * rename over the target, retrying the Windows-busy errors a watching
@@ -90,8 +177,17 @@ export class LayerAdmin {
   private watchers: Array<{ close(): void }> = []
   private watchTimer: NodeJS.Timeout | undefined
   private lastFailureValue: LayerFailure | null = null
+  private lastRendererDigest: string
 
-  constructor(private readonly ctx: Context, readonly handles: LayerHandles) {}
+  constructor(private readonly ctx: Context, readonly handles: LayerHandles) {
+    // Baseline the renderer projection at mount time so the first apply after
+    // a real change (not the first apply ever) decides whether to nudge.
+    this.lastRendererDigest = rendererFacesDigest({
+      pool: scanPluginPool(handles.poolDirs),
+      userLayer: loadUserLayer(handles.userLayerPath),
+      rendererPackages: handles.rendererPackages,
+    })
+  }
 
   /** Last failed compose/refresh attempt, or null after a clean apply. */
   lastFailure(): LayerFailure | null {
@@ -113,8 +209,9 @@ export class LayerAdmin {
 
   /**
    * Apply the current layer files to the mounted tree: recompose, skip when
-   * the derived artifact is unchanged, otherwise rewrite it and refresh the
-   * include (transactional per entry, rolling back on failure).
+   * neither the derived artifact nor the renderer-visible projection
+   * changed, otherwise rewrite and refresh the include (transactional per
+   * entry, rolling back on failure) and/or nudge the renderer windows.
    *
    * @returns whether the composed artifact changed.
    * @throws whatever recomposition or the include refresh raised; in both
@@ -124,23 +221,36 @@ export class LayerAdmin {
     try {
       const composed = this.recompose()
       const serialized = dump(composed)
+      const rendererDigest = rendererFacesDigest({
+        pool: scanPluginPool(this.handles.poolDirs),
+        userLayer: loadUserLayer(this.handles.userLayerPath),
+        rendererPackages: this.handles.rendererPackages,
+      })
       const current = existsSync(this.handles.composedPath)
         ? readFileSync(this.handles.composedPath, 'utf8')
         : undefined
-      if (serialized === current) {
+      const compositionChanged = serialized !== current
+      if (!compositionChanged && rendererDigest === this.lastRendererDigest) {
         this.lastFailureValue = null
         return false
       }
 
-      const include = this.ctx.loader.store[this.handles.includeId]?.subtree as Refreshable | undefined
-      if (include === undefined) {
-        throw new Error('pluginLayers: the root include entry is no longer mounted')
+      if (compositionChanged) {
+        const include = this.ctx.loader.store[this.handles.includeId]?.subtree as Refreshable | undefined
+        if (include === undefined) {
+          throw new Error('pluginLayers: the root include entry is no longer mounted')
+        }
+        atomicWrite(this.handles.composedPath, serialized)
+        await include.refresh()
       }
-      atomicWrite(this.handles.composedPath, serialized)
-      await include.refresh()
       this.lastFailureValue = null
-      this.ctx.emit('plugin-layers/applied', composed)
-      return true
+      if (compositionChanged) this.ctx.emit('plugin-layers/applied', composed)
+      // A renderer-only change (client face swap, client-only row edit)
+      // composes identically: the host tree stays as mounted and the
+      // renderer windows take the reload nudge instead.
+      if (rendererDigest !== this.lastRendererDigest) this.ctx.emit('client-faces/changed')
+      this.lastRendererDigest = rendererDigest
+      return compositionChanged
     } catch (cause) {
       this.lastFailureValue = {
         time: Date.now(),

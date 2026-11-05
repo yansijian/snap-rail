@@ -59,6 +59,8 @@ native/integrated/custom（管理页徽标，不做门禁）。
 ```
 snap-rail-plugin init <dir> --template <t> [--framework <pkg[@range]>] [--force]
 snap-rail-plugin doctor <dir>                  # 发布前契约自检
+snap-rail-plugin dev <dir> [--launch] [--home <dir>] [--reset] [--no-watch]
+                                               # 边写边看：热同步进终端插件池，Ctrl+C 恢复原状
 snap-rail-plugin pack <dir> --out dist --sign-key key.pem --key-id my-key
 snap-rail-plugin feed <dir>                    # 由已签名 zip 产出 index.json
 snap-rail-plugin inspect <zip>                 # 身份/面/签名概览

@@ -699,6 +699,71 @@ describe('plugin layers admin', () => {
     }
   })
 
+  it('nudges renderers for a client-only face swap without recomposing the host tree', async () => {
+    // Client-only rows never join the composed artifact, so a bundle swap
+    // composes byte-identically; the renderer projection digest is what
+    // notices — the dev sync loop and reinstall updates of UI plugins both
+    // depend on this nudge to reach the windows without an app restart.
+    const world = await makeWorld()
+    const dir = join(world.home, 'plugins', '@snap-rail__station')
+    mkdirSync(join(dir, 'lib-client'), { recursive: true })
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      name: '@snap-rail/station', version: '0.1.0', type: 'module', main: 'lib-client/client.js',
+      snapRail: { kind: 'plugin', clientOnly: true, client: { entry: 'lib-client/client.js' } },
+    }))
+    writeFileSync(join(dir, 'lib-client', 'client.js'), '/* v1 */\n')
+
+    const applied: unknown[] = []
+    const faces: unknown[] = []
+    world.ctx.on('plugin-layers/applied', composed => { applied.push(composed) })
+    world.ctx.on('client-faces/changed', () => { faces.push(true) })
+
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/station'\n    enabled: true\n")
+    expect(await world.layers.apply()).toBe(false)
+    expect(faces).toHaveLength(1)
+    expect(applied).toHaveLength(0)
+
+    // The swap itself: new bundle bytes, same host composition.
+    writeFileSync(join(dir, 'lib-client', 'client.js'), '/* v2 — rebuilt bundle */\n')
+    expect(await world.layers.apply()).toBe(false)
+    expect(faces).toHaveLength(2)
+    expect(applied).toHaveLength(0)
+
+    // Nothing changed since: no nudge, no recompose.
+    expect(await world.layers.apply()).toBe(false)
+    expect(faces).toHaveLength(2)
+
+    // Flipping the client-only row is renderer-visible too.
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/station'\n    enabled: false\n")
+    await world.layers.apply()
+    expect(faces).toHaveLength(3)
+    expect(applied).toHaveLength(0)
+  })
+
+  it('re-imports a rebuilt host face in place (content-addressed entry URL)', async () => {
+    const world = await makeWorld()
+    const dir = seedPoolPackage(world.home, '@snap-rail/mini')
+    writeFileSync(world.userPath, "plugins:\n  - name: '@snap-rail/mini'\n    enabled: true\n")
+    await world.layers.apply()
+    await sleepUntil(() => world.ctx.get('mini') !== undefined)
+    const before = String(world.layers.recompose().find(entry => entry.id === '@snap-rail/mini')!.name)
+    expect(before).toContain('?v=')
+
+    const applied: unknown[] = []
+    world.ctx.on('plugin-layers/applied', composed => { applied.push(composed) })
+    // A rebuild under the same path: the provided service value changes, so
+    // the remount is observable only if the fresh module really executed
+    // (a cached import would keep providing `true`).
+    writeFileSync(join(dir, 'lib', 'index.js'),
+      'export default { name: "mini", apply(c) { c.provide("mini", "rebuilt") } }\n')
+    expect(await world.layers.apply()).toBe(true)
+    expect(applied).toHaveLength(1)
+    const after = String(world.layers.recompose().find(entry => entry.id === '@snap-rail/mini')!.name)
+    expect(after).not.toBe(before)
+    await sleepUntil(() => world.ctx.get('mini') === 'rebuilt')
+    expect(world.ctx.get('mini')).toBe('rebuilt')
+  })
+
   it('audits enable and config mutations', async () => {
     const world = await makeWorld()
     seedPoolPackage(world.home, '@snap-rail/mini')

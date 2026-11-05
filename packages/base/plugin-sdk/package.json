@@ -52,6 +52,7 @@
     "@snap-rail/plugin-kit": "workspace:^",
     "@snap-rail/settings": "workspace:^",
     "fflate": "^0.8.3",
+    "js-yaml": "^4.2.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
