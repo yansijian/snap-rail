@@ -19,6 +19,12 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      # electron-builder 工具链（nsis/winCodeSign/appimage）从
+      # electron-userland/electron-builder-binaries 的 GitHub release 下载，
+      # 同样会间歇 504——与 electron-builder.yml 的 electronDownload.mirror
+      # （Electron 发行包本体，走 npmmirror）配套切镜像。
+      ELECTRON_BUILDER_BINARIES_MIRROR: https://npmmirror.com/mirrors/electron-builder-binaries/
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

@@ -28,6 +28,14 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   artifactName: ${productName}-${version}-${arch}-setup.${ext}
+# Electron 发行包走 npmmirror：github.com/electron/electron/releases 的下载
+# 链路对 CI/国内机器都会间歇 504（zip 拉完卡 SHASUMS256.txt），镜像目录完整
+# （zip + SHASUMS256.txt 同源），@electron/get 逐字节校验签名清单，完整性
+# 不依赖源站。electron-builder 26 只认这个配置键（ELECTRON_MIRROR env 被它
+# 故意绕过）；builder 工具链（nsis/winCodeSign）另走 release.yml 的
+# ELECTRON_BUILDER_BINARIES_MIRROR。
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/
 # Update channel seat: electron-updater reads the publish provider at
 # runtime (this config packs into app-update.yml as the built-in default);
 # a deployment overrides it per terminal with the `update.feedUrl` settings
