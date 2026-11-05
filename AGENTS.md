@@ -127,10 +127,12 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   退出策略 `'ball'` 关窗收进球是底座唯一代办的配对）、贴边收起（拖动全程
   不出屏、四边贴边停泊、指针离开缩 2/3 留 1/3、悬停滑出，缩起态经
   `shell/ball-dock-changed` 帧给插件）都是底座不变式；活动 layout/suite 可声明
-  `WindowProfile`/`BallProfile`（尺寸/模式/停泊行为，全部有界），宿主校验
-  夹取。球的几何单源 `resolveBallProfile`（默认 128 窗/112 球/8px 余量）：
+  `WindowProfile`/`BallProfile`（尺寸/模式/停泊行为；尺寸无下限、上限有界
+  ——窗口夹屏幕工作区、球 24–192），宿主校验夹取。球的几何单源
+  `resolveBallProfile`（默认 128 窗/112 球/8px 余量）：
   **窗口必须方形、8px 余量固定、阴影必须画在余量内**（径向渐变衰减到零；
-  `box-shadow` 会被窗口边界切成灰边）。退出策略是宿主面
+  `box-shadow` 会被窗口边界切成灰边；24 是余量不变式派生的技术下限）。
+  退出策略是宿主面
   的数据声明（`close/quit: 'ball'|'tray'|'quit'|'hold'`，最后声明且存活者
   生效，fiber 回收即回退默认 quit）；`'hold'` 把请求挂起交回插件——确认框
   **永远由插件的渲染面自己画**（底座不画任何 UI），经 `shell.exit.resolve`

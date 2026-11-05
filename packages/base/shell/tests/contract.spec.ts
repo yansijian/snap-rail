@@ -70,13 +70,22 @@ describe('window profile', () => {
     expect(profile.remember).toBe(true)
   })
 
-  it('clamps an oversized request to the display work area and a tiny one to the guard', () => {
+  it('clamps an oversized request to the display work area and keeps a declared minimum', () => {
     const profile = resolveWindowProfile(
       { width: 5000, height: 4000, minWidth: 100, minHeight: 100 },
       { width: 1600, height: 900 },
     )
     expect(profile.width).toBe(1600)
     expect(profile.height).toBe(900)
+    // The host imposes no lower bound: a declared minimum is honoured as-is.
+    expect(profile.minWidth).toBe(100)
+    expect(profile.minHeight).toBe(100)
+  })
+
+  it('lets a layout request any positive size — no host floor', () => {
+    const profile = resolveWindowProfile({ width: 400, height: 300 }, { width: 1600, height: 900 })
+    expect(profile.width).toBe(400)
+    expect(profile.height).toBe(300)
     expect(profile.minWidth).toBe(WINDOW_LIMITS.minWidth)
     expect(profile.minHeight).toBe(WINDOW_LIMITS.minHeight)
   })
@@ -104,6 +113,12 @@ describe('ball profile', () => {
     expect(tiny.size).toBe(BALL_LIMITS.minSize)
     expect(tiny.dockVisibleRatio).toBe(BALL_LIMITS.minCollapseRatio)
     expect(tiny.hoverDelayMs).toBe(BALL_LIMITS.minHoverDelayMs)
+
+    // The only floor is the paint-rim invariant (orb = size − 2 × inset);
+    // a mini ball the layout declares passes through untouched.
+    const mini = resolveBallProfile({ size: 32 })
+    expect(mini.size).toBe(32)
+    expect(mini.orb + 2 * mini.inset).toBe(32)
 
     const huge = resolveBallProfile({ size: 999, collapseRatio: 0.99, hoverDelayMs: 99_999 })
     expect(huge.size).toBe(BALL_LIMITS.maxSize)

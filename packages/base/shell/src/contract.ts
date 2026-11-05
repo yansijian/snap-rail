@@ -104,10 +104,15 @@ export type WindowMode = (typeof WINDOW_MODES)[number]
 
 /** Absolute guards the host applies to every requested window profile. */
 export const WINDOW_LIMITS = {
-  /** The smallest window width a profile may request. */
-  minWidth: 960,
-  /** The smallest window height a profile may request. */
-  minHeight: 600,
+  /**
+   * The floor applied when a profile declares no minimum of its own: 1 is
+   * the smallest positive pixel size, i.e. the host imposes no lower bound
+   * beyond the wire schema's positivity. A layout wanting a readable floor
+   * declares `minWidth`/`minHeight` itself.
+   */
+  minWidth: 1,
+  /** See {@link WINDOW_LIMITS.minWidth}. */
+  minHeight: 1,
   /** The factory window width when nobody requested one. */
   defaultWidth: 1280,
   /** The factory window height when nobody requested one. */
@@ -220,8 +225,12 @@ export function resolveWindowProfile(
 
 /** Absolute guards for a requested floating-ball profile. */
 export const BALL_LIMITS = {
-  /** The smallest square ball window. */
-  minSize: 96,
+  /**
+   * The smallest square ball window — purely technical, not ergonomic: the
+   * 8px paint rim is fixed, so the orb (`size − 2 × inset`) must stay
+   * paintable. 24 leaves an 8px orb; anything below would have none.
+   */
+  minSize: 24,
   /** The largest square ball window. */
   maxSize: 192,
   /** The factory ball window edge. */

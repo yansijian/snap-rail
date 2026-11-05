@@ -229,13 +229,14 @@ export default {
   `precedence ≥ 1` 都能接管；`LayoutContribution` 字段 = `id` / `order` /
   `precedence?` / `provides` / `window?` / `ball?` / `render`。
 - `window`/`ball` 是布局推荐档案（`WindowProfile` / `BallProfile`，类型来自
-  `@snap-rail/shell/contract`），宿主会夹取边界；用户可在「外观与显示」
+  `@snap-rail/shell/contract`），宿主只夹上限（屏幕工作区/球 ≤192），尺寸
+  无下限；用户可在「外观与显示」
   覆盖（来源优先级 user > persisted > layout > face > default）：
   - `WindowProfile`：`mode?`（`'windowed' | 'maximized' | 'fullscreen'`）、
-    `width?` / `height?`（≥ 960×600，≤ 7680×4320，默认 1280×800）、
+    `width?` / `height?`（正整数，≤ 7680×4320，默认 1280×800）、
     `minWidth?` / `minHeight?`、`resizable?` / `center?` / `remember?`
     （默认皆 true）。
-  - `BallProfile`：`enabled?` / `size?`（96–192，默认 128；球体 = size − 16）/
+  - `BallProfile`：`enabled?` / `size?`（24–192，默认 128；球体 = size − 16）/
     `dockable?` / `collapse?`（默认皆 true）/ `dockEdges?`（四边子集，默认
     全部）/ `collapseRatio?`（收起后留在屏内的比例，1/4–1/2，默认 1/3）/
     `hoverDelayMs?`（指针离开到收起的延迟，300–1200，默认 600）。
@@ -324,7 +325,8 @@ clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),  /
 ### 球面几何与贴边
 
 几何单源 `resolveBallProfile`（`@snap-rail/shell/contract`）：默认窗口
-128×128、球体 112、四周 8px 余量；尺寸可被布局/用户覆盖（96–192），但
+128×128、球体 112、四周 8px 余量；尺寸可被布局/用户覆盖（24–192，下限
+只是 8px 余量的几何技术下限），但
 方形、8px 余量固定——面里 `100% × 100%` 恒等于 `size × size`。四条硬规则：
 
 1. **阴影画在余量内**：CSS `box-shadow` 会被透明窗口边界硬切成灰边；用

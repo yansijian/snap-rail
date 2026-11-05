@@ -145,11 +145,12 @@ async function start(): Promise<void> {
     console.error(`snap-rail: Shell 适配器未挂载（缺 ${missingShell.join(', ')}）——通知、托盘与悬浮球不可用`)
   }
 
+  // No hardcoded OS minimum here: the effective profile's `minWidth`/
+  // `minHeight` are applied by the Shell (`applyWindowProfile`) as soon as
+  // the window is attached, so a layout may request any positive size.
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 960,
-    minHeight: 600,
     frame: false,
     backgroundColor: '#0b0f14',
     autoHideMenuBar: true,

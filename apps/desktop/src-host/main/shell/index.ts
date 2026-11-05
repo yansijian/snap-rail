@@ -189,6 +189,10 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       applyingWindow = true
       try {
         win.setResizable(profile.resizable)
+        // The profile's own floor is the only one: a layout declaring
+        // `minWidth` keeps it, one declaring nothing is unconstrained (the
+        // resolved default is 1 — the wire schema's positivity floor).
+        win.setMinimumSize(profile.minWidth, profile.minHeight)
         if (profile.mode === 'fullscreen') {
           win.setFullScreen(true)
         } else if (profile.mode === 'maximized') {
