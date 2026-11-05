@@ -7,6 +7,7 @@
  */
 
 export * from '../utils.ts'
+export * from './alert.tsx'
 export * from './button.tsx'
 export * from './controls.tsx'
 export * from './dialog.tsx'
@@ -17,4 +18,5 @@ export * from './input.tsx'
 export * from './layout.tsx'
 export * from './overlay.tsx'
 export * from './schema-form.tsx'
+export * from './slider.tsx'
 export * from './surface.tsx'

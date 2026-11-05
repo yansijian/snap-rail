@@ -1,6 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
   Badge,
   Button,
   Card,
@@ -12,14 +15,20 @@ import {
   Grid,
   Input,
   Led,
+  List,
+  ListItem,
   NumberInput,
   Progress,
   RadioGroup,
   RadioGroupItem,
   Row,
   SchemaForm,
+  ScrollArea,
   Select,
   SelectItem,
+  Separator,
+  Skeleton,
+  Slider,
   Stack,
   Switch,
   Table,
@@ -347,5 +356,65 @@ describe('semantic component anatomy', () => {
     expect(html).toContain('data-snap-component="widget"')
     expect(html).toContain('data-snap-part="widget.title"')
     expect(space('md')).toBe('var(--snap-space-md)')
+  })
+
+  it('renders alert, separator, and skeleton anatomy', () => {
+    const html = renderToStaticMarkup(
+      <>
+        <Alert intent="danger">
+          <AlertTitle>保存失败</AlertTitle>
+          <AlertDescription>设备未响应</AlertDescription>
+        </Alert>
+        <Separator orientation="vertical" />
+        <Skeleton variant="text" />
+      </>,
+    )
+    expect(html).toContain('data-snap-part="alert.root"')
+    expect(html).toContain('data-intent="danger"')
+    expect(html).toContain('role="alert"')
+    expect(html).toContain('data-snap-part="alert.title"')
+    expect(html).toContain('data-snap-part="separator.root"')
+    expect(html).toContain('data-orientation="vertical"')
+    expect(html).toContain('data-snap-part="skeleton.root"')
+    expect(html).toContain('data-variant="text"')
+  })
+
+  it('renders list rows with leading/trailing slots and selection state', () => {
+    const html = renderToStaticMarkup(
+      <List divided>
+        <ListItem leading="◆" trailing={<Badge>3</Badge>} selected>一号机</ListItem>
+        <ListItem disabled>二号机</ListItem>
+      </List>,
+    )
+    expect(html).toContain('data-snap-part="list.root"')
+    expect(html).toContain('data-divided="true"')
+    expect(html).toContain('data-snap-part="list.leading"')
+    expect(html).toContain('data-snap-part="list.trailing"')
+    expect(html).toContain('data-selected="true"')
+    expect(html).toContain('data-disabled="true"')
+  })
+
+  it('renders the slider track and thumb anatomy', () => {
+    const html = renderToStaticMarkup(
+      <Slider value={[60]} min={0} max={100} step={5} label="设定值" />,
+    )
+    expect(html).toContain('data-snap-part="slider.root"')
+    expect(html).toContain('data-snap-part="slider.track"')
+    expect(html).toContain('data-snap-part="slider.range"')
+    expect(html).toContain('data-snap-part="slider.thumb"')
+    expect(html).toContain('role="slider"')
+    expect(html).toContain('aria-valuemin="0"')
+    expect(html).toContain('aria-valuemax="100"')
+  })
+
+  it('renders the scroll area viewport and hides the native bars', () => {
+    // Radix mounts themed scrollbars only after mount (see
+    // scroll-area.spec.tsx); static markup covers the shell.
+    const html = renderToStaticMarkup(
+      <ScrollArea scrollbarType="always">内容</ScrollArea>,
+    )
+    expect(html).toContain('data-snap-part="scroll-area.root"')
+    expect(html).toContain('data-snap-part="scroll-area.viewport"')
+    expect(html).toContain('scrollbar-width:none')
   })
 })

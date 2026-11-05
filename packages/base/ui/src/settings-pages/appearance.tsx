@@ -12,7 +12,7 @@
 import type { HostLink } from '@snap-rail/connection'
 import { rpcErrorText } from '@snap-rail/connection'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Button, Page, Row, Section, Stack, Switch, Tabs, TabsList, TabsTrigger } from '../components/index.ts'
+import { Alert, Button, Page, Row, Section, Stack, Switch, Tabs, TabsList, TabsTrigger } from '../components/index.ts'
 import { useSkinId, useSkins } from '../skins.tsx'
 import { useClient } from '../runtime.tsx'
 
@@ -153,7 +153,7 @@ export function AppearancePage(): ReactNode {
   return (
     <Page title="外观与显示" description="主题、主窗口尺寸和悬浮球外观。">
       <Stack gap="lg">
-        {error !== undefined && <div role="alert" style={{ color: 'var(--snap-color-danger)' }}>{error}</div>}
+        {error !== undefined && <Alert intent="danger">{error}</Alert>}
 
         <Section title="主题">
           <Tabs value={activeId} onValueChange={value => {

@@ -291,6 +291,28 @@ export const UI_COMPONENTS = {
     parts: ['led.root', 'led.halo'],
     props: ['tone'],
   },
+  alert: {
+    parts: ['alert.root', 'alert.title', 'alert.description'],
+    slots: ['title', 'description'],
+    props: ['intent'],
+  },
+  separator: {
+    parts: ['separator.root'],
+    props: ['orientation'],
+  },
+  skeleton: {
+    parts: ['skeleton.root'],
+    props: ['variant'],
+  },
+  list: {
+    parts: ['list.root', 'list.item', 'list.leading', 'list.content', 'list.trailing'],
+    slots: ['leading', 'trailing'],
+    props: ['divided', 'selected', 'disabled'],
+  },
+  slider: {
+    parts: ['slider.root', 'slider.track', 'slider.range', 'slider.thumb'],
+    props: ['value', 'min', 'max', 'step'],
+  },
   spinner: {
     parts: ['spinner.root'],
   },
@@ -333,7 +355,7 @@ export const UI_COMPONENTS = {
   row: { parts: ['row.root'], props: ['gap', 'padding', 'align', 'justify'] },
   grid: { parts: ['grid.root'], props: ['gap', 'columns', 'padding'] },
   split: { parts: ['split.root', 'split.start', 'split.end'], slots: ['start', 'end'] },
-  'scroll-area': { parts: ['scroll-area.root', 'scroll-area.viewport', 'scroll-area.scrollbar'] },
+  'scroll-area': { parts: ['scroll-area.root', 'scroll-area.viewport', 'scroll-area.scrollbar', 'scroll-area.thumb'] },
   'drag-scroll': { parts: ['drag-scroll.root', 'drag-scroll.viewport'] },
   'chart-frame': {
     parts: ['chart-frame.root', 'chart-frame.header', 'chart-frame.title', 'chart-frame.description', 'chart-frame.actions', 'chart-frame.body', 'chart-frame.loading', 'chart-frame.empty', 'chart-frame.error'],

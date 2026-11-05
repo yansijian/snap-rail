@@ -17,7 +17,7 @@ import type { Context } from '@snap-rail/cordis'
 import type { InspectedArchive, PluginInfo, PluginSignature, PluginUpdate, RemotePluginInfo } from '@snap-rail/app-boot/contract'
 import { rpcErrorText } from '@snap-rail/connection'
 import { useEffect, useState, type DragEvent, type ReactNode } from 'react'
-import { Badge, Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, IconButton, Input, Page, Stack, Switch, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/index.ts'
+import { Alert, Badge, Button, Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, EmptyState, IconButton, Input, Page, Stack, Switch, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/index.ts'
 
 /** The preload's zip→path bridge (`webUtils.getPathForFile`); null outside
  * Electron or in tests. Inlined rather than imported from the app-internal
@@ -371,7 +371,7 @@ export function PluginsPage({ ctx }: { ctx: Context }): ReactNode {
       actions={restartNeeded ? <Button intent="primary" onClick={restart}>重启生效</Button> : undefined}
     >
       <Stack gap="lg">
-        {error !== undefined && <div role="alert" style={{ color: 'var(--snap-color-danger)' }}>{error}</div>}
+        {error !== undefined && <Alert intent="danger">{error}</Alert>}
 
         {rows.length === 0
           ? (

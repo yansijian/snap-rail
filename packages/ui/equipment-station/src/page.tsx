@@ -19,6 +19,7 @@ import type {
 import { rpcErrorText, subscribeFrame } from '@snap-rail/connection'
 import { equipmentFrameSchemas } from '@snap-rail/equipment/contract'
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -391,7 +392,7 @@ export function EquipmentPage(): ReactNode {
       titleExtra={<IconButton icon={<PlusIcon />} label="新增设备" disabled={drivers.length === 0} onClick={() => openDevice()} />}
     >
       <Stack gap="lg">
-        {error !== undefined && <div role="alert" style={{ color: 'var(--snap-color-danger)' }}>{error}</div>}
+        {error !== undefined && <Alert intent="danger">{error}</Alert>}
         {config === undefined
           ? <EmptyState title="正在读取设备配置…" />
           : config.devices.length === 0

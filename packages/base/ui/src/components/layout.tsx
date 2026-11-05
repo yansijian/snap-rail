@@ -6,6 +6,7 @@
  * @module @snap-rail/ui/components/layout
  */
 
+import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area'
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { cn, part, space } from '../utils.ts'
 
@@ -253,23 +254,44 @@ export function Toolbar({ start, end, children, className, style }: ToolbarProps
 export interface ScrollAreaProps extends LayoutProps {
   /** `vertical`, `horizontal`, or `both`. */
   direction?: 'vertical' | 'horizontal' | 'both'
+  /** When the themed scrollbar shows: on hover (default), only while
+   * scrolling, or always (a good fit for gloved/touch terminals). */
+  scrollbarType?: 'hover' | 'scroll' | 'always'
 }
 
-/** A native scroll container with a stable anatomy. */
-export function ScrollArea({ direction = 'vertical', className, style, children }: ScrollAreaProps): ReactNode {
+/** A scroll container with themed, overlay-style scrollbars over the Radix
+ * viewport. The anatomy stays `scroll-area.root/viewport` plus the
+ * `scroll-area.scrollbar/thumb` parts the skin styles. */
+export function ScrollArea({ direction = 'vertical', scrollbarType = 'hover', className, style, children }: ScrollAreaProps): ReactNode {
   return (
-    <div
+    <ScrollAreaPrimitive.Root
       {...part('scroll-area', 'root')}
       className={cn('snap-scroll-area', className)}
-      style={{
-        overflowY: direction === 'horizontal' ? 'hidden' : 'auto',
-        overflowX: direction === 'vertical' ? 'hidden' : 'auto',
-        minHeight: 0,
-        ...style,
-      }}
+      type={scrollbarType}
+      style={{ minHeight: 0, ...direction === 'horizontal' ? { height: '100%' } : {}, ...style }}
     >
-      <div {...part('scroll-area', 'viewport')}>{children}</div>
-    </div>
+      <ScrollAreaPrimitive.Viewport {...part('scroll-area', 'viewport')} className="snap-scroll-area-viewport">
+        {children}
+      </ScrollAreaPrimitive.Viewport>
+      {direction !== 'horizontal' && (
+        <ScrollAreaPrimitive.Scrollbar
+          {...part('scroll-area', 'scrollbar')}
+          className="snap-scroll-area-scrollbar"
+          orientation="vertical"
+        >
+          <ScrollAreaPrimitive.Thumb {...part('scroll-area', 'thumb')} className="snap-scroll-area-thumb" />
+        </ScrollAreaPrimitive.Scrollbar>
+      )}
+      {direction !== 'vertical' && (
+        <ScrollAreaPrimitive.Scrollbar
+          {...part('scroll-area', 'scrollbar')}
+          className="snap-scroll-area-scrollbar"
+          orientation="horizontal"
+        >
+          <ScrollAreaPrimitive.Thumb {...part('scroll-area', 'thumb')} className="snap-scroll-area-thumb" />
+        </ScrollAreaPrimitive.Scrollbar>
+      )}
+    </ScrollAreaPrimitive.Root>
   )
 }
 
