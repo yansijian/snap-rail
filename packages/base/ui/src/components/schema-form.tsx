@@ -58,6 +58,8 @@ export interface SchemaFormProps {
   value: Readonly<Record<string, unknown>>
   onChange: (value: Record<string, unknown>) => void
   idPrefix?: string
+  /** Arrange the fields in a grid with this many columns (default stacked). */
+  columns?: number
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -67,7 +69,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 /** Render a flat JSON-Schema object as semantic fields. */
-export function SchemaForm({ schema, value, onChange, idPrefix = 'schema' }: SchemaFormProps): ReactNode {
+export function SchemaForm({ schema, value, onChange, idPrefix = 'schema', columns }: SchemaFormProps): ReactNode {
   const properties = schema.properties ?? {}
   const required = new Set(schema.required ?? [])
   const update = (key: string, next: unknown): void => {
@@ -157,7 +159,9 @@ export function SchemaForm({ schema, value, onChange, idPrefix = 'schema' }: Sch
     <div
       {...part('schema-form', 'root')}
       className="snap-schema-form"
-      style={{ display: 'flex', flexDirection: 'column', gap: 'var(--snap-space-md)' }}
+      style={columns !== undefined
+        ? { display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: 'var(--snap-space-md)' }
+        : { display: 'flex', flexDirection: 'column', gap: 'var(--snap-space-md)' }}
     >
       {Object.entries(properties).map(([key, property]) => (
         <div key={key} {...part('schema-form', 'field')}>{renderField(key, property)}</div>

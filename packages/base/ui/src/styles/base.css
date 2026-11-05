@@ -212,11 +212,47 @@
     min-width: 0;
   }
 
-  [data-snap-part='form.root'],
-  [data-snap-part='form.fields'] {
+  /* Horizontal fields put the label beside the control; help/error drop
+   * under the control column. */
+  [data-snap-part='field.root'][data-orientation='horizontal'] {
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  [data-snap-part='field.root'][data-orientation='horizontal'] > [data-snap-part='field.label'] {
+    line-height: var(--snap-control-height-md);
+  }
+
+  [data-snap-part='field.root'][data-orientation='horizontal'] > [data-snap-part='field.control'] {
+    flex: 1;
+    min-width: 0;
+  }
+
+  [data-snap-part='field.root'][data-orientation='horizontal'] > [data-snap-part='field.help'],
+  [data-snap-part='field.root'][data-orientation='horizontal'] > [data-snap-part='field.error'] {
+    flex-basis: 100%;
+  }
+
+  [data-snap-part='form.root'] {
     display: flex;
     flex-direction: column;
     gap: var(--snap-space-md);
+  }
+
+  [data-snap-part='form.root'][data-orientation='inline'] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  [data-snap-part='form.root'][data-orientation='inline'] > [data-snap-part='form.fields'] {
+    flex: 1;
+    min-width: 0;
+  }
+
+  [data-snap-part='form.root'][data-orientation='inline'] > [data-snap-part='form.actions'] {
+    flex-shrink: 0;
   }
 
   [data-snap-part='form.actions'] {

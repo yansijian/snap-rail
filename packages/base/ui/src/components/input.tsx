@@ -18,6 +18,8 @@ export interface InputProps extends Omit<ComponentPropsWithoutRef<'input'>, 'siz
   prefix?: ReactNode
   suffix?: ReactNode
   onClear?: (() => void) | undefined
+  /** Styles the native field (`input.field`) instead of the wrapper. */
+  fieldClassName?: string
   /** Internal anatomy name so NumberInput can reuse the field. */
   componentName?: 'input' | 'number-input'
 }
@@ -31,6 +33,7 @@ export function Input({
   prefix,
   suffix,
   onClear,
+  fieldClassName,
   componentName = 'input',
   className,
   style,
@@ -49,7 +52,7 @@ export function Input({
       {prefix !== undefined && <span {...part(componentName, 'prefix')}>{prefix}</span>}
       <input
         {...part(componentName, 'field')}
-        className="snap-input-field"
+        className={cn('snap-input-field', fieldClassName)}
         disabled={disabled}
         aria-invalid={invalid || undefined}
         {...props}
@@ -74,6 +77,8 @@ export function Input({
 export interface TextareaProps extends Omit<ComponentPropsWithoutRef<'textarea'>, 'size'> {
   size?: InputSize
   invalid?: boolean
+  /** Styles the native field (`textarea.field`) instead of the wrapper. */
+  fieldClassName?: string
 }
 
 /** A multi-line text field. Like {@link Input}, layout `style`/`className`
@@ -81,6 +86,7 @@ export interface TextareaProps extends Omit<ComponentPropsWithoutRef<'textarea'>
 export function Textarea({
   size = 'md',
   invalid = false,
+  fieldClassName,
   className,
   style,
   disabled,
@@ -97,7 +103,7 @@ export function Textarea({
     >
       <textarea
         {...part('textarea', 'field')}
-        className="snap-textarea-field"
+        className={cn('snap-textarea-field', fieldClassName)}
         disabled={disabled}
         aria-invalid={invalid || undefined}
         {...props}
@@ -122,6 +128,7 @@ export function NumberInput({
   step = 1,
   size = 'md',
   invalid = false,
+  fieldClassName,
   className,
   style,
   disabled,
@@ -156,7 +163,7 @@ export function NumberInput({
       <input
         ref={fieldRef}
         {...part('number-input', 'field')}
-        className="snap-input-field"
+        className={cn('snap-input-field', fieldClassName)}
         type="number"
         inputMode="decimal"
         disabled={disabled}

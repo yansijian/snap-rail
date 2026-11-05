@@ -45,36 +45,66 @@ export function TabsContent({ className, children, ...props }: ComponentPropsWit
 /** Props of {@link Switch}. */
 export interface SwitchProps extends Omit<ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>, 'children'> {
   label?: ReactNode
+  /** Which side of the switch the label sits on (default `end`). */
+  labelPosition?: 'start' | 'end'
+  /** Helper text under the label row. */
+  description?: ReactNode
+  /** Escape hatch for the outermost wrapper (only rendered with `description`). */
+  containerClassName?: string
 }
 
-/** A boolean switch. */
-export function Switch({ className, label, ...props }: SwitchProps): ReactNode {
-  return (
+/** A boolean switch with an optional label on either side. */
+export function Switch({ className, label, labelPosition = 'end', description, containerClassName, ...props }: SwitchProps): ReactNode {
+  const labelNode = label !== undefined && <span {...part('switch', 'label')}>{label}</span>
+  const row = (
     <label className="snap-switch-label">
+      {labelPosition === 'start' && labelNode}
       <SwitchPrimitive.Root {...part('switch', 'root')} className={cn('snap-switch', className)} {...props}>
         <SwitchPrimitive.Thumb {...part('switch', 'thumb')} className="snap-switch-thumb" />
       </SwitchPrimitive.Root>
-      {label !== undefined && <span {...part('switch', 'label')}>{label}</span>}
+      {labelPosition === 'end' && labelNode}
     </label>
+  )
+  if (description === undefined) return row
+  return (
+    <span {...part('switch', 'field')} className={cn('snap-switch-field', containerClassName)}>
+      {row}
+      <span {...part('switch', 'description')} className="snap-field-help">{description}</span>
+    </span>
   )
 }
 
 /** Props of {@link Checkbox}. */
 export interface CheckboxProps extends Omit<ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>, 'children'> {
   label?: ReactNode
+  /** Which side of the checkbox the label sits on (default `end`). */
+  labelPosition?: 'start' | 'end'
+  /** Helper text under the label row. */
+  description?: ReactNode
+  /** Escape hatch for the outermost wrapper (only rendered with `description`). */
+  containerClassName?: string
 }
 
-/** A tri-state checkbox with an inline indicator. */
-export function Checkbox({ className, label, ...props }: CheckboxProps): ReactNode {
-  return (
+/** A tri-state checkbox with an optional label on either side. */
+export function Checkbox({ className, label, labelPosition = 'end', description, containerClassName, ...props }: CheckboxProps): ReactNode {
+  const labelNode = label !== undefined && <span {...part('checkbox', 'label')}>{label}</span>
+  const row = (
     <label className="snap-checkbox-label">
+      {labelPosition === 'start' && labelNode}
       <CheckboxPrimitive.Root {...part('checkbox', 'root')} className={cn('snap-checkbox', className)} {...props}>
         <CheckboxPrimitive.Indicator {...part('checkbox', 'indicator')} className="snap-checkbox-indicator">
           ✓
         </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>
-      {label !== undefined && <span {...part('checkbox', 'label')}>{label}</span>}
+      {labelPosition === 'end' && labelNode}
     </label>
+  )
+  if (description === undefined) return row
+  return (
+    <span {...part('checkbox', 'field')} className={cn('snap-checkbox-field', containerClassName)}>
+      {row}
+      <span {...part('checkbox', 'description')} className="snap-field-help">{description}</span>
+    </span>
   )
 }
 
@@ -125,21 +155,43 @@ export interface SelectOption {
   disabled?: boolean
 }
 
+/** The popper side the select content opens to. */
+export type SelectSide = 'top' | 'right' | 'bottom' | 'left'
+
 /** Props of {@link Select}. */
 export interface SelectProps {
+  /** Controlled value. */
   value?: string
+  /** Uncontrolled initial value. */
+  defaultValue?: string
   onValueChange?: (value: string) => void
-  options: readonly SelectOption[]
+  /** Data-driven options; mutually exclusive with `children` (children win). */
+  options?: readonly SelectOption[]
+  /** Composite mode: build the content from {@link SelectItem} children. */
+  children?: ReactNode
   placeholder?: string
   disabled?: boolean
   invalid?: boolean
+  /** Associates a hidden native select for form submission. */
+  name?: string
+  required?: boolean
+  /** The trigger's id; also wires the label's `htmlFor`. */
+  id?: string
   size?: 'sm' | 'md' | 'lg'
+  /** Content placement (default `bottom`). */
+  side?: SelectSide
+  /** Content alignment against the trigger (default `start`). */
+  align?: 'start' | 'center' | 'end'
+  /** Content offset from the trigger in px (default 4). */
+  sideOffset?: number
   className?: string
+  contentClassName?: string
   'aria-label'?: string
 }
 
 /** Props of {@link TouchSelect}: a modal list for gloved/touch operation. */
-export interface TouchSelectProps extends SelectProps {
+export interface TouchSelectProps extends Omit<SelectProps, 'options' | 'children'> {
+  options: readonly SelectOption[]
   title?: ReactNode
 }
 
@@ -204,56 +256,129 @@ export function TouchSelect({
   )
 }
 
-/** A popover select. */
+/** The select trigger; composes a {@link SelectValue} inside. */
+export function SelectTrigger({
+  className,
+  size = 'md',
+  invalid = false,
+  disabled = false,
+  children,
+  ...props
+}: ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & { size?: 'sm' | 'md' | 'lg', invalid?: boolean }): ReactNode {
+  return (
+    <SelectPrimitive.Trigger
+      {...part('select', 'trigger')}
+      className={cn('snap-select-trigger', className)}
+      data-size={size}
+      data-invalid={invalid || undefined}
+      data-disabled={disabled || undefined}
+      aria-invalid={invalid || undefined}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon {...part('select', 'chevron')} className="snap-select-chevron">▾</SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  )
+}
+
+/** The selected-value slot of a trigger. */
+export function SelectValue(props: ComponentPropsWithoutRef<typeof SelectPrimitive.Value>): ReactNode {
+  return <SelectPrimitive.Value {...part('select', 'value')} {...props} />
+}
+
+/** Props of {@link SelectContent}. */
+export interface SelectContentProps extends ComponentPropsWithoutRef<typeof SelectPrimitive.Content> {
+  side?: SelectSide
+  align?: 'start' | 'center' | 'end'
+  sideOffset?: number
+}
+
+/** The portalled option list. */
+export function SelectContent({ side = 'bottom', align = 'start', sideOffset = 4, className, children, ...props }: SelectContentProps): ReactNode {
+  return (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content
+        {...part('select', 'content')}
+        className={cn('snap-select-content', className)}
+        position="popper"
+        side={side}
+        align={align}
+        sideOffset={sideOffset}
+        {...props}
+      >
+        <SelectPrimitive.Viewport>{children}</SelectPrimitive.Viewport>
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
+  )
+}
+
+/** One option row. */
+export function SelectItem({ className, children, ...props }: ComponentPropsWithoutRef<typeof SelectPrimitive.Item>): ReactNode {
+  return (
+    <SelectPrimitive.Item {...part('select', 'item')} className={cn('snap-select-item', className)} {...props}>
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemIndicator {...part('select', 'item-indicator')} className="snap-select-item-indicator">✓</SelectPrimitive.ItemIndicator>
+    </SelectPrimitive.Item>
+  )
+}
+
+/** A labelled group of options. */
+export function SelectGroup(props: ComponentPropsWithoutRef<typeof SelectPrimitive.Group>): ReactNode {
+  return <SelectPrimitive.Group {...props} />
+}
+
+/** A group heading. */
+export function SelectLabel({ className, ...props }: ComponentPropsWithoutRef<typeof SelectPrimitive.Label>): ReactNode {
+  return <SelectPrimitive.Label className={cn('snap-select-label', className)} {...props} />
+}
+
+/** A popover select: data-driven via `options`, or composed from
+ * {@link SelectItem} children for full layout control. */
 export function Select({
   value,
+  defaultValue,
   onValueChange,
   options,
+  children,
   placeholder = '请选择',
   disabled = false,
   invalid = false,
+  required,
+  name,
+  id,
   size = 'md',
+  side = 'bottom',
+  align = 'start',
+  sideOffset = 4,
   className,
+  contentClassName,
   'aria-label': ariaLabel,
 }: SelectProps): ReactNode {
+  const composite = children !== undefined
+  const empty = !composite && (options ?? []).length === 0
   return (
     <span {...part('select', 'root')} className="snap-select">
       <SelectPrimitive.Root
         {...value !== undefined ? { value } : {}}
+        {...defaultValue !== undefined ? { defaultValue } : {}}
         {...onValueChange !== undefined ? { onValueChange } : {}}
         disabled={disabled}
+        {...name !== undefined ? { name } : {}}
+        {...required !== undefined ? { required } : {}}
       >
-        <SelectPrimitive.Trigger
-          {...part('select', 'trigger')}
-          className={cn('snap-select-trigger', className)}
-          data-size={size}
-          data-invalid={invalid || undefined}
-          data-disabled={disabled || undefined}
-          aria-label={ariaLabel}
-          aria-invalid={invalid || undefined}
-        >
-          <SelectPrimitive.Value {...part('select', 'value')} placeholder={placeholder} />
-          <SelectPrimitive.Icon {...part('select', 'chevron')} className="snap-select-chevron">▾</SelectPrimitive.Icon>
-        </SelectPrimitive.Trigger>
-        <SelectPrimitive.Portal>
-          <SelectPrimitive.Content {...part('select', 'content')} className="snap-select-content" position="popper" sideOffset={4}>
-            <SelectPrimitive.Viewport>
-              {options.map(option => (
-                <SelectPrimitive.Item
-                  key={option.value}
-                  {...part('select', 'item')}
-                  className="snap-select-item"
-                  value={option.value}
-                  disabled={option.disabled === true}
-                >
-                  <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
-                  <SelectPrimitive.ItemIndicator {...part('select', 'item-indicator')} className="snap-select-item-indicator">✓</SelectPrimitive.ItemIndicator>
-                </SelectPrimitive.Item>
-              ))}
-              {options.length === 0 && <div {...part('select', 'empty')} className="snap-select-empty">无可选项</div>}
-            </SelectPrimitive.Viewport>
-          </SelectPrimitive.Content>
-        </SelectPrimitive.Portal>
+        <SelectTrigger id={id} size={size} invalid={invalid} disabled={disabled} className={className} aria-label={ariaLabel}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent side={side} align={align} sideOffset={sideOffset} className={contentClassName}>
+          {composite
+            ? children
+            : (options ?? []).map(option => (
+              <SelectItem key={option.value} value={option.value} disabled={option.disabled === true}>
+                {option.label}
+              </SelectItem>
+            ))}
+          {empty && <div {...part('select', 'empty')} className="snap-select-empty">无可选项</div>}
+        </SelectContent>
       </SelectPrimitive.Root>
     </span>
   )

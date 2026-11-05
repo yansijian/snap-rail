@@ -205,11 +205,11 @@ export const UI_COMPONENTS = {
   input: {
     parts: ['input.root', 'input.field', 'input.prefix', 'input.suffix', 'input.clear'],
     slots: ['prefix', 'suffix'],
-    props: ['size', 'invalid', 'disabled'],
+    props: ['size', 'invalid', 'disabled', 'fieldClassName'],
   },
   textarea: {
     parts: ['textarea.root', 'textarea.field'],
-    props: ['size', 'invalid', 'disabled'],
+    props: ['size', 'invalid', 'disabled', 'fieldClassName'],
   },
   'number-input': {
     parts: ['number-input.root', 'number-input.field', 'number-input.step-up', 'number-input.step-down'],
@@ -217,22 +217,22 @@ export const UI_COMPONENTS = {
   },
   select: {
     parts: ['select.root', 'select.trigger', 'select.value', 'select.chevron', 'select.content', 'select.item', 'select.item-indicator', 'select.empty'],
-    slots: ['empty'],
-    props: ['size', 'invalid', 'disabled'],
+    slots: ['empty', 'children'],
+    props: ['size', 'invalid', 'disabled', 'defaultValue', 'side', 'align'],
   },
   'touch-select': {
     parts: ['touch-select.root', 'touch-select.trigger', 'touch-select.sheet', 'touch-select.option'],
     props: ['invalid', 'disabled'],
   },
   checkbox: {
-    parts: ['checkbox.root', 'checkbox.indicator', 'checkbox.label'],
-    slots: ['label'],
-    props: ['checked', 'invalid', 'disabled'],
+    parts: ['checkbox.root', 'checkbox.indicator', 'checkbox.label', 'checkbox.field', 'checkbox.description'],
+    slots: ['label', 'description'],
+    props: ['checked', 'invalid', 'disabled', 'labelPosition'],
   },
   switch: {
-    parts: ['switch.root', 'switch.thumb', 'switch.label'],
-    slots: ['label'],
-    props: ['checked', 'disabled'],
+    parts: ['switch.root', 'switch.thumb', 'switch.label', 'switch.field', 'switch.description'],
+    slots: ['label', 'description'],
+    props: ['checked', 'disabled', 'labelPosition'],
   },
   'radio-group': {
     parts: ['radio-group.root', 'radio-group.item', 'radio-group.indicator', 'radio-group.label', 'radio-group.block', 'radio-group.description'],
@@ -301,15 +301,17 @@ export const UI_COMPONENTS = {
   form: {
     parts: ['form.root', 'form.fields', 'form.actions'],
     slots: ['fields', 'actions'],
+    props: ['orientation', 'gap', 'columns', 'form'],
   },
   field: {
     parts: ['field.root', 'field.label', 'field.control', 'field.help', 'field.error'],
     slots: ['label', 'control', 'help', 'error'],
-    props: ['invalid', 'required'],
+    props: ['invalid', 'required', 'orientation', 'labelWidth', 'labelAlign'],
   },
   'schema-form': {
     parts: ['schema-form.root', 'schema-form.field'],
     slots: ['fields'],
+    props: ['columns'],
   },
   'app-shell': {
     parts: ['app-shell.root', 'app-shell.header', 'app-shell.sidebar', 'app-shell.main', 'app-shell.footer'],

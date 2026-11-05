@@ -6,7 +6,9 @@ import {
   Card,
   CardContent,
   CardTitle,
+  Checkbox,
   Field,
+  Form,
   Grid,
   Input,
   Led,
@@ -17,6 +19,7 @@ import {
   Row,
   SchemaForm,
   Select,
+  SelectItem,
   Stack,
   Switch,
   Table,
@@ -31,7 +34,10 @@ import {
   TabsTrigger,
   Toolbar,
   TouchSelect,
+  cn,
   literalValuesOf,
+  part,
+  space,
 } from '../src/components/index.ts'
 
 describe('schema-driven forms', () => {
@@ -258,5 +264,88 @@ describe('semantic component anatomy', () => {
     expect(html).toContain('启用')
     expect(html).not.toContain('开启')
     expect(html).not.toContain('关闭')
+  })
+
+  it('lays a horizontal field with a fixed label column', () => {
+    const html = renderToStaticMarkup(
+      <Field label="主机地址" orientation="horizontal" labelWidth={120} labelAlign="end" required>
+        <Input value="" onChange={() => {}} />
+      </Field>,
+    )
+    expect(html).toContain('data-orientation="horizontal"')
+    expect(html).toContain('width:120px')
+    expect(html).toContain('text-align:end')
+  })
+
+  it('flows form fields inline or in a column grid', () => {
+    const inline = renderToStaticMarkup(
+      <Form orientation="inline" actions={<Button>保存</Button>}>
+        <Field label="a"><Input value="" onChange={() => {}} /></Field>
+      </Form>,
+    )
+    expect(inline).toContain('data-orientation="inline"')
+    expect(inline).toContain('flex-direction:row')
+    const grid = renderToStaticMarkup(
+      <Form orientation="grid" columns={3}>
+        <Field label="a"><Input value="" onChange={() => {}} /></Field>
+      </Form>,
+    )
+    expect(grid).toContain('grid-template-columns:repeat(3, minmax(0, 1fr))')
+  })
+
+  it('composes a select from children and wires uncontrolled form fields', () => {
+    // Radix mounts the option list in a portal only while open, so static
+    // markup covers the closed trigger; composition itself is type-checked.
+    const html = renderToStaticMarkup(
+      <Select defaultValue="b" name="mode" required>
+        <SelectItem value="a">自动</SelectItem>
+        <SelectItem value="b">手动</SelectItem>
+      </Select>,
+    )
+    expect(html).toContain('data-snap-part="select.root"')
+    expect(html).toContain('data-snap-part="select.trigger"')
+    // The hidden native select carries the form-field association.
+    expect(html).toContain('name="mode"')
+    expect(html).toContain('required')
+  })
+
+  it('places checkbox and switch labels on either side with descriptions', () => {
+    const html = renderToStaticMarkup(
+      <>
+        <Switch checked label="自锁" labelPosition="start" description="断电保持" />
+        <Checkbox label="记住" description="下次自动填写" />
+      </>,
+    )
+    expect(html).toContain('data-snap-part="switch.field"')
+    expect(html).toContain('data-snap-part="switch.description"')
+    expect(html).toContain('断电保持')
+    expect(html.indexOf('switch.label')).toBeLessThan(html.indexOf('switch.root'))
+    expect(html).toContain('data-snap-part="checkbox.description"')
+    // Without a description the DOM keeps the bare label row.
+    const bare = renderToStaticMarkup(<Switch checked label="自锁" />)
+    expect(bare).not.toContain('switch.field')
+  })
+
+  it('arranges schema-form fields in a grid when columns is set', () => {
+    const html = renderToStaticMarkup(
+      <SchemaForm
+        schema={{ type: 'object', properties: { a: { type: 'string' }, b: { type: 'string' } } }}
+        value={{}}
+        onChange={() => {}}
+        columns={2}
+      />,
+    )
+    expect(html).toContain('grid-template-columns:repeat(2, minmax(0, 1fr))')
+  })
+
+  it('exposes the anatomy helpers so extension components align with skins', () => {
+    const html = renderToStaticMarkup(
+      <div {...part('widget', 'root')} className={cn('snap-widget')}>
+        <span {...part('widget', 'title')}>标题</span>
+      </div>,
+    )
+    expect(html).toContain('data-snap-component="widget"')
+    expect(html).toContain('data-snap-part="widget.title"')
+    expect(space('md')).toBe('var(--snap-space-md)')
   })
 })
