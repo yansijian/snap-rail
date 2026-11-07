@@ -207,10 +207,16 @@ describe('zod interop sanity', () => {
 })
 
 describe('seed ABI', () => {
-  const host = { revision: SEED_ABI_REVISION, versions: { 'zod': '4.4.3', '@snap-rail/cordis': '4.0.1' } }
+  const host = {
+    revision: SEED_ABI_REVISION,
+    versions: { 'zod': '4.4.3', '@snap-rail/cordis': '4.0.1', '@snap-rail/ui/components': '0.3.1' },
+  }
 
-  it('the same revision and same majors pass', () => {
-    const verdict = checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { 'zod': '4.4.1', '@snap-rail/cordis': '4.9.0' } }, host)
+  it('the same revision and compatible versions pass', () => {
+    const verdict = checkSeedAbi({
+      revision: SEED_ABI_REVISION,
+      versions: { 'zod': '4.4.1', '@snap-rail/cordis': '4.0.0', '@snap-rail/ui/components': '0.3.0' },
+    }, host)
     expect(verdict).toMatchObject({ ok: true, undeclared: false })
   })
 
@@ -220,11 +226,29 @@ describe('seed ABI', () => {
     expect(verdict.reason).toContain(`r${SEED_ABI_REVISION + 1}`)
   })
 
-  it('a major drift refuses; patch/minor drift passes', () => {
+  it('a third-party seed needs only the same caret lane', () => {
     const drifted = checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { 'zod': '5.0.0' } }, host)
     expect(drifted.ok).toBe(false)
     expect(drifted.reason).toContain('zod@5.0.0')
+    // A plugin's lockfile may hold a newer patch/minor than the shell's.
     expect(checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { 'zod': '4.5.0' } }, host).ok).toBe(true)
+  })
+
+  it('across 0.x the minor is the lane boundary', () => {
+    const older = checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { '@snap-rail/ui/components': '0.2.0' } }, host)
+    expect(older.ok).toBe(false)
+    expect(older.reason).toContain('重新构建插件')
+    const newerLane = checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { '@snap-rail/ui/components': '0.4.0' } }, host)
+    expect(newerLane.ok).toBe(false)
+    expect(newerLane.reason).toContain('更新桌面应用')
+  })
+
+  it('a first-party seed needs a host at least as new as the build', () => {
+    // Built against 0.3.2 (say, a new component): the 0.3.1 host lacks it.
+    const ahead = checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { '@snap-rail/ui/components': '0.3.2' } }, host)
+    expect(ahead.ok).toBe(false)
+    expect(ahead.reason).toContain('更新桌面应用')
+    expect(checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { '@snap-rail/cordis': '4.9.0' } }, host).ok).toBe(false)
   })
 
   it('an absent declaration passes as the grace window', () => {
@@ -234,6 +258,7 @@ describe('seed ABI', () => {
   it('only the declared∩host intersection is compared; garbage versions never pass', () => {
     expect(checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { '@snap-rail/unknown-face': '9.9.9' } }, host).ok).toBe(true)
     expect(checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { 'zod': 'not-a-version' } }, host).ok).toBe(false)
+    expect(checkSeedAbi({ revision: SEED_ABI_REVISION, versions: { '@snap-rail/cordis': 'not-a-version' } }, host).ok).toBe(false)
   })
 
   it('the manifest schema accepts the stamped shape', () => {

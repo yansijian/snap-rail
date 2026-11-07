@@ -279,8 +279,10 @@ export interface ShellWindowCapability {
   /** The effective operator-window stage and where it came from. */
   profile(): ShellWindowProfileState
   /**
-   * Request an operator-window stage (size/mode/constraints). User settings
-   * and remembered bounds win; otherwise the host applies and clamps it.
+   * Request an operator-window stage (size/mode/constraints). Only an
+   * operator-fixed profile (source `user`) refuses — the answer carries
+   * `{applied: false, reason}`; remembered bounds are a boot-time restore,
+   * never a lock. Otherwise the host applies and clamps it.
    */
   setProfile(caller: Context, profile: WindowProfile): WindowProfileApplyResult
 }

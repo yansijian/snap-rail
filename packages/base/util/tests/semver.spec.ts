@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareVersions, satisfiesRange, splitNameRange } from '../src/semver.ts'
+import { compareVersions, sameCompatLane, satisfiesRange, splitNameRange } from '../src/semver.ts'
 
 describe('compareVersions', () => {
   it('orders core segments numerically and prereleases before their release', () => {
@@ -29,6 +29,28 @@ describe('satisfiesRange', () => {
   it('an unparsable range or version satisfies nothing', () => {
     expect(satisfiesRange('abc', '^1.0')).toBe(false)
     expect(satisfiesRange('1.0.0', 'not-a-range')).toBe(false)
+  })
+
+  it('caret follows npm across 0.x: the leftmost non-zero segment is the boundary', () => {
+    expect(satisfiesRange('0.2.9', '^0.2.3')).toBe(true)
+    expect(satisfiesRange('0.2.1', '^0.2.3')).toBe(false)
+    expect(satisfiesRange('0.3.0', '^0.2.3')).toBe(false)
+    expect(satisfiesRange('1.0.0', '^0.2.3')).toBe(false)
+    expect(satisfiesRange('0.1.6', '^0.1')).toBe(true)
+    expect(satisfiesRange('0.2.0', '^0.1')).toBe(false)
+    expect(satisfiesRange('0.0.3', '^0.0.3')).toBe(true)
+    expect(satisfiesRange('0.0.4', '^0.0.3')).toBe(false)
+  })
+})
+
+describe('sameCompatLane', () => {
+  it('compares the caret lane in either direction', () => {
+    expect(sameCompatLane('4.4.1', '4.9.0')).toBe(true)
+    expect(sameCompatLane('4.4.1', '5.0.0')).toBe(false)
+    expect(sameCompatLane('0.3.2', '0.3.0')).toBe(true)
+    expect(sameCompatLane('0.2.0', '0.3.0')).toBe(false)
+    expect(sameCompatLane('0.0.3', '0.0.4')).toBe(false)
+    expect(sameCompatLane('not-a-version', '1.0.0')).toBe(false)
   })
 })
 

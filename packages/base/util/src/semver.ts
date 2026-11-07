@@ -52,18 +52,19 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
-/** Does `version` satisfy `range`? Supported range forms: `^x.y.z` (same
- * major, at least), `~x.y.z` (same major.minor, at least), `>=` `>` `<=` `<`
- * `=` with an exact version, and a bare exact version. An unparsable range
- * or version satisfies nothing. */
+/** Does `version` satisfy `range`? Supported range forms: `^x.y.z` (npm
+ * caret: at least, within the same compatibility lane — see
+ * {@link sameCompatLane}; `^0.2.3` stops before `0.3.0`), `~x.y.z` (same
+ * major.minor, at least), `>=` `>` `<=` `<` `=` with an exact version, and a
+ * bare exact version. An unparsable range or version satisfies nothing. */
 export function satisfiesRange(version: string, range: string): boolean {
   const trimmed = range.trim()
   const target = parseCore(trimmed.replace(/^[^0-9]*/, ''))
   const actual = parseCore(version)
   if (target === undefined || actual === undefined) return false
-  if (trimmed.startsWith('^')) return sameMajor(actual, target) && compareVersions(version, trimmed.slice(1).trim()) >= 0
+  if (trimmed.startsWith('^')) return laneOf(actual) === laneOf(target) && compareVersions(version, trimmed.slice(1).trim()) >= 0
   if (trimmed.startsWith('~')) {
-    return sameMajor(actual, target) && actual[1] === target[1] && compareVersions(version, trimmed.slice(1).trim()) >= 0
+    return actual[0] === target[0] && actual[1] === target[1] && compareVersions(version, trimmed.slice(1).trim()) >= 0
   }
   if (trimmed.startsWith('>=')) return compareVersions(version, trimmed.slice(2).trim()) >= 0
   if (trimmed.startsWith('>')) return compareVersions(version, trimmed.slice(1).trim()) > 0
@@ -71,6 +72,19 @@ export function satisfiesRange(version: string, range: string): boolean {
   if (trimmed.startsWith('<')) return compareVersions(version, trimmed.slice(1).trim()) < 0
   if (trimmed.startsWith('=')) return compareVersions(version, trimmed.slice(1).trim()) === 0
   return compareVersions(version, trimmed) === 0
+}
+
+/**
+ * Whether two versions sit in the same npm caret lane: the leftmost non-zero
+ * core segment is the compatibility boundary — the major from 1.0.0 on, the
+ * minor across 0.x, the patch across 0.0.x. Unparsable versions share no
+ * lane.
+ */
+export function sameCompatLane(a: string, b: string): boolean {
+  const left = parseCore(a)
+  const right = parseCore(b)
+  if (left === undefined || right === undefined) return false
+  return laneOf(left) === laneOf(right)
 }
 
 /** Split a `name@range` requires entry: the package name (scoped names
@@ -86,8 +100,11 @@ export function splitNameRange(entry: string): { name: string, range?: string } 
   return { name, range }
 }
 
-function sameMajor(actual: readonly [number, number, number], target: readonly [number, number, number]): boolean {
-  return actual[0] === target[0]
+/** The caret lane key of a parsed core: `"2"`, `"0.3"`, or `"0.0.4"`. */
+function laneOf(core: readonly [number, number, number]): string {
+  if (core[0] > 0) return String(core[0])
+  if (core[1] > 0) return `0.${core[1]}`
+  return `0.0.${core[2]}`
 }
 
 /** Parse `x.y.z` tolerating missing minor/patch (`^1.0`, `2`): absent

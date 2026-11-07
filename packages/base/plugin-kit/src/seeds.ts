@@ -27,6 +27,8 @@
  * @module @snap-rail/plugin-kit/seeds
  */
 
+import { compareVersions, sameCompatLane, satisfiesRange } from '@snap-rail/util/semver'
+
 /** Module ids the shell seeds and every client bundle may require. */
 export const SEED_MODULES: readonly string[] = [
   'react',
@@ -105,9 +107,17 @@ export interface SeedAbiVerdict {
 /**
  * Compare a client face's stamped seed ABI against the live table. Only the
  * ids present in BOTH maps are compared (a stamp covers exactly what its
- * build could resolve): the revision must match exactly, every shared
- * version must agree on the major. An absent declaration passes — zips
- * predating the stamping stay installable, marked for the caller to log.
+ * build could resolve): the revision must match exactly, and every shared
+ * version must sit in the live version's npm caret lane (`^` semantics — the
+ * minor is the boundary across `0.x`, so a face built against `ui` 0.2
+ * refuses a 0.3 host). First-party seeds (`@snap-rail/*`) evolve with the
+ * SDK a face was built against, so the host must also carry at least that
+ * version — a face using a component an older terminal lacks is refused at
+ * install instead of crashing at render. Third-party seeds resolve
+ * independently in every repository (a plugin's lockfile may hold a newer
+ * patch than the shell), so lane agreement is enough there. An absent
+ * declaration passes — zips predating the stamping stay installable, marked
+ * for the caller to log.
  */
 export function checkSeedAbi(declared: SeedAbi | undefined, host: SeedAbi): SeedAbiVerdict {
   if (declared === undefined) return { ok: true, undeclared: true }
@@ -121,18 +131,19 @@ export function checkSeedAbi(declared: SeedAbi | undefined, host: SeedAbi): Seed
   for (const [id, version] of Object.entries(declared.versions)) {
     const live = host.versions[id]
     if (live === undefined) continue
-    if (majorOf(version) !== majorOf(live)) {
+    const compatible = id.startsWith('@snap-rail/')
+      ? satisfiesRange(live, `^${version}`)
+      : sameCompatLane(version, live)
+    if (!compatible) {
+      const hostOlder = compareVersions(live, version) < 0
       return {
         ok: false,
         undeclared: false,
-        reason: `插件构建于 ${id}@${version}，宿主提供 ${live}（主版本不一致）`,
+        reason: hostOlder
+          ? `插件构建于 ${id}@${version}，宿主提供 ${live}（宿主版本较旧，请更新桌面应用）`
+          : `插件构建于 ${id}@${version}，宿主提供 ${live}（兼容版本线不一致，请用新版 SDK 重新构建插件）`,
       }
     }
   }
   return { ok: true, undeclared: false }
-}
-
-/** The npm major of a version string; unparsable → NaN, which never equals. */
-function majorOf(version: string): number {
-  return Number.parseInt(version.split('.')[0] ?? '', 10)
 }
