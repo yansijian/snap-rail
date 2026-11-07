@@ -58,7 +58,9 @@
 `controlHeightSm/Md/Lg` = 40/48/56px，`Button`/`Input` 默认 `md`（48）即满足
 基线、`lg`（56）给主操作，`sm`（40）低于触控基线只用于非主要触控路径；
 表格行间距走 `spaceMd`。数值输入用 `NumberInput`（`number-input.step-up/
-step-down` 步进钮），单选用 `TouchSelect`，滚动容器用 `DragScroll`，设定值
+step-down` 步进钮），固定选项单选用 `TouchSelect`，可搜索/异步候选用
+`Combobox`（`combobox.option` 行高取 `controlHeightMd`），滚动容器用
+`DragScroll`，设定值
 粗调用 `Slider`（`slider.thumb` 是触控目标）。这些组件的 part 由出厂主题保证
 触控尺寸；custom 主题必须维持最小目标，`uiProfile: custom` 的插件自担其责。
 戴手套的终端可让 `ScrollArea` 的滚动条常显（`scrollbarType="always"`），
@@ -84,12 +86,23 @@ step-down` 步进钮），单选用 `TouchSelect`，滚动容器用 `DragScroll`
 - **表单排布是结构不是皮肤**：`field.root[data-orientation='horizontal']` 的
   横排与 `form.root[data-orientation]` 的 stack/inline/grid 排布由 base 结构层
   给出；主题只调 `field.label` 的字号/颜色与间距 token，不改排布方向。
+- **部件身份恒定（ui 0.3 起）**：组件自己的 `data-snap-component`/
+  `data-snap-part` 在调用方 props 之后写入，不会被组合件改写——`button.root`
+  上的主题规则在 `TouchSelect` 触发钮、浮层触发器等组合里照常命中。组合件
+  的自有部件挂在包装元素上：`touch-select.root/trigger/sheet/options`（选项
+  本身是 `button.root`）、`combobox.root/anchor/list/option/empty`
+  （`combobox.option` 带 `data-active`（键盘活动项）、`aria-selected`、
+  `data-disabled`）。
+- **结构缺省**：`popover.content` 至少与锚等宽（`--radix-popper-anchor-width`）、
+  `list.item` 自带水平内边距、`table.head` 不换行、`touch-select.root` 吃满
+  容器宽度——这些在 base 结构层，主题无需重复。
 
 ## 窗口与悬浮球
 
 - 主窗口：活动 layout/suite 的 `LayoutContribution.window` 声明
-  `WindowProfile`；用户可在「外观与显示」写 `ui.window` 覆盖，手动调整
-  由宿主持久化。窗口尺寸不是响应式布局的替代品，页面仍用布局原语。
+  `WindowProfile`；用户可在「外观与显示」写 `ui.window` 覆盖（唯一会拒绝
+  布局/插件请求的来源），手动调整由宿主持久化——持久化的几何只做开机恢复、
+  不锁后续请求。窗口尺寸不是响应式布局的替代品，页面仍用布局原语。
 - 悬浮球：活动 layout/suite 的 `LayoutContribution.ball` 声明 `BallProfile`
   （尺寸/启用/停泊行为）。几何不变量：方形窗口、8px 余量固定、
   `orb = size - 16`、阴影必须画在余量内；`resolveBallProfile` 是宿主与

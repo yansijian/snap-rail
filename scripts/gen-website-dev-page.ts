@@ -43,7 +43,8 @@ export const DEV_DOC_TOC: DevDocTocEntry[] = ${JSON.stringify(toc, null, 2)}
 `
 
 if (check) {
-  const current = existsSync(outFile) ? readFileSync(outFile, 'utf8') : ''
+  // EOL-insensitive like the wire catalog: Windows checkouts carry CRLF.
+  const current = existsSync(outFile) ? readFileSync(outFile, 'utf8').replaceAll('\r\n', '\n') : ''
   if (current !== body) {
     console.error('gen-website-dev-page — FAIL: dev-page.ts 与 docs/plugin-development.md 不一致')
     console.error('运行 pnpm run gen:dev-page 重新生成并提交。')

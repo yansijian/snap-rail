@@ -58,10 +58,13 @@ PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立�
 3. **`snapRail.client.seedAbi` 永不手写**——pack 时自动盖章，安装期与渲染
    端 boot 双向校验，三条判定：无章放行（存量 zip 宽限期）；修订号与宿主
    **不等即拒**（当前宿主 **r3**，报「插件构建于种子 ABI r2，宿主为 r3 ——
-   请更新插件包或桌面应用」）；共享 base 种子**主版本**漂移同样拒（报
-   「插件构建于 <id>@<ver>，宿主提供 <live>（主版本不一致）」）。**终端升级
-   后必须用 r3 闭包的 plugin-kit（≥ 0.2.4）重新 build + pack**；锁文件钉在
-   plugin-kit 0.2.3 的仓库打出来的 zip 盖 r2，装进 ≥ v0.5.3 的终端一律被拒。
+   请更新插件包或桌面应用」）；共享种子的版本按 **npm caret 兼容线**比较
+   （终端 ≥ v0.7.0）：1.x 起看主版本，**0.x 看次版本**（ui 0.2 构建的 zip
+   装不进 ui 0.3 终端）。第一方 `@snap-rail/*` 种子还要求**宿主版本 ≥ 构建
+   版本**（用到新组件的插件在旧终端上安装期就被拒，而不是渲染时崩），
+   报「插件构建于 <id>@<ver>，宿主提供 <live>（宿主版本较旧，请更新桌面应用）」
+   或「…（兼容版本线不一致，请用新版 SDK 重新构建插件）」；react/zod 等第三方
+   种子同兼容线即放行。**终端升级后按版本锚重装闭包再 build + pack**。
 4. **注册皆 effect，缝方法自带回收**。缝注册方法（首参 caller 上下文，如
    `ctx.equipment.registerDriver(ctx, driver)`）的处置随 caller 的 fiber 自
    动跟踪——插件停用/卸载时自动回收，**模板骨架的裸调用就是完整写法**，
@@ -79,8 +82,9 @@ PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立�
 7. **主题只用 skin token**。页面禁止硬编码色值和 `dark:` 变体；图表系列
    只用 `--snap-chart-1…6`；红/黄/绿是状态语义，不进数据系列。第三方图表
    包在 `ChartFrame`/`Visualization` 内，用 `useChartTheme()` 取色。
-8. **触屏基线**：数值输入用 `NumberInput`（带步进钮），单选用
-   `TouchSelect`，滚动容器用 `DragScroll`（指针拖拽平移）。
+8. **触屏基线**：数值输入用 `NumberInput`（带步进钮），固定选项单选用
+   `TouchSelect`，可搜索/异步候选的选择用 `Combobox`（焦点全程留在输入框），
+   滚动容器用 `DragScroll`（指针拖拽平移）。
 9. **OS 资源只走 shell 缝，插件永不 import `electron`**。通知、托盘、窗口
    surface、悬浮球、退出策略一律经 `ctx.shell`（宿主面）或
    `@snap-rail/shell/contract`（渲染面）。
@@ -186,7 +190,9 @@ pnpm run doctor
 #     更早版本没有 dev 子命令——见下方「版本锚」）：
 pnpm run dev        # = snap-rail-plugin dev . --launch
 #    doctor 自检 + 首次构建后，产物整目录热同步进安装版终端的插件池
-#    （%APPDATA%\snap-rail\plugins），客户端自动拉起（已运行则只聚焦）；
+#    （%APPDATA%\snap-rail\plugins），客户端自动拉起（已运行则只聚焦；
+#    安装位置从卸载注册表项推导，自定义安装目录 plugin-sdk ≥ 0.3.0 起可探测，
+#    仍找不到时 `--launch <exe 路径>` 直接指定）；
 #    之后 tsdown --watch 每次重建自动再同步：渲染面改动 → 渲染窗自动重载，
 #    宿主面改动 → 插件就地以新代码重挂，不重启应用。
 #    Ctrl+C 结束 = 恢复原状（同名正式版挪回池、plugins.yml 行回到会话前）；
@@ -261,15 +267,17 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
   存在但类型包没装 → 按地图升级 SDK；地图里没有的才是真的没有。不要从已装
   插件的编译产物反推 API，也不要在插件里 `as any`——那是 skill/闭包缺口的
   信号。
-- **版本锚**（本 skill 快照 = **r3 闭包 · ui 0.2**）：plugin-sdk `^0.2.8`、
-  plugin-kit `^0.2.4`、`@snap-rail/ui` `^0.2.0`、`@snap-rail/shell` `^0.2.3`、
-  cordis `^4.0.1`、equipment `^0.1.6`、store `^0.1.0`、zod `^4`、react `^19`、
-  tsdown `^0.22`。`npm view @snap-rail/plugin-kit version` 查最新。
+- **版本锚**（本 skill 快照 = **r3 闭包 · ui 0.3 · 终端 v0.7.0**）：
+  plugin-sdk `^0.3.0`、plugin-kit `^0.3.0`、`@snap-rail/ui` `^0.3.0`、
+  `@snap-rail/shell` `^0.2.4`、cordis `^4.0.1`、equipment `^0.1.6`、store
+  `^0.1.0`、zod `^4`、react `^19`、tsdown `^0.22`。
+  `npm view @snap-rail/plugin-kit version` 查最新。
   base 服务门面 `@snap-rail/plugin-sdk/api` 与 `/api/client` 从 `0.2.5`
   起提供；底层 gateway/connection/settings 由 SDK 传递安装，作者不单列。
   本地迭代命令 `dev`（`snap-rail-plugin dev .`）从 plugin-sdk **0.2.8** 起
-  ——更早版本没有该子命令，`pnpm add @snap-rail/plugin-sdk@^0.2.8` 升级
-  （init 模板的 `dev` script 同版本起生成，旧仓手动加即可）。
+  ——更早版本没有该子命令，`pnpm add @snap-rail/plugin-sdk@^0.3.0` 升级
+  （init 模板的 `dev` script 同版本起生成，旧仓手动加即可）；`--launch`
+  探测自定义安装目录从 **0.3.0** 起可用。
   `SEED_ABI_REVISION` 当前为 **r3**（以 `@snap-rail/plugin-kit` 导出为准；
   r2→r3 = 主题契约收敛为单套 token）。球面拖拽 `attachBallDrag` 从
   `@snap-rail/ui/runtime` 导入，需 ui ≥ 0.1.1。
@@ -281,17 +289,21 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
     0.2.2`——9 模板齐、UI 模板默认内置 `@snap-rail/ui`，但盖 **r2** 章，
     只能装进终端 **v0.5.0–v0.5.2**。
   - **r3**：`plugin-sdk 0.2.7` / `plugin-kit 0.2.4` / `ui 0.1.1` / `shell
-    0.2.3` 起——盖 r3 章，对应终端 **≥ v0.5.3**（当前线）。
-  - **r3 · ui 0.2**：`plugin-sdk 0.2.8` / `ui 0.2.0` 起——仍盖 r3 章（种子
-    ABI 不变、只增导出），组件面镜像 shadcn：浮层 Tooltip/Popover/Menu/
-    `toast()`、Alert/List/Slider、Form/Field 横排栅格、RHF 复合件。用到这些
-    新组件的插件**需终端 ≥ v0.6.0**：章只比主版本，0.x 跨 minor 不拦截，
-    装进 v0.5.3–v0.5.5 不会被拒、渲染新组件时才失败——插件 README 写明
-    最低终端版本。只用 0.1 组件的插件照旧覆盖全部 r3 终端。
+    0.2.3` 起——盖 r3 章，对应终端 **≥ v0.5.3**。
+  - **r3 · ui 0.2**：`plugin-sdk 0.2.8` / `ui 0.2.0`——仍盖 r3 章，组件面
+    镜像 shadcn：浮层 Tooltip/Popover/Menu/`toast()`、Alert/List/Slider、
+    Form/Field 横排栅格、RHF 复合件。目标终端 **v0.6.x**（这些终端的版本
+    检查只比主版本，0.x 跨 minor 不拦截，旧终端上渲染新组件时才失败）。
+  - **r3 · ui 0.3**（当前线）：`plugin-sdk 0.3.0` / `plugin-kit 0.3.0` /
+    `ui 0.3.0` / `shell 0.2.4`——仍盖 r3 章；新增一等 `Combobox`、浮层焦点
+    策略（可编辑元素打开时不夺焦、关闭回焦）、组件身份不可被调用方 props
+    覆盖。目标终端 **≥ v0.7.0**：版本检查改为 npm caret 兼容线 + 第一方种子
+    宿主 ≥ 构建版本，**ui 0.2 构建的 zip 在 v0.7.0 上被拒，ui 0.3 构建的
+    zip 在 v0.6.x 上也被拒**——跨线一律按版本锚重装闭包后重建。
   - 只有带渲染面的包（ui-*/suite）会被盖章；纯宿主包（driver/
     store-provider/host-service/tool）无章放行，不受时代影响。
-  - 装到旧版按版本锚升级重装（锁文件里的 plugin-kit 版本决定盖哪一章），
-    不要照旧骨架写。
+  - 装到旧版按版本锚升级重装（锁文件里的 plugin-kit 与 ui 版本决定盖什么
+    章、记录什么种子版本），不要照旧骨架写。
 - **版本陷阱（以 plugin-sdk 0.2.3 / equipment 0.1.4 为界，之后消除）**：
   - `probe`（驱动「测试连接」）：主仓已实现，但 npm
     `@snap-rail/equipment@0.1.4` 的类型里**没有**该字段——`0.1.5` 起恢复；
@@ -304,8 +316,9 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
     由内置 runtime 提供（`ctx.client.link` / `surface`），不再有可替换的
     独立 UI 框架插件；
   - `@snap-rail/ui` 0.1.x 的类型里没有 0.2 组件（`Tooltip`/`FormField`/
-    `Alert`/`toast`/`SelectItem`…）——报 has no exported member 就升
-    `^0.2.0`；RHF hooks（`useForm`/`useFormContext`/`zodResolver`…）只从
+    `Alert`/`toast`/`SelectItem`…）、0.2.x 没有 `Combobox` 与
+    `PopoverContent` 的 `autoFocusOnOpen`——报 has no exported member 就升
+    `^0.3.0`；RHF hooks（`useForm`/`useFormContext`/`zodResolver`…）只从
     `@snap-rail/ui/components` 导入，**不装** `react-hook-form`（私有副本
     的 context 与种子不是同一实例）；
   - npmmirror 元数据同步滞后还可能让版本范围解析到旧版本——遇到「文档说有、

@@ -30,7 +30,9 @@ warning = 建议（放行但要逐条确认）。
 | `Cannot find module '@snap-rail/connection'` | 绕过 SDK 直接 import 了未单列的包 | 改用 `@snap-rail/plugin-sdk/api/client`；确实要直接用时才加 devDependency |
 | `Cannot find module '@snap-rail/client-kernel'`（UI d.ts 里） | 内置 UI 的 d.ts 引用了内部包 | `skipLibCheck` 会跳过；**不要** import kernel——`ClientHandle` 是 app-internal，插件不需要也不应引用（容器启动由内置 runtime 负责）；球拖拽从 `@snap-rail/ui/runtime` 导入 `attachBallDrag` |
 | `Module '"@snap-rail/ui/runtime"' has no exported member 'attachBallDrag'` | 安装的 `@snap-rail/ui` < 0.1.1（r3 闭包前的发布没有这个转出） | `pnpm add -D @snap-rail/ui@^0.1.1`；连带把 plugin-sdk/plugin-kit 升到 r3 闭包（见 SKILL.md 时代分界） |
-| `Module '"@snap-rail/ui/components"' has no exported member 'Tooltip'/'FormField'/'Alert'/'toast'` | 安装的 `@snap-rail/ui` 是 0.1.x，没有 0.2 组件 | `pnpm add -D @snap-rail/ui@^0.2.0`（plugin-sdk ≥ 0.2.8 的 init 默认生成）；用到 0.2 组件的插件需终端 ≥ v0.6.0，README 写明 |
+| `Module '"@snap-rail/ui/components"' has no exported member 'Tooltip'/'FormField'/'Alert'/'toast'` | 安装的 `@snap-rail/ui` 是 0.1.x，没有 0.2 组件 | `pnpm add -D @snap-rail/ui@^0.3.0`（plugin-sdk ≥ 0.3.0 的 init 默认生成）；构建出的 zip 需终端 ≥ v0.7.0 |
+| `Module '"@snap-rail/ui/components"' has no exported member 'Combobox'`，或 `PopoverContent` 没有 `autoFocusOnOpen` | 安装的 `@snap-rail/ui` 是 0.2.x | `pnpm add -D @snap-rail/ui@^0.3.0`，连带 plugin-sdk/plugin-kit 升到 `^0.3.0`（见 SKILL.md 时代分界）；zip 需终端 ≥ v0.7.0 |
+| 锚定下拉（输入框 + 候选浮层）一输入就丢焦点、键盘全部落空 | 旧基座的浮层打开时把焦点抢进浮层第一项，关闭时回焦空转、焦点落在 body | 换 `Combobox`（ui ≥ 0.3.0）；旧终端上手搓时 `PopoverContent` 传 `onOpenAutoFocus`/`onCloseAutoFocus` 两个 `e => e.preventDefault()`，选项行 `onMouseDown={e => e.preventDefault()}` |
 | 表单读不到状态：`useFormContext()` 为 null、`Cannot read properties of null (reading 'control')` | RHF hooks 从 `react-hook-form` 直接导入——私有副本与终端种子不是同一 context | hooks 改从 `@snap-rail/ui/components` 导入（`useForm`/`zodResolver`/`FormField`…），`package.json` 删掉 `react-hook-form` |
 
 ## init / 安装依赖
@@ -64,7 +66,7 @@ warning = 建议（放行但要逐条确认）。
 | 同步输出正常，客户端里没反应 | 客户端没在运行（同步只落盘），或该行被禁用 | 启动客户端后看效果；管理页确认该包行是启用态。`--launch` 可让 dev 自动拉起 |
 | 改了宿主面代码，重挂的还是旧行为 | 终端版本旧于此机制（entryUrl 内容哈希击穿 ESM 缓存） | 升级终端后重试；应急就重启客户端 |
 | `--launch` 报「只在目标是安装版 home 时可用」 | `--home` 指向了别的 home（如主仓开发版） | 安装版 exe 的 home 固定，它读不到别处——去掉 `--launch` 自己启动，或把 `--home` 指回安装版 home |
-| `--launch` 输出「未找到客户端可执行文件」 | 未安装客户端，或装在非默认目录（注册表无记录） | 按输出列出的探测位置核对；其它平台/自定义位置用 `--launch <exe 路径>` |
+| `--launch` 输出「未找到客户端可执行文件」 | 未安装客户端；或 plugin-sdk < 0.3.0（旧探测只认默认目录，自定义安装目录一律找不到） | 升级 `@snap-rail/plugin-sdk` 到 `^0.3.0`（从卸载注册表项推导安装目录）；仍找不到按输出列出的探测位置核对，或 `--launch <exe 路径>` 直接指定 |
 | Ctrl+C 后客户端里该插件不见了/回到旧版 | 设计行为：会话结束恢复原状（备份的正式版挪回池、行回到会话前） | 想保留 dev 副本用 `--no-watch`（清理再跑 `--reset`） |
 | 池里是 dev 副本、正式版不见了（没在跑 dev） | 上次会话崩溃/杀进程，恢复没执行 | `snap-rail-plugin dev . --reset` 恢复；下次 `dev` 启动也会自动恢复 |
 | 会话中经管理页手动停用/卸载了 dev 行，退出时又变了 | 恢复以会话前快照为准 | 正常语义：退出恢复「dev 之前」的状态 |
@@ -75,7 +77,7 @@ warning = 建议（放行但要逐条确认）。
 | --- | --- | --- |
 | 安装预检列 `missing` | requires 的包没装/没启用 | 先装依赖包（如设备底座、其他套件），再启用本包 |
 | 启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方未安装）` | 把 base 种子写进了 `client.externalSeeds` | 删掉该条；base 种子由 shell 自动播种，不进 externalSeeds |
-| 启用被拒：版本不合 | `name@range` 与已装版本冲突 | 放宽 range 或升级依赖包 |
+| 启用被拒：版本不合 | `name@range` 与已装版本冲突（range 按 npm 语义：`^0.2.0` 不接受 0.3.x） | 放宽 range 或升级依赖包 |
 | 卸载/禁用被拒 | 还有别的包依赖它 | 先停用依赖方 |
 | 管理页找不到我的包 | clientOnly 行不在宿主树 | 正常：纯渲染包经渲染端下发行展示；检查 `client-config.list` |
 | 分类落「其他」 | 没声明 `category` | manifest 补 `category`（开放词汇，声明即归组） |
@@ -87,7 +89,10 @@ warning = 建议（放行但要逐条确认）。
 | 球阴影出现灰色硬边 | 用了 `box-shadow`（被窗口边界切） | 改径向渐变画进 8px 余量并衰减到零 |
 | 退出确认框 10s 后自己退了 | 渲染面没应答 `shell.exit.resolve` | 确认订阅 `shell/exit-requested` 并应答；10s 兜底是设计行为 |
 | 通知没弹出来 | 触发全局节流（5 条/10s）或超 `SHELL_LIMITS` | 看 `{applied:false, reason}` 返回值；同 tag 合并、控制频率 |
-| 安装被拒「<包> 的种子依赖与宿主不匹配：插件构建于种子 ABI r2，宿主为 r3 —— 请更新插件包或桌面应用」，或渲染面没加载、控制台 `client: face "<包>" refused — …` | zip 是用 r2 时代工具链（npm `plugin-kit 0.2.3` / `plugin-sdk 0.2.6`，锁文件钉住最常见）打的，章与 ≥ v0.5.3 终端不符 | 升到 r3 闭包（`plugin-kit ^0.2.4` / `plugin-sdk ^0.2.7` / `ui ^0.1.1`，`pnpm update` 让锁文件跟上）后重新 `pnpm run build` + `pack`；**不要**手改 `seedAbi`（pack 自动盖章，手写会被拒）。同一报错族还有「插件构建于 <id>@<ver>，宿主提供 <live>（主版本不一致）」= 某个 base 种子主版本漂移，同样重打 |
+| `shell.window.configure` / `setProfile` 请求的舞台尺寸没生效 | 返回 `{applied:false, source:'user'}` = 操作员在外观页固定了窗口（唯一会拒绝的来源；记住的历史尺寸不锁请求）；或终端 < v0.7.0——Windows 无框窗上约束先于尺寸写入，目标尺寸被 OS 纠正吞掉（如 1280×800 落成 960×768） | **检查返回值**（`link.call` 对业务拒绝不抛异常）；固定态让操作员恢复「跟随布局」；旧终端升级 |
+| 安装被拒「<包> 的种子依赖与宿主不匹配：插件构建于种子 ABI r2，宿主为 r3 —— 请更新插件包或桌面应用」，或渲染面没加载、控制台 `client: face "<包>" refused — …` | zip 是用 r2 时代工具链（npm `plugin-kit 0.2.3` / `plugin-sdk 0.2.6`，锁文件钉住最常见）打的，章与 ≥ v0.5.3 终端不符 | 按 SKILL.md 版本锚升到当前闭包（`pnpm update` 让锁文件跟上）后重新 `pnpm run build` + `pack`；**不要**手改 `seedAbi`（pack 自动盖章，手写会被拒） |
+| 安装被拒「插件构建于 <id>@<ver>，宿主提供 <live>（兼容版本线不一致，请用新版 SDK 重新构建插件）」 | 种子版本按 npm caret 兼容线比较（终端 ≥ v0.7.0）：0.x 看次版本，如 ui 0.2 构建的 zip 装 ui 0.3 终端 | 按版本锚升级闭包（ui `^0.3.0` 等）后重新 build + pack |
+| 安装被拒「…（宿主版本较旧，请更新桌面应用）」 | 第一方 `@snap-rail/*` 种子要求宿主 ≥ 构建版本：插件用了比终端新的 SDK（可能用到了终端没有的组件） | 升级终端；或把插件的闭包降回终端对应的版本线重新打包 |
 | 设置页不出现 | 没注册、注册在 `apply` 之外，或插件没 `inject: ['settings']` | 在 `apply(ctx)` 里 `ctx.settings.registerPage(ctx, { id, title, group, order, render })`；确认 `inject` 含 `settings` |
 | 更新了但自动更新没生效 | 版本号没变，或换 key 触发 keyChanged 拦截 | 升版本号重发；换 key 走手动更新确认 |
 

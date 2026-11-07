@@ -100,7 +100,9 @@ export function renderCatalog(): string {
 
 const check = process.argv.includes('--check')
 const rendered = renderCatalog()
-const current = existsSync(catalogPath) ? readFileSync(catalogPath, 'utf8') : undefined
+// Compare EOL-insensitively: Windows checkouts carry CRLF (core.autocrlf),
+// and the gate is about contract drift, not line endings.
+const current = existsSync(catalogPath) ? readFileSync(catalogPath, 'utf8').replace(/\r\n/g, '\n') : undefined
 if (check) {
   if (rendered !== current) {
     console.error('verify:wire-catalog — docs/wire-catalog.md drifted from the contracts; run `pnpm run gen:wire-catalog`')

@@ -37,7 +37,7 @@
 | 组 | 导出 |
 | --- | --- |
 | 按钮 | `Button`（`intent`: neutral/primary/danger/success/warning；`emphasis`: solid/soft/outline/ghost/link；`size`: sm/md/lg）、`IconButton`、`Spinner` |
-| 控件 | `Label`、`Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`、`Switch`（`labelPosition`/`description`）、`Checkbox`（同）、`RadioGroup`（`label`/`description`）/`RadioGroupItem`、`TouchSelect`、`Select`（`options` 数据驱动**或** `SelectItem` children 组合；`defaultValue`/`name`/`required`/`side`/`align`）与 `SelectTrigger`/`SelectValue`/`SelectContent`/`SelectItem`/`SelectGroup`/`SelectLabel` |
+| 控件 | `Label`、`Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`、`Switch`（`labelPosition`/`description`）、`Checkbox`（同）、`RadioGroup`（`label`/`description`）/`RadioGroupItem`、`TouchSelect`、`Combobox`（输入框 + 锚定候选列表：`options` 本地按标签过滤，或 `onInputValueChange` 驱动异步搜索；`loading`/`emptyText`；焦点全程留在输入框，↑↓/Enter/Esc 键盘可用）、`Select`（`options` 数据驱动**或** `SelectItem` children 组合；`defaultValue`/`name`/`required`/`side`/`align`）与 `SelectTrigger`/`SelectValue`/`SelectContent`/`SelectItem`/`SelectGroup`/`SelectLabel` |
 | 输入 | `Input`、`Textarea`、`NumberInput`（触屏 `＋/－` 步进钮，尊重 `min/max`）；三者均支持 `fieldClassName` 直达原生元素 |
 | 表单 | `Form`（`orientation`: stack/inline/grid + `columns`；可选 `form`/`onValid` 接 React Hook Form）、`Field`（`orientation`: vertical/horizontal、`labelWidth`、`labelAlign`）、RHF 复合件 `FormField`/`FormItem`/`FormLabel`/`FormControl`/`FormDescription`/`FormMessage`（见下节）、`SchemaForm` |
 | 对话 | `Dialog`/`DialogTrigger`/`DialogClose`/`DialogContent`/`DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogBody`/`DialogFooter`、`Sheet`（`presentation`: modal/sheet/fullscreen） |
@@ -47,6 +47,23 @@
 | 容器 | `Card`/`CardHeader`/`CardTitle`/`CardDescription`/`CardContent`/`CardFooter`、`Panel`、`Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`/`TableEmpty` |
 | 布局 | `Stack`、`Row`、`Grid`、`Split`、`AppShell`、`Page`、`Section`、`Toolbar`（children 渲染于 start/end 之间）、`ScrollArea`（主题化滚动条，`scrollbarType`: hover/scroll/always）、`DragScroll`（指针拖拽平移，触屏走原生滚动） |
 | 解剖助手 | `part`/`cn`/`space`/`controlHeight`——ui-extension 自定义组件用 `part('my-widget', 'root')` 对齐 `data-snap-part`，皮肤才能覆盖 |
+
+组件身份不可覆盖：`data-snap-component`/`data-snap-part` 由基座组件在
+调用方 props 之后写入，塞进组件 props 的同名属性会被丢弃（防止组合件把
+宿主部件藏掉、皮肤规则全部脱靶）——要给组合件挂语义，包一层自己的元素
+再打 `part()`。浮层缺省：`PopoverContent` 跟锚等宽（内容更宽仍可超出）；
+从可编辑元素（输入框/文本域）打开时焦点留在原处、关闭时回焦打开者，其他
+打开者仍把焦点移入浮层（键盘可达），`autoFocusOnOpen` 显式覆盖。锚定式
+下拉直接用 `Combobox`（ui ≥ 0.3.0、终端 ≥ v0.7.0；种子版本门禁要求宿主
+≥ 构建版本，用到它的 zip 在旧终端上安装期即被拒）。旧终端上手搓锚定下拉
+的三行自救：
+`PopoverContent` 传 `onOpenAutoFocus={e => e.preventDefault()}` 与
+`onCloseAutoFocus={e => e.preventDefault()}`，选项行加
+`onMouseDown={e => e.preventDefault()}`。
+`PopoverAnchor` 的子元素必须能转发 ref（真实 DOM 元素或透传组件），包住
+不透传 ref 的组件（如 `Input`）时锚静默落空，垫一层真实 DOM 元素。
+容器缺省：`CardFooter` 右对齐且子元素不拉伸，footer 里要等宽按钮组时给
+`Row` 显式 `width: '100%'`；表头不换行（窄栏出横向滚动）。
 
 缺原语时**不要在页面里手写交互组件**——改用现有原语组合，或把原语补进
 `@snap-rail/ui`（一方职责）。`UI_COMPONENTS`（`@snap-rail/ui/contract`）
@@ -125,6 +142,8 @@ function DeviceForm({ onSave }: { onSave: (values: { host: string }) => void }) 
 ```
 
 `FormItem` 支持 `orientation="horizontal"`（与 `Field` 同款横排布局）。
+横排行的控件层要留收缩余量：包一层时用 `style={{ flex: 1, minWidth: 0 }}`，
+不要 `width: '100%'`——flex 行里的满宽子元素会触发换行，横排静默变竖排。
 校验错误经 `FormMessage` 渲染（`field.error` 解剖、`role="alert"`）。
 
 ## link 与帧
@@ -141,7 +160,8 @@ function DeviceForm({ onSave }: { onSave: (values: { host: string }) => void }) 
   `rpcErrorText(result.error)` 出文案。
 
 触屏基线：数值输入 `NumberInput`、单选 `TouchSelect`、滚动容器
-`DragScroll`（均已在内置组件集内）。
+`DragScroll`（均已在内置组件集内）。`TouchSelect` 缺省吃满容器宽度
+（与 `Input` 同款基线，触发钮随根元素拉伸），与同屏输入框天然对齐。
 
 ## 区域插槽与贡献（布局之外也能挂 UI）
 
@@ -273,8 +293,10 @@ export default {
   `precedence?` / `provides` / `window?` / `ball?` / `render`。
 - `window`/`ball` 是布局推荐档案（`WindowProfile` / `BallProfile`，类型来自
   `@snap-rail/shell/contract`），宿主只夹上限（屏幕工作区/球 ≤192），尺寸
-  无下限；用户可在「外观与显示」
-  覆盖（来源优先级 user > persisted > layout > face > default）：
+  无下限；用户可在「外观与显示」覆盖——只有操作员显式固定的档案
+  （source=user）会拒绝布局/face 请求；上次会话记住的窗口几何只是开机
+  恢复（persisted），不锁后续请求（布局/face 应用结果不写入该记忆，
+  操作员手动拖动的才记）：
   - `WindowProfile`：`mode?`（`'windowed' | 'maximized' | 'fullscreen'`）、
     `width?` / `height?`（正整数，≤ 7680×4320，默认 1280×800）、
     `minWidth?` / `minHeight?`、`resizable?` / `center?` / `remember?`

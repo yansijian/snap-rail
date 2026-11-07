@@ -103,14 +103,18 @@ zip 里残留的字段在 manifest 校验时被剥离，宿主永不再读它们
   require 到的种子与其版本 + 当前 `SEED_ABI_REVISION`，现为 **r3**），安装期与
   渲染端 boot 双向校验，作者永不手写。三条判定：无章放行（存量 zip 宽限
   期）；修订号不等即拒（报「插件构建于种子 ABI r2，宿主为 r3 —— 请更新插件
-  包或桌面应用」）；共享 base 种子主版本漂移同样拒。**终端升级后要用 r3 闭包
-  的 plugin-kit（≥ 0.2.4）重新 build + pack**：npm `plugin-kit 0.2.3` 盖的是
-  r2 章，装进 ≥ v0.5.3 的终端一律被拒。
+  包或桌面应用」）；共享种子版本按 npm caret 兼容线比较（终端 v0.7.0 起：
+  1.x 看主版本、**0.x 看次版本**），第一方 `@snap-rail/*` 种子还要求宿主版本
+  ≥ 构建版本，第三方种子（react/zod…）同兼容线即放行。**终端升级后按版本锚
+  重装闭包再 build + pack**：npm `plugin-kit 0.2.3` 盖的是 r2 章，装进
+  ≥ v0.5.3 的终端一律被拒；ui 0.2 构建的 zip 装进 v0.7.0（ui 0.3）同样被拒。
 - 页面组件只组合 `@snap-rail/ui/components` 的语义原语
   （Button/Card/Dialog/Table/Tabs/Page/Stack/Grid…）；缺原语补进
-  `@snap-rail/ui`，不在页面里手搓交互组件或写裸 Tailwind。触屏基线：
-  数值输入用 `NumberInput`（带步进钮），单选用 `TouchSelect`，滚动容器用
-  `DragScroll`（指针拖拽平移）。
+  `@snap-rail/ui`，不在页面里手搓交互组件或写裸 Tailwind。组件身份
+  （`data-snap-component`/`data-snap-part`）不可被调用方 props 覆盖——给
+  组合件挂语义请包一层自己的元素再打 `part()`。触屏基线：
+  数值输入用 `NumberInput`（带步进钮），固定选项单选用 `TouchSelect`，
+  可搜索/异步候选用 `Combobox`，滚动容器用 `DragScroll`（指针拖拽平移）。
   第三方图表包在 `ChartFrame`/`Visualization` 内，用 `useChartTheme()` 取色。
 - **组件面镜像 shadcn（`@snap-rail/ui` 0.2，终端 v0.6.0 起）**：浮层
   `Tooltip`/`Popover`/`Menu` 与 `toast()`（runtime 已挂 Provider 与
@@ -123,9 +127,16 @@ zip 里残留的字段在 manifest 校验时被剥离，宿主永不再读它们
   `FormControl`/`FormMessage`），**hooks 一律从 `@snap-rail/ui/components`
   导入**——RHF 的 context 是模块级的，插件自带的 `react-hook-form` 副本与
   终端种子不是同一实例，构建能过、运行读不到表单状态。
-- **最低终端版本**：种子 ABI 章只比主版本，0.x 的 UI 基座跨 minor 不在安装期
-  拦截——用到 0.2 新组件的插件装进 v0.6.0 以前的终端会在渲染时失败。用到时
-  在插件 README 写明「需要 snap-rail v0.6.0+」。
+- **`@snap-rail/ui` 0.3（终端 v0.7.0 起）**：一等 `Combobox`（输入框 + 锚定
+  候选列表；`options` 本地按标签过滤，或 `onInputValueChange` 驱动异步搜索；
+  `loading`/`emptyText`；焦点全程留在输入框，↑↓/Enter/Esc 键盘可用）；
+  `PopoverContent` 焦点策略——从可编辑元素打开时不夺焦、关闭回焦打开者，
+  其他打开者照旧移入浮层，`autoFocusOnOpen` 显式覆盖；浮层缺省跟锚等宽；
+  `TouchSelect` 缺省吃满容器宽度、`ListItem` 自带水平内边距、表头不换行。
+- **最低终端版本由安装期门禁兜底**：v0.7.0 起种子版本按 caret 兼容线比较、
+  第一方种子要求宿主 ≥ 构建版本——用到新组件的插件装进旧终端会在安装期
+  被拒并提示「请更新桌面应用」，不再留到渲染时失败。v0.6.x 终端只比主版本，
+  对这些终端仍需在插件 README 写明最低终端版本。
 
 驱动骨架说明：驱动只上交 zod schema（`.meta({ title })` 做表单标签）+
 可选 `probe`（一次性只读连接测试，设置页的「测试连接」按钮）+
@@ -374,9 +385,11 @@ snap-rail-plugin dev . --no-watch         # 只同步一次并保留 dev 副本�
    `plugins.yml` 里该行的原状（会话日志 `.dev-stage/<包名>.session.json`）。
 3. 精简 manifest + `lib-host/` + `lib-client/` 整目录换入插件池
    `plugins/<包名，/ 换成 __>/`，该行置为启用。
-4. `--launch` 拉起已安装客户端：Windows 从安装器写的注册表项找安装目录
-   （安装时可自选目录），找不到再试默认的 `%LOCALAPPDATA%\Programs\snap-rail`；
-   客户端已在运行时只聚焦现有窗口；其它平台用 `--launch <可执行文件路径>`。
+4. `--launch` 拉起已安装客户端：Windows 枚举卸载注册表项（安装器写的键名是
+   UUID，按显示名「snap-rail <版本>」匹配），从图标路径/卸载命令推导安装目录
+   （安装时可自选目录；plugin-sdk ≥ 0.3.0），找不到再试默认的
+   `%LOCALAPPDATA%\Programs\snap-rail`；客户端已在运行时只聚焦现有窗口；
+   仍找不到或其它平台用 `--launch <可执行文件路径>`。
 5. `tsdown --watch` 持续构建，产物稳定（约 300ms 无新写入）后整目录重新换入。
 
 | 改动 | 客户端的反应 |
@@ -522,16 +535,30 @@ SDK 的传递依赖与 base 运行时包：不需要单独安装，也不要写�
   base 种子，**不要**写进 `client.externalSeeds`；只有其他插件贡献的
   `<包>/<子路径>` 才写。
 - **安装/渲染面被拒：`插件构建于种子 ABI r2，宿主为 r3 —— 请更新插件包或桌面应用`**：
-  zip 是用 r2 时代工具链（npm `plugin-kit 0.2.3`）打的。升到 r3 闭包
-  （`plugin-kit ^0.2.4` / `plugin-sdk ^0.2.7` / `ui ^0.1.1`）后重新
+  zip 是用 r2 时代工具链（npm `plugin-kit 0.2.3`）打的。按版本锚升到当前闭包
+  （`plugin-kit ^0.3.0` / `plugin-sdk ^0.3.0` / `ui ^0.3.0`）后重新
   `pnpm run build` + `pack`（`seedAbi` 由 pack 自动盖章，永不手写）。
+- **安装被拒：`插件构建于 <种子>@<版本>，宿主提供 <宿主版本>（兼容版本线不一致…）`**
+  （终端 v0.7.0 起）：种子版本按 npm caret 兼容线比较，0.x 看次版本——如
+  ui 0.2 构建的 zip 装 ui 0.3 终端。按版本锚升级闭包后重新 build + pack。
+  **`…（宿主版本较旧，请更新桌面应用）`**：第一方种子要求宿主 ≥ 构建版本，
+  插件用了比终端新的 SDK——升级终端。
 - **`Module '"@snap-rail/ui/components"' has no exported member 'Tooltip'`**
-  （或 `FormField`/`Alert`/`toast`/`SelectItem` 等）：装的是 `@snap-rail/ui`
-  0.1.x。`pnpm add -D @snap-rail/ui@^0.2.0`（plugin-sdk ≥ 0.2.8 的 `init`
-  已默认生成该区间）。
+  （或 `FormField`/`Alert`/`toast`/`SelectItem`/`Combobox` 等）：装的
+  `@snap-rail/ui` 太旧。`pnpm add -D @snap-rail/ui@^0.3.0`（plugin-sdk ≥ 0.3.0
+  的 `init` 已默认生成该区间）。
 - **页面在部分终端上渲染失败（`Element type is invalid … got: undefined`）**：
-  插件用了 0.2 新组件，装在 v0.6.0 以前的终端上——旧终端的 UI 基座没有这些
-  导出。升级终端；插件 README 写明最低终端版本。
+  插件用了新组件，装在 v0.6.x 及更早的终端上——这些终端的版本检查只比主版本，
+  不会在安装期拦截。升级终端（v0.7.0 起安装期即拒）；对旧终端在插件 README
+  写明最低终端版本。
+- **锚定下拉（输入框 + 候选浮层）一输入就丢焦点**：旧基座的浮层打开时把焦点
+  抢进浮层第一项、关闭时回焦落在 body。换 `Combobox`（ui ≥ 0.3.0）；旧终端
+  上手搓时给 `PopoverContent` 传 `onOpenAutoFocus`/`onCloseAutoFocus` 两个
+  `e => e.preventDefault()`，选项行加 `onMouseDown={e => e.preventDefault()}`。
+- **`shell.window.configure` 请求的舞台尺寸没生效**：先看返回值——
+  `{applied:false, source:'user'}` 是操作员在外观页固定了窗口（唯一会拒绝的
+  来源，记住的历史尺寸不锁请求）；终端 < v0.7.0 时还可能是 Windows 无框窗上
+  约束先于尺寸写入、目标尺寸被吞（如 1280×800 落成 960×768），升级终端。
 - **表单读不到状态（`useFormContext()` 为 null、`Cannot read properties of
   null (reading 'control')`）**：hooks 是从 `react-hook-form` 直接导入的。改为
   `import { useForm, zodResolver, … } from '@snap-rail/ui/components'`，并从

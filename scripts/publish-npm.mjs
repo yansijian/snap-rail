@@ -101,6 +101,30 @@ function npmView(pkg) {
   return result.status === 0 ? result.stdout.trim() : undefined
 }
 
+function packFileList(dir) {
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  const result = spawnSync(npm, ['pack', '--dry-run', '--json'], { encoding: 'utf8', cwd: dir, shell: process.platform === 'win32' })
+  if (result.status !== 0) return undefined
+  try {
+    return JSON.parse(result.stdout)?.[0]?.files?.map(file => file.path)
+  } catch {
+    return undefined
+  }
+}
+
+/** Every concrete file target declared by a package's exports map (wildcard
+ * targets are directory copies — the pack includes them wholesale). */
+function exportFileTargets(conditions, found = []) {
+  for (const value of Object.values(conditions ?? {})) {
+    if (typeof value === 'string') {
+      if (!value.includes('*')) found.push(value)
+    } else if (value !== null && typeof value === 'object') {
+      exportFileTargets(value, found)
+    }
+  }
+  return found
+}
+
 const entries = closure.map(dir => {
   const manifestPath = join(repoRoot, dir, 'package.json')
   if (!existsSync(manifestPath)) {
@@ -118,6 +142,22 @@ for (const entry of entries) {
   if (existing !== undefined) {
     console.log(`skip ${name}@${version} (already published)`)
     continue
+  }
+
+  // Publish gate: a build output the exports map promises must be inside the
+  // tarball. tsdown entry collisions once silently dropped whole subpath
+  // bundles from fresh-checkout packs while a stale local lib kept masking
+  // it — every external consumer got ERR_MODULE_NOT_FOUND. Verify the pack
+  // contents, not just the build exit code.
+  const files = packFileList(join(repoRoot, dir))
+  if (files === undefined) {
+    throw new Error(`publish-npm: ${name} 无法枚举 pack 内容（npm pack --dry-run 失败）——先跑 pnpm run build`)
+  }
+  const missing = exportFileTargets(manifest.exports)
+    .map(target => target.replace(/^\.\//, ''))
+    .filter(target => !files.includes(target))
+  if (missing.length > 0) {
+    throw new Error(`publish-npm: ${name} 的 exports 目标不在 tarball 里：${missing.join(', ')}——构建缺口，禁止发布`)
   }
 
   // Publish-time peer filter (see module doc): drop peers nothing public

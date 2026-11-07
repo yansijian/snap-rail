@@ -57,7 +57,8 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   可安装插件 dev 与生产同路。
 - **依赖预检（`snapRail.requires`，唯一兼容声明）**：三种条目——包名
   （`@snap-rail/equipment`）、带版本范围的包名（`name@range`，语义单源
-  `@snap-rail/util/semver`）、服务名（`service:store`）；启用正向校验
+  `@snap-rail/util/semver`，与 npm 同义：`^` 以最左非零段为兼容边界，
+  `^0.2.0` 不接受 0.3.x）、服务名（`service:store`）；启用正向校验
   （缺/版本不合 → 拒绝）、禁用/卸载反向校验（有依赖方 → 拒绝）。
   `@snap-rail/ui` 是 base 种子，**不是 requires 条目**；UI 插件用
   `snapRail.uiProfile` 声明主题覆盖关系（只做徽标，不做门禁）。
@@ -128,7 +129,12 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   不出屏、四边贴边停泊、指针离开缩 2/3 留 1/3、悬停滑出，缩起态经
   `shell/ball-dock-changed` 帧给插件）都是底座不变式；活动 layout/suite 可声明
   `WindowProfile`/`BallProfile`（尺寸/模式/停泊行为；尺寸无下限、上限有界
-  ——窗口夹屏幕工作区、球 24–192），宿主校验夹取。球的几何单源
+  ——窗口夹屏幕工作区、球 24–192），宿主校验夹取。**只有操作员在外观页显式
+  固定（source `user`）会拒绝布局/插件请求**（`{applied:false, reason}` 正常
+  返回不抛）；记住的窗口几何只做开机恢复、不锁请求，程序化应用的几何永不写进
+  该记忆（`remember` 只决定之后的手动调整记不记）。几何写入走固定舞步
+  （`window-apply`：先松约束再写尺寸最后扣回约束——Windows 无框窗上约束先写会
+  被 OS 纠正吞掉目标尺寸）。球的几何单源
   `resolveBallProfile`（默认 128 窗/112 球/8px 余量）：
   **窗口必须方形、8px 余量固定、阴影必须画在余量内**（径向渐变衰减到零；
   `box-shadow` 会被窗口边界切成灰边；24 是余量不变式派生的技术下限）。
@@ -160,7 +166,10 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   `snapRail.client.seedAbi` 章（构建时真实 require 到的种子 id + 本包
   解析到的版本 + 当前 `SEED_ABI_REVISION`），安装期（installer 拒装）与
   渲染端 boot（`client-config.list` 附宿主活表，面加载前比对、不符
-  skip + fail-loud）双向校验；缺章的存量 zip 放行（过渡宽限）。
+  skip + fail-loud）双向校验；缺章的存量 zip 放行（过渡宽限）。比对规则：
+  修订号相等；共享种子版本按 npm caret 兼容线（0.x 看次版本），第一方
+  `@snap-rail/*` 种子另要求宿主 ≥ 构建版本（用到新组件的 zip 在旧终端安装期
+  即拒，不留到渲染时崩），第三方种子同兼容线即可（各仓锁文件独立解析）。
 - **可安装插件是构建产物**：发行 zip = 精简 manifest（`main` 指宿主面或
   （clientOnly 包）client 入口，`exports` 映射子路径，池内包单宿主入口）
   + 构建好的面目录，永不带 src；经设置页「安装插件」或 UI 基座不可用时的引导页
@@ -250,13 +259,16 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   表单由 equipment-station 的 SchemaForm 渲染。
 - **页面组件只用内置语义原语**：一方页面组合 `@snap-rail/ui/components`
   （Button/Card/Dialog/Table/Tabs/Stack/Grid/Page…）；缺原语补进
-  `@snap-rail/ui`（Radix 行为 + `data-snap-part` 解剖），不在页面里手写
+  `@snap-rail/ui`（Radix 行为 + `data-snap-part` 解剖；组件身份在调用方
+  props **之后**写入、不可被覆盖——组合件给自己的包装元素打 `part()`，
+  永不把 `part()` 塞进子组件 props），不在页面里手写
   交互组件或裸 Tailwind。横切物不手搓：重渲染 tick 用 UI 服务订阅，错误
   文案用 `rpcErrorText`，时间用 `formatClock`/`formatDuration`；schema
   驱动的配置表单用 `SchemaForm`（新交互模式往 UI 基座加字段类型）。
   组件面镜像 shadcn 的 props/插槽：浮层 Tooltip/Popover/Menu/`toast()`
-  （runtime 在每个 surface 根挂 Provider 与 Toaster，页面不自挂）、
-  Alert/List/Slider 等原语、Form/Field 的横排与栅格；需要校验的表单用 React
+  （runtime 在每个 surface 根挂 Provider 与 Toaster，页面不自挂；从可编辑
+  元素打开浮层时焦点留在原处、关闭回焦打开者）、Alert/List/Slider 等原语、
+  Form/Field 的横排与栅格；需要校验的表单用 React
   Hook Form 复合件（`FormField`…），**RHF hooks 只经
   `@snap-rail/ui/components` 再导出**——RHF context 是模块级的，种子单实例
   才共享表单状态，插件自带副本即失配。
@@ -268,8 +280,9 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   出厂「钴蓝·黑夜」；插件行「启用」对皮肤只表示已装载可选（`exclusive:
   'skin'` 单装载）。主题只管样式——组件定义与槽不在主题内。页面禁止硬编码
   色值或 `dark:` 变体；图表系列只用 `--snap-chart-1…6`，红/黄/绿是状态语义
-  不进数据系列。触屏基线：数值输入用 `NumberInput`、单选用 `TouchSelect`、
-  滚动容器用 `DragScroll`。细则见 [docs/theme.md](docs/theme.md)。
+  不进数据系列。触屏基线：数值输入用 `NumberInput`、固定选项单选用
+  `TouchSelect`、可搜索/异步候选用 `Combobox`、滚动容器用 `DragScroll`。
+  细则见 [docs/theme.md](docs/theme.md)。
 - **界面文案只陈述事实，不写说明书**：好的界面靠控件本身让人一眼会用，不靠
   一段文字教用户怎么用、为什么这样设计。只允许三类文字——当前状态（含空态
   标题、徽标、读数）、操作结果、失败/风险原因（安全与数据后果可一句话讲清）。
@@ -289,7 +302,9 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   `gen:wire-catalog --check` 看守）+ 种子表 `SEED_MODULES` + 宿主面 `ctx.*`
   注册 API 与内置页面行为。改到可见面：破坏性变更走既有闸门——种子类型
   （如 `SkinDefinition`）变化升 `SEED_ABI_REVISION`（pack 盖章、安装期/boot
-  双向拒旧 zip）、契约 schema 变更留过渡宽限、SDK 模板与 doctor 同步；行为
+  双向拒旧 zip）、种子导出/结构变化升 base 包次版本（0.x 的次版本即兼容
+  边界，`checkSeedAbi` 按 caret 线比较）、契约 schema 变更留过渡宽限、SDK
+  模板与 doctor 同步；行为
   变更同步 docs/ 与 skill。纯内部改动（`apps/desktop/src-host`、内置页源码、
   dev/打包脚本、测试）不要求迁移，但要对照 diff grep 一遍确认没碰导出面与
   契约 schema。

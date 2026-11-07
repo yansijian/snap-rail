@@ -236,8 +236,8 @@ electron**。所有写操作回 `{ applied: true, … }` 或
 | `ctx.shell.tray.addItem / updateItem / removeItem(ctx, …)`；`tray.available`；`tray.entries()` | 托盘菜单项 `{ id, label ≤40, checked? }`（单插件 12、全体 24；`checked` 画勾选态）；点击回执 `shell/tray-clicked` `(key)`，key 自动按 `包名:id` 命名空间化。 |
 | `ctx.shell.surface.present / hide(ctx, surface)`；`surface.state()` | 立起/隐藏/查询窗口（`present('main')` = 显示并聚焦；`hide` 只接受辅助面 `'ball'`；按需创建辅助窗）。主窗口与球各自独立显隐，底座不互斥；显隐变化经 `shell/surface-changed`（事件 + 帧）广播。 |
 | `ctx.shell.ball.setState(ctx, patch)`；`ball.state()` | 宿主聚合的球内容态：`{ progress: 0..1 \| null, label: ≤8 字 \| null, tone: 'neutral' \| 'accent' \| 'warning' \| 'danger' }`，变化经 `shell/ball-changed` 广播。 |
-| `ctx.shell.ball.setProfile(ctx, profile)`；`ball.profile()` | 宿主面请求球形态（`BallProfile`，字段见 client-face.md 布局节），宿主夹取后回 `{ applied, profile, source, reason? }`；布局/用户声明优先于面。 |
-| `ctx.shell.window.setProfile(ctx, profile)`；`window.profile()` | 同上，操作员窗口形态（`WindowProfile`）。 |
+| `ctx.shell.ball.setProfile(ctx, profile)`；`ball.profile()` | 宿主面请求球形态（`BallProfile`，字段见 client-face.md 布局节），宿主夹取后回 `{ applied, profile, source, reason? }`。只有操作员在外观页显式固定（`source: 'user'`）会拒绝；布局与面的请求后到者生效。 |
+| `ctx.shell.window.setProfile(ctx, profile)`；`window.profile()` | 同上，操作员窗口形态（`WindowProfile`）。记住的历史尺寸只做开机恢复、不锁请求，布局/面的应用结果也不写入该记忆（`remember` 只决定之后的手动调整记不记）。**检查返回值**——拒绝是 `{applied:false}` 正常返回，不抛异常。 |
 | `ctx.shell.window.setExitPolicy(ctx, {close?, quit?})`；`window.exitPolicy()` | 关窗/托盘退出行为声明（登记即 effect，fiber 回收即回退默认 `quit/quit`）。值：`'ball' \| 'tray' \| 'quit' \| 'hold'`。 |
 | `ctx.shell.window.resolve(ctx, action)` | 宿主面应答挂起的退出请求（与渲染面的 `shell.exit.resolve` 等价；确认框仍必须由渲染面画，这里只是宿主侧兜底/自动决策）。 |
 

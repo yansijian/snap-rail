@@ -39,7 +39,8 @@
   `store-backend`（store 实现包）。池内包都可经界面启停。
 - **依赖预检**（`snapRail.requires`，唯一兼容声明）：包作者声明依赖——
   包名条目（`@snap-rail/equipment`）、带版本范围的包名条目
-  （`name@range`，语义单源 `@snap-rail/util/semver`）或服务名条目
+  （`name@range`，语义单源 `@snap-rail/util/semver`，与 npm 同义：`^` 以
+  最左非零段为兼容边界，0.x 的次版本即破坏性边界）或服务名条目
   （`service:store`）。启用前正向校验，禁用/卸载前反向校验。
   `@snap-rail/ui` 是 base 种子，不是 requires 条目；渲染面插件用
   `snapRail.uiProfile` 声明 native/integrated/custom（徽标，不做门禁）。
@@ -491,7 +492,11 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
    shadcn（ui 0.2 / 终端 v0.6.0 起）：浮层 Tooltip/Popover/Menu/`toast()`
    由 runtime 在每个 surface 根挂好 Provider 与 Toaster；校验表单用 React
    Hook Form 复合件，hooks 只从组件面取（RHF context 是模块级的，种子单
-   实例才共享表单状态）。
+   实例才共享表单状态）。ui 0.3（终端 v0.7.0 起）：组件身份在调用方 props
+   之后写入、不可覆盖（组合件给包装元素打 `part()`）；`PopoverContent`
+   记住打开者——从可编辑元素打开时不夺焦、关闭回焦打开者（锚定模式下
+   Radix 的 trigger 引用为空，缺省回焦会让焦点落在 body）；一等
+   `Combobox` 把锚定下拉的焦点策略收进基座。
 3. 流程门控/变量服务仍在 runtime 服务面；第三方图表包在
    `ChartFrame`/`Visualization` 内，用 `useChartTheme()` 取色。
 4. 调 station 域方法（audit/settings/session）的住户 import
@@ -583,7 +588,10 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
   安装期 `plugins.install` 对照宿主活表拒装（`resolveSeedAbi(appRoot)`，
   appRoot 缺失降级为仅 revision）→ 渲染端 boot 经 `client-config.list`
   附带宿主表、面加载前比对（不符 skip + `console.error` fail-loud）；缺章的
-  存量 zip 放行（过渡宽限）。
+  存量 zip 放行（过渡宽限）。比对规则（`checkSeedAbi` 单源）：revision 相等；
+  共享种子版本落在同一 npm caret 兼容线（0.x 看次版本）；第一方
+  `@snap-rail/*` 种子另要求宿主版本 ≥ 构建版本（种子随 SDK 演进，旧终端
+  缺新导出时安装期即拒），第三方种子只看兼容线（各仓锁文件独立解析补丁版本）。
 - **管理页**（内置 `@snap-rail/ui` 设置页）：按 `snapRail.category` 标记动态分组
   （开放词汇，作者命名；声明即归组、不问来源——dev overlay 住户也各归
   其标记；未声明落「其他」；**内置来源的行不显示**——全部操作都被
@@ -632,11 +640,15 @@ but it cannot cross the boundary with private imports.
 
 Plugin manifests declare compatibility through one vocabulary: `requires`
 entries are a package name, a `name@range` version-constrained package (range
-semantics live in `@snap-rail/util/semver`), or a `service:` id —
-enable/install/uninstall resolve them before composition. `engines` records
-the supported snap-rail, Host protocol and Renderer ranges so an incompatible
-artifact is rejected at the install boundary, and the pack-stamped
-`client.seedAbi` gates the renderer seed contract. `@snap-rail/ui` is a base
+semantics live in `@snap-rail/util/semver` and match npm — a caret stops at
+the leftmost non-zero segment, so `^0.2.0` excludes 0.3.x), or a `service:`
+id — enable/install/uninstall resolve them before composition. `engines`
+records the supported snap-rail, Host protocol and Renderer ranges so an
+incompatible artifact is rejected at the install boundary, and the
+pack-stamped `client.seedAbi` gates the renderer seed contract: equal
+revision, every shared seed in the host's caret lane, and first-party
+`@snap-rail/*` seeds at least as new on the host as at build time.
+`@snap-rail/ui` is a base
 seed, not a `requires` entry; renderer plugins declare `uiProfile`
 (native/integrated/custom) as a management badge. (The retired
 `framework`/`capabilities` fields strip off legacy zips at manifest validation
