@@ -16,7 +16,7 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, win32 } from 'node:path'
 import { load, dump } from 'js-yaml'
 import { definePluginManifest } from './index.ts'
 
@@ -102,53 +102,114 @@ export function defaultInstalledHome(platform: string, env: Record<string, strin
   return join(env.XDG_CONFIG_HOME ?? join(env.HOME ?? '.', '.config'), 'snap-rail')
 }
 
-/** Parse `reg query … /v InstallLocation` output into the install directory. */
-export function parseRegQueryInstallLocation(stdout: string): string | undefined {
+/** Parse `reg query … /v <name>` output into the value's string data. */
+export function parseRegQueryValue(stdout: string, name: string): string | undefined {
   for (const line of stdout.split(/\r?\n/)) {
-    const match = /^\s*InstallLocation\s+REG_SZ\s+(.+?)\s*$/.exec(line)
-    if (match !== null) return match[1]
+    const match = /^\s*(\S+)\s+REG_(?:EXPAND_)?SZ\s+(.+?)\s*$/.exec(line)
+    if (match !== null && match[1] === name) return match[2]
   }
   return undefined
 }
 
-/** The NSIS uninstall key the installer writes (see electron-builder.yml). */
-const UNINSTALL_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\io.snaprail.desktop'
+/** Parse `reg query … /v InstallLocation` output into the install directory. */
+export function parseRegQueryInstallLocation(stdout: string): string | undefined {
+  return parseRegQueryValue(stdout, 'InstallLocation')
+}
+
+/** Parse `reg query … /v DisplayName` output into the displayed product name. */
+export function parseRegQueryDisplayName(stdout: string): string | undefined {
+  return parseRegQueryValue(stdout, 'DisplayName')
+}
+
+/** Parse a bare `reg query <key>` enumeration into the child key paths. */
+export function parseRegQuerySubKeys(stdout: string): string[] {
+  return stdout
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => /^HKEY_(CURRENT_USER|LOCAL_MACHINE)\\/i.test(line))
+}
+
+/** A process runner shaped like `execFileSync` with string output. */
+type RegistryExec = (file: string, args: readonly string[], options: { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }) => string
 
 /**
- * Locate the installed terminal executable: the registry's InstallLocation
- * (the installer allows a custom directory, so it is the authority), else the
- * default per-user path.
+ * The `reg query` reader the install probe uses; the executor is injected
+ * so tests pin the real invocation shape (`reg query <args…>`).
+ */
+export function registryQueryWith(exec: RegistryExec = execFileSync): (args: string[]) => string | undefined {
+  return args => {
+    try {
+      return exec('reg', ['query', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    } catch {
+      return undefined
+    }
+  }
+}
+
+/**
+ * The NSIS uninstall keys live under a UUIDv5 of the app id (electron-builder
+ * writes `Uninstall\<guid>`, not `Uninstall\<appId>`), so the key name cannot
+ * be guessed — the uninstall roots are enumerated and matched by
+ * DisplayName instead. HKLM covers a per-machine install.
+ */
+const UNINSTALL_ROOTS = [
+  'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+  'HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
+]
+
+/**
+ * The exe paths an uninstall entry names. The per-user NSIS entry carries no
+ * InstallLocation in practice; what it reliably writes is DisplayIcon
+ * (`<dir>\snap-rail.exe,0`) and UninstallString
+ * (`"<dir>\Uninstall snap-rail.exe" /currentuser`).
+ */
+function installedExeCandidates(key: string, registryQuery: (args: string[]) => string | undefined): string[] {
+  const read = (name: string): string | undefined => parseRegQueryValue(registryQuery([key, '/v', name]) ?? '', name)
+  const candidates: string[] = []
+  const location = read('InstallLocation')
+  if (location !== undefined) candidates.push(join(location, 'snap-rail.exe'))
+  const icon = /^"?(.*?)"?(?:,-?\d+)?$/.exec(read('DisplayIcon') ?? '')?.[1]
+  if (icon !== undefined && win32.basename(icon).toLowerCase() === 'snap-rail.exe') candidates.push(icon)
+  const uninstall = read('UninstallString')
+  const uninstaller = uninstall === undefined ? undefined : /^"([^"]+)"/.exec(uninstall)?.[1] ?? uninstall.split(' ')[0]
+  if (uninstaller !== undefined && uninstaller !== '') candidates.push(join(win32.dirname(uninstaller), 'snap-rail.exe'))
+  return [...new Set(candidates)]
+}
+
+/**
+ * Locate the installed terminal executable: the uninstall registry entry's
+ * InstallLocation (the installer allows a custom directory, so it is the
+ * authority), else the default per-user path.
  *
  * @param platform - `process.platform` (injected for tests).
  * @param env - `process.env` (injected for tests).
  * @param explicit - an explicit executable path from `--launch <path>`.
- * @param registryQuery - the registry reader (injected for tests).
+ * @param registryQuery - the registry reader: runs `reg query <args…>` and
+ *   returns its output, `undefined` on failure (injected for tests).
  * @returns the executable path, or the probed locations when none exists.
  */
 export function findInstalledAppExe(
   platform: string,
   env: Record<string, string | undefined>,
   explicit?: string,
-  registryQuery: (key: string) => string | undefined = key => {
-    try {
-      return execFileSync('reg', ['query', key, '/v', 'InstallLocation'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-    } catch {
-      return undefined
-    }
-  },
+  registryQuery: (args: string[]) => string | undefined = registryQueryWith(),
 ): { exe: string } | { missing: string[] } {
   if (explicit !== undefined && explicit !== '') {
     return existsSync(explicit) ? { exe: explicit } : { missing: [explicit] }
   }
   if (platform !== 'win32') return { missing: [] }
   const probed: string[] = []
-  const fromRegistry = registryQuery(UNINSTALL_KEY)
-  if (fromRegistry !== undefined) {
-    const location = parseRegQueryInstallLocation(fromRegistry)
-    if (location !== undefined) {
-      const exe = join(location, 'snap-rail.exe')
-      probed.push(exe)
-      if (existsSync(exe)) return { exe }
+  for (const root of UNINSTALL_ROOTS) {
+    const listed = registryQuery([root])
+    if (listed === undefined) continue
+    for (const child of parseRegQuerySubKeys(listed)) {
+      const displayName = parseRegQueryDisplayName(registryQuery([child, '/v', 'DisplayName']) ?? '')
+      // electron-builder writes `<productName> <version>` ("snap-rail 0.6.0").
+      if (displayName === undefined || !/^snap-rail(?:\s|$)/i.test(displayName)) continue
+      for (const exe of installedExeCandidates(child, registryQuery)) {
+        probed.push(exe)
+        if (existsSync(exe)) return { exe }
+      }
     }
   }
   const fallback = join(env.LOCALAPPDATA ?? join(env.USERPROFILE ?? '.', 'AppData', 'Local'), 'Programs', 'snap-rail', 'snap-rail.exe')
@@ -467,8 +528,8 @@ export async function runDev(directory: string, options: DevOptions): Promise<vo
       launchTerminal(found.exe)
       console.log(`已拉起客户端（${found.exe}；已在运行时仅聚焦现有窗口）`)
     } else {
-      const probed = found.missing.length > 0 ? `，探测过：${found.missing.join('、')}` : '（此平台需 --launch <exe 路径>）'
-      console.log(`未找到客户端可执行文件，仅继续同步${probed}`)
+      const probed = found.missing.length > 0 ? `，探测过：${found.missing.join('、')}` : '（此平台需显式路径）'
+      console.log(`未找到客户端可执行文件，仅继续同步；可用 --launch <exe 路径> 直接指定${probed}`)
     }
   }
 

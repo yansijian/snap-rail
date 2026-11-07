@@ -28,11 +28,12 @@ const sdkVersion = createRequire(import.meta.url)('../package.json').version as 
 /** The built-in UI substrate a renderer template compiles against. It is a
  * base seed, not a pool package, so it never appears in `requires`; the
  * generated repository only needs it as a dependency for types and build.
- * The 0.2 line (overlays, Alert/List/Slider, the React Hook Form composites)
- * ships with terminal v0.6.0 — the runtime value always comes from the
- * terminal's own seed. */
+ * The 0.3 line (identity hardening, popover focus policy, the first-class
+ * Combobox) ships with the current terminal — the runtime value always comes
+ * from the terminal's own seed, and the seed ABI gate compares caret lanes,
+ * so the generated range must track the substrate's minor. */
 const DEFAULT_UI_PACKAGE = '@snap-rail/ui'
-const UI_PACKAGE_RANGE = '^0.2.0'
+const UI_PACKAGE_RANGE = '^0.3.0'
 
 interface UiBinding {
   name: string

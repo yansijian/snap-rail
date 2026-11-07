@@ -11,6 +11,9 @@ function tempRoot(prefix: string): string {
   return mkdtempSync(join(tmpdir(), `${prefix}-`))
 }
 
+/** The SDK's own version — generated repos pin `^<version>`. */
+const sdkVersion = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }).version
+
 // The CLI reports through console.log; capture instead of spamming the run.
 let logs: string[] = []
 const logSpy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
@@ -44,7 +47,7 @@ describe('snap-rail-plugin init', () => {
       expect(source.main).toBe('lib-host/host.js')
       expect(source.snapRail).toMatchObject({ kind: 'driver', requires: ['@snap-rail/equipment'] })
       expect(source.dependencies?.zod).toBeDefined()
-      expect(source.devDependencies['@snap-rail/plugin-sdk']).toMatch(/^\^0\.2\./)
+      expect(source.devDependencies['@snap-rail/plugin-sdk']).toBe(`^${sdkVersion}`)
       expect(source.devDependencies['@snap-rail/equipment']).toBeDefined()
       expect(source.devDependencies['@types/node']).toBeDefined()
       expect(source.devDependencies.react).toBeUndefined()
@@ -84,7 +87,7 @@ describe('snap-rail-plugin init', () => {
       expect(source.snapRail.uiProfile).toBe('native')
       expect(source.snapRail.requires).toBeUndefined()
       expect(source.snapRail.client?.externalSeeds).toBeUndefined()
-      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.2.0')
+      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.3.0')
       expect(source.devDependencies.react).toBeDefined()
       // RHF must come from the seed: a private copy has its own context.
       expect(source.devDependencies['react-hook-form']).toBeUndefined()
@@ -121,7 +124,7 @@ describe('snap-rail-plugin init', () => {
       expect(source.snapRail.exclusive).toBe('skin')
       expect(source.snapRail.uiProfile).toBe('native')
       expect(source.snapRail.clientOnly).toBe(true)
-      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.2.0')
+      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.3.0')
       const client = readFileSync(join(dir, 'src', 'client.tsx'), 'utf8')
       expect(client).toContain('ctx.skins.register')
       expect(client).toContain('DEFAULT_DARK.tokens')

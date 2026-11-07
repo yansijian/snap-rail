@@ -9,7 +9,11 @@ import { scanPluginPool } from '../../app-boot/src/scan.ts'
 import {
   defaultInstalledHome,
   findInstalledAppExe,
+  parseRegQueryDisplayName,
   parseRegQueryInstallLocation,
+  parseRegQuerySubKeys,
+  parseRegQueryValue,
+  registryQueryWith,
   restoreSession,
   runDev,
   samePath,
@@ -99,7 +103,43 @@ describe('dev home and launch discovery', () => {
     expect(parseRegQueryInstallLocation('ERROR: The system was unable to find the specified registry key')).toBeUndefined()
   })
 
-  it('finds the exe: explicit path, registry InstallLocation, then the default per-user path', () => {
+  it('parses the uninstall key InstallLocation (spaces kept)', () => {
+    const stdout = [
+      '',
+      'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\io.snaprail.desktop',
+      '    InstallLocation    REG_SZ    D:\\Program Files\\snap rail',
+      '',
+    ].join('\r\n')
+    expect(parseRegQueryInstallLocation(stdout)).toBe('D:\\Program Files\\snap rail')
+    expect(parseRegQueryInstallLocation('ERROR: The system was unable to find the specified registry key')).toBeUndefined()
+  })
+
+  it('parses reg enumeration and value output', () => {
+    const enumeration = [
+      'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{2f0e4a52-1}',
+      '',
+      '    (默认)    REG_SZ    ',
+    ].join('\r\n')
+    expect(parseRegQuerySubKeys(enumeration)).toEqual(['HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{2f0e4a52-1}'])
+    expect(parseRegQueryDisplayName('    DisplayName    REG_SZ    snap-rail 0.6.0\r\n')).toBe('snap-rail 0.6.0')
+    expect(parseRegQueryValue('    DisplayIcon    REG_EXPAND_SZ    C:\\x\\snap-rail.exe,0\r\n', 'DisplayIcon')).toBe('C:\\x\\snap-rail.exe,0')
+    expect(parseRegQueryDisplayName('ERROR: The system was unable to find the specified registry key')).toBeUndefined()
+  })
+
+  it('runs the registry reader as `reg query <args>`', () => {
+    const seen: string[][] = []
+    const query = registryQueryWith((file, args) => {
+      seen.push([file, ...args])
+      return 'ok'
+    })
+    expect(query(['HKCU\\X', '/v', 'DisplayName'])).toBe('ok')
+    expect(seen).toEqual([['reg', 'query', 'HKCU\\X', '/v', 'DisplayName']])
+    expect(registryQueryWith(() => {
+      throw new Error('missing key')
+    })(['HKCU\\Y'])).toBeUndefined()
+  })
+
+  it('finds the exe: explicit path, the uninstall entry, then the default per-user path', () => {
     const root = tempRoot('sdk-dev-exe')
     const explicit = join(root, 'custom.exe')
     writeFileSync(explicit, '')
@@ -107,14 +147,40 @@ describe('dev home and launch discovery', () => {
     expect(findInstalledAppExe('win32', {}, join(root, 'absent.exe'), () => undefined))
       .toEqual({ missing: [join(root, 'absent.exe')] })
 
-    // The installer allows a custom directory: the registry is the authority.
-    const installed = join(root, 'chosen dir')
+    // The real per-user NSIS entry (captured from an install in a custom
+    // directory): a UUIDv5 key, a versioned DisplayName, and NO
+    // InstallLocation — DisplayIcon and UninstallString carry the directory.
+    // `reg query` echoes keys in their long HKEY_* form.
+    const installed = join(root, 'Software', 'snap-rail')
     mkdirSync(installed, { recursive: true })
     writeFileSync(join(installed, 'snap-rail.exe'), '')
-    const registry = `    InstallLocation    REG_SZ    ${installed}\r\n`
-    expect(findInstalledAppExe('win32', {}, undefined, () => registry)).toEqual({ exe: join(installed, 'snap-rail.exe') })
+    const queryRoot = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall'
+    const listedKey = 'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\f1cb149d-3093-5ef7-adc8-98908d96b731'
+    const foreignKey = 'HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{9adedd55-2}'
+    const registry: Record<string, string> = {
+      [queryRoot]: [listedKey, foreignKey].join('\r\n'),
+      [`${listedKey} /v DisplayName`]: '    DisplayName    REG_SZ    snap-rail 0.6.0\r\n',
+      [`${listedKey} /v DisplayIcon`]: `    DisplayIcon    REG_SZ    ${join(installed, 'snap-rail.exe')},0\r\n`,
+      [`${listedKey} /v UninstallString`]: `    UninstallString    REG_SZ    "${join(installed, 'Uninstall snap-rail.exe')}" /currentuser\r\n`,
+      [`${foreignKey} /v DisplayName`]: '    DisplayName    REG_SZ    snap-rail-like 9\r\n',
+    }
+    expect(findInstalledAppExe('win32', {}, undefined, args => registry[args.join(' ')]))
+      .toEqual({ exe: join(installed, 'snap-rail.exe') })
 
-    // No registry entry: the default per-user install path.
+    // UninstallString alone still names the directory.
+    const { [`${listedKey} /v DisplayIcon`]: _icon, ...withoutIcon } = registry
+    expect(findInstalledAppExe('win32', {}, undefined, args => withoutIcon[args.join(' ')]))
+      .toEqual({ exe: join(installed, 'snap-rail.exe') })
+
+    // An entry that does write InstallLocation is honoured first.
+    const located = join(root, 'chosen dir')
+    mkdirSync(located, { recursive: true })
+    writeFileSync(join(located, 'snap-rail.exe'), '')
+    const withLocation = { ...registry, [`${listedKey} /v InstallLocation`]: `    InstallLocation    REG_SZ    ${located}\r\n` }
+    expect(findInstalledAppExe('win32', {}, undefined, args => withLocation[args.join(' ')]))
+      .toEqual({ exe: join(located, 'snap-rail.exe') })
+
+    // No usable uninstall entry (empty roots): the default per-user install path.
     const local = join(root, 'local')
     mkdirSync(join(local, 'Programs', 'snap-rail'), { recursive: true })
     writeFileSync(join(local, 'Programs', 'snap-rail', 'snap-rail.exe'), '')
@@ -126,7 +192,7 @@ describe('dev home and launch discovery', () => {
     expect(findInstalledAppExe('win32', { LOCALAPPDATA: nowhere }, undefined, () => undefined))
       .toEqual({ missing: [join(nowhere, 'Programs', 'snap-rail', 'snap-rail.exe')] })
     // Other platforms auto-discover nothing (explicit paths only).
-    expect(findInstalledAppExe('linux', {}, undefined, () => registry)).toEqual({ missing: [] })
+    expect(findInstalledAppExe('linux', {}, undefined, () => 'HKEY_CURRENT_USER\\x')).toEqual({ missing: [] })
   })
 })
 
