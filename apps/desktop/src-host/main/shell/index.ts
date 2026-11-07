@@ -29,7 +29,6 @@ import type { AuxSurfaceId, SurfaceId } from '@snap-rail/protocol'
 import {
   EXIT_DECISIONS,
   SHELL_LIMITS,
-  WINDOW_LIMITS,
   ballProfileSchema,
   resolveBallProfile,
   resolveWindowProfile,
@@ -62,6 +61,8 @@ import {
 import { createShellMachine } from './machine.ts'
 import { createTrayHost } from './tray.ts'
 import { createSurfaceHost, type SurfaceHostOptions } from './surfaces.ts'
+import { createWindowSourceTracker } from './window-source.ts'
+import { applyResolvedWindowProfile } from './window-apply.ts'
 
 /** Settings key remembering where the ball was left. */
 export const BALL_POSITION_KEY = 'shell.ballPosition'
@@ -149,7 +150,12 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       : undefined
     const userWindow = readSetting(windowProfileSchema, WINDOW_PROFILE_KEY) as WindowProfile | undefined
     const userBall = readSetting(ballProfileSchema, BALL_PROFILE_KEY) as BallProfile | undefined
-    let windowSource: UiProfileSource = userWindow !== undefined ? 'user' : savedWindow !== undefined ? 'persisted' : 'default'
+    // Remembered bounds seed the boot geometry, but they never own the
+    // profile: only an operator fix (`ui.window`) locks layout/face requests
+    // out (see ./window-source for the policy).
+    const windowSource = createWindowSourceTracker()
+    windowSource.boot(userWindow !== undefined)
+    const bootWindowBounds = userWindow === undefined ? savedWindow : undefined
     let windowProfile: ResolvedWindowProfile = resolveWindowProfile(
       userWindow !== undefined
         ? userWindow
@@ -163,14 +169,13 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       screen.getPrimaryDisplay().workArea,
     )
     let windowRemember = windowProfile.remember
-    let windowManual = userWindow !== undefined || savedWindow !== undefined
     let ballSource: UiProfileSource = userBall !== undefined ? 'user' : 'default'
     let ballProfile: ResolvedBallProfile = resolveBallProfile(userBall)
     let applyingWindow = false
     let windowSaveTimer: ReturnType<typeof setTimeout> | undefined
 
     /** The current operator-window profile state. */
-    const windowProfileState = (): ShellWindowProfileState => ({ profile: windowProfile, source: windowSource })
+    const windowProfileState = (): ShellWindowProfileState => ({ profile: windowProfile, source: windowSource.state() })
 
     /** The current floating-ball profile state. */
     const ballProfileState = (): ShellBallProfileState => ({ profile: ballProfile, source: ballSource })
@@ -184,32 +189,23 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       }
     }
 
-    /** Apply a resolved window profile to a live window. */
+    /** Drop a queued remembered-save: a programmatic apply is never an operator gesture. */
+    const cancelWindowSave = (): void => {
+      if (windowSaveTimer !== undefined) {
+        clearTimeout(windowSaveTimer)
+        windowSaveTimer = undefined
+      }
+    }
+
+    /** Apply a resolved window profile to a live window (geometry dance in ./window-apply). */
     const applyWindowProfile = (win: BrowserWindow, profile: ResolvedWindowProfile, bounds?: SavedWindowState): void => {
+      // Open the settle window that swallows the apply's own geometry events
+      // (maximize/full-screen arrive asynchronously).
+      cancelWindowSave()
+      windowSource.beginApply()
       applyingWindow = true
       try {
-        win.setResizable(profile.resizable)
-        // The profile's own floor is the only one: a layout declaring
-        // `minWidth` keeps it, one declaring nothing is unconstrained (the
-        // resolved default is 1 — the wire schema's positivity floor).
-        win.setMinimumSize(profile.minWidth, profile.minHeight)
-        if (profile.mode === 'fullscreen') {
-          win.setFullScreen(true)
-        } else if (profile.mode === 'maximized') {
-          if (win.isFullScreen()) win.setFullScreen(false)
-          win.maximize()
-        } else {
-          if (win.isFullScreen()) win.setFullScreen(false)
-          if (win.isMaximized()) win.unmaximize()
-          const work = workAreaOf(win)
-          const x = bounds !== undefined
-            ? Math.min(Math.max(bounds.x, work.x), work.x + Math.max(0, work.width - WINDOW_LIMITS.minVisiblePx))
-            : work.x + Math.round((work.width - profile.width) / 2)
-          const y = bounds !== undefined
-            ? Math.min(Math.max(bounds.y, work.y), work.y + Math.max(0, work.height - WINDOW_LIMITS.minVisiblePx))
-            : work.y + Math.round((work.height - profile.height) / 2)
-          win.setBounds({ x, y, width: profile.width, height: profile.height })
-        }
+        applyResolvedWindowProfile(win, profile, () => workAreaOf(win), bounds)
       } finally {
         applyingWindow = false
       }
@@ -217,10 +213,13 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
 
     /** Persist manual bounds (debounced) and remember the operator's override. */
     const scheduleWindowSave = (win: BrowserWindow): void => {
-      if (!windowRemember || applyingWindow || win.isDestroyed()) return
+      // Events inside an apply's settle window are the apply's own echoes —
+      // remembering them would lock every later face/layout request out.
+      if (!windowRemember || applyingWindow || windowSource.settling() || win.isDestroyed()) return
       if (windowSaveTimer !== undefined) clearTimeout(windowSaveTimer)
       windowSaveTimer = setTimeout(() => {
-        if (win.isDestroyed()) return
+        windowSaveTimer = undefined
+        if (win.isDestroyed() || applyingWindow) return
         const bounds = win.getBounds()
         const state: SavedWindowState = {
           x: bounds.x,
@@ -231,8 +230,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
           fullscreen: win.isFullScreen(),
         }
         settings.set(WINDOW_STATE_KEY, state)
-        windowManual = true
-        windowSource = 'persisted'
+        windowSource.noteRemembered()
         windowProfile = resolveWindowProfile(
           {
             width: state.width,
@@ -258,22 +256,26 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
 
     /** Apply a requested window profile, honouring explicit user overrides. */
     const configureWindow = (request: WindowProfile): WindowProfileApplyResult => {
-      if (windowManual || windowSource === 'user') {
+      if (windowSource.locked()) {
+        const reason = '用户已固定窗口设置；请在外观设置中恢复“跟随布局”。'
+        logger.warn(`窗口档案请求被拒绝（来源 ${windowSource.state()}）：${reason}`)
         return {
           applied: false,
           profile: windowProfile,
-          source: windowSource,
-          reason: '用户已固定窗口设置；请在外观设置中恢复“跟随布局”。',
+          source: windowSource.state(),
+          reason,
         }
       }
       const win = surfaces.windowOf('main')
       const work = win === undefined ? screen.getPrimaryDisplay().workArea : workAreaOf(win)
       windowProfile = resolveWindowProfile(request, work)
       windowRemember = windowProfile.remember
-      windowSource = 'layout'
+      windowSource.applyRequested()
+      // Even before the window exists: a queued save must not land after a request.
+      cancelWindowSave()
       if (win !== undefined && !win.isDestroyed()) applyWindowProfile(win, windowProfile)
       publishWindowProfile()
-      return { applied: true, profile: windowProfile, source: windowSource }
+      return { applied: true, profile: windowProfile, source: windowSource.state() }
     }
 
     /** Apply a requested ball profile, honouring explicit user overrides. */
@@ -336,8 +338,9 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       },
       onMainWindowAttached: win => {
         // Apply the effective stage before the window is shown (the app entry
-        // waits for ready-to-show), so there is no 1280×800 flash.
-        applyWindowProfile(win, windowProfile, windowSource === 'persisted' ? savedWindow : undefined)
+        // waits for ready-to-show), so there is no 1280×800 flash. Remembered
+        // bounds seed the geometry; they do not lock the profile in.
+        applyWindowProfile(win, windowProfile, bootWindowBounds)
         win.on('resize', () => scheduleWindowSave(win))
         win.on('move', () => scheduleWindowSave(win))
         win.on('maximize', () => scheduleWindowSave(win))
@@ -362,9 +365,13 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       if (key === WINDOW_PROFILE_KEY) {
         const win = surfaces.windowOf('main')
         if (value === null || value === undefined) {
-          windowManual = false
-          windowSource = 'default'
+          // 「跟随布局」forgets the remembered bounds too: the operator
+          // released the window, and stale remembered geometry would re-seed
+          // the old stage on the next boot before any layout applies.
+          windowSource.reset()
+          settings.set(WINDOW_STATE_KEY, null)
           windowProfile = resolveWindowProfile({}, win === undefined ? screen.getPrimaryDisplay().workArea : workAreaOf(win))
+          windowRemember = windowProfile.remember
           if (win !== undefined && !win.isDestroyed()) applyWindowProfile(win, windowProfile)
           publishWindowProfile()
           return
@@ -374,8 +381,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         const work = win === undefined ? screen.getPrimaryDisplay().workArea : workAreaOf(win)
         windowProfile = resolveWindowProfile(parsed.data as WindowProfile, work)
         windowRemember = windowProfile.remember
-        windowManual = true
-        windowSource = 'user'
+        windowSource.applyUser()
         if (win !== undefined && !win.isDestroyed()) applyWindowProfile(win, windowProfile)
         publishWindowProfile()
       }
