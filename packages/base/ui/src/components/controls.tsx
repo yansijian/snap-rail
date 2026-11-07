@@ -24,22 +24,22 @@ export function Label({ className, children, ...props }: ComponentPropsWithoutRe
 
 /** The tabs root. */
 export function Tabs({ className, children, ...props }: ComponentPropsWithoutRef<typeof TabsPrimitive.Root>): ReactNode {
-  return <TabsPrimitive.Root {...part('tabs', 'root')} className={cn('snap-tabs', className)} {...props}>{children}</TabsPrimitive.Root>
+  return <TabsPrimitive.Root className={cn('snap-tabs', className)} {...props} {...part('tabs', 'root')}>{children}</TabsPrimitive.Root>
 }
 
 /** The tabs list. */
 export function TabsList({ className, children, ...props }: ComponentPropsWithoutRef<typeof TabsPrimitive.List>): ReactNode {
-  return <TabsPrimitive.List {...part('tabs', 'list')} className={cn('snap-tabs-list', className)} {...props}>{children}</TabsPrimitive.List>
+  return <TabsPrimitive.List className={cn('snap-tabs-list', className)} {...props} {...part('tabs', 'list')}>{children}</TabsPrimitive.List>
 }
 
 /** A tab trigger. */
 export function TabsTrigger({ className, children, ...props }: ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>): ReactNode {
-  return <TabsPrimitive.Trigger {...part('tabs', 'trigger')} className={cn('snap-tabs-trigger', className)} {...props}>{children}</TabsPrimitive.Trigger>
+  return <TabsPrimitive.Trigger className={cn('snap-tabs-trigger', className)} {...props} {...part('tabs', 'trigger')}>{children}</TabsPrimitive.Trigger>
 }
 
 /** A tab panel. */
 export function TabsContent({ className, children, ...props }: ComponentPropsWithoutRef<typeof TabsPrimitive.Content>): ReactNode {
-  return <TabsPrimitive.Content {...part('tabs', 'content')} className={cn('snap-tabs-content', className)} {...props}>{children}</TabsPrimitive.Content>
+  return <TabsPrimitive.Content className={cn('snap-tabs-content', className)} {...props} {...part('tabs', 'content')}>{children}</TabsPrimitive.Content>
 }
 
 /** Props of {@link Switch}. */
@@ -59,7 +59,7 @@ export function Switch({ className, label, labelPosition = 'end', description, c
   const row = (
     <label className="snap-switch-label">
       {labelPosition === 'start' && labelNode}
-      <SwitchPrimitive.Root {...part('switch', 'root')} className={cn('snap-switch', className)} {...props}>
+      <SwitchPrimitive.Root className={cn('snap-switch', className)} {...props} {...part('switch', 'root')}>
         <SwitchPrimitive.Thumb {...part('switch', 'thumb')} className="snap-switch-thumb" />
       </SwitchPrimitive.Root>
       {labelPosition === 'end' && labelNode}
@@ -91,7 +91,7 @@ export function Checkbox({ className, label, labelPosition = 'end', description,
   const row = (
     <label className="snap-checkbox-label">
       {labelPosition === 'start' && labelNode}
-      <CheckboxPrimitive.Root {...part('checkbox', 'root')} className={cn('snap-checkbox', className)} {...props}>
+      <CheckboxPrimitive.Root className={cn('snap-checkbox', className)} {...props} {...part('checkbox', 'root')}>
         <CheckboxPrimitive.Indicator {...part('checkbox', 'indicator')} className="snap-checkbox-indicator">
           ✓
         </CheckboxPrimitive.Indicator>
@@ -121,10 +121,10 @@ export function RadioGroup({ className, label, description, children, ...props }
   const labelId = useId()
   const group = (
     <RadioGroupPrimitive.Root
-      {...part('radio-group', 'root')}
       className={cn('snap-radio-group', className)}
       {...label !== undefined ? { 'aria-labelledby': labelId } : {}}
       {...props}
+      {...part('radio-group', 'root')}
     >
       {children}
     </RadioGroupPrimitive.Root>
@@ -142,7 +142,7 @@ export function RadioGroup({ className, label, description, children, ...props }
 /** One radio item. */
 export function RadioGroupItem({ className, ...props }: ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>): ReactNode {
   return (
-    <RadioGroupPrimitive.Item {...part('radio-group', 'item')} className={cn('snap-radio-item', className)} {...props}>
+    <RadioGroupPrimitive.Item className={cn('snap-radio-item', className)} {...props} {...part('radio-group', 'item')}>
       <RadioGroupPrimitive.Indicator {...part('radio-group', 'indicator')} className="snap-radio-indicator" />
     </RadioGroupPrimitive.Item>
   )
@@ -212,43 +212,45 @@ export function TouchSelect({
   const selected = options.find(option => option.value === value)
   return (
     <span {...part('touch-select', 'root')} className="snap-touch-select">
-      <Button
-        type="button"
-        size={size}
-        emphasis="outline"
-        className={className}
-        disabled={disabled}
-        aria-label={ariaLabel}
-        aria-invalid={invalid || undefined}
-        aria-haspopup="dialog"
-        onClick={() => setOpen(true)}
-        {...part('touch-select', 'trigger')}
-      >
-        <span style={{ flex: 1, textAlign: 'left' }}>{selected?.label ?? placeholder}</span>
-        <span aria-hidden="true">▾</span>
-      </Button>
+      <span {...part('touch-select', 'trigger')} className="snap-touch-select-trigger">
+        <Button
+          type="button"
+          size={size}
+          emphasis="outline"
+          className={className}
+          disabled={disabled}
+          aria-label={ariaLabel}
+          aria-invalid={invalid || undefined}
+          aria-haspopup="dialog"
+          onClick={() => setOpen(true)}
+        >
+          <span style={{ flex: 1, textAlign: 'left' }}>{selected?.label ?? placeholder}</span>
+          <span aria-hidden="true">▾</span>
+        </Button>
+      </span>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent presentation="modal" size="sm" {...part('touch-select', 'sheet')}>
-          <DialogHeader><DialogTitle>{title ?? ariaLabel ?? '请选择'}</DialogTitle></DialogHeader>
-          <div {...part('touch-select', 'options')} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--snap-space-sm)' }}>
-            {options.map(option => (
-              <Button
-                key={option.value}
-                type="button"
-                size="lg"
-                emphasis={option.value === value ? 'solid' : 'outline'}
-                intent={option.value === value ? 'primary' : 'neutral'}
-                disabled={option.disabled === true}
-                onClick={() => {
-                  onValueChange?.(option.value)
-                  setOpen(false)
-                }}
-                {...part('touch-select', 'option')}
-              >
-                {option.label}
-              </Button>
-            ))}
-            {options.length === 0 && <span style={{ color: 'var(--snap-color-muted)' }}>无可选项</span>}
+        <DialogContent presentation="modal" size="sm">
+          <div {...part('touch-select', 'sheet')} className="snap-touch-select-sheet">
+            <DialogHeader><DialogTitle>{title ?? ariaLabel ?? '请选择'}</DialogTitle></DialogHeader>
+            <div {...part('touch-select', 'options')} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--snap-space-sm)' }}>
+              {options.map(option => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  size="lg"
+                  emphasis={option.value === value ? 'solid' : 'outline'}
+                  intent={option.value === value ? 'primary' : 'neutral'}
+                  disabled={option.disabled === true}
+                  onClick={() => {
+                    onValueChange?.(option.value)
+                    setOpen(false)
+                  }}
+                >
+                  {option.label}
+                </Button>
+              ))}
+              {options.length === 0 && <span style={{ color: 'var(--snap-color-muted)' }}>无可选项</span>}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -267,13 +269,13 @@ export function SelectTrigger({
 }: ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & { size?: 'sm' | 'md' | 'lg', invalid?: boolean }): ReactNode {
   return (
     <SelectPrimitive.Trigger
-      {...part('select', 'trigger')}
       className={cn('snap-select-trigger', className)}
       data-size={size}
       data-invalid={invalid || undefined}
       data-disabled={disabled || undefined}
       aria-invalid={invalid || undefined}
       {...props}
+      {...part('select', 'trigger')}
     >
       {children}
       <SelectPrimitive.Icon {...part('select', 'chevron')} className="snap-select-chevron">▾</SelectPrimitive.Icon>
@@ -283,7 +285,7 @@ export function SelectTrigger({
 
 /** The selected-value slot of a trigger. */
 export function SelectValue(props: ComponentPropsWithoutRef<typeof SelectPrimitive.Value>): ReactNode {
-  return <SelectPrimitive.Value {...part('select', 'value')} {...props} />
+  return <SelectPrimitive.Value {...props} {...part('select', 'value')} />
 }
 
 /** Props of {@link SelectContent}. */
@@ -298,13 +300,13 @@ export function SelectContent({ side = 'bottom', align = 'start', sideOffset = 4
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
-        {...part('select', 'content')}
         className={cn('snap-select-content', className)}
         position="popper"
         side={side}
         align={align}
         sideOffset={sideOffset}
         {...props}
+        {...part('select', 'content')}
       >
         <SelectPrimitive.Viewport>{children}</SelectPrimitive.Viewport>
       </SelectPrimitive.Content>
@@ -315,7 +317,7 @@ export function SelectContent({ side = 'bottom', align = 'start', sideOffset = 4
 /** One option row. */
 export function SelectItem({ className, children, ...props }: ComponentPropsWithoutRef<typeof SelectPrimitive.Item>): ReactNode {
   return (
-    <SelectPrimitive.Item {...part('select', 'item')} className={cn('snap-select-item', className)} {...props}>
+    <SelectPrimitive.Item className={cn('snap-select-item', className)} {...props} {...part('select', 'item')}>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator {...part('select', 'item-indicator')} className="snap-select-item-indicator">✓</SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>

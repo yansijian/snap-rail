@@ -21,10 +21,10 @@ export interface SliderProps extends ComponentPropsWithoutRef<typeof SliderPrimi
 export function Slider({ label, className, children, ...props }: SliderProps): ReactNode {
   return (
     <SliderPrimitive.Root
-      {...part('slider', 'root')}
       className={cn('snap-slider', className)}
       aria-label={label}
       {...props}
+      {...part('slider', 'root')}
     >
       <SliderPrimitive.Track {...part('slider', 'track')} className="snap-slider-track">
         <SliderPrimitive.Range {...part('slider', 'range')} className="snap-slider-range" />

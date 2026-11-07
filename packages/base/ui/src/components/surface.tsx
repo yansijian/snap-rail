@@ -15,32 +15,32 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 /** A content card. */
 export function Card({ className, children, ...props }: CardProps): ReactNode {
-  return <div {...part('card', 'root')} className={cn('snap-card', className)} {...props}>{children}</div>
+  return <div className={cn('snap-card', className)} {...props} {...part('card', 'root')}>{children}</div>
 }
 
 /** The card header region. */
 export function CardHeader({ className, children, ...props }: HTMLAttributes<HTMLDivElement>): ReactNode {
-  return <div {...part('card', 'header')} className={cn('snap-card-header', className)} {...props}>{children}</div>
+  return <div className={cn('snap-card-header', className)} {...props} {...part('card', 'header')}>{children}</div>
 }
 
 /** The card title. */
 export function CardTitle({ className, children, ...props }: HTMLAttributes<HTMLDivElement>): ReactNode {
-  return <div {...part('card', 'title')} className={cn('snap-card-title', className)} {...props}>{children}</div>
+  return <div className={cn('snap-card-title', className)} {...props} {...part('card', 'title')}>{children}</div>
 }
 
 /** The card description. */
 export function CardDescription({ className, children, ...props }: HTMLAttributes<HTMLDivElement>): ReactNode {
-  return <div {...part('card', 'description')} className={cn('snap-card-description', className)} {...props}>{children}</div>
+  return <div className={cn('snap-card-description', className)} {...props} {...part('card', 'description')}>{children}</div>
 }
 
 /** The card body. */
 export function CardContent({ className, children, ...props }: HTMLAttributes<HTMLDivElement>): ReactNode {
-  return <div {...part('card', 'body')} className={cn('snap-card-content', className)} {...props}>{children}</div>
+  return <div className={cn('snap-card-content', className)} {...props} {...part('card', 'body')}>{children}</div>
 }
 
 /** The card footer. */
 export function CardFooter({ className, children, ...props }: HTMLAttributes<HTMLDivElement>): ReactNode {
-  return <div {...part('card', 'footer')} className={cn('snap-card-footer', className)} {...props}>{children}</div>
+  return <div className={cn('snap-card-footer', className)} {...props} {...part('card', 'footer')}>{children}</div>
 }
 
 /** Props of {@link Panel}. */
@@ -53,7 +53,7 @@ export interface PanelProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'
 /** A bounded panel with optional header/footer. */
 export function Panel({ title, actions, footer, className, children, ...props }: PanelProps): ReactNode {
   return (
-    <div {...part('panel', 'root')} className={cn('snap-panel', className)} {...props}>
+    <div className={cn('snap-panel', className)} {...props} {...part('panel', 'root')}>
       {(title !== undefined || actions !== undefined) && (
         <div {...part('panel', 'header')} className="snap-panel-header">
           <div {...part('panel', 'title')}>{title}</div>
@@ -77,27 +77,27 @@ export function Table({ className, children, ...props }: HTMLAttributes<HTMLTabl
 
 /** The table head. */
 export function TableHeader({ className, children, ...props }: HTMLAttributes<HTMLTableSectionElement>): ReactNode {
-  return <thead {...part('table', 'header')} className={cn('snap-table-header', className)} {...props}>{children}</thead>
+  return <thead className={cn('snap-table-header', className)} {...props} {...part('table', 'header')}>{children}</thead>
 }
 
 /** The table body. */
 export function TableBody({ className, children, ...props }: HTMLAttributes<HTMLTableSectionElement>): ReactNode {
-  return <tbody {...part('table', 'body')} className={cn('snap-table-body', className)} {...props}>{children}</tbody>
+  return <tbody className={cn('snap-table-body', className)} {...props} {...part('table', 'body')}>{children}</tbody>
 }
 
 /** A table row. */
 export function TableRow({ className, children, ...props }: HTMLAttributes<HTMLTableRowElement>): ReactNode {
-  return <tr {...part('table', 'row')} className={cn('snap-table-row', className)} {...props}>{children}</tr>
+  return <tr className={cn('snap-table-row', className)} {...props} {...part('table', 'row')}>{children}</tr>
 }
 
 /** A table header cell. */
 export function TableHead({ className, children, ...props }: ThHTMLAttributes<HTMLTableCellElement>): ReactNode {
-  return <th {...part('table', 'head')} className={cn('snap-table-head', className)} {...props}>{children}</th>
+  return <th className={cn('snap-table-head', className)} {...props} {...part('table', 'head')}>{children}</th>
 }
 
 /** A table body cell. */
 export function TableCell({ className, children, ...props }: TdHTMLAttributes<HTMLTableCellElement>): ReactNode {
-  return <td {...part('table', 'cell')} className={cn('snap-table-cell', className)} {...props}>{children}</td>
+  return <td className={cn('snap-table-cell', className)} {...props} {...part('table', 'cell')}>{children}</td>
 }
 
 /** A full-width empty row. */

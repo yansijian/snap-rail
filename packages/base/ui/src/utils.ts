@@ -10,7 +10,13 @@ export function cn(...values: ReadonlyArray<string | false | null | undefined>):
   return values.filter((value): value is string => typeof value === 'string' && value.length > 0).join(' ')
 }
 
-/** The anatomy attributes every semantic component renders. */
+/**
+ * The anatomy attributes every semantic component renders. The identity is
+ * component-owned: components spread these AFTER caller props so a composite
+ * can never mask a host part (a masked `button.root` loses every skin rule
+ * and falls back to the UA default look). Composites tag their own wrappers
+ * instead of pushing `part()` into a child component's props.
+ */
 export function part(component: string, name: string): Record<string, string> {
   return {
     'data-snap-component': component,

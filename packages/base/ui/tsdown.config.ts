@@ -14,13 +14,17 @@ const shared = {
 
 export default defineConfig([
   { ...shared, entry: ['lib/types/index.js'] },
-  { ...shared, entry: ['lib/types/components/index.js'] },
+  // The nested subpath entries are record-form on purpose: array entries name
+  // their output after the file basename (`index.js`), so both barrels would
+  // collide with the main one at `lib/index.js` and silently vanish from the
+  // published tarball (fresh CI checkouts never had them).
+  { ...shared, entry: { 'components/index': 'lib/types/components/index.js' } },
   { ...shared, entry: ['lib/types/charts.js'] },
   { ...shared, entry: ['lib/types/contract.js'] },
   { ...shared, entry: ['lib/types/slots.js'] },
   { ...shared, entry: ['lib/types/skins.js'] },
   { ...shared, entry: ['lib/types/settings.js'] },
-  { ...shared, entry: ['lib/types/settings-pages/index.js'] },
+  { ...shared, entry: { 'settings-pages/index': 'lib/types/settings-pages/index.js' } },
   { ...shared, entry: ['lib/types/runtime.js'] },
   { ...shared, entry: ['lib/types/pages.js'] },
   { ...shared, entry: ['lib/types/fallback.js'] },

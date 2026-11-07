@@ -654,6 +654,16 @@
     background: var(--snap-color-surface-raised);
   }
 
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='combobox.option']:hover,
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='combobox.option'][data-active] {
+    background: var(--snap-color-surface);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='combobox.option'][aria-selected='true'] {
+    background: var(--snap-color-surface-raised);
+    font-weight: 600;
+  }
+
   :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='list.leading'],
   :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='list.trailing'] {
     color: var(--snap-color-muted);

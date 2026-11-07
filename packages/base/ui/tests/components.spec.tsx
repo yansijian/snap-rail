@@ -123,6 +123,31 @@ describe('schema-driven forms', () => {
     expect(html).toContain('甲')
     expect(html).toContain('aria-haspopup="dialog"')
     expect(html).toContain('data-snap-component="button"')
+    // The trigger part rides its own wrapper — never pushed into Button props.
+    expect(html).toContain('data-snap-part="touch-select.trigger"')
+  })
+})
+
+describe('component identity', () => {
+  // The anatomy contract: a component's `data-snap-*` identity is written
+  // after caller props, so composites cannot mask a host part away (a masked
+  // `button.root` loses every base/skin rule and falls back to the UA look).
+  it('keeps component identity when a caller passes its own part', () => {
+    const html = renderToStaticMarkup(
+      <Button {...part('custom-widget', 'submit')}>提交</Button>,
+    )
+    expect(html).toContain('data-snap-component="button"')
+    expect(html).toContain('data-snap-part="button.root"')
+    expect(html).not.toContain('custom-widget')
+  })
+
+  it('keeps surface identity when the caller rides attributes through', () => {
+    const html = renderToStaticMarkup(
+      <Card data-testid="probe" {...part('custom-card', 'body')}>内容</Card>,
+    )
+    expect(html).toContain('data-snap-part="card.root"')
+    expect(html).toContain('data-testid="probe"')
+    expect(html).not.toContain('custom-card')
   })
 })
 

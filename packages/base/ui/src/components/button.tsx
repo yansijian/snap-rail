@@ -73,7 +73,6 @@ export function Button({
       )
   return (
     <Component
-      {...part('button', 'root')}
       {...type !== undefined ? { type } : !asChild ? { type: 'button' as const } : {}}
       className={cn('snap-button', className)}
       data-intent={intent}
@@ -84,6 +83,7 @@ export function Button({
       aria-busy={loading || undefined}
       disabled={!asChild ? disabled === true || loading : undefined}
       {...props}
+      {...part('button', 'root')}
     >
       {content}
     </Component>
@@ -110,7 +110,6 @@ export function IconButton({
 }: IconButtonProps): ReactNode {
   return (
     <button
-      {...part('icon-button', 'root')}
       type="button"
       className={cn('snap-icon-button', className)}
       data-intent={intent}
@@ -120,6 +119,7 @@ export function IconButton({
       aria-label={label}
       aria-pressed={active || undefined}
       {...props}
+      {...part('icon-button', 'root')}
     >
       <span {...part('icon-button', 'icon')} aria-hidden="true">{icon}</span>
     </button>

@@ -46,11 +46,11 @@ export function DialogContent({
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay {...part('dialog', 'overlay')} className="snap-dialog-overlay" />
       <DialogPrimitive.Content
-        {...part('dialog', 'panel')}
         className={cn('snap-dialog-panel', className)}
         data-presentation={resolved}
         data-size={size}
         {...rest}
+        {...part('dialog', 'panel')}
       >
         {children}
         {showClose && (

@@ -221,8 +221,13 @@ export const UI_COMPONENTS = {
     props: ['size', 'invalid', 'disabled', 'defaultValue', 'side', 'align'],
   },
   'touch-select': {
-    parts: ['touch-select.root', 'touch-select.trigger', 'touch-select.sheet', 'touch-select.option'],
+    parts: ['touch-select.root', 'touch-select.trigger', 'touch-select.sheet', 'touch-select.options'],
     props: ['invalid', 'disabled'],
+  },
+  combobox: {
+    parts: ['combobox.root', 'combobox.anchor', 'combobox.list', 'combobox.option', 'combobox.empty'],
+    slots: ['empty'],
+    props: ['value', 'options', 'size', 'invalid', 'disabled', 'loading', 'onInputValueChange'],
   },
   checkbox: {
     parts: ['checkbox.root', 'checkbox.indicator', 'checkbox.label', 'checkbox.field', 'checkbox.description'],

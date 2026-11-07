@@ -51,11 +51,11 @@ export function Input({
     >
       {prefix !== undefined && <span {...part(componentName, 'prefix')}>{prefix}</span>}
       <input
-        {...part(componentName, 'field')}
         className={cn('snap-input-field', fieldClassName)}
         disabled={disabled}
         aria-invalid={invalid || undefined}
         {...props}
+        {...part(componentName, 'field')}
       />
       {onClear !== undefined && typeof props.value === 'string' && props.value !== '' && (
         <button
@@ -102,11 +102,11 @@ export function Textarea({
       data-disabled={disabled === true || undefined}
     >
       <textarea
-        {...part('textarea', 'field')}
         className={cn('snap-textarea-field', fieldClassName)}
         disabled={disabled}
         aria-invalid={invalid || undefined}
         {...props}
+        {...part('textarea', 'field')}
       />
     </div>
   )
@@ -162,7 +162,6 @@ export function NumberInput({
     >
       <input
         ref={fieldRef}
-        {...part('number-input', 'field')}
         className={cn('snap-input-field', fieldClassName)}
         type="number"
         inputMode="decimal"
@@ -174,6 +173,7 @@ export function NumberInput({
         {...max !== undefined ? { max } : {}}
         {...step !== undefined ? { step } : {}}
         {...props}
+        {...part('number-input', 'field')}
       />
       <span className="snap-number-input-steps">
         <button

@@ -9,6 +9,7 @@
 export * from '../utils.ts'
 export * from './alert.tsx'
 export * from './button.tsx'
+export * from './combobox.tsx'
 export * from './controls.tsx'
 export * from './dialog.tsx'
 export * from './feedback.tsx'

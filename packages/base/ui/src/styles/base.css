@@ -178,6 +178,12 @@
     text-align: left;
   }
 
+  /* Headers never wrap: narrow panes get a wider scrollable table instead of
+   * vertically stacked glyphs. */
+  [data-snap-part='table.head'] {
+    white-space: nowrap;
+  }
+
   [data-snap-part='card.root'],
   [data-snap-part='panel.root'] {
     display: flex;
@@ -352,9 +358,31 @@
     min-height: 0;
   }
 
-  [data-snap-component='touch-select'] {
-    display: inline-flex;
-    max-width: 100%;
+  /* TouchSelect fills its container like every other form control (the
+   * Input family defaults to width:100%); parts anchor the layout because
+   * the trigger/sheet wrappers also carry the component tag. */
+  [data-snap-part='touch-select.root'] {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+  }
+
+  [data-snap-part='touch-select.trigger'] {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+  }
+
+  [data-snap-part='touch-select.trigger'] > [data-snap-component='button'] {
+    width: 100%;
+  }
+
+  [data-snap-part='touch-select.sheet'] {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--snap-space-sm);
+    min-height: 0;
   }
 
   [data-snap-part='radio-group.block'] {
@@ -399,6 +427,49 @@
   [data-snap-part='popover.content'],
   [data-snap-part='menu.content'] {
     z-index: var(--snap-z-overlay);
+  }
+
+  /* A popover tracks its anchor: at least as wide, wider when content asks
+   * (the popper exposes the anchor width as a CSS variable). */
+  [data-snap-part='popover.content'] {
+    min-width: var(--radix-popper-anchor-width);
+  }
+
+  [data-snap-part='combobox.root'] {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+  }
+
+  [data-snap-part='combobox.anchor'] {
+    display: block;
+    flex: 1;
+    min-width: 0;
+  }
+
+  [data-snap-part='combobox.list'] {
+    display: flex;
+    flex-direction: column;
+    max-height: 320px;
+    overflow: auto;
+  }
+
+  [data-snap-part='combobox.option'] {
+    display: flex;
+    align-items: center;
+    min-height: var(--snap-control-height-md);
+    padding-inline: var(--snap-space-md);
+    cursor: pointer;
+  }
+
+  [data-snap-part='combobox.option'][data-disabled] {
+    color: var(--snap-color-muted);
+    cursor: default;
+  }
+
+  [data-snap-part='combobox.empty'] {
+    padding: var(--snap-space-sm) var(--snap-space-md);
+    color: var(--snap-color-muted);
   }
 
   [data-snap-part='menu.item'],
@@ -478,6 +549,7 @@
     display: flex;
     align-items: center;
     gap: var(--snap-space-sm);
+    padding-inline: var(--snap-space-md);
     min-height: var(--snap-control-height-md);
     min-width: 0;
   }

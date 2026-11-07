@@ -20,7 +20,7 @@ export interface AlertProps extends ComponentPropsWithoutRef<'div'> {
 /** An inline status banner for results and failures. */
 export function Alert({ intent = 'neutral', className, children, ...props }: AlertProps): ReactNode {
   return (
-    <div {...part('alert', 'root')} role="alert" className={cn('snap-alert', className)} data-intent={intent} {...props}>
+    <div role="alert" className={cn('snap-alert', className)} data-intent={intent} {...props} {...part('alert', 'root')}>
       {children}
     </div>
   )
@@ -28,12 +28,12 @@ export function Alert({ intent = 'neutral', className, children, ...props }: Ale
 
 /** The alert heading line. */
 export function AlertTitle({ className, children, ...props }: ComponentPropsWithoutRef<'h5'>): ReactNode {
-  return <h5 {...part('alert', 'title')} className={cn('snap-alert-title', className)} {...props}>{children}</h5>
+  return <h5 className={cn('snap-alert-title', className)} {...props} {...part('alert', 'title')}>{children}</h5>
 }
 
 /** The alert body text. */
 export function AlertDescription({ className, children, ...props }: ComponentPropsWithoutRef<'div'>): ReactNode {
-  return <div {...part('alert', 'description')} className={cn('snap-alert-description', className)} {...props}>{children}</div>
+  return <div className={cn('snap-alert-description', className)} {...props} {...part('alert', 'description')}>{children}</div>
 }
 
 /** Props of {@link Separator}. */
@@ -45,10 +45,10 @@ export interface SeparatorProps extends ComponentPropsWithoutRef<typeof Separato
 export function Separator({ orientation = 'horizontal', className, ...props }: SeparatorProps): ReactNode {
   return (
     <SeparatorPrimitive.Root
-      {...part('separator', 'root')}
       orientation={orientation}
       className={cn('snap-separator', className)}
       {...props}
+      {...part('separator', 'root')}
     />
   )
 }
@@ -61,7 +61,7 @@ export interface SkeletonProps extends ComponentPropsWithoutRef<'div'> {
 
 /** A neutral loading placeholder shaped by the skin. */
 export function Skeleton({ variant = 'block', className, ...props }: SkeletonProps): ReactNode {
-  return <div {...part('skeleton', 'root')} className={cn('snap-skeleton', className)} data-variant={variant} aria-hidden="true" {...props} />
+  return <div className={cn('snap-skeleton', className)} data-variant={variant} aria-hidden="true" {...props} {...part('skeleton', 'root')} />
 }
 
 /** Props of {@link List}. */
@@ -73,7 +73,7 @@ export interface ListProps extends ComponentPropsWithoutRef<'ul'> {
 /** A vertical collection of {@link ListItem} rows. */
 export function List({ divided = false, className, children, ...props }: ListProps): ReactNode {
   return (
-    <ul {...part('list', 'root')} className={cn('snap-list', className)} data-divided={divided || undefined} {...props}>
+    <ul className={cn('snap-list', className)} data-divided={divided || undefined} {...props} {...part('list', 'root')}>
       {children}
     </ul>
   )
@@ -113,7 +113,6 @@ export function ListItem({
   }
   return (
     <li
-      {...part('list', 'item')}
       className={cn('snap-list-item', className)}
       data-selected={selected || undefined}
       data-interactive={interactive || undefined}
@@ -121,6 +120,7 @@ export function ListItem({
       aria-disabled={disabled || undefined}
       {...interactive ? { role: 'button', tabIndex: 0, onClick, onKeyDown: activate } : {}}
       {...props}
+      {...part('list', 'item')}
     >
       {leading !== undefined && <span {...part('list', 'leading')}>{leading}</span>}
       <span {...part('list', 'content')} style={{ flex: 1, minWidth: 0 }}>{children}</span>
