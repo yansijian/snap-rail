@@ -274,16 +274,16 @@ describe('seed ABI precheck', () => {
     rmSync(base, { recursive: true, force: true })
   })
 
-  it('refuses a major drift on a declared seed', () => {
+  it('refuses a seed outside the host compatibility lane', () => {
     const base = mkdtempSync(join(tmpdir(), 'snap-rail-abi-'))
     const pool = join(base, 'plugins')
     expect(() => installPluginFromZip(abiZip({ revision: 1, versions: { 'zod': '5.0.0' } }), pool, { seedAbi: hostAbi }))
-      .toThrow(/主版本不一致/)
+      .toThrow(/zod@5\.0\.0.*宿主版本较旧/)
     expect(existsSync(join(pool, '@snap-rail__demo-plugin'))).toBe(false)
     rmSync(base, { recursive: true, force: true })
   })
 
-  it('passes same-major stamps and absent declarations', () => {
+  it('passes in-lane third-party stamps and absent declarations', () => {
     const base = mkdtempSync(join(tmpdir(), 'snap-rail-abi-'))
     const pool = join(base, 'plugins')
     installPluginFromZip(abiZip({ revision: 1, versions: { 'zod': '4.9.1' } }), pool, { seedAbi: hostAbi })
