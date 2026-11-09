@@ -21,7 +21,7 @@ SKILL.md「先拆解，再选模板」一节的判定依据与协作链路。拆
 | 场景私有闭环（跨点聚合 + 持久化 + 专属界面） | `suite` | 单活；场景本身就是交付单位 |
 | 多页面共享的组件/图表卡 | `ui-extension` | `<包>/<键>` 种子跨包同一实例 |
 | 全局存储后端 | `store-provider` | 消费者零改动 |
-| 宿主能力服务（无界面、跨插件协作） | `host-service` | 服务是插件间协作唯一通道 |
+| 宿主能力服务（无界面、跨插件协作） | `host-service` | 服务是宿主面插件间协作的通道（渲染面另有一条：贡献种子） |
 
 布局/主题是替换宿主外观的独立包型，一般不作为功能拆解的产物。
 
@@ -125,7 +125,8 @@ import { clientBundle, hostBundle } from '@snap-rail/plugin-sdk'
 export default [
   hostBundle('src/index.ts'),
   clientBundle('@my-scope/my-suite', 'src/client.tsx'),
-  // 辅助面再各加一条，outName 决定文件名，第三参决定模块 id：
+  // 辅助面再各加一条：第一参决定模块 id（默认包名，辅助面写 <包名>/<面>；
+  // 第三参的 outName 决定文件名，moduleId 可显式覆盖模块 id）：
   clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),
 ]
 ```
@@ -234,7 +235,10 @@ export default {
 render })` 声明并编排区域插槽。叠层对话框（如退出确认）**不要**为此注册
 高 order 布局——贡献到 `UI_SLOT_IDS.overlay`（
 `ctx.ui.contribute(ctx, UI_SLOT_IDS.overlay, { id, order, render })`），由
-内置 runtime 渲染、永远在最上层。
+内置 runtime 渲染、永远在最上层。布局激活时宿主应用声明的 `window`/`ball`
+档案：只有操作员在外观页显式固定才拒绝（检查 `shell.window.configure`
+返回的 `{applied:false, source:'user'}`），记住的历史尺寸只做开机恢复、
+不锁请求；**检查返回值**——拒绝是正常返回，不抛异常。
 
 ### ui-extension
 

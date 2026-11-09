@@ -59,8 +59,9 @@
   `externalSeeds`。`import type {}` 被擦除，不产生运行时 require，不用写。
 - `ctx.client` 的 `ClientServices` 由内置 `@snap-rail/ui/runtime` 提供
   （`link` + `surface`），不再有可替换的独立 UI 框架插件。
-- init 模板默认不带 `@snap-rail/protocol` / `zod` / `@snap-rail/util`；写
-  wire 或使用 format 助手时按上表补到对应的 `dependencies` / `devDependencies`。
+- init 模板默认不带 `@snap-rail/protocol` / `@snap-rail/util`（driver 模板
+  已自带 `zod`）；写 wire 或使用 format 助手时按上表补到对应的
+  `dependencies` / `devDependencies`。
 
 ## 2. 依赖放哪张表
 
@@ -224,8 +225,8 @@ settings / runtime / pages / fallback 九个子路径。
 
 | 症状 | 原因 | 修法 |
 | --- | --- | --- |
-| 启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方未安装）` | 把 base 种子写进了 `externalSeeds` | 删掉；base 种子由 shell 自动播种 |
-| `Cannot find module '@snap-rail/plugin-sdk/api'` | SDK 低于 0.2.5 | 升级 `@snap-rail/plugin-sdk` 到 `^0.2.5` |
+| 启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方 <包> 未安装）` | 把 base 种子写进了 `externalSeeds` | 删掉；base 种子由 shell 自动播种 |
+| `Cannot find module '@snap-rail/plugin-sdk/api'` | SDK 低于 0.2.5 | 升级 `@snap-rail/plugin-sdk` 到 `^0.3.0`（当前闭包，见 SKILL.md 版本锚） |
 | `Property 'rpc' does not exist on type 'Context'` | 没引入 gateway 类型增强 | 从 `@snap-rail/plugin-sdk/api` 导入 `GatewayService`；不要直接 import gateway |
 | `Property 'client' does not exist on type 'Context'` | 没引入 UI runtime 增强 | `import type {} from '@snap-rail/ui/runtime'` |
 | `Cannot find module '@snap-rail/connection'` | 绕过 SDK 直接 import 了未安装的包 | 改用 `@snap-rail/plugin-sdk/api/client` |

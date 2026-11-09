@@ -30,7 +30,8 @@ PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立�
     语义原语、插槽/主题/设置/runtime 与契约等**种子模块**运行时从共享种子表
     取单实例。
 - 插件之间**永不互相 import**：协作只走 cordis 服务（`ctx.provide` /
-  `inject`）、wire 帧和 store 服务缝。
+  `inject`）、wire 帧和 store 服务缝；渲染面的组件共享走贡献种子
+  （`client.seeds` / `externalSeeds`，见 client-face.md）。
 - **一个功能 ≠ 一个包**：需求横跨多个正交能力（采集 + 展示、协议 + 存储…）
   时，先拆解成多个可独立复用的插件再动手（见「先拆解，再选模板」）；
   拆与合的判据是复用预期，不是场景步数。
@@ -208,8 +209,10 @@ openssl pkey -in .keys/release.private.pem -pubout -out .keys/release.public.pem
 #    没有 openssl 的 Windows 可用 node:crypto 的 generateKeyPairSync('ed25519')，
 #    私钥导出 pkcs8 PEM、公钥导出 spki PEM。
 
-# 5. 打包签名（无签名 zip 不可安装）；产物名 = 包名把 `/` 换成 `__`，
-#    如 dist/@my-scope__my-driver.zip：
+# 5. 打包签名（签名是身份锚与更新链锚定：默认策略下未签名 zip 放行但带
+#    显著警告 + 额外风险确认，`plugins.signaturePolicy: 'strict'` 的现场
+#    直接拒装；`@snap-rail/*` 命名空间无论策略都必须 verified）；产物名 =
+#    包名把 `/` 换成 `__`，如 dist/@my-scope__my-driver.zip：
 pnpm exec snap-rail-plugin pack . --out dist --sign-key .keys/release.private.pem --key-id my-key
 pnpm exec snap-rail-plugin inspect dist/<scope>__<name>.zip        # 身份/面/签名概览
 pnpm exec snap-rail-plugin verify dist/<scope>__<name>.zip --public-key .keys/release.public.pem --key-id my-key
@@ -297,9 +300,10 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
   - **r3 · ui 0.3**（当前线）：`plugin-sdk 0.3.0` / `plugin-kit 0.3.0` /
     `ui 0.3.0` / `shell 0.2.4`——仍盖 r3 章；新增一等 `Combobox`、浮层焦点
     策略（可编辑元素打开时不夺焦、关闭回焦）、组件身份不可被调用方 props
-    覆盖。目标终端 **≥ v0.7.0**：版本检查改为 npm caret 兼容线 + 第一方种子
-    宿主 ≥ 构建版本，**ui 0.2 构建的 zip 在 v0.7.0 上被拒，ui 0.3 构建的
-    zip 在 v0.6.x 上也被拒**——跨线一律按版本锚重装闭包后重建。
+    覆盖。目标终端 **≥ v0.7.0**：这些终端的版本检查改为 npm caret 兼容线 +
+    第一方种子宿主 ≥ 构建版本，**ui 0.2 构建的 zip 在 v0.7.0 上被拒**；
+    反方向（ui 0.3 构建的 zip 装进 v0.6.x）不被拦截——旧终端仍按主版本
+    比较、安装放行，渲染到新组件时才失败。跨线一律按版本锚重装闭包后重建。
   - 只有带渲染面的包（ui-*/suite）会被盖章；纯宿主包（driver/
     store-provider/host-service/tool）无章放行，不受时代影响。
   - 装到旧版按版本锚升级重装（锁文件里的 plugin-kit 与 ui 版本决定盖什么

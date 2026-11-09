@@ -15,7 +15,7 @@ manifest 是插件的协议入口。安装器、池扫描、管理页都从这�
 | `exclusive` | string | 互斥组：启用本包自动停用同组其他已启用包。`suite` 默认 `'suite'`，skin 必须 `'skin'`，store 后端必须 `'store-backend'`。 |
 | `uiProfile` | `native \| integrated \| custom` | 渲染面与皮肤契约的关系声明；管理页徽标，不做门禁。 |
 | `window` | object | **预留字段**：schema 已定义（`WindowProfile` 形状），宿主当前不读取。操作员窗口形态经布局 `LayoutContribution.window` 或宿主面 `ctx.shell.window.setProfile` / 渲染面 `shell.window.configure` 声明（见 client-face / host-face）；宿主只夹上限（屏幕工作区），尺寸无下限。 |
-| `ball` | object | **预留字段**：schema 已定义（`BallProfile` 形状：`size?` 24–192，默认 128；球体 = size − 16、8px 余量固定），宿主当前不读取。悬浮球形态经布局 `LayoutContribution.ball` 或 `shell.ball.configure` 声明；几何单源 `resolveBallProfile`，宿主夹取。 |
+| `ball` | object | **预留字段**：schema 已定义（`BallProfile` 形状：`size?` 收正整数 ≤512，宿主 `resolveBallProfile` 夹取到 24–192，默认 128；球体 = size − 16、8px 余量固定），宿主当前不读取 manifest 里的该字段。悬浮球形态经布局 `LayoutContribution.ball`、宿主面 `ctx.shell.ball.setProfile` 或渲染面 `shell.ball.configure` 声明。 |
 | `requires` | string[] | **唯一兼容声明**，见下节。 |
 | `clientOnly` | boolean | 纯渲染包（无宿主面）：行不进宿主树，经 `client-config.list` 下发给渲染端。必须声明 `client.entry`。 |
 | `client` | object | 渲染面声明：`entry`（CJS 工厂包路径；schema 默认 `lib/client.js`，init 模板显式写 `lib-client/client.js`，以模板/doctor 为准）、`surfaces`（辅助面映射）、`seeds`（贡献的种子子路径）、`externalSeeds`（消费的贡献种子 id）。`seedAbi` 由 pack 盖章，**永不手写**。 |

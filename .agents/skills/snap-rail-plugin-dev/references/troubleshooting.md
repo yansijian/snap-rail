@@ -24,7 +24,7 @@ warning = 建议（放行但要逐条确认）。
 | 渲染面构建后无法 require UI 组件 | `@snap-rail/ui` 是 base 种子，却写进了 `externalSeeds`，或真正贡献种子没写 | `@snap-rail/ui` 子路径不写；其他插件的 `<包>/<子路径>` 才写 |
 | `clientBundle` 打进 node 侧代码报错 | client bundle 里 import 了宿主入口 / node-only 模块 | 跨端消费类型/schema 走 `./contract` 纯面；宿主实现永不进渲染图 |
 | 构建警告 `Could not resolve 'zod'`（契约模块） | 契约 import 了 zod，但没放 `dependencies` | `pnpm add zod`；契约是 host value import，app 的 resolve-hooks 会外部化 zod |
-| `Cannot find module '@snap-rail/plugin-sdk/api'` | SDK 低于 0.2.5，没有作者 API 门面 | 升级 `@snap-rail/plugin-sdk` 到 `^0.2.5`；宿主类型从 `/api`、渲染 link/帧从 `/api/client` 取 |
+| `Cannot find module '@snap-rail/plugin-sdk/api'` | SDK 低于 0.2.5，没有作者 API 门面 | 升级 `@snap-rail/plugin-sdk` 到 `^0.3.0`（当前闭包）；宿主类型从 `/api`、渲染 link/帧从 `/api/client` 取 |
 | `Property 'rpc' does not exist on type 'Context'` | 没引入 gateway 类型增强 | `import type { GatewayService } from '@snap-rail/plugin-sdk/api'`；不要直接 import gateway |
 | `Property 'client' does not exist on type 'Context'` | 没引入 UI runtime 的 `Context` 增强 | `import type {} from '@snap-rail/ui/runtime'`（type-only，不产生运行时代码） |
 | `Cannot find module '@snap-rail/connection'` | 绕过 SDK 直接 import 了未单列的包 | 改用 `@snap-rail/plugin-sdk/api/client`；确实要直接用时才加 devDependency |
@@ -76,7 +76,7 @@ warning = 建议（放行但要逐条确认）。
 | 症状 | 原因 | 修法 |
 | --- | --- | --- |
 | 安装预检列 `missing` | requires 的包没装/没启用 | 先装依赖包（如设备底座、其他套件），再启用本包 |
-| 启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方未安装）` | 把 base 种子写进了 `client.externalSeeds` | 删掉该条；base 种子由 shell 自动播种，不进 externalSeeds |
+| 启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方 <包> 未安装）` | 把 base 种子写进了 `client.externalSeeds` | 删掉该条；base 种子由 shell 自动播种，不进 externalSeeds（安装预检的同族 warning 不带提供方名，格式 `…（提供方未安装）`） |
 | 启用被拒：版本不合 | `name@range` 与已装版本冲突（range 按 npm 语义：`^0.2.0` 不接受 0.3.x） | 放宽 range 或升级依赖包 |
 | 卸载/禁用被拒 | 还有别的包依赖它 | 先停用依赖方 |
 | 管理页找不到我的包 | clientOnly 行不在宿主树 | 正常：纯渲染包经渲染端下发行展示；检查 `client-config.list` |
@@ -93,7 +93,7 @@ warning = 建议（放行但要逐条确认）。
 | 安装被拒「<包> 的种子依赖与宿主不匹配：插件构建于种子 ABI r2，宿主为 r3 —— 请更新插件包或桌面应用」，或渲染面没加载、控制台 `client: face "<包>" refused — …` | zip 是用 r2 时代工具链（npm `plugin-kit 0.2.3` / `plugin-sdk 0.2.6`，锁文件钉住最常见）打的，章与 ≥ v0.5.3 终端不符 | 按 SKILL.md 版本锚升到当前闭包（`pnpm update` 让锁文件跟上）后重新 `pnpm run build` + `pack`；**不要**手改 `seedAbi`（pack 自动盖章，手写会被拒） |
 | 安装被拒「插件构建于 <id>@<ver>，宿主提供 <live>（兼容版本线不一致，请用新版 SDK 重新构建插件）」 | 种子版本按 npm caret 兼容线比较（终端 ≥ v0.7.0）：0.x 看次版本，如 ui 0.2 构建的 zip 装 ui 0.3 终端 | 按版本锚升级闭包（ui `^0.3.0` 等）后重新 build + pack |
 | 安装被拒「…（宿主版本较旧，请更新桌面应用）」 | 第一方 `@snap-rail/*` 种子要求宿主 ≥ 构建版本：插件用了比终端新的 SDK（可能用到了终端没有的组件） | 升级终端；或把插件的闭包降回终端对应的版本线重新打包 |
-| 设置页不出现 | 没注册、注册在 `apply` 之外，或插件没 `inject: ['settings']` | 在 `apply(ctx)` 里 `ctx.settings.registerPage(ctx, { id, title, group, order, render })`；确认 `inject` 含 `settings` |
+| 设置页不出现 | 没注册、注册在 `apply` 之外，或插件没 `inject: ['settings']` | 这是**渲染面** API：在 `apply(ctx)` 里 `ctx.settings.registerPage(ctx, { id, title, group, order, render })`（宿主面的 settings 只有 get/set）；确认 `inject` 含 `settings` |
 | 更新了但自动更新没生效 | 版本号没变，或换 key 触发 keyChanged 拦截 | 升版本号重发；换 key 走手动更新确认 |
 
 ## 自检顺序（卡住时）

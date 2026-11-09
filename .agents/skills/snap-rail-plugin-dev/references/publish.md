@@ -7,7 +7,7 @@
 | `doctor <目录>` | 校验仓库契约（manifest、requires 形态、构建入口落盘）。红 = 契约违约（阻断），warning = 建议（放行）。 |
 | `dev <目录> [--launch [exe]] [--home <目录>] [--no-watch] [--reset]` | **本地迭代**用（不属于发布链）：持续构建并把产物热同步进终端插件池，免打包免签名；Ctrl+C 恢复原状。细节见 SKILL.md 步骤 3.5 与 docs/plugin-development.md「dev 模式」。 |
 | `pack <目录> --out dist --sign-key <pem> --key-id <id> [--publisher <名>]` | 装配并签名发行 zip。**拒绝无签名**（缺 key 参数直接报错）；输出 sha256 与 size。产物名 = 包名把 `/` 换成 `__`（`@my-scope/my-driver` → `dist/@my-scope__my-driver.zip`）。zip 内容 = 精简 manifest + 构建面，永不带 src。 |
-| `feed <zip目录> [--out <目录>] [--repository <url>]` | 读目录内**已签名** zip，产出 `index.json`（条目含包名/版本/文件名/sha256/size/签名 keyId）。拒绝未签名 zip 与重名包——**同目录每个包名只留最新版**。 |
+| `feed <zip目录> [--out <目录>] [--repository <url>]` | 读目录内**已签名** zip，产出 `index.json`（条目含包名/版本/文件名/sha256/size/签名 keyId，另随 zip 携带 kind/title/category/requires/permissions/engines/description 与可选 `repository`）。拒绝未签名 zip 与重名包——**同目录每个包名只留最新版**。 |
 | `inspect <zip>` | 身份、面、文件数、签名 keyId 概览（无需公钥）。收货方快速查验用。 |
 | `verify <zip> --public-key <pem> --key-id <id>` | 用发布者公钥完整验签（摘要/身份/publisher）。 |
 
@@ -91,6 +91,14 @@ openssl pkey -in .keys/release.private.pem -pubout -out .keys/release.public.pem
 `RELEASE_PRIVATE_PEM` 与 `RELEASE_KEY_ID`。推送到 master（改动涉及
 `packages/**`、`scripts/**` 或工作流文件本身）时自动构建、打包、签名、
 更新滚动 Release；也可在 Actions 页手动触发（`workflow_dispatch`）。
+
+⚠ 该模板面向「一个仓库放多个插件包」的 workspace：它调用仓库根的聚合
+脚本 `pnpm run pack` / `pnpm run verify`、上传 `dist-plugins/*`。`init`
+生成的单包仓没有这些脚本（自带的是 `snap-rail-plugin pack . --out dist …`，
+产物在 `dist/`）——照抄会因脚本缺失、签名参数解析到不存在的 `.keys/` 而
+失败。单包仓要么改写 workflow 步骤直接调 `snap-rail-plugin pack` /
+`verify`（`--sign-key` 从 secret 落到临时文件），要么在仓库根补齐等价的
+聚合脚本。
 
 ## 组合包（combo，可选）
 

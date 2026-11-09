@@ -10,10 +10,13 @@
 - 渲染面运行时能 `require` 的外部模块 = **种子表**：base 种子 ∪ 其他插件
   贡献的种子（`client.seeds`）∪ 消费方 manifest `client.externalSeeds`
   声明的贡献 id。
-- **base 种子由 shell 自动播种，不能写 `externalSeeds`**：connection、
-  protocol、util、shell/contract、equipment/contract、react、react-dom、zod，
-  以及 `@snap-rail/ui` 的 components / contract / slots / skins / settings /
-  runtime / pages / fallback / charts。写了启用预检会报“提供方未安装”。
+- **base 种子由 shell 自动播种，不能写 `externalSeeds`**：cordis、
+  connection、protocol、util、shell/contract、equipment/contract、react、
+  react-dom、zod，以及 `@snap-rail/ui` 的 components / contract / slots /
+  skins / settings / runtime / pages / fallback / charts（完整清单见
+  faces-and-wire.md 第 4 节）。写了启用预检会报“提供方未安装”。
+  `@snap-rail/ui/settings-pages` 是底座内置设置页专用、**不是种子**——插件
+  不要 import（会把内置设置页整段内联进 bundle）。
 - **只有其他插件贡献的种子才写 `externalSeeds`**：`<包>/<子路径>`。只
   type-only 导入的贡献种子不产生运行时 require，不用写。
 - **import 语句写法**：只准 named/star——
@@ -31,12 +34,14 @@
 ## 语义原语（只组合，不手搓）
 
 页面组件只组合 `@snap-rail/ui/components` 的内置原语（`@snap-rail/ui`
-0.2.x 实际导出，按文件分组；0.2 新增的浮层/注意力原语/RHF 复合件需终端
-≥ v0.6.0，见 SKILL.md 时代分界）：
+0.3.x 实际导出，按文件分组。版本对照：0.2 新增的浮层/注意力原语/RHF 复合
+件对应终端 v0.6.x，0.3 新增的 Combobox/浮层焦点策略对应终端 ≥ v0.7.0——
+caret 兼容线门禁下，ui 0.2 构建的 zip 装不进 v0.7.0+ 终端，见 SKILL.md
+时代分界）：
 
 | 组 | 导出 |
 | --- | --- |
-| 按钮 | `Button`（`intent`: neutral/primary/danger/success/warning；`emphasis`: solid/soft/outline/ghost/link；`size`: sm/md/lg）、`IconButton`、`Spinner` |
+| 按钮 | `Button`（`intent`: neutral/primary/danger/success/warning；`emphasis`: solid/soft/outline/ghost/link；`size`: sm/md/lg；`icon`/`iconPosition`: start/end、`loading`、`asChild` 把按钮行为合到子元素）、`IconButton`（`label` 必填供无障碍、`active` 高亮态）、`Spinner` |
 | 控件 | `Label`、`Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`、`Switch`（`labelPosition`/`description`）、`Checkbox`（同）、`RadioGroup`（`label`/`description`）/`RadioGroupItem`、`TouchSelect`、`Combobox`（输入框 + 锚定候选列表：`options` 本地按标签过滤，或 `onInputValueChange` 驱动异步搜索；`loading`/`emptyText`；焦点全程留在输入框，↑↓/Enter/Esc 键盘可用）、`Select`（`options` 数据驱动**或** `SelectItem` children 组合；`defaultValue`/`name`/`required`/`side`/`align`）与 `SelectTrigger`/`SelectValue`/`SelectContent`/`SelectItem`/`SelectGroup`/`SelectLabel` |
 | 输入 | `Input`、`Textarea`、`NumberInput`（触屏 `＋/－` 步进钮，尊重 `min/max`）；三者均支持 `fieldClassName` 直达原生元素 |
 | 表单 | `Form`（`orientation`: stack/inline/grid + `columns`；可选 `form`/`onValid` 接 React Hook Form）、`Field`（`orientation`: vertical/horizontal、`labelWidth`、`labelAlign`）、RHF 复合件 `FormField`/`FormItem`/`FormLabel`/`FormControl`/`FormDescription`/`FormMessage`（见下节）、`SchemaForm` |
@@ -53,7 +58,9 @@
 宿主部件藏掉、皮肤规则全部脱靶）——要给组合件挂语义，包一层自己的元素
 再打 `part()`。浮层缺省：`PopoverContent` 跟锚等宽（内容更宽仍可超出）；
 从可编辑元素（输入框/文本域）打开时焦点留在原处、关闭时回焦打开者，其他
-打开者仍把焦点移入浮层（键盘可达），`autoFocusOnOpen` 显式覆盖。锚定式
+打开者仍把焦点移入浮层（键盘可达），`autoFocusOnOpen` 显式覆盖。关闭回焦
+只发生在 Esc/程序化关闭——点击浮层外关闭时焦点随点击自然转移、不回焦。
+锚定式
 下拉直接用 `Combobox`（ui ≥ 0.3.0、终端 ≥ v0.7.0；种子版本门禁要求宿主
 ≥ 构建版本，用到它的 zip 在旧终端上安装期即被拒）。旧终端上手搓锚定下拉
 的三行自救：
@@ -102,7 +109,8 @@ idPrefix?, columns? }`，`columns` 把字段排成栅格），设备管理页用
 
 - `.meta({ title })` → 字段标签（**缺省用键名**，不会不渲染）；`.describe()`
   → 字段说明；`.default()` → 初始值；必填来自 `required`。
-- 联合分支混进非字面量（如 `z.object`）就退回 JSON 文本框。
+- 联合分支混进非字面量（如 `z.object`）就退回普通 `Input`（投影后顶层没有
+  `type`，走兜底分支）；只有裸 `z.object` / `z.array` 字段才渲染 JSON 文本框。
 
 ## React Hook Form（shadcn 形状复合件）
 
@@ -204,8 +212,9 @@ export default {
   比「注册一层高 order 的布局」更正确。
 - 私有插槽用 `custom:<publisher>.<name>` 命名，先 `ctx.ui.defineSlot` 声明
   再 contribute；跨包消费同一词汇，禁止把包名当插槽 id。
-- 槽位诊断在 `ctx.ui.diagnostics()`（unknown-slot / missing-provider /
-  declared-not-rendered 等），页面里不要自己发明全局槽。
+- 槽位诊断在 `ctx.ui.diagnostics()`（当前实际产生 unknown-slot /
+  duplicate-id；贡献渲染失败走控制台边界，不进 diagnostics），页面里不要
+  自己发明全局槽。
 
 ## UI 插件写法（页面 / 布局 / 共享组件 / 主题，+ 设置页）
 

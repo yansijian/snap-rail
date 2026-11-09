@@ -578,7 +578,7 @@ SDK 的传递依赖与 base 运行时包：不需要单独安装，也不要写�
   里的 `allowBuilds.esbuild` 改成 `true`（或跑 `pnpm approve-builds`）。
 - **`pnpm exec tsc` 报 not found**：模板不带 typescript；`pnpm add -D
   typescript` 后再 `pnpm exec tsc --noEmit`（tsdown 只转译不检查类型）。
-- **启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方未安装）`**：
+- **启用被拒：`缺少贡献面：@snap-rail/shell/contract（提供方 <包> 未安装）`**：
   把 base 种子从 `client.externalSeeds` 删掉。
 - **驱动表单没有字段**：给 zod schema 的字段加 `.meta({ title: '标签' })`，
   设置页的 SchemaForm 按 JSON Schema 投影渲染。
