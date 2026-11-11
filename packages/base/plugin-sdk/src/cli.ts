@@ -33,7 +33,7 @@ const sdkVersion = createRequire(import.meta.url)('../package.json').version as 
  * from the terminal's own seed, and the seed ABI gate compares caret lanes,
  * so the generated range must track the substrate's minor. */
 const DEFAULT_UI_PACKAGE = '@snap-rail/ui'
-const UI_PACKAGE_RANGE = '^0.3.0'
+const UI_PACKAGE_RANGE = '^0.4.0'
 
 interface UiBinding {
   name: string

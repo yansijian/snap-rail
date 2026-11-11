@@ -97,7 +97,8 @@ SKILL.md「先拆解，再选模板」一节的判定依据与协作链路。拆
 
 UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 `requires` 条目，
 模板只把它放进 devDependencies 供类型/构建，运行时由终端种子表提供。
-plugin-sdk ≥ 0.3.0 的 init 生成 `@snap-rail/ui@^0.3.0`（0.2.8 生成
+plugin-sdk ≥ 0.4.0 的 init 生成 `@snap-rail/ui@^0.4.0`（0.3.0 生成
+`^0.3.0`；0.2.8 生成
 `^0.2.0`，没有 Combobox/浮层焦点策略；更早的 SDK 生成 `^0.1.0`，连浮层/
 Alert/List/Slider/RHF 复合件都没有——手动升区间并按 SKILL.md 版本锚重装
 闭包；ui 跨次版本即跨种子兼容线，zip 必须重建）。

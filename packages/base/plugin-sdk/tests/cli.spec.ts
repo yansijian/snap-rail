@@ -87,7 +87,7 @@ describe('snap-rail-plugin init', () => {
       expect(source.snapRail.uiProfile).toBe('native')
       expect(source.snapRail.requires).toBeUndefined()
       expect(source.snapRail.client?.externalSeeds).toBeUndefined()
-      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.3.0')
+      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.4.0')
       expect(source.devDependencies.react).toBeDefined()
       // RHF must come from the seed: a private copy has its own context.
       expect(source.devDependencies['react-hook-form']).toBeUndefined()
@@ -124,7 +124,7 @@ describe('snap-rail-plugin init', () => {
       expect(source.snapRail.exclusive).toBe('skin')
       expect(source.snapRail.uiProfile).toBe('native')
       expect(source.snapRail.clientOnly).toBe(true)
-      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.3.0')
+      expect(source.devDependencies['@snap-rail/ui']).toBe('^0.4.0')
       const client = readFileSync(join(dir, 'src', 'client.tsx'), 'utf8')
       expect(client).toContain('ctx.skins.register')
       expect(client).toContain('DEFAULT_DARK.tokens')

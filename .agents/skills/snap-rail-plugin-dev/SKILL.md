@@ -297,7 +297,14 @@ UI 模板以 base 种子 `@snap-rail/ui` 为语义基座；它不是 requires �
     镜像 shadcn：浮层 Tooltip/Popover/Menu/`toast()`、Alert/List/Slider、
     Form/Field 横排栅格、RHF 复合件。目标终端 **v0.6.x**（这些终端的版本
     检查只比主版本，0.x 跨 minor 不拦截，旧终端上渲染新组件时才失败）。
-  - **r3 · ui 0.3**（当前线）：`plugin-sdk 0.3.0` / `plugin-kit 0.3.0` /
+  - **r3 · ui 0.4**（当前线）：`plugin-sdk 0.4.0` / `plugin-kit 0.3.0` /
+    `ui 0.4.0`——仍盖 r3 章；toast 队列迁 **Sonner**，Radix Toast 原语族
+    （`Toast`/`ToastTitle`/`ToastDescription`/`ToastAction`/`ToastClose`/
+    `ToastViewport`）删除，改用 `toast()`（`{ title, description?, intent?,
+    duration? }` 不变）。目标终端 **≥ v0.8.0**：0.x 次版本即 caret 边界，
+    **ui 0.3 构建的 zip 在 ≥ v0.8.0 上被拒**，新版 SDK 构建的 zip 也装不进
+    ≤ v0.7.0 旧终端——跨线按版本锚重装闭包后重建；
+  - **r3 · ui 0.3**：`plugin-sdk 0.3.0` / `plugin-kit 0.3.0` /
     `ui 0.3.0` / `shell 0.2.4`——仍盖 r3 章；新增一等 `Combobox`、浮层焦点
     策略（可编辑元素打开时不夺焦、关闭回焦）、组件身份不可被调用方 props
     覆盖。目标终端 **≥ v0.7.0**：这些终端的版本检查改为 npm caret 兼容线 +
