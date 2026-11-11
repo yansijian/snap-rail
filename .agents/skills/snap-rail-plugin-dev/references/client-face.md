@@ -46,7 +46,7 @@ caret 兼容线门禁下，ui 0.2 构建的 zip 装不进 v0.7.0+ 终端，见 S
 | 输入 | `Input`、`Textarea`、`NumberInput`（触屏 `＋/－` 步进钮，尊重 `min/max`）；三者均支持 `fieldClassName` 直达原生元素 |
 | 表单 | `Form`（`orientation`: stack/inline/grid + `columns`；可选 `form`/`onValid` 接 React Hook Form）、`Field`（`orientation`: vertical/horizontal、`labelWidth`、`labelAlign`）、RHF 复合件 `FormField`/`FormItem`/`FormLabel`/`FormControl`/`FormDescription`/`FormMessage`（见下节）、`SchemaForm` |
 | 对话 | `Dialog`/`DialogTrigger`/`DialogClose`/`DialogContent`/`DialogHeader`/`DialogTitle`/`DialogDescription`/`DialogBody`/`DialogFooter`、`Sheet`（`presentation`: modal/sheet/fullscreen） |
-| 浮层 | `Tooltip`/`TooltipTrigger`/`TooltipContent`、`Popover`/`PopoverTrigger`/`PopoverContent`/`PopoverClose`/`PopoverAnchor`、`Menu`/`MenuTrigger`/`MenuContent`/`MenuItem`/`MenuCheckboxItem`/`MenuLabel`/`MenuGroup`/`MenuSeparator`、`toast()`/`dismissToast()` + `Toaster`（runtime 已挂，直接调 `toast({ title, description?, intent?, duration? })`）与 `Toast` 原语族 |
+| 浮层 | `Tooltip`/`TooltipTrigger`/`TooltipContent`、`Popover`/`PopoverTrigger`/`PopoverContent`/`PopoverClose`/`PopoverAnchor`、`Menu`/`MenuTrigger`/`MenuContent`/`MenuItem`/`MenuCheckboxItem`/`MenuLabel`/`MenuGroup`/`MenuSeparator`、`toast()`/`dismissToast()`（runtime 已挂 `Toaster`，直接调 `toast({ title, description?, intent?, duration? })`；队列跑在 Sonner 上，成功/警告/失败自带语义图标与透明底色，没有可组合的 Toast 原语） |
 | 反馈 | `Badge`、`Led`、`Progress`、`EmptyState` |
 | 注意力 | `Alert`/`AlertTitle`/`AlertDescription`（`intent` 语义色）、`Separator`、`Skeleton`（block/text/circle）、`List`/`ListItem`（`leading`/`trailing` 槽、`divided`/`selected`/`disabled`）、`Slider`（触屏粗调） |
 | 容器 | `Card`/`CardHeader`/`CardTitle`/`CardDescription`/`CardContent`/`CardFooter`、`Panel`、`Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`/`TableEmpty` |

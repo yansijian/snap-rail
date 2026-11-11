@@ -538,45 +538,75 @@
     font-size: var(--snap-text-xs);
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.root'] {
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toaster] {
+    z-index: var(--snap-z-toast);
+    --border-radius: var(--snap-radius-md);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast] {
     min-width: 280px;
-    max-width: 360px;
+    max-width: 380px;
     border: var(--snap-border-width) solid var(--snap-color-border);
     border-radius: var(--snap-radius-md);
     background: var(--snap-color-surface-raised);
-    padding: var(--snap-space-md);
+    color: var(--snap-color-text);
     box-shadow: var(--snap-shadow-lg);
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.root'][data-intent='danger'] {
-    border-color: var(--snap-color-danger);
+  /* intent reads through a translucent tint and the icon colour; the frame
+   * stays neutral */
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast][data-type='success'] {
+    background: color-mix(in srgb, var(--snap-color-success) 10%, var(--snap-color-surface-raised));
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.root'][data-intent='success'] {
-    border-color: var(--snap-color-success);
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast][data-type='warning'] {
+    background: color-mix(in srgb, var(--snap-color-warning) 10%, var(--snap-color-surface-raised));
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.root'][data-intent='warning'] {
-    border-color: var(--snap-color-warning);
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast][data-type='error'] {
+    background: color-mix(in srgb, var(--snap-color-danger) 10%, var(--snap-color-surface-raised));
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.title'] {
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast].snap-intent-primary {
+    background: color-mix(in srgb, var(--snap-color-primary) 8%, var(--snap-color-surface-raised));
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast] [data-icon] {
+    color: var(--snap-color-muted);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast][data-type='success'] [data-icon] {
+    color: var(--snap-color-success);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast][data-type='warning'] [data-icon] {
+    color: var(--snap-color-warning);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast][data-type='error'] [data-icon] {
+    color: var(--snap-color-danger);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast].snap-intent-primary [data-icon] {
+    color: var(--snap-color-primary);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast] [data-title] {
     font-weight: var(--snap-weight-medium);
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.description'] {
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast] [data-description] {
     color: var(--snap-color-muted);
-    font-size: var(--snap-text-sm);
+    opacity: 1;
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='toast.close'] {
-    position: absolute;
-    top: var(--snap-space-sm);
-    right: var(--snap-space-sm);
-    border: 0;
-    background: transparent;
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast] [data-close-button] {
     color: var(--snap-color-muted);
-    cursor: pointer;
+    border-radius: var(--snap-radius-full);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-sonner-toast] [data-close-button]:hover {
+    background: color-mix(in srgb, var(--snap-color-muted) 18%, transparent);
   }
 
   /* Alerts / separator / skeleton / list / slider ---------------------- */

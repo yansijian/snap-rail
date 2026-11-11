@@ -485,23 +485,41 @@
     background: var(--snap-color-border);
   }
 
-  [data-snap-part='toast.viewport'] {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    z-index: var(--snap-z-modal);
-    display: flex;
-    flex-direction: column;
-    gap: var(--snap-space-sm);
-    margin: 0;
+  /* Toast (Sonner hosts the queue; these fit it to the semantic scale).
+   * The stylesheet ships with the app boot, so the structural rules here are
+   * written to out-last its defaults by loading order and specificity. */
+  [data-sonner-toast] {
     padding: var(--snap-space-md);
-    list-style: none;
+    gap: var(--snap-space-sm);
+    font-size: var(--snap-text-sm);
   }
 
-  [data-snap-part='toast.root'] {
-    display: flex;
-    flex-direction: column;
-    gap: var(--snap-space-xs);
+  [data-sonner-toast] [data-icon] {
+    width: 1.15em;
+    height: 1.15em;
+  }
+
+  [data-sonner-toast] [data-icon] svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  [data-sonner-toast] [data-content] {
+    /* keep clear of the absolutely-positioned close button */
+    padding-right: var(--snap-space-lg);
+  }
+
+  [data-sonner-toast] [data-close-button] {
+    /* always reachable on touch: pinned top-right, visible without hover */
+    top: 0;
+    right: 0;
+    left: auto;
+    opacity: 1;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    background: transparent;
   }
 
   [data-snap-part='alert.root'] {

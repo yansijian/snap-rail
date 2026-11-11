@@ -117,7 +117,7 @@ zip 里残留的字段在 manifest 校验时被剥离，宿主永不再读它们
   可搜索/异步候选用 `Combobox`，滚动容器用 `DragScroll`（指针拖拽平移）。
   第三方图表包在 `ChartFrame`/`Visualization` 内，用 `useChartTheme()` 取色。
 - **组件面镜像 shadcn（`@snap-rail/ui` 0.2，终端 v0.6.0 起）**：浮层
-  `Tooltip`/`Popover`/`Menu` 与 `toast()`（runtime 已挂 Provider 与
+  `Tooltip`/`Popover`/`Menu` 与 `toast()`（runtime 已挂
   Toaster，插件直接用）；`Alert`/`Separator`/`Skeleton`/`List`/`Slider`；
   `Form` 的 stack/inline/grid 布局与 `Field` 横排（`orientation`/
   `labelWidth`/`labelAlign`）；`Select` 的 `options` 快捷形态与

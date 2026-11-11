@@ -197,18 +197,45 @@ describe('overlay components', () => {
       root.render(<Toaster />)
     })
 
-    let id = 0
+    // sonner applies queue changes on a macrotask (and dismissals on a
+    // rAF) to escape React batching — flush both before asserting. The
+    // final unmount rides sonner's own 200ms exit timer, which happy-dom
+    // does not run to completion; the exit state is the wrapper's contract.
+    const flushQueue = async (): Promise<void> => {
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 0))
+        await new Promise(resolve => requestAnimationFrame(() => resolve(null)))
+      })
+    }
+
+    let id = ''
     await act(async () => {
       id = toast({ title: '保存成功', description: '配置已写入设备', intent: 'success' })
     })
-    expect(container.innerHTML).toContain('data-snap-part="toast.root"')
-    expect(container.innerHTML).toContain('data-snap-part="toast.viewport"')
+    await flushQueue()
+    expect(container.innerHTML).toContain('data-sonner-toast')
+    expect(container.innerHTML).toContain('data-type="success"')
+    expect(container.innerHTML).toContain('snap-intent-success')
     expect(container.innerHTML).toContain('保存成功')
-    expect(container.innerHTML).toContain('data-intent="success"')
+    expect(container.innerHTML).toContain('配置已写入设备')
+    expect(container.innerHTML).toContain('<svg')
+
+    let failure = ''
+    await act(async () => {
+      failure = toast({ title: '退回失败', intent: 'danger' })
+    })
+    await flushQueue()
+    expect(container.innerHTML).toContain('data-type="error"')
+    expect(container.innerHTML).toContain('snap-intent-danger')
+    expect(container.innerHTML).toContain('退回失败')
 
     await act(async () => {
-      dismissToast(id)
+      dismissToast(Number(id) || id)
+      dismissToast(Number(failure) || failure)
     })
-    expect(container.innerHTML).not.toContain('保存成功')
+    await flushQueue()
+    for (const toastRoot of container.querySelectorAll('[data-sonner-toast]')) {
+      expect(toastRoot.getAttribute('data-removed')).toBe('true')
+    }
   })
 })

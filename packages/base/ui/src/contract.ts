@@ -282,10 +282,6 @@ export const UI_COMPONENTS = {
     parts: ['menu.trigger', 'menu.content', 'menu.item', 'menu.checkbox-item', 'menu.item-indicator', 'menu.separator'],
     slots: ['trigger', 'content'],
   },
-  toast: {
-    parts: ['toast.root', 'toast.title', 'toast.description', 'toast.action', 'toast.close', 'toast.viewport'],
-    slots: ['action'],
-  },
   progress: {
     parts: ['progress.root', 'progress.track', 'progress.indicator'],
   },

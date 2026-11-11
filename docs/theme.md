@@ -71,12 +71,15 @@ step-down` 步进钮），固定选项单选用 `TouchSelect`，可搜索/异步
 `@snap-rail/ui` 0.2 起组件面镜像 shadcn，主题要覆盖的 part 随之增加
 （全表见 `UI_COMPONENTS`）：
 
-- **语义色走 `data-intent`**：`button.root`、`badge.root`、`alert.root`、
-  `toast.root` 都带 `data-intent`（`neutral`/`primary`/`danger`/`success`/
-  `warning`），主题按属性选择器映射到 `--snap-color-*`，不自造类名。
+- **语义色走 `data-intent`**：`button.root`、`badge.root`、`alert.root` 都带
+  `data-intent`（`neutral`/`primary`/`danger`/`success`/`warning`），主题按
+  属性选择器映射到 `--snap-color-*`，不自造类名。
 - **浮层**：`tooltip.content`、`popover.content`、`menu.content`/`menu.item`
-  （高亮态 `[data-highlighted]`）、`toast.viewport`/`toast.root`；层级只用
-  `--snap-z-overlay`（提示/弹出/菜单）与 `--snap-z-modal`（对话框/通知），
+  （高亮态 `[data-highlighted]`）；toast 队列跑在 Sonner 上（`data-sonner-toast`
+  等 data 属性，`success`/`warning`/`error` 类型加 `data-type`，
+  `neutral`/`primary` 加 `snap-intent-*` 类）——intent 由图标着色、根吃同色
+  透明 tint，框线保持中性色，层级走 `--snap-z-toast`。层级只用
+  `--snap-z-overlay`（提示/弹出/菜单）与 `--snap-z-modal`（对话框），
   不写裸 z-index。浮层经 portal 挂在 `<body>` 下，`data-snap-skin` 在
   `<html>` 上，`[data-snap-skin='<id>'] …` 作用域照常命中。
 - **注意力原语**：`alert.root/title/description`、`separator.root`

@@ -490,7 +490,7 @@ equipment 是设备连接底座（原 field，已全链改名含 wire 与数据�
    主题经 `ctx.skins.register`。错误文案 `rpcErrorText`；时间
    `formatClock`/`formatDuration`；色值用 `useSkinTokens()`。组件面镜像
    shadcn（ui 0.2 / 终端 v0.6.0 起）：浮层 Tooltip/Popover/Menu/`toast()`
-   由 runtime 在每个 surface 根挂好 Provider 与 Toaster；校验表单用 React
+   由 runtime 在每个 surface 根挂好 Toaster（toast 队列跑在 Sonner 上）；校验表单用 React
    Hook Form 复合件，hooks 只从组件面取（RHF context 是模块级的，种子单
    实例才共享表单状态）。ui 0.3（终端 v0.7.0 起）：组件身份在调用方 props
    之后写入、不可覆盖（组合件给包装元素打 `part()`）；`PopoverContent`

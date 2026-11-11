@@ -1,7 +1,8 @@
 /**
- * Overlay semantics over Radix: tooltips, popovers, dropdown menus, and
- * toasts. Behaviour/keyboard/focus handling stays here; skins target the
- * stable parts (`tooltip.*`, `popover.*`, `menu.*`, `toast.*`) and state
+ * Overlay semantics over Radix: tooltips, popovers, and dropdown menus; the
+ * toast queue runs on Sonner (the Radix toast primitive is deprecated
+ * upstream). Behaviour/keyboard/focus handling stays here; skins target the
+ * stable parts (`tooltip.*`, `popover.*`, `menu.*`) and Sonner's toast data
  * attributes. The imperative toast() helper pairs with the <Toaster/> the
  * runtime mounts in every surface root.
  *
@@ -10,11 +11,10 @@
 
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
-import * as ToastPrimitive from '@radix-ui/react-toast'
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
+import { Toaster as SonnerToaster, toast as sonnerToast } from 'sonner'
 import {
   useRef,
-  useSyncExternalStore,
   type ComponentPropsWithoutRef,
   type ReactNode,
 } from 'react'
@@ -250,97 +250,80 @@ export interface ToastEntry {
   duration?: number
 }
 
-/** The module-level toast store: {@link toast} publishes from anywhere (event
- * handlers included — no render context needed) and every mounted
- * {@link Toaster} renders the queue. */
-interface ToastRecord extends ToastEntry {
-  id: number
+/** Stroke glyphs per intent (lucide-style 24-box, `currentColor`); the skin
+ * colours them through the toast's `[data-icon]`. */
+const TOAST_INTENT_PATHS: Record<NonNullable<ToastEntry['intent']>, ReactNode> = {
+  neutral: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </>
+  ),
+  primary: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </>
+  ),
+  success: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 4-4" />
+    </>
+  ),
+  warning: (
+    <>
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </>
+  ),
+  danger: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m15 9-6 6" />
+      <path d="m9 9 6 6" />
+    </>
+  ),
 }
 
-let toastNextId = 1
-let toastRecords: readonly ToastRecord[] = []
-const toastListeners = new Set<() => void>()
-
-function toastEmit(): void {
-  for (const listener of toastListeners) listener()
+function toastIcon(intent: NonNullable<ToastEntry['intent']>): ReactNode {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {TOAST_INTENT_PATHS[intent]}
+    </svg>
+  )
 }
 
-function toastDismiss(id: number): void {
-  toastRecords = toastRecords.filter(record => record.id !== id)
-  toastEmit()
-}
-
-/** Enqueue a toast on the runtime-mounted {@link Toaster}s. */
+/** Enqueue a toast on the runtime-mounted {@link Toaster}s. Backed by Sonner
+ * (the Radix toast primitive is deprecated upstream): `success`/`warning`/
+ * `danger` map to the typed emitters, `neutral`/`primary` ride the plain one,
+ * and every toast carries an `snap-intent-*` class the skins target. */
 export function toast(entry: ToastEntry): number {
-  const id = toastNextId++
-  toastRecords = [...toastRecords, { ...entry, id }]
-  toastEmit()
-  return id
+  const intent = entry.intent ?? 'neutral'
+  const options = {
+    description: entry.description,
+    icon: toastIcon(intent),
+    duration: entry.duration === 0 ? Number.POSITIVE_INFINITY : (entry.duration ?? 5000),
+    className: `snap-intent-${intent}`,
+  }
+  switch (intent) {
+    case 'success': return sonnerToast.success(entry.title, options) as number
+    case 'warning': return sonnerToast.warning(entry.title, options) as number
+    case 'danger': return sonnerToast.error(entry.title, options) as number
+    default: return sonnerToast(entry.title, options) as number
+  }
 }
 
 /** Dismiss a queued toast by id. */
 export function dismissToast(id: number): void {
-  toastDismiss(id)
+  sonnerToast.dismiss(id)
 }
 
 /** The runtime-mounted viewport: renders the shared toast queue. Pages never
  * mount this themselves — the runtime provides one per surface root. */
-export function Toaster(props: Omit<ComponentPropsWithoutRef<typeof ToastPrimitive.Provider>, 'duration'>): ReactNode {
-  const records = useSyncExternalStore(
-    (onStoreChange) => {
-      toastListeners.add(onStoreChange)
-      return () => toastListeners.delete(onStoreChange)
-    },
-    () => toastRecords,
-    () => toastRecords,
-  )
-  return (
-    <ToastPrimitive.Provider {...props}>
-      {records.map(record => (
-        <ToastPrimitive.Root
-          key={record.id}
-          {...part('toast', 'root')}
-          className="snap-toast"
-          data-intent={record.intent ?? 'neutral'}
-          duration={record.duration ?? 5000}
-          onOpenChange={(open) => {
-            if (!open) toastDismiss(record.id)
-          }}
-        >
-          <ToastTitle>{record.title}</ToastTitle>
-          {record.description !== undefined && <ToastDescription>{record.description}</ToastDescription>}
-          <ToastClose aria-label="关闭" />
-        </ToastPrimitive.Root>
-      ))}
-      <ToastViewport />
-    </ToastPrimitive.Provider>
-  )
-}
-
-/** The raw toast root for pages that manage their own open state. */
-export const Toast = ToastPrimitive.Root
-
-/** A toast title with its part tag. */
-export function ToastTitle({ className, children, ...props }: ComponentPropsWithoutRef<typeof ToastPrimitive.Title>): ReactNode {
-  return <ToastPrimitive.Title className={cn('snap-toast-title', className)} {...props} {...part('toast', 'title')}>{children}</ToastPrimitive.Title>
-}
-
-/** A toast description with its part tag. */
-export function ToastDescription({ className, children, ...props }: ComponentPropsWithoutRef<typeof ToastPrimitive.Description>): ReactNode {
-  return <ToastPrimitive.Description className={cn('snap-toast-description', className)} {...props} {...part('toast', 'description')}>{children}</ToastPrimitive.Description>
-}
-
-/** An interactive toast action (confirm/retry affordances). */
-export function ToastAction({ className, children, ...props }: ComponentPropsWithoutRef<typeof ToastPrimitive.Action>): ReactNode {
-  return <ToastPrimitive.Action className={cn('snap-toast-action', className)} {...props} {...part('toast', 'action')}>{children}</ToastPrimitive.Action>
-}
-
-/** A toast dismissal button. */
-export function ToastClose({ className, children, ...props }: ComponentPropsWithoutRef<typeof ToastPrimitive.Close>): ReactNode {
-  return <ToastPrimitive.Close className={cn('snap-toast-close', className)} {...props} {...part('toast', 'close')}>{children ?? <span aria-hidden="true">×</span>}</ToastPrimitive.Close>
-}
-
-/** The toast viewport; only the runtime's {@link Toaster} mounts one. */
-export function ToastViewport({ className, ...props }: ComponentPropsWithoutRef<typeof ToastPrimitive.Viewport>): ReactNode {
-  return <ToastPrimitive.Viewport className={cn('snap-toast-viewport', className)} {...props} {...part('toast', 'viewport')} />
+export function Toaster(): ReactNode {
+  return <SonnerToaster position="bottom-right" closeButton />
 }
