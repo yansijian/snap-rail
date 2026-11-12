@@ -8,7 +8,7 @@
  */
 
 import { Context, type Plugin } from '@snap-rail/cordis'
-import { Component, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Component, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import {
   Button,
   Dialog,
@@ -120,6 +120,37 @@ export function SettingsEntry(props: {
   return <IconButton icon={<GearIcon />} label="设置" active={props.isOpen} onClick={props.open} />
 }
 
+/** The settings footer: the running app's version plus the copyright line,
+ * pinned below the page area of every settings page. The version rides the
+ * existing `update.state` snapshot (`app.getVersion()`, populated in dev
+ * too); hosts without the update bridge — or bare contexts without client
+ * services — simply get no footer instead of an error. */
+function SettingsFooter({ ctx }: { ctx: Context }): ReactNode {
+  const [version, setVersion] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    let link: Context['client']['link']
+    try {
+      link = ctx.client.link
+    } catch {
+      return
+    }
+    let cancelled = false
+    void link.call('update.state', {}).then(result => {
+      if (!cancelled && result.ok) setVersion(result.value.status.currentVersion)
+    }).catch(() => undefined)
+    return () => { cancelled = true }
+  }, [ctx])
+
+  if (version === undefined) return null
+  return (
+    <footer {...part('settings', 'footer')} className="snap-settings-footer">
+      <span>snap-rail v{version}</span>
+      <span>© {new Date().getFullYear()} snap-rail · Apache-2.0</span>
+    </footer>
+  )
+}
+
 /** The default settings surface. */
 export function SettingsSurface(props: { service: SettingsService, ctx: Context }): ReactNode {
   const { service, ctx } = props
@@ -173,9 +204,12 @@ export function SettingsSurface(props: { service: SettingsService, ctx: Context 
                 ))}
               </nav>
               <main {...part('settings', 'content')} className="snap-settings-content" data-active-page={activeId}>
-                {active === undefined
-                  ? <EmptyState title="暂无设置页" />
-                  : <SettingsPageBoundary page={active.id}>{active.render()}</SettingsPageBoundary>}
+                <div {...part('settings', 'page')} className="snap-settings-page">
+                  {active === undefined
+                    ? <EmptyState title="暂无设置页" />
+                    : <SettingsPageBoundary page={active.id}>{active.render()}</SettingsPageBoundary>}
+                </div>
+                <SettingsFooter ctx={ctx} />
               </main>
             </div>
           </div>

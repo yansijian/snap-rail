@@ -940,11 +940,18 @@
     box-shadow: inset 3px 0 0 var(--snap-color-primary);
   }
 
-  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='settings.content'] {
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='settings.page'] {
     padding: var(--snap-space-lg);
     /* Deep bottom padding: the scrolled pane's last control must clear the
      * window edge instead of hanging sliced across it. */
     padding-bottom: var(--snap-space-xl);
+  }
+
+  :is([data-snap-skin='default-light'], [data-snap-skin='default-dark']) [data-snap-part='settings.footer'] {
+    padding: var(--snap-space-sm) var(--snap-space-lg);
+    border-top: var(--snap-border-width) solid var(--snap-color-border);
+    color: var(--snap-color-muted);
+    font-size: var(--snap-text-xs);
   }
 
   @keyframes snap-spin {

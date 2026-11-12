@@ -1,7 +1,7 @@
 {
   "name": "@snap-rail/ui",
   "description": "The built-in UI substrate: semantic components, typed region slots, skins, settings and renderer runtime",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

@@ -337,9 +337,26 @@
   }
 
   [data-snap-part='settings.content'] {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  [data-snap-part='settings.page'] {
+    flex: 1;
+    min-height: 0;
     overflow: auto;
+  }
+
+  [data-snap-part='settings.footer'] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--snap-space-sm);
+    flex-shrink: 0;
   }
 
   [data-snap-part='settings.nav-item'] {

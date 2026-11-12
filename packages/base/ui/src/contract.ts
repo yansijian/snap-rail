@@ -375,6 +375,8 @@ export const UI_COMPONENTS = {
       'settings.group',
       'settings.group-title',
       'settings.content',
+      'settings.page',
+      'settings.footer',
     ],
   },
 } as const satisfies Record<string, UiComponentSpec>

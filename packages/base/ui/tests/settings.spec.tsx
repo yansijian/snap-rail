@@ -32,6 +32,22 @@ function page(ctx: Context, id: string, order: number, group = '系统'): void {
   ctx.settings.registerPage(ctx, { id, title: id, group, order, render: () => id })
 }
 
+/** Render the default surface and open it, letting microtasks settle. */
+async function mountSurface(ctx: Context): Promise<void> {
+  const element = document.createElement('div')
+  document.body.append(element)
+  const root = createRoot(element)
+  roots.push(root)
+  await act(async () => {
+    root.render(<SettingsSurface service={ctx.settings} ctx={ctx} />)
+    await new Promise(resolve => setTimeout(resolve, 0))
+  })
+  await act(async () => {
+    ctx.settings.open()
+    await new Promise(resolve => setTimeout(resolve, 0))
+  })
+}
+
 describe('ctx.settings', () => {
   it('registers pages in order and exposes the first page when opened', async () => {
     const ctx = await makeSettings()
@@ -98,20 +114,36 @@ describe('ctx.settings', () => {
       call: async () => ({ ok: false, error: { code: 'internal', details: { what: 'stub' } } }),
     } as unknown as HostLink
     ctx.provide('client', { link, surface: 'main' })
-    const element = document.createElement('div')
-    document.body.append(element)
-    const root = createRoot(element)
-    roots.push(root)
-    await act(async () => {
-      root.render(<SettingsSurface service={ctx.settings} ctx={ctx} />)
-      await new Promise(resolve => setTimeout(resolve, 0))
-    })
-    await act(async () => {
-      ctx.settings.open()
-      await new Promise(resolve => setTimeout(resolve, 0))
-    })
+    await mountSurface(ctx)
     expect(document.querySelector('button[aria-label="关闭"]')).not.toBeNull()
     expect(document.querySelector('button[aria-label="配置插件源"]')).not.toBeNull()
     expect(document.body.textContent).not.toContain('关闭')
+  })
+
+  it('pins a version/copyright footer under the scrollable page area', async () => {
+    const ctx = await makeSettings()
+    const link: HostLink = {
+      call: async (method: string) => method === 'update.state'
+        ? { ok: true, value: { status: { phase: 'idle', currentVersion: '9.9.9' } } }
+        : { ok: false, error: { code: 'internal', details: { what: method } } },
+    } as unknown as HostLink
+    ctx.provide('client', { link, surface: 'main' })
+    await mountSurface(ctx)
+    expect(document.querySelector('[data-snap-part="settings.page"]')).not.toBeNull()
+    const footer = document.querySelector('[data-snap-part="settings.footer"]')
+    expect(footer).not.toBeNull()
+    expect(footer?.textContent).toContain('snap-rail v9.9.9')
+    expect(footer?.textContent).toContain('©')
+    expect(footer?.textContent).toContain('Apache-2.0')
+  })
+
+  it('hides the footer when the update bridge answers with an error', async () => {
+    const ctx = await makeSettings()
+    const link: HostLink = {
+      call: async () => ({ ok: false, error: { code: 'internal', details: { what: 'stub' } } }),
+    } as unknown as HostLink
+    ctx.provide('client', { link, surface: 'main' })
+    await mountSurface(ctx)
+    expect(document.querySelector('[data-snap-part="settings.footer"]')).toBeNull()
   })
 })
