@@ -51,7 +51,7 @@ zip 装不进 v0.8.0+ 终端，见 SKILL.md 时代分界）：
 | 反馈 | `Badge`、`Led`、`Progress`、`EmptyState` |
 | 注意力 | `Alert`/`AlertTitle`/`AlertDescription`（`intent` 语义色）、`Separator`、`Skeleton`（block/text/circle）、`List`/`ListItem`（`leading`/`trailing` 槽、`divided`/`selected`/`disabled`）、`Slider`（触屏粗调） |
 | 容器 | `Card`/`CardHeader`/`CardTitle`/`CardDescription`/`CardContent`/`CardFooter`、`Panel`、`Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell`/`TableEmpty` |
-| 布局 | `Stack`、`Row`、`Grid`、`Split`、`AppShell`、`Page`、`Section`、`Toolbar`（children 渲染于 start/end 之间）、`ScrollArea`（主题化滚动条，`scrollbarType`: hover/scroll/always）、`DragScroll`（指针拖拽平移，触屏走原生滚动） |
+| 布局 | `Stack`、`Row`、`Grid`、`Split`、`AppShell`、`Page`、`Section`、`Toolbar`（children 渲染于 start/end 之间）、`ScrollArea`（主题化滚动条，`scrollbarType`: hover/scroll/always）、`DragScroll`（指针拖拽平移，触屏走原生滚动）、`attachDragPan`（自建滚动容器复用同一套拖拽平移） |
 | 解剖助手 | `part`/`cn`/`space`/`controlHeight`——ui-extension 自定义组件用 `part('my-widget', 'root')` 对齐 `data-snap-part`，皮肤才能覆盖 |
 
 组件身份不可覆盖：`data-snap-component`/`data-snap-part` 由基座组件在
@@ -276,7 +276,7 @@ ctx.settings.registerPage(ctx, {
 
 ```tsx
 import { AppShell, Slot } from '@snap-rail/ui'
-import { UI_SLOT_IDS } from '@snap-rail/ui/contract'
+import { UI_SLOT_IDS, WINDOW_CONTROLS } from '@snap-rail/ui/contract'
 import type { Plugin } from '@snap-rail/cordis'
 
 export default {
@@ -286,17 +286,34 @@ export default {
     ctx.ui.registerLayout(ctx, {
       id: '@my-scope/my-layout',
       order: 0,
-      provides: [UI_SLOT_IDS.titlebar, UI_SLOT_IDS.sidebar, UI_SLOT_IDS.settingsEntry, UI_SLOT_IDS.statusbar],
+      provides: [
+        UI_SLOT_IDS.titlebar,
+        UI_SLOT_IDS.titlebarActions,
+        UI_SLOT_IDS.sidebar,
+        UI_SLOT_IDS.settingsEntry,
+        UI_SLOT_IDS.statusbar,
+      ],
       window: { width: 1440, height: 900, minWidth: 1024, minHeight: 600 },
       ball: { size: 128, enabled: true, dockable: true, collapse: true },
-      render: () => <AppShell header={<Slot name={UI_SLOT_IDS.titlebar} />} sidebar={<Slot name={UI_SLOT_IDS.sidebar} />} />,
+      render: () => (
+        <AppShell
+          header={<><Slot name={UI_SLOT_IDS.titlebar} /><Slot name={UI_SLOT_IDS.titlebarActions} context={{ surface: 'main', controls: WINDOW_CONTROLS }} /></>}
+          sidebar={<Slot name={UI_SLOT_IDS.sidebar} context={{ surface: 'main' }} />}
+          footer={<Slot name={UI_SLOT_IDS.statusbar} context={{ surface: 'main' }} />}
+        />
+      ),
     })
   },
 } satisfies Plugin
 ```
 
-- `provides` 必须列全布局实际渲染的槽；未列出的槽视为未提供，runtime 会
-  用 fallback/诊断补位（`Slot` 对未声明的槽渲染 `null`）。
+- `provides` 必须列全布局**实际挂载**的槽；未列出的槽视为未提供（`Slot` 对它
+  渲染 `null`）。反过来更危险：声明了却没渲染，别人的贡献会**静默消失**——
+  基座回退布局已渲染 `titlebar`、`titlebarActions`、`sidebar`、`statusbar`、
+  `settingsEntry`（后两者仅在有人贡献时占位）。
+- 只想在标题栏加动作按钮就别接管整条：往 `shell.titlebar.actions` 贡献即可
+  （context `{ surface, controls }`，`controls` 是 `WindowControl[]`）；整条接管
+  用 `shell.titlebar`，占用者自己画窗口按钮并调 `window.control`。
 - **布局选举**：`precedence` 降序 → `order` 升序 → 后注册胜。内置回退布局
   是 `precedence: 0, order: 200`，所以插件布局 `order < 200` 或
   `precedence ≥ 1` 都能接管；`LayoutContribution` 字段 = `id` / `order` /
@@ -408,10 +425,20 @@ clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),  /
    径向渐变把阴影画进 8px 余量并衰减到零。
 2. **贴边态读 `shell.ball.dock` + 订阅 `shell/ball-dock-changed`**：载荷
    `{ edge: 'left' | 'right' | 'top' | 'bottom' | null, collapsed: boolean,
-   visiblePx: number }`。球贴边停泊后指针离开 `hoverDelayMs` 即收起（四边
-   一律；留在屏内的像素 = `visiblePx`，默认 size × 1/3 ≈ 43），悬停滑出；
-   停泊先发一次 `collapsed: false`，收起再发 `collapsed: true`。面在
-   `collapsed` 时按 `edge` 画收起形态。
+   revealing: boolean, hovered: boolean, visiblePx: number,
+   visibleOrbPx: number, orbRatio: number }`。
+   - `1/3` 是**窗口**边的比例（默认 43px），8px 余量在窗内，所以外露球冠是
+     `visibleOrbPx`（默认 35px ≈ 球径 31%）。要画球冠就按 `orbRatio`，别拿
+     1/3 当球体比例；换算单源 `resolveBallDockGeometry(profile)`。
+   - `revealing: true` = 滑动动画还在跑（收起或滑出）。**内容形态要等到它变
+     false 再切**，否则滑出过程中全量内容会被窗口边缘裁成半截。什么时候画
+     收起形态用单源 `ballLookFor(dock)`：收起或滑动中 → `'tab'`，稳定外露 →
+     `'orb'`。
+   - `hovered` 是宿主替你观测的指针（收起时点在可见条上）——离屏部分面拿不到
+     指针事件；完整可见时用 DOM 指针事件即可。宿主只在停泊且开启 `collapse`
+     时观测，其他情况恒 `false`。
+   - 停泊先发 `collapsed: false, revealing: true`，滑出到位再发
+     `revealing: false`；收起同理（`collapsed: true` + 两次 `revealing`）。
 3. **拖拽用 `attachBallDrag`（`import { attachBallDrag } from
    '@snap-rail/ui/runtime'`，ui ≥ 0.1.1）**：整球一个 drag/click 表面——
    按住拖过 4px 阈值（`threshold` 可调）发 `shell.ball.move` `begin`，松开发
@@ -425,13 +452,26 @@ clientBundle('@my-scope/my-suite/ball', 'src/ball.tsx', { outName: 'ball' }),  /
 
 ## 退出策略（套件的渲染面 + 宿主面配合）
 
-1. 宿主面声明一次：`ctx.shell.window.setExitPolicy(ctx, { close: 'ball',
-   quit: 'hold' })`（登记即 effect；`'hold'` 把请求挂起交回插件）。
-2. 渲染面订阅 `shell/exit-requested` 帧 → **自己画确认框**（贡献到
+1. 宿主面声明一次，**每个字段可以是一条有序链**：
+   ```ts
+   ctx.shell.window.setExitPolicy(ctx, {
+     close: ['ball', 'quit'],   // 有球就收进球，没球退出
+     quit: 'hold',              // 托盘退出先问操作员
+     priority: 50,              // 仲裁：管整机怎么退的插件用高优先级（0–100）
+   })
+   ```
+   请求到达时按序取第一个**当前可执行**的处置（`ball` 要球已启用、`tray` 要
+   托盘图标在，`quit`/`hold` 恒可执行）；链耗尽则窗口原样保留 + 告警。
+   「有悬浮球才驻留」就是 `['ball', 'quit']`——**不要**订阅
+   `shell/ball-profile-changed` 反复重声明。
+2. 想知道此刻结果：`ctx.shell.capabilities()`（`{tray, ball}`）、
+   `ctx.shell.window.planExit(source)`（逐项 `satisfiable` + `reason` + `decision`）。
+3. 渲染面订阅 `shell/exit-requested` 帧 → **自己画确认框**（贡献到
    `shell.overlay`，见「区域插槽与贡献」）；底座不画 UI。
-3. 用户选择后 `shell.exit.resolve` 应答 `'ball' | 'tray' | 'quit' |
-   'cancel'` 并撤下自己；10s 未应答按 quit 兜底。
-4. 确认框要一个活着的渲染面：宿主面收到 `source: 'tray'` 且主窗藏着时，
+4. 用户选择后 `shell.exit.resolve` 应答 `'ball' | 'tray' | 'quit' |
+   'cancel'` 并撤下自己；10s 未应答按 quit 兜底。应答执行不了时只告警留窗，
+   不会被悄悄换成别的处置。
+5. 确认框要一个活着的渲染面：宿主面收到 `source: 'tray'` 且主窗藏着时，
    先 `ctx.shell.surface.present(ctx, 'main')` 把窗口叫回来。
 
 ## 测试

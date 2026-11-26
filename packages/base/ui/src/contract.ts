@@ -67,8 +67,11 @@ export const UI_SLOT_MODES = {
   [UI_SLOT_IDS.settingsSurface]: 'one',
 } as const satisfies Record<string, SlotMode>
 
+/** The window controls a layout exposes to its chrome contributions. */
+export const WINDOW_CONTROLS = ['minimize', 'toggle-maximize', 'close'] as const
+
 /** The operator-window controls a layout exposes to chrome contributions. */
-export type WindowControl = 'minimize' | 'toggle-maximize' | 'close'
+export type WindowControl = (typeof WINDOW_CONTROLS)[number]
 
 /** The context a settings trigger receives from the layout that hosts it. */
 export interface SettingsEntryContext {
@@ -102,8 +105,8 @@ export interface SettingsSurfaceContext {
  */
 export interface SlotContextMap {
   'shell.layout': { surface: SurfaceId }
-  'shell.titlebar': { surface: SurfaceId; controls: WindowControl }
-  'shell.titlebar.actions': { surface: SurfaceId; controls: WindowControl }
+  'shell.titlebar': { surface: SurfaceId; controls: readonly WindowControl[] }
+  'shell.titlebar.actions': { surface: SurfaceId; controls: readonly WindowControl[] }
   'shell.sidebar': { surface: SurfaceId }
   'shell.statusbar': { surface: SurfaceId }
   'shell.overlay': { surface: SurfaceId }

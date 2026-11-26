@@ -10,8 +10,11 @@ import {
   SHELL_LIMITS,
   WINDOW_LIMITS,
   ballDockStateSchema,
+  ballLookFor,
   ballProfileSchema,
   ballStateSchema,
+  dockVisiblePx,
+  resolveBallDockGeometry,
   resolveBallProfile,
   resolveWindowProfile,
   shellContract,
@@ -54,6 +57,80 @@ describe('ball geometry', () => {
 
   it('documents the hold timeout as a positive cap', () => {
     expect(SHELL_LIMITS.exitHoldMs).toBeGreaterThan(0)
+  })
+})
+
+describe('ball dock geometry', () => {
+  it('expresses the tuck in window pixels and in orb pixels', () => {
+    const geometry = resolveBallDockGeometry(resolveBallProfile())
+    // The ratio is a share of the WINDOW edge: 128 / 3 ≈ 43px on screen, of
+    // which the 8px paint rim eats 8 — the orb itself only shows 35px (31%).
+    expect(geometry).toEqual({ visiblePx: 43, visibleOrbPx: 35, orbRatio: 35 / 112 })
+    expect(geometry.visiblePx).toBe(dockVisiblePx(BALL_SURFACE.size, BALL_SURFACE.dockVisibleRatio))
+  })
+
+  it('leaves no orb on screen at the technical floor', () => {
+    // size 24 is the smallest ball the 8px rim allows: the orb is 8px and the
+    // tucked sliver is pure rim, so a face has nothing of the orb to show.
+    const geometry = resolveBallDockGeometry(resolveBallProfile({ size: BALL_LIMITS.minSize }))
+    expect(geometry).toEqual({ visiblePx: 8, visibleOrbPx: 0, orbRatio: 0 })
+  })
+
+  it('scales with a large ball and a wide collapse ratio', () => {
+    const geometry = resolveBallDockGeometry(resolveBallProfile({ size: BALL_LIMITS.maxSize, collapseRatio: BALL_LIMITS.maxCollapseRatio }))
+    expect(geometry.visiblePx).toBe(96)
+    expect(geometry.visibleOrbPx).toBe(88)
+    expect(geometry.orbRatio).toBe(0.5)
+  })
+
+  it('never reports a negative or over-full orb share', () => {
+    for (const size of [24, 48, 96, 128, 192]) {
+      for (const ratio of [BALL_LIMITS.minCollapseRatio, BALL_LIMITS.defaultCollapseRatio, BALL_LIMITS.maxCollapseRatio]) {
+        const geometry = resolveBallDockGeometry(resolveBallProfile({ size, collapseRatio: ratio }))
+        expect(geometry.visibleOrbPx).toBe(Math.max(0, geometry.visiblePx - BALL_LIMITS.inset))
+        expect(geometry.orbRatio).toBeGreaterThanOrEqual(0)
+        expect(geometry.orbRatio).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+})
+
+describe('ball look', () => {
+  it('keeps the collapsed look while the slide is in flight', () => {
+    // Tucked and settled.
+    expect(ballLookFor({ edge: 'right', collapsed: true, revealing: false })).toBe('tab')
+    // Sliding in or out: the face must not paint full content yet.
+    expect(ballLookFor({ edge: 'right', collapsed: true, revealing: true })).toBe('tab')
+    expect(ballLookFor({ edge: 'right', collapsed: false, revealing: true })).toBe('tab')
+    // Settled out, and free-floating: the full orb.
+    expect(ballLookFor({ edge: 'right', collapsed: false, revealing: false })).toBe('orb')
+    expect(ballLookFor({ edge: null, collapsed: false, revealing: false })).toBe('orb')
+  })
+})
+
+describe('ball dock wire state', () => {
+  const settled = {
+    edge: 'left' as const,
+    collapsed: true,
+    revealing: false,
+    hovered: true,
+    visiblePx: 43,
+    visibleOrbPx: 35,
+    orbRatio: 35 / 112,
+  }
+
+  it('round-trips every field', () => {
+    expect(ballDockStateSchema.parse(settled)).toEqual(settled)
+    expect(ballDockStateSchema.safeParse({ ...settled, edge: null, collapsed: false }).success).toBe(true)
+  })
+
+  it('requires the slide and hover flags, and bounds the geometry', () => {
+    const { revealing: _revealing, ...withoutRevealing } = settled
+    expect(ballDockStateSchema.safeParse(withoutRevealing).success).toBe(false)
+    expect(ballDockStateSchema.safeParse({ ...settled, hovered: 'yes' }).success).toBe(false)
+    expect(ballDockStateSchema.safeParse({ ...settled, orbRatio: 1.5 }).success).toBe(false)
+    expect(ballDockStateSchema.safeParse({ ...settled, visibleOrbPx: -1 }).success).toBe(false)
+    expect(ballDockStateSchema.safeParse({ ...settled, visiblePx: 0 }).success).toBe(false)
   })
 })
 
@@ -210,12 +287,20 @@ describe('shell contract', () => {
   })
 
   it('validates dock state: a parked edge, the tucked flag, and a sane visible strip', () => {
-    expect(ballDockStateSchema.safeParse({ edge: null, collapsed: false, visiblePx: 43 }).success).toBe(true)
-    expect(ballDockStateSchema.safeParse({ edge: 'left', collapsed: true, visiblePx: 43 }).success).toBe(true)
-    expect(ballDockStateSchema.safeParse({ edge: 'top', collapsed: false, visiblePx: 43 }).success).toBe(true)
-    expect(ballDockStateSchema.safeParse({ edge: 'diagonal', collapsed: false, visiblePx: 43 }).success).toBe(false)
-    expect(ballDockStateSchema.safeParse({ edge: 'left', collapsed: true, visiblePx: BALL_SURFACE.size + 1 }).success).toBe(false)
-    expect(ballDockStateSchema.safeParse({ edge: 'left', collapsed: true, visiblePx: 0 }).success).toBe(false)
+    const state = {
+      collapsed: false,
+      revealing: false,
+      hovered: false,
+      visiblePx: 43,
+      visibleOrbPx: 35,
+      orbRatio: 35 / 112,
+    }
+    expect(ballDockStateSchema.safeParse({ ...state, edge: null }).success).toBe(true)
+    expect(ballDockStateSchema.safeParse({ ...state, edge: 'left', collapsed: true }).success).toBe(true)
+    expect(ballDockStateSchema.safeParse({ ...state, edge: 'top' }).success).toBe(true)
+    expect(ballDockStateSchema.safeParse({ ...state, edge: 'diagonal' }).success).toBe(false)
+    expect(ballDockStateSchema.safeParse({ ...state, edge: 'left', collapsed: true, visiblePx: BALL_LIMITS.maxSize + 1 }).success).toBe(false)
+    expect(ballDockStateSchema.safeParse({ ...state, edge: 'left', collapsed: true, visiblePx: 0 }).success).toBe(false)
   })
 
   it('accepts exit resolutions and request sources from the closed vocabularies', () => {

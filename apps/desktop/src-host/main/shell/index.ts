@@ -27,7 +27,6 @@ import type { GatewayService } from '@snap-rail/gateway'
 import type { SettingsService } from '@snap-rail/settings'
 import type { AuxSurfaceId, SurfaceId } from '@snap-rail/protocol'
 import {
-  EXIT_DECISIONS,
   SHELL_LIMITS,
   ballProfileSchema,
   resolveBallProfile,
@@ -44,8 +43,8 @@ import {
   type ResolvedWindowProfile,
   type ShellBallProfileState,
   type ShellExitAction,
-  type ShellExitDecision,
   type ShellExitDisposition,
+  type ShellExitOption,
   type ShellExitRequest,
   type ShellExitSource,
   type ShellNotificationInput,
@@ -123,7 +122,13 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
     const rpc: GatewayService = ctx.rpc
     const settings: SettingsService = ctx.settings
     const logger = ctx.logger('desktop-shell')
-    const machine = createShellMachine()
+    // The exit policy resolves against live OS affordances: a tray icon that
+    // exists, and a ball surface that is enabled. Both are read lazily (the
+    // tray is created later in this same apply, the ball profile may change at
+    // any time), so a chain never applies a disposition it cannot land.
+    const machine = createShellMachine({
+      capabilities: () => ({ tray: tray.available, ball: ballProfile.enabled }),
+    })
 
     const readSetting = <T>(schema: { safeParse(value: unknown): { success: true, data: T } | { success: false } }, key: string): T | undefined => {
       const raw = settings.get<unknown>(key)
@@ -353,7 +358,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         win.on('close', event => {
           if (leaving) return
           event.preventDefault()
-          applyExit('window', machine.exitDecision('window'))
+          applyExitRequest('window')
         })
       },
     })
@@ -436,7 +441,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         app.exit(0)
       },
       quit: () => {
-        applyExit('tray', machine.exitDecision('tray'))
+        applyExitRequest('tray')
       },
       pick: key => {
         ctx.emit('shell/tray-clicked', key)
@@ -492,35 +497,65 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
     // operator window instead of waiting for a plugin to summon it.
     syncBall()
 
-    /** Apply one immediate disposition. Returns false when nothing could be done. */
-    const performExit = (source: ShellExitSource, action: ShellExitDisposition): void => {
+    /**
+     * Apply one immediate disposition, verifying its affordance first. Returns
+     * false when it could not land — the caller then falls through to the next
+     * entry of the chain instead of hiding the window where nothing can bring
+     * it back.
+     */
+    const attemptExit = (source: ShellExitSource, action: ShellExitDisposition): boolean => {
       if (action === 'quit') {
         leaving = true
         options.requestQuit()
-        return
+        return true
       }
       if (action === 'ball') {
-        // The `ball` disposition is the plugin-declared exclusive form: the
-        // operator window goes away and the ball stays — the one pairing the
-        // base still performs, because the exit policy asked for it.
-        const parked = present('ball').applied
-        const win = surfaces.windowOf('main')
-        if (win !== undefined && !win.isDestroyed() && win.isVisible()) {
-          win.hide()
-          publishSurface('main')
-        }
-        if (parked) return
+        // The `ball` disposition is the operator window's handover to the
+        // floating ball: the ball comes up (it may be hidden while enabled)
+        // and only then does the operator window go away.
+        if (!present('ball').applied) return false
+        hideMain()
+        return true
       }
-      // `tray`, or a ball that could not be shown: park behind the tray icon.
+      // `tray`: hiding behind an icon that failed to create would leave the
+      // window on screen with no way back — refuse instead, so the chain can
+      // continue (usually to `quit`).
       if (!tray.ensure()) {
-        logger.error(`退出处置 ${action}（来源 ${source}）失败：托盘图标创建失败，主窗口保持可见`)
-        return
+        logger.error(`退出处置 ${action}（来源 ${source}）失败：托盘图标创建失败`)
+        return false
       }
+      hideMain()
+      return true
+    }
+
+    /** Hide the operator window and publish the change. */
+    const hideMain = (): void => {
       const win = surfaces.windowOf('main')
-      if (win !== undefined && !win.isDestroyed() && win.isVisible()) {
-        win.hide()
-        publishSurface('main')
+      if (win === undefined || win.isDestroyed() || !win.isVisible()) return
+      win.hide()
+      publishSurface('main')
+    }
+
+    /** The chain in words, for the one log line that explains a refused exit. */
+    const describeChain = (options: readonly ShellExitOption[]): string =>
+      options.map(option => option.satisfiable ? option.intent : `${option.intent}（${option.reason ?? '不可用'}）`).join(' → ')
+
+    /**
+     * Resolve a source's chain and apply the first entry that lands. Nothing
+     * happens when the chain has no satisfiable entry: the window stays as it
+     * is, which is always recoverable, and the reason is logged.
+     */
+    const applyExitRequest = (source: ShellExitSource): void => {
+      const plan = machine.planExit(source)
+      for (const option of plan.options) {
+        if (!option.satisfiable) continue
+        if (option.intent === 'hold') {
+          if (holdExit(source)) return
+          continue
+        }
+        if (attemptExit(source, option.intent)) return
       }
+      logger.warn(`退出请求（来源 ${source}）没有可执行的处置：${describeChain(plan.options)}；窗口保持可见`)
     }
 
     /** The exit request currently on hold, with its timeout. */
@@ -531,12 +566,15 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
      * answers through `resolve` — or the hold times out and the operator's
      * original intent (`quit`) is applied anyway, because a hung renderer
      * must never make the app unkillable.
+     *
+     * @returns false when a request is already on the table (the caller may
+     * then try the next chain entry).
      */
-    const holdExit = (source: ShellExitSource): void => {
+    const holdExit = (source: ShellExitSource): boolean => {
       const held = machine.holdExit(source)
       if (!held.applied) {
         logger.warn(`退出请求（来源 ${source}）被忽略：已有一个挂起的请求`)
-        return
+        return false
       }
       const request: ShellExitRequest = { source }
       const timer = setTimeout(() => {
@@ -544,15 +582,11 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         pendingExit = undefined
         logger.error(`挂起的退出请求（来源 ${source}）超过 ${SHELL_LIMITS.exitHoldMs}ms 未应答，按退出处理`)
         ctx.emit('shell/exit-resolved', request, 'quit')
-        performExit(source, 'quit')
+        attemptExit(source, 'quit')
       }, SHELL_LIMITS.exitHoldMs)
       pendingExit = { source, timer }
       ctx.emit('shell/exit-requested', request)
-    }
-
-    const applyExit = (source: ShellExitSource, decision: ShellExitDecision): void => {
-      if (decision === 'hold') holdExit(source)
-      else performExit(source, decision)
+      return true
     }
 
     const resolveExit = (action: ShellExitAction): ShellResult => {
@@ -564,7 +598,12 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
         pendingExit = undefined
       }
       ctx.emit('shell/exit-resolved', { source: answered.source }, action)
-      if (action !== 'cancel') performExit(answered.source, action)
+      // The operator answered explicitly: apply exactly that, and keep the
+      // window visible (with a logged reason) when it cannot land — silently
+      // substituting another disposition would contradict the answer.
+      if (action !== 'cancel' && !attemptExit(answered.source, action)) {
+        logger.error(`退回应答 ${action}（来源 ${answered.source}）未能执行：前置能力不满足，主窗口保持可见`)
+      }
       return { applied: true }
     }
 
@@ -615,6 +654,7 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       get available() {
         return true
       },
+      capabilities: () => ({ tray: tray.available, ball: ballProfile.enabled }),
       notify: (caller, input) => notify(caller, input),
       tray: {
         get available() {
@@ -665,24 +705,18 @@ const desktopShellPlugin: Plugin.Object<DesktopShellOptions> = {
       window: {
         profile: () => windowProfileState(),
         setProfile: (_caller, profile) => configureWindow(profile),
-        setExitPolicy: (caller, policy) => {
-          for (const key of ['close', 'quit'] as const) {
-            const value = policy[key]
-            if (value !== undefined && !EXIT_DECISIONS.includes(value)) {
-              return { applied: false, reason: 'limit-reached', message: `退出策略 ${key} 不合法：${String(value)}` }
-            }
-          }
-          const declared = machine.setExitPolicy(caller.fiber.name, policy)
-          if (declared.applied) {
-            // The declaration lives exactly as long as its fiber: disabling
-            // the scenario reverts the app to the default (quit) policy.
-            caller.effect(() => () => {
-              machine.removeExitPolicyOwner(caller.fiber.name)
-            })
-          }
+        setExitPolicy: (caller, declaration) => {
+          const declared = machine.setExitPolicy(caller.fiber.name, declaration)
+          if (!declared.applied) return declared
+          // The declaration lives exactly as long as its fiber: disabling the
+          // scenario reverts the app to the default (quit) policy.
+          caller.effect(() => () => {
+            machine.removeExitPolicyOwner(caller.fiber.name)
+          })
           return declared
         },
         exitPolicy: () => machine.exitPolicy(),
+        planExit: source => machine.planExit(source),
         resolve: (_caller, action) => resolveExit(action),
       },
     }

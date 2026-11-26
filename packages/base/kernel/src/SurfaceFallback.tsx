@@ -24,7 +24,10 @@ import { subscribeFrame, type HostLink } from '@snap-rail/connection'
 import {
   BALL_SURFACE,
   ballDockStateSchema,
+  ballLookFor,
   ballStateSchema,
+  resolveBallDockGeometry,
+  resolveBallProfile,
   type BallDockState,
   type BallState,
   type BallTone,
@@ -52,11 +55,13 @@ const TONE_COLOR: Record<BallTone, string> = {
 /** The ball's resting state before the host answers (a quiet grey orb). */
 const IDLE_BALL: BallState = { progress: null, label: null, tone: 'neutral' }
 
-/** The resting dock state: free-floating, fully visible. */
+/** The resting dock state: free-floating, fully visible, not sliding. */
 const IDLE_DOCK: BallDockState = {
   edge: null,
   collapsed: false,
-  visiblePx: Math.max(1, Math.round(BALL_SURFACE.size * BALL_SURFACE.dockVisibleRatio)),
+  revealing: false,
+  hovered: false,
+  ...resolveBallDockGeometry(resolveBallProfile()),
 }
 
 /** Present a surface through the wire; failures are cosmetic here. */
@@ -138,7 +143,10 @@ export interface SurfaceFallbackProps {
 function BallFallback(props: SurfaceFallbackProps): ReactNode {
   const ball = useBallState(props.link)
   const dock = useBallDock(props.link)
-  const tucked = dock.edge !== null && dock.collapsed
+  // The look rule is the contract's, not this fallback's: a tucked ball keeps
+  // its tab for the whole slide (`revealing`), so content never appears
+  // half-cropped while the window is still moving.
+  const tucked = ballLookFor(dock) === 'tab'
   const rootRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const element = rootRef.current
@@ -211,10 +219,13 @@ function BallFallback(props: SurfaceFallbackProps): ReactNode {
 
 /**
  * The tucked tab: what the parked ball looks like while only
- * {@link BallDockState.visiblePx} pixels of the window are on screen. A face
- * may render its own tab the same way — the contract is "anchor to the parked
- * edge, fit inside the visible strip"; the drag/click surface wraps the whole
- * window, so the tab needs no wiring of its own.
+ * {@link BallDockState.visiblePx} pixels of the window are on screen (the
+ * rectangle spans that whole strip, rim included; a face painting the orb
+ * itself should use {@link BallDockState.visibleOrbPx}/{@link BallDockState.orbRatio}
+ * instead — the rim paints nothing). A face may render its own tab the same
+ * way — the contract is "anchor to the parked edge, fit inside the visible
+ * strip"; the drag/click surface wraps the whole window, so the tab needs no
+ * wiring of its own.
  */
 function TabContent(props: { dock: BallDockState, ball: BallState, notice?: string | undefined }): ReactNode {
   const horizontal = props.dock.edge === 'left' || props.dock.edge === 'right'

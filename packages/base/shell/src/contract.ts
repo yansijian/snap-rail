@@ -80,7 +80,14 @@ export const BALL_SURFACE = {
   orb: 112,
   /** The paint-free rim on every side; shadows live here, faded to zero. */
   inset: 8,
-  /** How much of the window stays on screen when the ball parks at an edge. */
+  /**
+   * How much of the **window** stays on screen when the ball parks at an edge
+   * — a share of the window edge, not of the orb: the 8px paint rim is inside
+   * the window, so the exposed orb cap is `visiblePx - inset` (35 of 112px,
+   * ≈31% of the orb diameter, at the factory geometry). Use
+   * {@link resolveBallDockGeometry} for the orb numbers instead of applying
+   * this ratio to the orb.
+   */
   dockVisibleRatio: 1 / 3,
 } as const
 
@@ -329,6 +336,52 @@ export function resolveBallProfile(profile: BallProfile = {}): ResolvedBallProfi
   }
 }
 
+/** The ball's on-screen strip, in both window and orb terms. */
+export interface BallDockGeometry {
+  /** Window pixels kept inside the work area while parked (`round(size × ratio)`, at least 1). */
+  visiblePx: number
+  /**
+   * Orb pixels still on screen. The 8px paint rim lives inside the window, so
+   * a tucked ball exposes `max(0, visiblePx − inset)` pixels of the orb — the
+   * rim is on screen but paints nothing.
+   */
+  visibleOrbPx: number
+  /** Share of the orb diameter still on screen (`visibleOrbPx / orb`, `0..1`). */
+  orbRatio: number
+}
+
+/**
+ * The window pixels that stay inside the work area for a tucked ball of
+ * `size` px with the given ratio — the one formula behind
+ * {@link BallDockGeometry.visiblePx} and the host's docking math.
+ *
+ * @param size - the ball window's edge length in pixels.
+ * @param ratio - the share of the window edge kept on screen.
+ */
+export function dockVisiblePx(size: number, ratio: number): number {
+  return Math.max(1, Math.round(size * ratio))
+}
+
+/**
+ * Resolve a ball profile's tucked geometry. The ratio is a share of the
+ * **window** edge (see {@link BALL_SURFACE.dockVisibleRatio}); this is the one
+ * place that converts it into the numbers a face paints with, so no face has
+ * to subtract the rim itself.
+ *
+ * @param profile - the effective ball profile (or just its geometry fields).
+ */
+export function resolveBallDockGeometry(
+  profile: Pick<ResolvedBallProfile, 'size' | 'orb' | 'inset' | 'dockVisibleRatio'>,
+): BallDockGeometry {
+  const visiblePx = dockVisiblePx(profile.size, profile.dockVisibleRatio)
+  const visibleOrbPx = Math.max(0, visiblePx - profile.inset)
+  return {
+    visiblePx,
+    visibleOrbPx,
+    orbRatio: profile.orb > 0 ? visibleOrbPx / profile.orb : 0,
+  }
+}
+
 /** Where an effective window/ball profile came from. */
 export const UI_PROFILE_SOURCES = ['user', 'persisted', 'layout', 'face', 'default'] as const
 
@@ -411,27 +464,66 @@ export interface SurfaceState {
 }
 
 /**
- * The ball window's dock state: where it is parked and whether it is tucked
- * into that edge. Purely window geometry — the content half of the ball lives
- * in {@link BallState}. A face that ignores this state simply renders the full
- * orb and lets the screen edge crop it; a face that follows it draws its own
- * collapsed look inside the visible strip.
+ * The ball window's dock state: where it is parked, whether it is tucked into
+ * that edge, and whether a slide is in flight. Purely window geometry — the
+ * content half of the ball lives in {@link BallState}. A face that ignores this
+ * state simply renders the full orb and lets the screen edge crop it; a face
+ * that follows it draws its own collapsed look inside the visible strip and
+ * keeps that look while {@link BallDockState.revealing} holds (see
+ * {@link ballLookFor}).
  */
 export interface BallDockState {
   /** The parked edge, or `null` while the ball floats freely. */
   edge: BallDockEdge | null
   /** Whether the ball is tucked into the edge (only `visiblePx` is on screen). */
   collapsed: boolean
-  /** How many pixels of the window stay inside the work area while collapsed. */
+  /**
+   * Whether the tuck or reveal slide is still running: the window is moving
+   * toward the state in {@link BallDockState.collapsed}. A face keeps painting
+   * its collapsed look until this turns `false`, so content never appears
+   * half-cropped mid-slide.
+   */
+  revealing: boolean
+  /**
+   * The host's pointer observation: the cursor is over the part of the window
+   * that is on screen (the visible strip while tucked, the whole window
+   * otherwise). A face only needs this while tucked — it cannot see the
+   * pointer from off screen; when the whole ball is visible, DOM pointer
+   * events are exact.
+   */
+  hovered: boolean
+  /** Window pixels that stay inside the work area while collapsed. */
   visiblePx: number
+  /** Orb pixels that stay on screen (`visiblePx − inset`); see {@link BallDockGeometry}. */
+  visibleOrbPx: number
+  /** Share of the orb diameter still on screen (`0..1`); see {@link BallDockGeometry}. */
+  orbRatio: number
 }
 
 /** Payload schema of the `shell/ball-dock-changed` frame. */
 export const ballDockStateSchema = z.object({
   edge: z.enum(BALL_DOCK_EDGES).nullable(),
   collapsed: z.boolean(),
-  visiblePx: z.number().int().min(1).max(BALL_SURFACE.size),
+  revealing: z.boolean(),
+  hovered: z.boolean(),
+  visiblePx: z.number().int().min(1).max(BALL_LIMITS.maxSize),
+  visibleOrbPx: z.number().int().min(0).max(BALL_LIMITS.maxSize),
+  orbRatio: z.number().min(0).max(1),
 }).strict()
+
+/**
+ * Which look a face should paint right now: the collapsed look (`tab`) while a
+ * parked ball is tucked **or sliding**, the full orb (`orb`) once it has
+ * settled out. Single-sourced so every face switches at the same moment —
+ * `collapsed` alone would repaint the full content halfway through a slide.
+ *
+ * @param dock - the host's dock state (or just the three fields it reads).
+ */
+export function ballLookFor(
+  dock: Pick<BallDockState, 'edge' | 'collapsed' | 'revealing'>,
+): 'orb' | 'tab' {
+  return dock.edge !== null && (dock.collapsed || dock.revealing) ? 'tab' : 'orb'
+}
 
 /**
  * What resolving a held exit request (or answering for it) does. `ball` parks

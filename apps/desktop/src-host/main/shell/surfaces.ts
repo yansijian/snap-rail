@@ -29,8 +29,10 @@ import { join } from 'node:path'
 import { SURFACE_IDS, type AuxSurfaceId, type SurfaceId } from '@snap-rail/protocol'
 import {
   BALL_SURFACE,
+  resolveBallDockGeometry,
   resolveBallProfile,
   type BallDockEdge,
+  type BallDockGeometry,
   type BallDockState,
   type BallProfile,
   type ResolvedBallProfile,
@@ -41,6 +43,7 @@ import {
   clampPosition,
   dockedPosition,
   initialTuckState,
+  insideRect,
   settleDock,
   tickTuck,
   visiblePxOf,
@@ -155,7 +158,8 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
   const windows = new Map<AuxSurfaceId, BrowserWindow>()
   let ball = resolveBallProfile()
   const ballSize = (): Size => ({ width: ball.size, height: ball.size })
-  const ballVisiblePx = (): number => visiblePxOf(ballSize(), ball.dockVisibleRatio)
+  /** The tucked geometry of the current profile: window pixels and orb pixels. */
+  const ballGeometry = (): BallDockGeometry => resolveBallDockGeometry(ball)
   let main: BrowserWindow | undefined
   /** The ball's pending drag-settle timer. */
   let settleTimer: ReturnType<typeof setTimeout> | undefined
@@ -172,7 +176,13 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
   let drag: { anchorX: number, anchorY: number } | undefined
   /** The 60 fps follow poll that pins the dragged ball under the OS cursor. */
   let dragTimer: ReturnType<typeof setInterval> | undefined
-  let dockState: BallDockState = { edge: null, collapsed: false, visiblePx: ballVisiblePx() }
+  let dockState: BallDockState = {
+    edge: null,
+    collapsed: false,
+    revealing: false,
+    hovered: false,
+    ...ballGeometry(),
+  }
   let tuck: TuckState = initialTuckState(false)
 
   // The operator window arrives whenever the app entry finishes creating it;
@@ -210,14 +220,26 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
   screen.on('display-metrics-changed', onDisplaysChanged)
   screen.on('display-removed', onDisplaysChanged)
 
-  function publishDock(next: BallDockState): void {
+  /**
+   * Publish a dock change. The geometry (`visiblePx`/`visibleOrbPx`/`orbRatio`)
+   * always comes from the live profile through {@link resolveBallDockGeometry},
+   * so a face never has to subtract the 8px rim itself, and the equality check
+   * covers every field — a changed `revealing`/`hovered` must reach the face
+   * even when the edge did not move.
+   */
+  function publishDock(next: Partial<Pick<BallDockState, 'edge' | 'collapsed' | 'revealing' | 'hovered'>>): void {
+    const merged: BallDockState = { ...dockState, ...ballGeometry(), ...next }
     if (
-      next.edge === dockState.edge
-      && next.collapsed === dockState.collapsed
-      && next.visiblePx === dockState.visiblePx
+      merged.edge === dockState.edge
+      && merged.collapsed === dockState.collapsed
+      && merged.revealing === dockState.revealing
+      && merged.hovered === dockState.hovered
+      && merged.visiblePx === dockState.visiblePx
+      && merged.visibleOrbPx === dockState.visibleOrbPx
+      && merged.orbRatio === dockState.orbRatio
     ) return
-    dockState = next
-    options.onDockChanged?.(next)
+    dockState = merged
+    options.onDockChanged?.(merged)
   }
 
   /** Mark our own positioning so the drag settle does not fight the animation. */
@@ -232,12 +254,20 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     }, 600)
   }
 
-  /** Tween the ball window to a dock position (a few frames; the ball is 128px). */
-  function animateTo(win: BrowserWindow, target: Point): void {
+  /**
+   * Tween the ball window to a dock position (a few frames; the ball is 128px).
+   * `onSettled` fires on the last frame (or at once when the window is already
+   * there), which is where the dock state stops being `revealing`.
+   */
+  function animateTo(win: BrowserWindow, target: Point, onSettled?: () => void): void {
     if (animTimer !== undefined) clearInterval(animTimer)
     const [fromX, fromY] = win.getPosition()
     const from = { x: fromX ?? 0, y: fromY ?? 0 }
-    if (from.x === target.x && from.y === target.y) return
+    if (from.x === target.x && from.y === target.y) {
+      animTimer = undefined
+      onSettled?.()
+      return
+    }
     const steps = 10
     let step = 0
     animTimer = setInterval(() => {
@@ -246,6 +276,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
         if (animTimer !== undefined) clearInterval(animTimer)
         animTimer = undefined
         if (!win.isDestroyed()) positionProgrammatically(win, target)
+        onSettled?.()
         return
       }
       positionProgrammatically(win, {
@@ -255,25 +286,32 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     }, 12)
   }
 
-  /** Place the parked ball at its tucked or slid-out position. */
+  /**
+   * Place the parked ball at its tucked or slid-out position. The dock state is
+   * published as `revealing: true` for the duration of the slide: a face keeps
+   * painting its collapsed look until the ball has settled out, instead of
+   * appearing half-cropped while the window is still moving.
+   */
   function applyDock(win: BrowserWindow, collapsed: boolean): void {
     if (parked === undefined) return
-    const at = dockedPosition(parked.dock, ballSize(), parked.work, collapsed, ballVisiblePx())
-    animateTo(win, at)
+    const { dock, work } = parked
+    publishDock({ edge: dock.edge, collapsed, revealing: true })
+    const at = dockedPosition(dock, ballSize(), work, collapsed, ballGeometry().visiblePx)
+    animateTo(win, at, () => {
+      publishDock({ edge: dock.edge, collapsed, revealing: false })
+    })
   }
 
   function tuckBall(win: BrowserWindow): void {
     if (parked === undefined) return
     tuck = initialTuckState(true)
     applyDock(win, true)
-    publishDock({ edge: parked.dock.edge, collapsed: true, visiblePx: ballVisiblePx() })
   }
 
   function revealBall(win: BrowserWindow): void {
     if (parked === undefined) return
     tuck = { collapsed: false, inside: false, outsideSince: undefined }
     applyDock(win, false)
-    publishDock({ edge: parked.dock.edge, collapsed: false, visiblePx: ballVisiblePx() })
   }
 
   function stopPolling(): void {
@@ -309,9 +347,17 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       }
       const [rawX, rawY] = win.getPosition()
       const windowRect: Rect = { x: rawX ?? 0, y: rawY ?? 0, width: ballSize().width, height: ballSize().height }
-      const strip = visibleRect(parked.dock, ballSize(), parked.work, ballVisiblePx())
+      const strip = visibleRect(parked.dock, ballSize(), parked.work, ballGeometry().visiblePx)
       const verdict = tickTuck(tuck, pointer, windowRect, strip, Date.now(), ball.hoverDelayMs)
       tuck = verdict.state
+      // The host is the only party that can see the pointer while part of the
+      // window is off screen, so it reports it: a tucked face paints its
+      // hover state from this flag instead of guessing.
+      publishDock({
+        edge: parked.dock.edge,
+        collapsed: verdict.state.collapsed,
+        hovered: insideRect(pointer, verdict.state.collapsed ? strip : windowRect),
+      })
       if (verdict.action === 'reveal') revealBall(win)
       else if (verdict.action === 'tuck') tuckBall(win)
     }, 120)
@@ -329,7 +375,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
       const clamped = clampPosition(position, ballSize(), work)
       positionProgrammatically(win, clamped)
       options.saveBallPosition({ kind: 'free', x: clamped.x, y: clamped.y })
-      publishDock({ edge: null, collapsed: false, visiblePx: ballVisiblePx() })
+      publishDock({ edge: null, collapsed: false, revealing: false, hovered: false })
       return
     }
     parked = { dock: landed, work }
@@ -338,7 +384,6 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
     // it stays fully out and tucks only once the pointer moves on.
     tuck = initialTuckState(false)
     applyDock(win, false)
-    publishDock({ edge: landed.edge, collapsed: false, visiblePx: ballVisiblePx() })
     if (ball.collapse) startPolling(win)
   }
 
@@ -415,10 +460,10 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
         const work = screen.getPrimaryDisplay().workArea
         const dock = clampDock({ edge: saved.edge, offset: saved.offset }, size, work)
         parked = { dock, work }
-        const at = dockedPosition(dock, size, work, ball.collapse, ballVisiblePx())
+        const at = dockedPosition(dock, size, work, ball.collapse, ballGeometry().visiblePx)
         placeBall(win, size, at.x, at.y)
         tuck = initialTuckState(ball.collapse)
-        dockState = { edge: dock.edge, collapsed: ball.collapse, visiblePx: ballVisiblePx() }
+        dockState = { edge: dock.edge, collapsed: ball.collapse, revealing: false, hovered: false, ...ballGeometry() }
       } else if (saved !== undefined && saved.kind === 'free') {
         const placed = clampToDisplay({ x: saved.x, y: saved.y }, size)
         if (placed !== undefined) placeBall(win, size, placed.x, placed.y)
@@ -503,7 +548,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
           const clamped = clampToDisplay({ x: x ?? 0, y: y ?? 0 }, ballSize())
           if (clamped !== undefined) positionProgrammatically(win, clamped)
         }
-        publishDock({ edge: parked?.dock.edge ?? null, collapsed: parked !== undefined && tuck.collapsed, visiblePx: ballVisiblePx() })
+        publishDock({ edge: parked?.dock.edge ?? null, collapsed: parked !== undefined && tuck.collapsed })
       }
       return ball
     },
@@ -522,9 +567,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
         // An explicit summon slides a parked ball out; it keeps its edge and
         // tucks back once the pointer moves on.
         if (surface === 'ball' && ball.collapse && parked !== undefined) {
-          tuck = { collapsed: false, inside: false, outsideSince: undefined }
-          applyDock(win, false)
-          publishDock({ edge: parked.dock.edge, collapsed: false, visiblePx: ballVisiblePx() })
+          revealBall(win)
           startPolling(win)
         }
         return true
@@ -567,7 +610,7 @@ export function createSurfaceHost(options: SurfaceHostOptions): SurfaceHost {
           clearInterval(animTimer)
           animTimer = undefined
         }
-        publishDock({ edge: null, collapsed: false, visiblePx: ballVisiblePx() })
+        publishDock({ edge: null, collapsed: false, revealing: false, hovered: false })
         // The cursor is the only truth: pin the window to it at display rate.
         // Absolute positioning cannot accumulate error, so the ball stays
         // glued to the pointer no matter how fast the drag is. The writes go

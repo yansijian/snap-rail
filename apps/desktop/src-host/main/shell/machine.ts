@@ -27,8 +27,13 @@ import {
   SHELL_LIMITS,
   type BallPatch,
   type BallState,
+  type ShellCapabilities,
   type ShellExitAction,
+  type ShellExitChain,
   type ShellExitDecision,
+  type ShellExitDeclaration,
+  type ShellExitOption,
+  type ShellExitPlan,
   type ShellExitPolicy,
   type ShellExitSource,
   type ShellNotificationInput,
@@ -60,6 +65,13 @@ export type NotificationPlan =
 export interface ShellMachineOptions {
   /** Clock override for the throttle window (tests drive it). */
   now?: (() => number) | undefined
+  /**
+   * The live OS affordances an exit chain resolves against. The adapter
+   * passes the tray's real availability and the effective ball profile's
+   * `enabled`; omitted, both are assumed available (the pure machine has no
+   * windows to ask).
+   */
+  capabilities?: (() => ShellCapabilities) | undefined
 }
 
 /**
@@ -68,7 +80,20 @@ export interface ShellMachineOptions {
  * behavior, so a base upgrade never changes what an operator's X does until a
  * plugin declares otherwise.
  */
-export const DEFAULT_EXIT_POLICY: Readonly<ShellExitPolicy> = { close: 'quit', quit: 'quit' }
+export const DEFAULT_EXIT_POLICY: Readonly<ShellExitPolicy> = { close: ['quit'], quit: ['quit'] }
+
+/** The affordances assumed when no probe is supplied. */
+const ASSUMED_CAPABILITIES: ShellCapabilities = { tray: true, ball: true }
+
+/** The highest accepted `priority` in an exit policy declaration. */
+export const EXIT_PRIORITY_MAX = 100
+
+/** One plugin's exit policy declaration, normalized for the fold. */
+interface ExitDeclaration {
+  close?: ShellExitChain | undefined
+  quit?: ShellExitChain | undefined
+  priority: number
+}
 
 /** The Shell adapter's state, minus the OS. */
 export interface ShellMachine {
@@ -96,16 +121,17 @@ export interface ShellMachine {
   setBallState(patch: BallPatch): BallState
   /**
    * Declare (part of) the exit policy. A plugin's later declaration replaces
-   * its earlier one and moves to the back of the line (last declaration wins
-   * per field); an unknown decision value is refused.
+   * its earlier one (and its `priority`); per field the highest-priority live
+   * declaration wins, ties going to the later one. Unknown decisions, empty
+   * chains, and out-of-range priorities are refused.
    */
-  setExitPolicy(plugin: string, policy: Partial<ShellExitPolicy>): ShellResult
+  setExitPolicy(plugin: string, declaration: ShellExitDeclaration): ShellResult
   /** The folded policy in force (defaults underneath every declaration). */
   exitPolicy(): Readonly<ShellExitPolicy>
   /** Drop one plugin's declaration (its fiber went away). */
   removeExitPolicyOwner(plugin: string): void
-  /** The decision the live policy makes for one exit source. */
-  exitDecision(source: ShellExitSource): ShellExitDecision
+  /** Resolve one source's chain against the live capabilities. */
+  planExit(source: ShellExitSource): ShellExitPlan
   /**
    * Hold the one open exit request (`hold` in the policy). A second request
    * while one is pending is refused — the declaring plugin's dialog is already
@@ -154,10 +180,11 @@ export function createShellMachine(options: ShellMachineOptions = {}): ShellMach
   const tagIndex = new Map<string, string>()
   let notificationCounter = 0
   let ball: BallState = { progress: null, label: null, tone: 'neutral' }
-  /** Exit policy declarations by plugin, in declaration order (later wins per field). */
-  const exitPolicies = new Map<string, Partial<ShellExitPolicy>>()
+  /** Exit policy declarations by plugin, in declaration order (ties go to the later one). */
+  const exitPolicies = new Map<string, ExitDeclaration>()
   /** The exit request currently on hold, when one is. */
   let heldExit: ShellExitSource | undefined
+  const capabilities = options.capabilities ?? (() => ASSUMED_CAPABILITIES)
 
   const keyOf = (plugin: string, id: string): string => `${plugin}:${id}`
 
@@ -185,17 +212,51 @@ export function createShellMachine(options: ShellMachineOptions = {}): ShellMach
     while (recent.length > 0 && at - recent[0]! >= SHELL_LIMITS.notificationWindowMs) recent.shift()
   }
 
-  /** Fold every live declaration over the defaults, in declaration order. */
+  /**
+   * Normalize one declared field: a bare decision becomes a one-entry chain;
+   * an unknown decision or an empty chain is refused (returns `undefined`
+   * after the caller has already produced its refusal).
+   */
+  function normalizeChain(value: ShellExitDecision | ShellExitChain): ShellExitChain | undefined {
+    const chain = typeof value === 'string' ? [value] : value
+    if (chain.length === 0) return undefined
+    for (const intent of chain) {
+      if (!EXIT_DECISIONS.includes(intent)) return undefined
+    }
+    return [...chain]
+  }
+
+  /** The field's chain from the highest-priority declaration that sets it. */
+  function foldField(field: 'close' | 'quit'): ShellExitChain {
+    let winner: { chain: ShellExitChain, priority: number } | undefined
+    for (const declaration of exitPolicies.values()) {
+      const chain = declaration[field]
+      if (chain === undefined) continue
+      // Map iteration is declaration order, so `>=` lets a later declaration
+      // win an equal priority — the documented tiebreak.
+      if (winner === undefined || declaration.priority >= winner.priority) {
+        winner = { chain, priority: declaration.priority }
+      }
+    }
+    return winner?.chain ?? DEFAULT_EXIT_POLICY[field]
+  }
+
+  /** Fold every live declaration over the defaults. */
   function foldExitPolicy(): ShellExitPolicy {
-    const folded: Partial<ShellExitPolicy> = {}
-    for (const patch of exitPolicies.values()) {
-      if (patch.close !== undefined) folded.close = patch.close
-      if (patch.quit !== undefined) folded.quit = patch.quit
+    return { close: foldField('close'), quit: foldField('quit') }
+  }
+
+  /** One chain entry with its live precondition. */
+  function optionOf(intent: ShellExitDecision, live: ShellCapabilities): ShellExitOption {
+    if (intent === 'quit' || intent === 'hold') return { intent, satisfiable: true }
+    if (intent === 'tray') {
+      return live.tray
+        ? { intent, satisfiable: true }
+        : { intent, satisfiable: false, reason: '托盘图标不可用' }
     }
-    return {
-      close: folded.close ?? DEFAULT_EXIT_POLICY.close,
-      quit: folded.quit ?? DEFAULT_EXIT_POLICY.quit,
-    }
+    return live.ball
+      ? { intent, satisfiable: true }
+      : { intent, satisfiable: false, reason: '悬浮球未启用' }
   }
 
   return {
@@ -315,22 +376,30 @@ export function createShellMachine(options: ShellMachineOptions = {}): ShellMach
       return next
     },
 
-    setExitPolicy(plugin, policy) {
-      const patch: Partial<ShellExitPolicy> = {}
+    setExitPolicy(plugin, declaration) {
+      const normalized: ExitDeclaration = { priority: 0 }
       for (const key of ['close', 'quit'] as const) {
-        const value = policy[key]
+        const value = declaration[key]
         if (value === undefined) continue
-        if (!EXIT_DECISIONS.includes(value)) {
-          return refuse('limit-reached', `退出策略 ${key} 不合法：${String(value)}`)
+        const chain = normalizeChain(value)
+        if (chain === undefined) {
+          return refuse('limit-reached', `退出策略 ${key} 不合法：${JSON.stringify(value)}`)
         }
-        patch[key] = value
+        normalized[key] = chain
       }
-      if (patch.close === undefined && patch.quit === undefined) {
+      if (normalized.close === undefined && normalized.quit === undefined) {
         return refuse('limit-reached', '退出策略声明为空')
       }
-      // Re-insert so the newest declaration of a returning plugin wins the fold.
+      const priority = declaration.priority
+      if (priority !== undefined) {
+        if (!Number.isInteger(priority) || priority < 0 || priority > EXIT_PRIORITY_MAX) {
+          return refuse('limit-reached', `退出策略优先级需为 0..${EXIT_PRIORITY_MAX} 的整数`)
+        }
+        normalized.priority = priority
+      }
+      // Re-insert so a re-declaration counts as the newest one on a tie.
       exitPolicies.delete(plugin)
-      exitPolicies.set(plugin, patch)
+      exitPolicies.set(plugin, normalized)
       return APPLIED
     },
 
@@ -340,7 +409,17 @@ export function createShellMachine(options: ShellMachineOptions = {}): ShellMach
       exitPolicies.delete(plugin)
     },
 
-    exitDecision: source => foldExitPolicy()[source === 'window' ? 'close' : 'quit'],
+    planExit(source) {
+      const chain = foldExitPolicy()[source === 'window' ? 'close' : 'quit']
+      const live = capabilities()
+      const planned = chain.map(intent => optionOf(intent, live))
+      return {
+        source,
+        chain,
+        options: planned,
+        decision: planned.find(option => option.satisfiable)?.intent,
+      }
+    },
 
     holdExit(source) {
       if (heldExit !== undefined) return refuse('duplicate', '已有一个挂起的退出请求')

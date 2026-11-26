@@ -239,7 +239,9 @@ electron**。所有写操作回 `{ applied: true, … }` 或
 | `ctx.shell.ball.setState(ctx, patch)`；`ball.state()` | 宿主聚合的球内容态：`{ progress: 0..1 \| null, label: ≤8 字 \| null, tone: 'neutral' \| 'accent' \| 'warning' \| 'danger' }`，变化经 `shell/ball-changed` 广播。 |
 | `ctx.shell.ball.setProfile(ctx, profile)`；`ball.profile()` | 宿主面请求球形态（`BallProfile`，字段见 client-face.md 布局节），宿主夹取后回 `{ applied, profile, source, reason? }`。只有操作员在外观页显式固定（`source: 'user'`）会拒绝；布局与面的请求后到者生效。 |
 | `ctx.shell.window.setProfile(ctx, profile)`；`window.profile()` | 同上，操作员窗口形态（`WindowProfile`）。记住的历史尺寸只做开机恢复、不锁请求，布局/面的应用结果也不写入该记忆（`remember` 只决定之后的手动调整记不记）。**检查返回值**——拒绝是 `{applied:false}` 正常返回，不抛异常。 |
-| `ctx.shell.window.setExitPolicy(ctx, {close?, quit?})`；`window.exitPolicy()` | 关窗/托盘退出行为声明（登记即 effect，fiber 回收即回退默认 `quit/quit`）。值：`'ball' \| 'tray' \| 'quit' \| 'hold'`。 |
+| `ctx.shell.window.setExitPolicy(ctx, {close?, quit?, priority?})`；`window.exitPolicy()` | 关窗/托盘退出行为声明（登记即 effect，fiber 回收即回退默认 `quit/quit`）。每个字段可以是单个处置 `'ball' \| 'tray' \| 'quit' \| 'hold'`，也可以是**有序链**（`['ball','quit']` = 有球收进球、否则退出）：请求到达时按序取第一个当前可执行的处置（`ball` 要球已启用、`tray` 要托盘图标在，`quit`/`hold` 恒可执行），链耗尽则窗口原样保留 + 告警。`priority`（0–100，默认 0）做仲裁：逐字段高者胜、同优先级后声明者胜。 |
+| `ctx.shell.capabilities()` | 当前可用的 OS 能力 `{ tray, ball }`——托盘图标是否在、球面是否启用。自定义决策（「没球就别藏窗」）读它，不要猜。 |
+| `ctx.shell.window.planExit(source)` | 实时解析：`{ chain, options: [{ intent, satisfiable, reason? }], decision }`（`source: 'window' \| 'tray'`）。想知道「现在关窗会发生什么」就读它，不必等请求到达。 |
 | `ctx.shell.window.resolve(ctx, action)` | 宿主面应答挂起的退出请求（与渲染面的 `shell.exit.resolve` 等价；确认框仍必须由渲染面画，这里只是宿主侧兜底/自动决策）。 |
 
 `'hold'` 流程：Shell 冻结请求 → 广播 `shell/exit-requested`（载荷

@@ -88,18 +88,24 @@ PLC 数据并用柱状图显示」）时，先引导把功能拆解成可独立�
    滚动容器用 `DragScroll`（指针拖拽平移）。
 9. **OS 资源只走 shell 缝，插件永不 import `electron`**。通知、托盘、窗口
    surface、悬浮球、退出策略一律经 `ctx.shell`（宿主面）或
-   `@snap-rail/shell/contract`（渲染面）。
-10. **驱动是纯协议适配器**。设备/组/点住在底座表里，驱动零自有存储、无
+   `@snap-rail/shell/contract`（渲染面）。退出策略**写链、写优先级**
+   （`close: ['ball','quit']` = 有球就驻留、否则退出；`priority` 0–100 仲裁），
+   不要靠监听 `shell/ball-profile-changed` 反复重声明。
+10. **区域插槽由布局渲染**：贡献 `shell.titlebar.actions` / `shell.sidebar` /
+    `shell.statusbar` 前确认活动布局真的挂了那个 `<Slot>`——基座回退布局已
+    渲染它们；自研布局必须「声明 + 渲染」同时做到（详见 client-face.md
+    的 ui-layout 节）。`shell.overlay` 例外，由 runtime 渲染。
+11. **驱动是纯协议适配器**。设备/组/点住在底座表里，驱动零自有存储、无
     RPC 子命名空间、无渲染端页面；只上交 zod schema + 可选探测 +
     `createConnection`。驱动**多活并存**。
-11. **结构化数据走 store 缝**。`ctx.store.register(ctx, '<ns>', drizzle表)`
+12. **结构化数据走 store 缝**。`ctx.store.register(ctx, '<ns>', drizzle表)`
     得到类型安全 db；只用 drizzle 查询构建器，无裸 SQL；跨命名空间协作走
     服务，永不共享表。简单键值配置走 settings.json，别建表。
-12. **`main` 不出现在 `client.surfaces` 里**（主窗口的面就是
+13. **`main` 不出现在 `client.surfaces` 里**（主窗口的面就是
     `client.entry`）；辅助面（球等）**不订阅工业点**，只消费宿主聚合帧。
-13. **`@snap-rail/*` 命名空间是官方保留的**（无论签名策略强制 verified）。
+14. **`@snap-rail/*` 命名空间是官方保留的**（无论签名策略强制 verified）。
     社区包用自己的 scope；冒名包装不上。
-14. **zip 永不带 src**，`pack` 会拒；`main` 必须与构建产物一致。
+15. **zip 永不带 src**，`pack` 会拒；`main` 必须与构建产物一致。
 
 ## 先拆解，再选模板
 

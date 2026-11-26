@@ -86,9 +86,15 @@ warning = 建议（放行但要逐条确认）。
 | 「测试连接」按钮不存在 | 驱动没实现 `probe`，或安装的 equipment 版本类型里还没有 probe（发布滞后） | 先按 SKILL.md「版本陷阱」查安装的类型；有字段再实现 |
 | 「测试连接」总是超时 | probe 内部建了长连接/等待无上限；底座硬超时 10s | probe 只做一次性只读探测并在 10s 内返回；需要更长的握手就缩短或返回 `ok:false` + `error.hint` |
 | 球拖不动 / 拖动抖动不跟手 | 拖拽用了 CSS `-webkit-app-region`（透明窗命中不可靠）或自己流式上报坐标（窗动则坐标系动） | 换 `attachBallDrag`（`import { attachBallDrag } from '@snap-rail/ui/runtime'`，ui ≥ 0.1.1）：整球一个 drag/click 表面，只发 `shell.ball.move` 的 `begin`/`end`，宿主以光标为锚接管跟随与贴边落定 |
-| 球拖到边缘拽不回来 | 拖拽没有交给宿主（`shell.ball.move` 未接） | 同上用 `attachBallDrag`；贴边、收起、滑出全由宿主负责，面只按 `shell/ball-dock-changed`（`{ edge, collapsed, visiblePx }`）画形态 |
+| 球拖到边缘拽不回来 | 拖拽没有交给宿主（`shell.ball.move` 未接） | 同上用 `attachBallDrag`；贴边、收起、滑出全由宿主负责，面只按 `shell/ball-dock-changed`（`{ edge, collapsed, revealing, hovered, visiblePx, visibleOrbPx, orbRatio }`）画形态 |
+| 收起时的球冠比预期小（不是 1/3 圆） | 1/3 是**窗口**边的比例，8px 余量在窗内——外露球冠只有 `visiblePx − inset`（默认 35/112 ≈ 31%） | 按 `orbRatio`（或 `visibleOrbPx`）画球冠，别把 1/3 套到球径上；换算单源 `resolveBallDockGeometry` |
+| 滑出/收起过程中内容被窗口裁成半截 | 面只看 `collapsed` 就切了全量内容，动画还在跑 | 用 `ballLookFor(dock)`：`revealing` 为真时保持收起形态，等它变 `false` 再切 |
+| 收起态拿不到指针 / 悬停高亮不生效 | 收起时大半窗口在屏外，面收不到指针事件 | 读帧上的 `hovered`（宿主观测，仅停泊 + `collapse` 开启时有效）；完整可见时用自己的 DOM 事件 |
 | 球阴影出现灰色硬边 | 用了 `box-shadow`（被窗口边界切） | 改径向渐变画进 8px 余量并衰减到零 |
 | 退出确认框 10s 后自己退了 | 渲染面没应答 `shell.exit.resolve` | 确认订阅 `shell/exit-requested` 并应答；10s 兜底是设计行为 |
+| 关窗没反应 / 收藏起来又弹回 | 退出链一项都执行不了（`close: ['tray']` 而托盘图标建不起来），或被更高 `priority` 的声明盖过 | 读 `ctx.shell.window.planExit('window')` 看逐项 `satisfiable` + `reason`；把链写成 `['ball','tray','quit']` 之类带兜底的形态，或调高/调低 `priority`（0–100） |
+| 声明了 `close: 'ball'` 但球被用户关掉后关窗没反应 | 单值即单元素链：`ball` 不可执行 → 链耗尽 → 留窗 + 告警（旧版会静默落回托盘） | 想保留兜底就声明链：`close: ['ball', 'tray', 'quit']` |
+| 往标题栏/状态栏贡献了但界面看不到 | 活动布局没渲染那个槽（只声明 `provides` 不够，必须挂 `<Slot>`） | 基座回退布局自 ui 0.4.2 起渲染 `titlebar`/`titlebarActions`/`sidebar`/`statusbar`；自研布局请照 client-face.md 的 ui-layout 示例同时声明并渲染 |
 | 通知没弹出来 | 触发全局节流（5 条/10s）或超 `SHELL_LIMITS` | 看 `{applied:false, reason}` 返回值；同 tag 合并、控制频率 |
 | `shell.window.configure` / `setProfile` 请求的舞台尺寸没生效 | 返回 `{applied:false, source:'user'}` = 操作员在外观页固定了窗口（唯一会拒绝的来源；记住的历史尺寸不锁请求）；或终端 < v0.7.0——Windows 无框窗上约束先于尺寸写入，目标尺寸被 OS 纠正吞掉（如 1280×800 落成 960×768） | **检查返回值**（`link.call` 对业务拒绝不抛异常）；固定态让操作员恢复「跟随布局」；旧终端升级 |
 | 安装被拒「<包> 的种子依赖与宿主不匹配：插件构建于种子 ABI r2，宿主为 r3 —— 请更新插件包或桌面应用」，或渲染面没加载、控制台 `client: face "<包>" refused — …` | zip 是用 r2 时代工具链（npm `plugin-kit 0.2.3` / `plugin-sdk 0.2.6`，锁文件钉住最常见）打的，章与 ≥ v0.5.3 终端不符 | 按 SKILL.md 版本锚升到当前闭包（`pnpm update` 让锁文件跟上）后重新 `pnpm run build` + `pack`；**不要**手改 `seedAbi`（pack 自动盖章，手写会被拒） |

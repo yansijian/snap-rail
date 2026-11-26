@@ -164,13 +164,33 @@ ctx.skins.register(ctx, { id, title, tokens, css? })                        // �
 ```tsx
 import { UI_SLOT_IDS } from '@snap-rail/ui/contract'
 
+ctx.ui.contribute(ctx, UI_SLOT_IDS.titlebarActions, { id: 'sync', order: 10, render: () => … })
 ctx.ui.contribute(ctx, UI_SLOT_IDS.statusbar, { id: 'my-status', order: 10, render: () => … })
 ctx.ui.contribute(ctx, UI_SLOT_IDS.overlay, { id: 'my-exit-prompt', order: 101, render: () => … })
 ```
 
+| 插槽 | 模式 | 谁渲染 | context |
+| --- | --- | --- | --- |
+| `shell.layout` | one | 活动布局（`precedence` → `order` → 后注册胜） | `{ surface }` |
+| `shell.titlebar` | one | 布局；占用者整条接管标题栏（含窗口按钮） | `{ surface, controls }` |
+| `shell.titlebar.actions` | many | 布局；默认标题栏里是动作按钮位 | `{ surface, controls }` |
+| `shell.sidebar` | many | 布局；有贡献时才占位 | `{ surface }` |
+| `shell.statusbar` | many | 布局；有贡献时才占位 | `{ surface }` |
+| `shell.overlay` | many | **内置 runtime**（不依赖布局，永远在最上层） | `{ surface }` |
+| `shell.ball` | one | runtime 的球面（无占用者时画回退圆球） | `{ surface: 'ball' }` |
+| `settings.entry` | one | 布局 / 设置外壳 | `{ presentation, open, isOpen }` |
+| `settings.surface` | one | runtime 的设置叠层 | `{ pages, activeId, close }` |
+
+`controls` 是布局提供的窗口控制集合（`('minimize' | 'toggle-maximize' | 'close')[]`）：
+接管 `shell.titlebar` 的占用者要自己画按钮并调 `window.control`。
+
+**插槽由布局渲染，不是由贡献方渲染。** 布局必须在 `provides` 里列全它真正
+渲染的槽（用 `Slot` 组件挂出来）；声明了却没渲染的槽，别人的贡献会静默消失
+（基座回退布局已渲染上表的 `titlebar`、`titlebarActions`、`sidebar`、
+`statusbar`、`settings.entry`）。
 `shell.overlay` 由内置 runtime 渲染、始终叠在活动布局之上——退出确认框挂
-这里，不要为此注册一层高 order 的布局。完整插槽表与设置页字段定义见仓库
-skill 的 `.agents/skills/snap-rail-plugin-dev/references/client-face.md`。
+这里，不要为此注册一层高 order 的布局。设置页字段定义见仓库 skill 的
+`.agents/skills/snap-rail-plugin-dev/references/client-face.md`。
 
 ## 多窗口：悬浮球、托盘、退出策略与通知
 
@@ -214,9 +234,14 @@ export default defineConfig([
 - **阴影画在余量内**：CSS `box-shadow` 会被透明窗口边界硬切成灰边；用径向
   渐变把阴影画进 8px 余量并衰减到零。
 - **贴边状态读 `shell.ball.dock` + 订阅 `shell/ball-dock-changed`**
-  （`{edge, collapsed, visiblePx}`）：球贴边停泊后指针离开即收起只留 1/3
-  （四边一律），悬停自动滑出——底座负责一切几何与时机；面在 `collapsed`
-  时按 `edge` 在可见条里画**收起形态**（贴边小标签）。
+  （`{edge, collapsed, revealing, hovered, visiblePx, visibleOrbPx, orbRatio}`）：
+  球贴边停泊后指针离开即收起，只留**窗口**边的 1/3（四边一律）；8px 余量在
+  窗内，所以真正外露的球冠只有 `visibleOrbPx`（默认 35px ≈ 球径 31%）——
+  按 `orbRatio` 画，别拿 1/3 当球体比例。`revealing` 为真表示滑动动画还在跑
+  （面的内容形态应继续保持收起态，动画结束再切全量内容，否则半截被窗口裁
+  出来）；`hovered` 是宿主替你看的指针（收起时点在可见条上），完整可见时用
+  自己的指针事件即可。何时画收起形态单源 `ballLookFor(dock)`（收起或滑动中
+  → `'tab'`，稳定外露 → `'orb'`）。悬停自动滑出——底座负责一切几何与时机。
 - **拖拽用 `attachBallDrag`**（`import { attachBallDrag } from
   '@snap-rail/ui/runtime'`，ui ≥ 0.1.1；kernel 是 app-internal，插件不
   import）：球面
@@ -238,15 +263,32 @@ export default defineConfig([
 ```ts
 // 宿主面：声明一次（登记即 effect，fiber 回收即回退默认）
 ctx.shell.window.setExitPolicy(ctx, {
-  close: 'ball',                       // 关窗 → 收进悬浮球（'tray' | 'quit' | 'hold'）
-  quit: 'quit',                        // 托盘退出：'quit' | 'tray' | 'ball' | 'hold'
+  close: ['ball', 'quit'],   // 有球就收进球；没球直接退出
+  quit: 'hold',              // 托盘退出：先问操作员
+  priority: 50,              // 仲裁用：管整机怎么退的用高优先级
 })
 ```
 
+- 每个字段可以是一个处置，也可以是一条**有序链**：请求到达时按序取第一个
+  当前可执行的处置。可执行性由底座实测——`'ball'` 要求球面已启用、`'tray'`
+  要求托盘图标在，`'quit'`/`'hold'` 恒可执行。链耗尽（全不可执行）时窗口
+  保持原样并记一条告警，不会把你藏进一个不存在的图标后面。所以
+  「有悬浮球才驻留」直接写 `close: ['ball', 'quit']`——**不要**去监听
+  `shell/ball-profile-changed` 反复重声明。
+- 想知道此刻会发生什么：`ctx.shell.capabilities()`（`{tray, ball}`）与
+  `ctx.shell.window.planExit('window' | 'tray')`（逐项 `satisfiable` + `reason`，
+  外加最终 `decision`）。
+- 单个处置等于单元素链：`close: 'ball'` 在球被禁用时**不会**自动落回托盘
+  （旧版会），而是链耗尽、窗口保持可见并告警。要兜底就显式写
+  `close: ['ball', 'tray', 'quit']`。
+- 多个插件都声明时按 `priority`（0–100，默认 0）逐字段仲裁：高者胜，同优先级
+  后声明者胜。场景/套件管“整机怎么退”，用高优先级；功能插件只想让应用常驻，
+  用默认即可。
 - `'hold'`：Shell 冻结请求、广播 `shell/exit-requested`（宿主事件 + 帧，
   载荷 `{source: 'window' | 'tray'}`），**由你的渲染面弹确认框**
   （底座从不画 UI），经 `shell.exit.resolve` 应答 `'ball' | 'tray' | 'quit' | 'cancel'`。
   超过 10s 未应答按 `quit` 兜底——确认框是锦上添花，不能变成关不掉。
+  应答是明确表态：那个处置执行不了时只告警留窗，不会被悄悄换成别的。
 - 确认框的挂载方式：往 **`shell.overlay`** 区域插槽贡献——
   `ctx.ui.contribute(ctx, UI_SLOT_IDS.overlay, { id, order, render })`。该槽
   由内置 runtime 的 OverlayHost 渲染，与活动布局无关、永远在最上层；订阅
@@ -263,11 +305,12 @@ OS 资源只走这条缝，插件**永不 import Electron**。所有权按点击
 
 | 能力 | 面 | 说明 |
 | --- | --- | --- |
+| `ctx.shell.capabilities()` | 宿主面 | 当前可用的 OS 能力 `{tray, ball}`：托盘图标是否在、球面是否启用（退出链与自定义决策都读它） |
 | `ctx.shell.notify(caller, {title, body, actions, tag, silent})` | 宿主面 | 带按钮的通知；返回 `{applied, id}` 或 `{applied:false, reason, message}` |
 | `ctx.shell.tray.addItem/updateItem/removeItem(caller, …)` | 宿主面 | 托盘菜单项（单插件 12、全体 24）；点击回执 `ctx.on('shell/tray-clicked', key)` |
 | `ctx.shell.surface.present/hide/state(caller, …)` | 宿主面 | 并按需创建/显示/隐藏辅助窗口（`main` = 显示并聚焦；各面独立显隐，互斥编排自己做） |
 | `ctx.shell.ball.setState(caller, patch)` | 宿主面 | 宿主聚合的球状态：`{progress 0..1 或 null, label ≤8字 或 null, tone}` |
-| `ctx.shell.window.setExitPolicy/exitPolicy/resolve(caller, …)` | 宿主面 | 关窗/托盘退出的行为声明与挂起应答 |
+| `ctx.shell.window.setExitPolicy/exitPolicy/planExit/resolve(caller, …)` | 宿主面 | 关窗/托盘退出的行为声明（链 + 优先级）、实时解析与挂起应答 |
 | `shell.toast` | 渲染面 | 单向通知（无按钮、无回调，点击聚焦主窗口） |
 | `shell.surface.present/hide/state` | 渲染面 | 立起/收起窗口；`state` 读当前可见面（球在主窗隐藏时出生，必须先读再画）；`present('main')` 是回退圆球唯一的动作 |
 | `shell.ball.state` / `shell.ball.dock` | 渲染面 | 读宿主聚合的球内容态与窗口贴边态；帧 `shell/ball-changed`、`shell/ball-dock-changed` 负责推送 |

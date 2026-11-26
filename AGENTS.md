@@ -104,6 +104,10 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   `Visualization`/`ChartFrame` 内。**没有 UI 插件时 kernel 引导页仍是
   最后恢复面；宿主安全模式（CLI `--safe-mode` / `Ctrl+Shift+F12`）位于
   UI 契约之外，custom 插件不能覆盖。**
+  区域插槽由**布局**渲染，`provides` 必须列全实际挂载的槽：基座回退布局
+  已渲染 `shell.titlebar`、`shell.titlebar.actions`、`shell.sidebar`、
+  `shell.statusbar`（后两者仅在有人贡献时占位）——只声明不渲染的槽会让
+  贡献静默消失。
 - **tool 层**：暂无规范缝，工具互不依赖（门禁强制）。暂无住户——场景私有
   逻辑收进套件（见 suite 层），不再拆跨包场景工具。
 - **suite 层**：单包单行、可双面（宿主面 + 渲染面）、单活（`snapRail.exclusive: 'suite'`
@@ -127,7 +131,10 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   `shell/surface-changed` 帧 + `shell.surface.present/hide` 自行编排，
   退出策略 `'ball'` 关窗收进球是底座唯一代办的配对）、贴边收起（拖动全程
   不出屏、四边贴边停泊、指针离开缩 2/3 留 1/3、悬停滑出，缩起态经
-  `shell/ball-dock-changed` 帧给插件）都是底座不变式；活动 layout/suite 可声明
+  `shell/ball-dock-changed` 帧给插件——1/3 的基准是**窗口**边，8px 余量在
+  窗内，外露球冠只有 `visiblePx − inset`（默认 35/112 ≈ 31%），故帧上同时
+  下发 `visiblePx`、`visibleOrbPx`、`orbRatio`；滑动期间 `revealing` 为真，
+  收起条上的指针经 `hovered` 上报）都是底座不变式；活动 layout/suite 可声明
   `WindowProfile`/`BallProfile`（尺寸/模式/停泊行为；尺寸无下限、上限有界
   ——窗口夹屏幕工作区、球 24–192），宿主校验夹取。**只有操作员在外观页显式
   固定（source `user`）会拒绝布局/插件请求**（`{applied:false, reason}` 正常
@@ -139,8 +146,13 @@ feed 工作流把 `SNAP_RAIL_EXTERNAL_REPOS` 扩到驱动仓（modbus/enip），
   **窗口必须方形、8px 余量固定、阴影必须画在余量内**（径向渐变衰减到零；
   `box-shadow` 会被窗口边界切成灰边；24 是余量不变式派生的技术下限）。
   退出策略是宿主面
-  的数据声明（`close/quit: 'ball'|'tray'|'quit'|'hold'`，最后声明且存活者
-  生效，fiber 回收即回退默认 quit）；`'hold'` 把请求挂起交回插件——确认框
+  的数据声明（`close`/`quit` 取 `'ball'|'tray'|'quit'|'hold'`，或**有序链**
+  `['ball','quit']`：按序取第一个当前可执行的处置——`ball` 要求球已启用、
+  `tray` 要求托盘图标在、`quit`/`hold` 恒可执行；链耗尽则不动作并留窗告警，
+  绝不把窗口藏到无处可回）。声明可带 `priority`（0–100，默认 0）：逐字段高者
+  胜、同优先级后声明者胜，fiber 回收即回退默认 quit；实时能力与解析结果经
+  `ctx.shell.capabilities()`、`ctx.shell.window.planExit(source)` 读取。
+  `'hold'` 把请求挂起交回插件——确认框
   **永远由插件的渲染面自己画**（底座不画任何 UI），经 `shell.exit.resolve`
   应答，10s 未应答按 `quit` 兜底。上限/节流单源在 `SHELL_LIMITS`，溢出回
   `{applied:false, reason}` 不抛。

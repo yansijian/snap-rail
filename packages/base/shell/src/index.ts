@@ -249,12 +249,90 @@ export type ShellExitDecision = (typeof EXIT_DECISIONS)[number]
 /** The decisions that act at once (`hold` defers instead). */
 export type ShellExitDisposition = Exclude<ShellExitDecision, 'hold'>
 
-/** The operator window's and the tray's exit behavior, as a plugin declares it. */
+/**
+ * One policy field's effective value: an ordered fallback chain, applied
+ * left-to-right with the first entry whose precondition holds. A lone
+ * decision is the one-entry case (`'tray'` ≡ `['tray']`), so a declaration
+ * written before chains existed keeps its meaning.
+ *
+ * The preconditions are live, not declared: `'ball'` needs the ball surface
+ * enabled (and its window presentable), `'tray'` needs a tray icon, `'quit'`
+ * and `'hold'` always hold. That is how "park behind the tray only while a
+ * ball is there" is expressed — `['ball', 'quit']` — instead of a plugin
+ * watching `shell/ball-profile-changed` and re-declaring.
+ */
+export type ShellExitChain = readonly ShellExitDecision[]
+
+/**
+ * The policy in force, per source. Not a snapshot of one request: the chain
+ * is what the operator configured, resolved against live capabilities each
+ * time a request arrives ({@link ShellWindowCapability.planExit} answers for
+ * "right now").
+ */
 export interface ShellExitPolicy {
   /** The operator window's close (X, Alt+F4, taskbar close, `window.control`). */
-  close: ShellExitDecision
+  close: ShellExitChain
   /** The tray menu's 退出 row. */
-  quit: ShellExitDecision
+  quit: ShellExitChain
+}
+
+/**
+ * A host-face plugin's declaration. Omitted fields keep the defaults
+ * (`quit`/`quit` — the behavior of a terminal with no scenario loaded).
+ */
+export interface ShellExitDeclaration {
+  /** What the operator window's close does; a bare decision means a one-step chain. */
+  close?: ShellExitDecision | ShellExitChain | undefined
+  /** What the tray's 退出 does. */
+  quit?: ShellExitDecision | ShellExitChain | undefined
+  /**
+   * Arbitration among live declarers (integer `0..100`, default `0`): the
+   * field is taken from the highest priority that declares it, ties go to the
+   * later declaration. A scenario owner (it decides how the whole station
+   * shuts down) declares high; a feature plugin that merely wants to keep the
+   * app resident declares low, and neither has to know about the other.
+   */
+  priority?: number | undefined
+}
+
+/**
+ * The live OS affordances an exit chain resolves against. Both are host
+ * facts, not declarations: the tray icon either exists or the notification
+ * area refused it, and the ball surface either is enabled or is not.
+ */
+export interface ShellCapabilities {
+  /** A tray icon exists; without it nothing can be parked "behind the tray". */
+  tray: boolean
+  /** The ball surface is enabled, so it can hold the app while the operator window is hidden. */
+  ball: boolean
+}
+
+/** One chain entry with its live precondition. */
+export interface ShellExitOption {
+  /** The decision this entry would apply. */
+  intent: ShellExitDecision
+  /** Whether the host can apply it right now. */
+  satisfiable: boolean
+  /** Why not, when it cannot (operator-facing diagnostic text). */
+  reason?: string | undefined
+}
+
+/**
+ * What the host would do if an exit request arrived now. Read-only
+ * introspection for plugins that need to explain or gate the behavior
+ * ("closing hides to the ball" vs "closing quits") — and the probe that made
+ * `tray`/`ball` dispositions honest: an unsatisfiable entry is skipped, never
+ * applied blind.
+ */
+export interface ShellExitPlan {
+  /** Which request this plan is for. */
+  source: ShellExitSource
+  /** The chain in force for that source, in declaration order. */
+  chain: ShellExitChain
+  /** Every entry with its live precondition, in chain order. */
+  options: readonly ShellExitOption[]
+  /** The entry that would be applied now; `undefined` when none is satisfiable. */
+  decision: ShellExitDecision | undefined
 }
 
 /** A held exit request, as the events carry it. */
@@ -265,15 +343,18 @@ export interface ShellExitRequest {
 
 /**
  * The operator window's exit policy: what closing it and quitting from the
- * tray do. The last live declaration wins; a declaring fiber's disposal
- * reverts its fields to the defaults (`quit`/`quit` — today's behavior), so a
- * disabled scenario can never leave a surprise behind.
+ * tray do. The highest-priority live declaration wins per field; a declaring
+ * fiber's disposal reverts its fields to the defaults (`quit`/`quit` —
+ * today's behavior), so a disabled scenario can never leave a surprise
+ * behind.
  */
 export interface ShellWindowCapability {
   /** Declare (part of) the policy; omitted fields keep the default. */
-  setExitPolicy(caller: Context, policy: Partial<ShellExitPolicy>): ShellResult
-  /** The policy in force right now. */
+  setExitPolicy(caller: Context, declaration: ShellExitDeclaration): ShellResult
+  /** The policy in force right now, as declared (chains, not a resolution). */
   exitPolicy(): Readonly<ShellExitPolicy>
+  /** Resolve a source's chain against the live capabilities. */
+  planExit(source: ShellExitSource): ShellExitPlan
   /** Answer a held exit request; `cancel` keeps everything as it was. */
   resolve(caller: Context, action: ShellExitAction): ShellResult
   /** The effective operator-window stage and where it came from. */
@@ -291,6 +372,11 @@ export interface ShellWindowCapability {
 export interface ShellService {
   /** Whether an OS integration is mounted at all (headless boots answer `false`). */
   readonly available: boolean
+  /**
+   * The live OS affordances: which non-quit dispositions can actually land.
+   * Read this instead of assuming a tray icon or a ball window exists.
+   */
+  capabilities(): ShellCapabilities
   /** Raise an actionable notification; the click arrives as a context event. */
   notify(caller: Context, input: ShellNotificationInput): ShellNotificationResult
   /** Tray menu contributions and their click return path. */

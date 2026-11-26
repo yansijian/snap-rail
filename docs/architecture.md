@@ -164,8 +164,13 @@ provider，消费方零改动。
 则坐标系动，靠事件反馈修位置会停摆抖动；`end` 后贴边结算一次落定。CSS
 app-region 在透明窗上命中不可靠，内核导出的 `attachBallDrag` 是标准画法）。
 落点距工作区边缘 ≤16px 即停泊（四边一律）；停泊后指针离开球满 600ms 即缩进
-边缘只留 1/3（`shell/ball-dock-changed` 推 `{edge, collapsed, visiblePx}`），
-悬停可见条即滑出；必须"先离开再进入"才再次滑出（防止缩起即弹出）。
+边缘只留 1/3 ——**这个 1/3 的基准是窗口边，不是球体**：8px 余量在窗内，所以
+外露的球冠只有 `visiblePx − inset`（默认 43−8＝35px，约球径的 31%）。
+`shell/ball-dock-changed` 因此同时推 `visiblePx`（窗口像素）、`visibleOrbPx`
+（球体像素）与 `orbRatio`，换算单源 `resolveBallDockGeometry`，面不必自己
+减余量；滑入/滑出动画期间 `revealing: true`（面保持收起形态，动画结束才切
+全量内容），收起条上的指针观测经 `hovered` 上报。悬停可见条即滑出；必须
+"先离开再进入"才再次滑出（防止缩起即弹出）。
 `ui.ball.collapse` 关闭时仍吸附停泊、永不缩起。决策数学单源 `shell/dock.ts`
 （纯函数、无 Electron、可测），动画与光标轮询是适配器的胶水。
 
@@ -175,13 +180,23 @@ CSS `box-shadow` 会被窗口边界硬切成灰边，因此阴影必须以径向
 绘制）。
 
 **退出策略**：关闭操作员窗口与托盘「退出」做什么，由宿主面插件以**数据**
-声明——`ctx.shell.window.setExitPolicy(caller, { close, quit })`，取值
-`'ball' | 'tray' | 'quit' | 'hold'`；最后声明且存活的插件生效，fiber 回收
-即回退默认 `quit/quit`（无插件声明 = 与历史行为完全一致）。`'hold'` 把请求
-挂起交回插件：Shell 冻结窗口、广播 `shell/exit-requested`（宿主事件 + 同名
-帧），插件用**自己的**渲染面弹确认框（底座从不画任何 UI），经
-`shell.exit.resolve` 应答 `ball/tray/quit/cancel`；超过 `SHELL_LIMITS.exitHoldMs`
-（10s）无人应答则按操作员原意 `quit` 兜底——渲染进程挂了也不能让应用关不掉。
+声明——`ctx.shell.window.setExitPolicy(caller, { close, quit, priority })`。
+每个字段可以是单个处置（`'ball' | 'tray' | 'quit' | 'hold'`），也可以是
+**有序链**（如 `['ball', 'tray', 'quit']`）：请求到达时按序取第一个
+**当前可执行**的处置——`'ball'` 要求球面已启用、`'tray'` 要求托盘图标在，
+`'quit'`/`'hold'` 恒可执行；链耗尽（全不可执行）则不动作、保留窗口并告警，
+绝不把窗口藏进一个不存在的图标后面。能力探测单源 `ctx.shell.capabilities()`
+与 `ctx.shell.window.planExit(source)`（逐项 `satisfiable` + `reason` +
+最终 `decision`），因此「有球才收起来」写成 `close: ['ball', 'quit']` 即可，
+不再需要插件监听 `shell/ball-profile-changed` 反复重声明。
+**仲裁**：声明可带 `priority`（0–100，默认 0）——逐字段取高优先级者，同
+优先级取后声明者，fiber 回收即回退默认 `quit/quit`（无插件声明 = 与历史
+行为一致）。`'hold'` 把请求挂起交回插件：Shell 冻结窗口、广播
+`shell/exit-requested`（宿主事件 + 同名帧），插件用**自己的**渲染面弹确认
+框（底座从不画任何 UI），经 `shell.exit.resolve` 应答 `ball/tray/quit/cancel`；
+超过 `SHELL_LIMITS.exitHoldMs`（10s）无人应答则按操作员原意 `quit` 兜底——
+渲染进程挂了也不能让应用关不掉。应答是操作员的明确表态：该处置执行不了时
+只告警留窗，不自作主张换成别的处置。
 
 **通知**：宿主面 `ctx.shell.notify(caller, input)`，上限单源在
 `SHELL_LIMITS`（标题 120 / 正文 512 / 动作标题 20 / 动作 id 64 / 一条最多 3
@@ -669,6 +684,12 @@ replace any UI surface, but the host recovery path (kernel bootstrap page,
 overridden.
 Malformed or undeclared slots produce a diagnostic and never become an
 implicit global vocabulary.
+A layout **renders** the slots it declares: `provides` is the promise, a mounted
+`Slot` is the outlet. The built-in fallback layout paints `shell.titlebar`,
+`shell.titlebar.actions`, `shell.sidebar`, `shell.statusbar` and
+`settings.entry` (the middle three only take space once something contributes),
+so a declared-but-unrendered slot — which would swallow contributions without a
+trace — is not one of the base's own.
 
 Independent plugin repositories use `@snap-rail/plugin-sdk` and the
 `snap-rail-plugin` CLI from public npm. Each generated repository contains its

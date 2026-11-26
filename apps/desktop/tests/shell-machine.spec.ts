@@ -1,19 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { SHELL_LIMITS } from '@snap-rail/shell'
+import { SHELL_LIMITS, type ShellCapabilities } from '@snap-rail/shell'
 import { createShellMachine } from '../src-host/main/shell/machine.ts'
 
 /**
  * The Shell adapter's rules, driven without a window: the tray contribution
  * caps and ownership model, the notification ledger (throttle, coalescing,
- * eviction), the ball state merge, and the exit policy fold with its hold
- * ledger. The Electron glue is deliberately out of scope — everything
- * decidable is decided here.
+ * eviction), the ball state merge, and the exit policy fold — priorities,
+ * fallback chains, and resolution against the live capabilities. The Electron
+ * glue is deliberately out of scope — everything decidable is decided here.
  */
 
-/** A machine with a controllable clock. */
-function machineAt(start = 1_000): { machine: ReturnType<typeof createShellMachine>, advance: (ms: number) => void } {
+/** A machine with a controllable clock and, optionally, live capabilities. */
+function machineAt(
+  start = 1_000,
+  capabilities?: () => ShellCapabilities,
+): { machine: ReturnType<typeof createShellMachine>, advance: (ms: number) => void } {
   let clock = start
-  const machine = createShellMachine({ now: () => clock })
+  const machine = createShellMachine({
+    now: () => clock,
+    ...capabilities !== undefined ? { capabilities } : {},
+  })
   return { machine, advance: (ms: number) => { clock += ms } }
 }
 
@@ -170,42 +176,111 @@ describe('ball state', () => {
 })
 
 describe('exit policy', () => {
-  it('defaults to quit for both sources — the pre-policy behavior', () => {
+  it('defaults to a one-step quit chain for both sources — the pre-policy behavior', () => {
     const { machine } = machineAt()
-    expect(machine.exitPolicy()).toEqual({ close: 'quit', quit: 'quit' })
-    expect(machine.exitDecision('window')).toBe('quit')
-    expect(machine.exitDecision('tray')).toBe('quit')
+    expect(machine.exitPolicy()).toEqual({ close: ['quit'], quit: ['quit'] })
+    expect(machine.planExit('window')).toEqual({
+      source: 'window',
+      chain: ['quit'],
+      options: [{ intent: 'quit', satisfiable: true }],
+      decision: 'quit',
+    })
+    expect(machine.planExit('tray').decision).toBe('quit')
   })
 
-  it('accepts a partial declaration and folds the rest from the defaults', () => {
+  it('normalizes a bare decision into a one-entry chain', () => {
     const { machine } = machineAt()
     expect(machine.setExitPolicy('suite', { close: 'ball' })).toEqual({ applied: true })
-    expect(machine.exitPolicy()).toEqual({ close: 'ball', quit: 'quit' })
+    expect(machine.exitPolicy()).toEqual({ close: ['ball'], quit: ['quit'] })
   })
 
-  it('lets the newest declaration win, per field, across plugins', () => {
+  it('keeps a declared chain in order, per field', () => {
     const { machine } = machineAt()
-    machine.setExitPolicy('suite-a', { close: 'ball', quit: 'hold' })
-    machine.setExitPolicy('suite-b', { close: 'tray' })
-    expect(machine.exitPolicy()).toEqual({ close: 'tray', quit: 'hold' })
-    // A re-declaration replaces its author's whole patch and moves to the
-    // back of the line: the suite always declares the pair it means.
-    machine.setExitPolicy('suite-a', { close: 'quit' })
-    expect(machine.exitPolicy()).toEqual({ close: 'quit', quit: 'quit' })
+    machine.setExitPolicy('suite', { close: ['ball', 'tray', 'quit'], quit: ['tray', 'quit'] })
+    expect(machine.exitPolicy()).toEqual({ close: ['ball', 'tray', 'quit'], quit: ['tray', 'quit'] })
   })
 
-  it('reverts the fields of a plugin whose fiber goes away', () => {
+  it('arbitrates by priority, and by declaration order only on a tie', () => {
     const { machine } = machineAt()
-    machine.setExitPolicy('suite', { close: 'ball', quit: 'hold' })
-    machine.removeExitPolicyOwner('suite')
-    expect(machine.exitPolicy()).toEqual({ close: 'quit', quit: 'quit' })
+    // The scenario owner decides how the station shuts down.
+    machine.setExitPolicy('session', { close: 'hold', priority: 50 })
+    // A feature plugin wants the app to stay resident: lower priority loses.
+    machine.setExitPolicy('feature', { close: ['ball', 'quit'] })
+    expect(machine.exitPolicy().close).toEqual(['hold'])
+    // Same priority: the later declaration wins the tie.
+    machine.setExitPolicy('feature', { close: ['ball', 'quit'], priority: 50 })
+    expect(machine.exitPolicy().close).toEqual(['ball', 'quit'])
+    // A re-declaration counts as the newest one again.
+    machine.setExitPolicy('session', { close: 'hold', priority: 50 })
+    expect(machine.exitPolicy().close).toEqual(['hold'])
+    // The fields fold independently.
+    machine.setExitPolicy('session', { quit: ['tray', 'quit'], priority: 50 })
+    expect(machine.exitPolicy().quit).toEqual(['tray', 'quit'])
   })
 
-  it('refuses unknown decisions and an empty declaration', () => {
+  it('reverts a plugin\'s fields when its fiber goes away, keeping the rest', () => {
     const { machine } = machineAt()
-    expect(machine.setExitPolicy('suite', { close: 'explode' as never })).toMatchObject({ applied: false, reason: 'limit-reached' })
+    machine.setExitPolicy('session', { close: ['ball', 'quit'], quit: 'hold', priority: 50 })
+    machine.setExitPolicy('feature', { close: 'tray' })
+    machine.removeExitPolicyOwner('session')
+    expect(machine.exitPolicy()).toEqual({ close: ['tray'], quit: ['quit'] })
+  })
+
+  it('refuses unknown decisions, empty chains, and out-of-range priorities', () => {
+    const { machine } = machineAt()
+    expect(machine.setExitPolicy('suite', { close: 'explode' as never }))
+      .toMatchObject({ applied: false, reason: 'limit-reached' })
+    expect(machine.setExitPolicy('suite', { close: ['ball', 'explode'] as never }))
+      .toMatchObject({ applied: false, reason: 'limit-reached' })
+    expect(machine.setExitPolicy('suite', { close: [] }))
+      .toMatchObject({ applied: false, reason: 'limit-reached' })
     expect(machine.setExitPolicy('suite', {})).toMatchObject({ applied: false, reason: 'limit-reached' })
-    expect(machine.exitPolicy()).toEqual({ close: 'quit', quit: 'quit' })
+    expect(machine.setExitPolicy('suite', { close: 'quit', priority: 101 }))
+      .toMatchObject({ applied: false, reason: 'limit-reached' })
+    expect(machine.setExitPolicy('suite', { close: 'quit', priority: 1.5 }))
+      .toMatchObject({ applied: false, reason: 'limit-reached' })
+    expect(machine.exitPolicy()).toEqual({ close: ['quit'], quit: ['quit'] })
+  })
+})
+
+describe('exit chain resolution', () => {
+  it('skips dispositions whose affordance is missing and reports why', () => {
+    const { machine } = machineAt(1_000, () => ({ tray: false, ball: false }))
+    machine.setExitPolicy('suite', { close: ['tray', 'ball', 'quit'] })
+    const plan = machine.planExit('window')
+    expect(plan.chain).toEqual(['tray', 'ball', 'quit'])
+    expect(plan.options).toEqual([
+      { intent: 'tray', satisfiable: false, reason: '托盘图标不可用' },
+      { intent: 'ball', satisfiable: false, reason: '悬浮球未启用' },
+      { intent: 'quit', satisfiable: true },
+    ])
+    expect(plan.decision).toBe('quit')
+  })
+
+  it('falls back to hold when nothing can park the window', () => {
+    const { machine } = machineAt(1_000, () => ({ tray: false, ball: true }))
+    machine.setExitPolicy('suite', { close: ['tray', 'hold'] })
+    expect(machine.planExit('window').decision).toBe('hold')
+  })
+
+  it('reports no decision when every entry is unsatisfiable', () => {
+    const { machine } = machineAt(1_000, () => ({ tray: false, ball: false }))
+    machine.setExitPolicy('suite', { close: ['ball', 'tray'] })
+    expect(machine.planExit('window').decision).toBeUndefined()
+  })
+
+  it('resolves each source against its own field and the current capabilities', () => {
+    let live: ShellCapabilities = { tray: true, ball: true }
+    const { machine } = machineAt(1_000, () => live)
+    machine.setExitPolicy('suite', { close: ['ball', 'tray', 'quit'], quit: ['tray', 'quit'] })
+    expect(machine.planExit('window').decision).toBe('ball')
+    expect(machine.planExit('tray').decision).toBe('tray')
+    // The ball vanishing re-resolves the same chain without a re-declaration.
+    live = { tray: true, ball: false }
+    expect(machine.planExit('window').decision).toBe('tray')
+    live = { tray: false, ball: false }
+    expect(machine.planExit('window').decision).toBe('quit')
+    expect(machine.planExit('tray').decision).toBe('quit')
   })
 })
 

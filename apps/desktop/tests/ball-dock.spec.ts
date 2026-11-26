@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BALL_SURFACE } from '@snap-rail/shell'
+import { BALL_SURFACE, resolveBallDockGeometry, resolveBallProfile } from '@snap-rail/shell'
 import {
   DOCK_SNAP_PX,
   DOCK_TUCK_DELAY_MS,
@@ -34,6 +34,14 @@ function at(x: number, y: number): Point {
 describe('visible strip', () => {
   it('keeps a third of the window on screen', () => {
     expect(visiblePxOf(SIZE)).toBe(43)
+  })
+
+  it('agrees with the contract geometry (window pixels, orb pixels)', () => {
+    // The docking math and the wire state must not disagree about the strip:
+    // 43 window px, of which 35 are orb (the 8px rim is inside the window).
+    const geometry = resolveBallDockGeometry(resolveBallProfile())
+    expect(visiblePxOf(SIZE)).toBe(geometry.visiblePx)
+    expect(visiblePxOf(SIZE, BALL_SURFACE.dockVisibleRatio)).toBe(geometry.visiblePx)
   })
 
   it('tells the vertical edges from the horizontal ones', () => {

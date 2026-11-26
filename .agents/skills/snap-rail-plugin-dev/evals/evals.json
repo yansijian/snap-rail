@@ -84,12 +84,12 @@
       "id": 4,
       "name": "builtin-ui-settings-page-and-overlay",
       "status": "draft",
-      "note": "内置 UI 基座时代（2026-10-25 起）。补跑后把 result 改成实际断言结果。",
+      "note": "内置 UI 基座时代（2026-10-25 起）。补跑后把 result 改成实际断言结果。2026-11-26 注：`shell.statusbar` 此前在内置回退布局里只声明不渲染（贡献静默消失），ui 0.4.2 起回退布局真正渲染 titlebar/titlebarActions/sidebar/statusbar——插件侧（init/build/doctor/pack）可用已发布的 ui 0.4.1 验证，状态栏可见性要等 0.4.2 进终端。",
       "prompt": "给 snap-rail 做一个独立插件：一个主页面 + 一个设置页（设置页里改一个阈值并即时生效），再往状态栏挂一个时钟、往全局叠层挂一个退出确认框。用独立插件仓，build/doctor 通过后签名打包。",
-      "expected_output": "ui-view 模板（同一个包可同时注册 pages 与 settings）；渲染面 import type {} from '@snap-rail/ui/runtime' 引入 ctx.client 增强；overlay 用 ctx.ui.contribute(ctx, UI_SLOT_IDS.overlay, { id, order, render }) 而不是注册高 order 布局；状态栏用 shell.statusbar；@snap-rail/ui 只在 devDependencies、不写 externalSeeds/requires；包名用自己的 scope；doctor/build/pack 绿",
+      "expected_output": "ui-view 模板（同一个包可同时注册 pages 与 settings）；渲染面 import type {} from '@snap-rail/ui/runtime' 引入 ctx.client 增强；overlay 用 ctx.ui.contribute(ctx, UI_SLOT_IDS.overlay, { id, order, render }) 而不是注册高 order 布局；状态栏用 shell.statusbar（并知道它由布局渲染——基座回退布局 ui ≥ 0.4.2 才画）；@snap-rail/ui 只在 devDependencies、不写 externalSeeds/requires；包名用自己的 scope；doctor/build/pack 绿",
       "files": [],
       "assertions": [],
-      "result": "待实测：本计划更新 skill 后补跑"
+      "result": "待实测：本计划更新 skill 后补跑（状态栏可见性依赖 ui 0.4.2 进入终端）"
     },
     {
       "id": 5,

@@ -4,9 +4,12 @@
  * is over, so the ball never leaves the screen); when a drag settles near a
  * work-area edge the ball **parks** there, flush with the edge. Once the
  * pointer leaves a parked ball it tucks itself into the edge until only
- * {@link BALL_SURFACE.dockVisibleRatio} of the window remains on screen (the
- * familiar floating-ball sliver) — on every edge alike; hovering the visible
- * strip slides it back out.
+ * {@link BALL_SURFACE.dockVisibleRatio} of the **window** remains on screen
+ * (the familiar floating-ball sliver) — on every edge alike; hovering the
+ * visible strip slides it back out. That ratio is a share of the window edge,
+ * not of the orb: the 8px paint rim is inside the window, so only
+ * `visiblePx − inset` of the orb is actually on screen
+ * ({@link resolveBallDockGeometry} is the contract-side conversion).
  *
  * Reveal and tuck are decided by a tiny cursor-driven machine
  * ({@link tickTuck}): hovering the visible strip slides the ball out; the
@@ -17,7 +20,7 @@
  * @module @snap-rail/desktop/main/shell/dock
  */
 
-import { BALL_SURFACE, type BallDockEdge } from '@snap-rail/shell'
+import { BALL_SURFACE, dockVisiblePx, type BallDockEdge } from '@snap-rail/shell'
 
 /** A point in screen coordinates. */
 export interface Point {
@@ -51,9 +54,16 @@ export const DOCK_SNAP_PX = 16
 /** How long the pointer must stay away from a revealed, parked ball before it tucks back in. */
 export const DOCK_TUCK_DELAY_MS = 600
 
-/** Pixels of the ball window that stay inside the work area while parked. */
+/**
+ * Pixels of the ball window that stay inside the work area while parked — a
+ * share of the **window** edge (see {@link BALL_SURFACE.dockVisibleRatio}),
+ * computed with the contract's {@link dockVisiblePx}.
+ *
+ * @param size - the ball window's size.
+ * @param ratio - the share of the window edge kept on screen.
+ */
 export function visiblePxOf(size: Size, ratio: number = BALL_SURFACE.dockVisibleRatio): number {
-  return Math.max(1, Math.round(Math.min(size.width, size.height) * ratio))
+  return dockVisiblePx(Math.min(size.width, size.height), ratio)
 }
 
 /**
@@ -175,7 +185,8 @@ export interface TickVerdict {
   action?: 'reveal' | 'tuck'
 }
 
-function insideRect(point: Point, rect: Rect): boolean {
+/** Whether a point lies inside a rectangle (half-open, so adjacent rects never overlap). */
+export function insideRect(point: Point, rect: Rect): boolean {
   return point.x >= rect.x && point.x < rect.x + rect.width && point.y >= rect.y && point.y < rect.y + rect.height
 }
 
