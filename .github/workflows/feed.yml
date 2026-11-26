@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy-retry.outputs.page_url }}
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -140,7 +140,19 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: website/dist
+      # deploy-pages 读产物的通道（Actions results 服务）是最终一致的：刚上传
+      # 完的 "github-pages" 可能还列不出来，报「Found 0 artifact(s)」，而 artifact
+      # 其实就在这次 run 里（run 102/104 即如此：API 能查到 257 KB 的产物，
+      # 部署却看不到）。一次短暂等待后的重试能吸收这种抖动；两次都失败仍让
+      # 作业红，不掩盖真故障。
       - id: deploy
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: settle before retrying the Pages deploy
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 20
+      - id: deploy-retry
+        if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
 
       # 国内 OSS 镜像（docs/deploy.md「云基址」）：滚动源资产 → <bucket>/feed/，

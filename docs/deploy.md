@@ -135,7 +135,9 @@ pnpm run site:build
 - GitHub Pages 由 `feed.yml` 在每次滚动发布后自动部署（artifact =
   `website/dist`，feed 作业内以 GitHub 基址构建），作为公网镜像；对内
   部署用 `site:build`（feed-base 基址）+ `site:sync-oss` 传 OSS 桶根
-  （资源路径全是相对路径，任意静态托管可用）；
+  （资源路径全是相对路径，任意静态托管可用）。`deploy-pages` 读产物的
+  通道是最终一致的（刚上传完可能列不出来 → 「Found 0 artifact(s)」），
+  工作流因此在失败后等待 20s 重试一次；两次都失败仍判红；
 - 页面上的插件卡片下载 `FEED_BASE + <zip 文件名>`，组合卡片下载
   `FEED_BASE + <id>.zip`——官网只做下载入口，不代理安装；
 - `pnpm run verify:website` 是站点门禁（五页、CTA、dev 导航、生成文档
